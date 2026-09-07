@@ -1,5 +1,6 @@
 export {
   type BusEnvelope,
+  type ContextInjection,
   type EngineEventType,
   type EnginePayloads,
   engineEventTypes,
@@ -7,6 +8,7 @@ export {
   type MessagePart,
   type PermissionDecision,
   type QueuedPrompt,
+  type Replayable,
   type SpillReference,
   type ToolCallPart,
   type TurnDelta,

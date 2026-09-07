@@ -1,0 +1,53 @@
+{
+  "id": "s1",
+  "title": "(untitled session)",
+  "createdAt": "2026-09-07T12:00:00.000Z",
+  "lastActivityAt": "2026-09-07T12:00:00.000Z",
+  "messageCount": 4,
+  "cwd": "<cwd>",
+  "live": true,
+  "messages": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "run echo served"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-call",
+          "callId": "c1",
+          "name": "bash",
+          "arguments": {
+            "command": "echo served"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "parts": [
+        {
+          "type": "tool-result",
+          "callId": "c1",
+          "output": "served",
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "It printed served."
+        }
+      ]
+    }
+  ]
+}

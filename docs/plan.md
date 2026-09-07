@@ -95,6 +95,46 @@ The wire, mirrored and proven, before a single pixel.
 Needs **S0** for ephemeral ports and per-workspace tickets; until it lands the app uses
 `--port` with a probe for a free port and the user's ticket file.
 
+### M1 ledger (landed 2026-09-07, wave 1)
+
+**What landed.** `packages/protocol` mirrors the fifteen-event vocabulary, the route ids, and
+the session shapes; a checked-in copy of keywork's `docs/events.md` is read by a test that
+fails when the two disagree. `packages/client` holds the SSE frame reader (comments kept, so
+`: connected` and the ring-gap notice become typed `StreamNotice`s), the typed client over
+every route plus `/doc`, the resuming event iterator (Last-Event-ID carried across drops,
+250 ms doubling to 5 s, abortable, 401 refused rather than retried), and the projection:
+a pure reducer from envelopes to a transcript (user, assistant, thinking, tool, notice
+entries), the live turn, the queue, gate decisions, preset, mode, injections, diagnostics,
+and a usage ledger that counts unpriced turns so a total can be honest. Tool durations come
+from envelope timestamps, never a local clock. `coalesceEnvelopes` merges text deltas and
+tool output per frame and is proven equivalent to reducing one by one. `historyEnvelopes`
+turns `GET /sessions/{id}` into replay-flagged envelopes, and a test proves the replayed
+transcript equals the live one. `scripts/fixtures/record.ts` drives keywork's real
+`fileSessionHost` and server package (loaded by path from the keywork checkout, never
+imported by the app) through six scenarios with a stepping clock and normalized ids, so
+every fixture is byte-stable across runs. `scripts/check-contract.ts` compares the
+protocol's route ids with the recorded `/doc` or a live server.
+
+**Evidence.** 53 tests: SSE framing across chunk boundaries, every client route and refusal,
+resume and backoff, projection semantics by hand and against the six recorded fixtures,
+coalescing equivalence on every fixture, the raw SSE capture parsing to the jsonl fixture,
+stored history replaying to the live transcript, and the contract check.
+
+**Findings from the real wire, for keywork.**
+- `docs/events.md` says a refused tool never fires `tool.started`. The server fires
+  `tool.started`, then `gate.permission{denied}`, then `tool.finished{isError}`. The
+  projection follows the wire; the doc or the engine should be corrected.
+- A tool-using turn carries two `done` deltas: a zero-usage one after the tool call and the
+  priced one after the final text. Only `turn.completed` is counted.
+- `GET /sessions/{id}` on a live session reports the title as `(untitled session)` while
+  `GET /sessions` already shows the titled summary for the same session.
+- Session timestamps are wall clock rather than the event log's clock, so the recorder
+  normalizes them.
+
+**Left for M2.** The app-side server feed multiplexing one stream across panes lands with
+the first pane; the recorder gains a `--live` mode against a real `keywork serve` once a
+provider is configured for CI.
+
 ## M2: The front door (14pt)
 
 `keywork attach` parity in a native window: open a folder, the server starts, a conversation

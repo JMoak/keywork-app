@@ -6,6 +6,8 @@
       "name": "keywork-app-monorepo",
       "devDependencies": {
         "@biomejs/biome": "2.5.12",
+        "@keywork-app/client": "workspace:*",
+        "@keywork-app/protocol": "workspace:*",
         "@types/bun": "1.3.14",
         "@types/node": "24.10.1",
         "happy-dom": "20.14.0",

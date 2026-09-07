@@ -1,0 +1,12 @@
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"run echo served"}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"tool-call","call":{"type":"tool-call","callId":"c1","name":"bash","arguments":{"command":"echo served"}}}}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":0,"outputTokens":0}}}}
+{"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"tool.started","payload":{"call":{"type":"tool-call","callId":"c1","name":"bash","arguments":{"command":"echo served"}}}}
+{"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"gate.permission","payload":{"decision":{"tool":"bash","callId":"c1","verdict":"granted","gate":"policy"}}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"served\n","callId":"c1"}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"\n","callId":"c1"}}
+{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"\n","callId":"c1"}}
+{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"tool.finished","payload":{"callId":"c1","output":"served","isError":false}}
+{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"It printed served."}}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"It printed served."}]},"usage":{"inputTokens":12,"outputTokens":5}}}

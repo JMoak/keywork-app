@@ -1,0 +1,11 @@
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"first"}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"First answer, "}}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"queue.changed","payload":{"queued":[{"id":"q1","text":"second","behavior":"queue"}]}}
+{"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"finished."}}}
+{"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"First answer, finished."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"queue.changed","payload":{"queued":[]}}
+{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"turn.started","payload":{"userText":"second"}}
+{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Second answer."}}}
+{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Second answer."}]},"usage":{"inputTokens":12,"outputTokens":5}}}

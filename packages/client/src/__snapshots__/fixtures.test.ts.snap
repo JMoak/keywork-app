@@ -1,0 +1,316 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > denied 1`] = `
+{
+  "decisions": {
+    "c1": {
+      "callId": "c1",
+      "gate": "headless",
+      "tool": "bash",
+      "verdict": "denied",
+    },
+  },
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "run echo served",
+    },
+    {
+      "kind": "tool",
+      "run": {
+        "args": "{"command":"echo served"}",
+        "callId": "c1",
+        "decision": {
+          "callId": "c1",
+          "gate": "headless",
+          "tool": "bash",
+          "verdict": "denied",
+        },
+        "detail": [
+          "not approved: this run has no one to ask, so the call was refused",
+        ],
+        "durationMs": undefined,
+        "live": undefined,
+        "name": "bash",
+        "outputChars": 65,
+        "phase": "refused",
+        "reason": "no one to ask",
+        "replay": false,
+        "spill": undefined,
+        "startedAt": "2026-09-07T12:00:01.000Z",
+        "subject": "echo served",
+      },
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "I could not run it.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 9,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > interrupt 1`] = `
+{
+  "decisions": {},
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "wait forever",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "Working on it",
+    },
+    {
+      "kind": "notice",
+      "level": "info",
+      "text": "· interrupted",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 3,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "turns": 0,
+    "unpricedTurns": 0,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > plain 1`] = `
+{
+  "decisions": {},
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "say hello",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "Hello from keywork.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 4,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > queued 1`] = `
+{
+  "decisions": {},
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "first",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "First answer, finished.",
+    },
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "second",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "Second answer.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 11,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 24,
+    "outputTokens": 10,
+    "turns": 2,
+    "unpricedTurns": 2,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > thinking 1`] = `
+{
+  "decisions": {},
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "what changed?",
+    },
+    {
+      "kind": "thinking",
+      "replay": false,
+      "text": "Two files changed; the second one matters.",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "The change is in \`layout.ts\`.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 7,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > tool 1`] = `
+{
+  "decisions": {
+    "c1": {
+      "callId": "c1",
+      "gate": "policy",
+      "tool": "bash",
+      "verdict": "granted",
+    },
+  },
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "run echo served",
+    },
+    {
+      "kind": "tool",
+      "run": {
+        "args": "{"command":"echo served"}",
+        "callId": "c1",
+        "decision": {
+          "callId": "c1",
+          "gate": "policy",
+          "tool": "bash",
+          "verdict": "granted",
+        },
+        "detail": [
+          "served",
+        ],
+        "durationMs": 1250,
+        "live": undefined,
+        "name": "bash",
+        "outputChars": 6,
+        "phase": "done",
+        "reason": undefined,
+        "replay": false,
+        "spill": undefined,
+        "startedAt": "2026-09-07T12:00:01.000Z",
+        "subject": "echo served",
+      },
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "It printed served.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 12,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;

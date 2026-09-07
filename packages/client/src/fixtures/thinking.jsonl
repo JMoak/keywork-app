@@ -1,0 +1,7 @@
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"what changed?"}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"visible-thinking","text":"Two files changed; "}}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"visible-thinking","text":"the second one matters."}}}
+{"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"The change is in "}}}
+{"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"`layout.ts`."}}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"visible-thinking","text":"Two files changed; the second one matters."},{"type":"text","text":"The change is in `layout.ts`."}]},"usage":{"inputTokens":12,"outputTokens":5}}}

@@ -58,6 +58,7 @@ export type TurnDelta =
   | { type: "done"; usage: Usage };
 
 export interface ToolCallPart {
+  type: "tool-call";
   callId: string;
   name: string;
   arguments: Record<string, unknown>;
@@ -65,7 +66,7 @@ export interface ToolCallPart {
 
 export interface Message {
   role: "user" | "assistant" | "tool";
-  parts: MessagePart[];
+  parts: readonly MessagePart[];
 }
 
 export type MessagePart =

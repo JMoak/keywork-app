@@ -60,6 +60,11 @@ keywork-app/
 `protocol` and `client` have no DOM dependency and run under plain Vitest; `ui` runs under
 `happy-dom`; `desktop` builds with electron-builder and is exercised by Playwright.
 
+`scripts/fixtures/record.ts` is the one place keywork's source is executed from this repo: it
+loads the keywork checkout by file path (`KEYWORK_REPO`, default `../keywork`) and drives the
+real server package with a mock provider to record `packages/client/src/fixtures/`. Nothing
+under `packages/` imports keywork; the guardrail check keeps it that way.
+
 ## What the server must grow
 
 The app is only as capable as `keywork serve`. Today the server exposes sessions (list,

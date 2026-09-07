@@ -7,5 +7,6 @@
     "resolveJsonModule": true
   },
   "include": ["**/*.ts", "*.json"],
-  "exclude": ["dist"]
+  "exclude": ["dist"],
+  "references": [{ "path": "../packages/protocol" }, { "path": "../packages/client" }]
 }

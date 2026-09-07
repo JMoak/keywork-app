@@ -1,6 +1,15 @@
 {
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["packages/**", "scripts/**", "*.json", "!!.claude"] },
+  "files": {
+    "includes": [
+      "packages/**",
+      "scripts/**",
+      "*.json",
+      "!!.claude",
+      "!packages/client/src/fixtures",
+      "!packages/client/src/__snapshots__"
+    ]
+  },
   "formatter": { "indentStyle": "space", "lineEnding": "lf", "lineWidth": 100 },
   "linter": { "rules": { "preset": "recommended" } }
 }
