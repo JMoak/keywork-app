@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/protocol" },
+    { "path": "packages/client" },
+    { "path": "packages/ui" },
+    { "path": "packages/desktop" },
+    { "path": "scripts" }
+  ]
+}

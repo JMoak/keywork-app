@@ -1,0 +1,19 @@
+appId: dev.keywork.app
+productName: keywork
+directories:
+  output: release
+files:
+  - out/**
+extraResources:
+  - from: sidecar
+    to: sidecar
+    filter:
+      - "**/*"
+win:
+  target: nsis
+mac:
+  target: dmg
+linux:
+  target:
+    - AppImage
+    - deb

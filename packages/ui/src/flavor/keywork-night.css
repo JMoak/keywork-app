@@ -1,0 +1,23 @@
+:root {
+  --kw-background: #1a1b26;
+  --kw-panel: #1f2335;
+  --kw-panel-lift: #24283b;
+  --kw-text: #c0caf5;
+  --kw-text-mid: #828bb8;
+  --kw-text-dim: #565f89;
+  --kw-border: #3b4261;
+  --kw-border-focus: #bb9af7;
+  --kw-accent: #bb9af7;
+  --kw-accent-soft: #9d7cd8;
+  --kw-success: #9ece6a;
+  --kw-error: #f7768e;
+  --kw-ramp-1: #bb9af7;
+  --kw-ramp-2: #7aa2f7;
+  --kw-ramp-3: #7dcfff;
+  --kw-density-light: var(--kw-text-dim);
+  --kw-density-medium: var(--kw-text-mid);
+  --kw-density-heavy: var(--kw-text);
+  --kw-density-full: var(--kw-accent);
+  --kw-font-mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --kw-font-prose: "Newsreader", "Source Serif 4", Georgia, "Times New Roman", serif;
+}

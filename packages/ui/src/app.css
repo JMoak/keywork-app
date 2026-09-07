@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "./flavor/keywork-night.css";
+
+:root {
+  color-scheme: dark;
+  font-family: var(--kw-font-mono);
+  font-size: 14px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.kw-ground {
+  display: grid;
+  place-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  background: var(--kw-background);
+  color: var(--kw-text);
+}
+
+.kw-masthead {
+  margin: 0;
+  color: var(--kw-accent);
+  letter-spacing: 0.08em;
+}
+
+.kw-dim {
+  margin: 0;
+  color: var(--kw-text-dim);
+}

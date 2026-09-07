@@ -1,0 +1,26 @@
+{
+  "everywhere": [
+    {
+      "name": "anthropic subscription oauth",
+      "pattern": "claude\\.ai/oauth|console\\.anthropic\\.com/oauth|anthropic[-_ ]?oauth|oauth[-_ ]?anthropic|claude[-_ ]?(pro|max)[-_ ]?(login|auth|oauth)",
+      "flags": "i"
+    },
+    {
+      "name": "claude code client impersonation",
+      "pattern": "user-agent[\"'\\s:=]+[\"']?claude-code|anthropic-beta[\"'\\s:=]+[\"']?oauth",
+      "flags": "i"
+    }
+  ],
+  "codeOnly": [
+    {
+      "name": "engine import (the app is a client, keywork D7)",
+      "pattern": "from\\s+[\"']@keywork/(engine|tui|cli)(/|[\"'])",
+      "flags": ""
+    },
+    {
+      "name": "anthropic api key handled in the app",
+      "pattern": "x-api-key|ANTHROPIC_API_KEY|sk-ant-",
+      "flags": ""
+    }
+  ]
+}
