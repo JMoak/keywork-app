@@ -180,6 +180,51 @@ streams. This is the milestone that proves the architecture and is the first dem
 
 Needs **S0**. Asks still answer no here, shown honestly as keywork attach does.
 
+### M2 ledger, wave 2 (landed 2026-09-07, two parallel lanes)
+
+**The page (lane A, `packages/ui`).** `src/flavor/`: keywork's flavor schema and APCA
+validator mirrored with the same floors and the same failure message; `keywork-night` from
+keywork's exact values and a designed `keywork-day`; tokens mapped to `--kw-*` variables;
+the default stylesheet generated from the same values and byte-checked by a test.
+`src/page/`: the conversation pane with the density rail (`█ ▓ ░` voice stamps, the agent
+stamp stepping through density tokens while streaming), serif prose at a 72ch measure at
+broadsheet, mono machine output full bleed, container-query width tiers (800 / 560 / 320
+px), thinking folded to a one-line count, the tool row from `toolRowSpans` with the outcome
+as the only colored word and detail under a faint rule, an own markdown renderer over
+`marked`'s lexer that never touches innerHTML. `src/composer/`: Enter steers, Alt+Enter
+queues, Shift+Enter newline, Esc interrupts, paste never submits. `src/dev/`: the review
+page at `/?dev` replaying the six recorded fixtures plus a prose scenario with scenario,
+flavor, and width pickers. Verified by Electron captures of plain, tool, prose in
+keywork-day, and denied at clipping width (`artifacts/shots/`, untracked).
+
+**The host (lane B, `packages/client` and `packages/desktop`).** `client/src/feed.ts`: one
+`/events` stream per server multiplexed to subscribers, batched per frame, notices and
+terminal loss surfaced. `desktop/src/main/serve-process.ts`: sidecar supervision pure over
+seams: free-port probe, ticket from stdout, `/doc` health check, exact version pin,
+restart with the client's backoff curve, exit classes mapped (usage, unresolved with
+`nextAction`, port in use, failed), tree kill via `taskkill /T /F` on Windows and
+SIGTERM then SIGKILL elsewhere. `workspace.ts`: attach-first through keywork's ticket
+file, spawn only when absent or dead, PATH `keywork` only on a version match else the
+bundled sidecar, only app-started servers stopped on close. `recents.ts`: zod-validated,
+atomic. HostPort grown (pickFolder, recentWorkspaces, openWorkspace with typed failures,
+closeWorkspace, onServerLost, openExternal, notify) with the Electron preload and handlers
+behind it, `electron` imports confined to three files.
+
+**Evidence.** 115 tests across 22 files; check rail green. One cross-lane defect found by
+looking at the capture and fixed: below the column tier the tool row hid every meta span,
+so the separator and the refusal reason vanished; spans now carry a `part`, and only
+`facts` (duration, size, elision) yield to narrow widths.
+
+**Decisions Jordan may reverse.** Voice stamps are literal block glyphs in mono; the
+streaming animation steps the stamp's color through density tokens; the measure applies at
+broadsheet only; `keywork-day`'s palette is a first design; links allow http(s), mailto,
+and anchors only; the version check is exact on `0.0.1`; a dead or corrupt ticket counts
+as absent; unresolved inference is read from stderr's first line.
+
+**Left for rung 2 and 3.** Wiring the feed and projection into the app shell against a
+live server (sessions list, composer intents to routes, status line), then the workspace
+open flow in the window.
+
 ## M3: The workspace (16pt)
 
 The tiler, the keyboard, and the trust ladder. After M3 the app is a daily driver for

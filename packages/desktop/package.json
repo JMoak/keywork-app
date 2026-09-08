@@ -10,7 +10,10 @@
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
-    "@keywork-app/ui": "workspace:*"
+    "@keywork-app/client": "workspace:*",
+    "@keywork-app/protocol": "workspace:*",
+    "@keywork-app/ui": "workspace:*",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

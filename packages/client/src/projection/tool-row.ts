@@ -2,33 +2,36 @@ import type { ToolRun } from "./types.ts";
 
 export type SpanTone = "body" | "meta" | "ok" | "bad";
 
+export type SpanPart = "head" | "live" | "facts" | "separator" | "outcome" | "reason";
+
 export interface RowSpan {
   text: string;
   tone: SpanTone;
+  part: SpanPart;
 }
 
 export function toolRowSpans(run: ToolRun): RowSpan[] {
-  const head = run.subject === "" ? run.name : `${run.name} ${run.subject}`;
-  if (run.phase === "proposed") return [{ text: head, tone: "body" }, meta(" · proposed")];
-  if (run.phase === "running") {
-    return [{ text: head, tone: "body" }, meta(` · ${run.live ?? "running"}`)];
-  }
+  const head: RowSpan = { text: headText(run), tone: "body", part: "head" };
+  if (run.phase === "proposed") return [head, span(" · proposed", "meta", "live")];
+  if (run.phase === "running") return [head, span(` · ${run.live ?? "running"}`, "meta", "live")];
   const facts = [durationText(run), sizeText(run), elisionText(run)]
     .filter((part) => part !== undefined)
     .map((part) => ` · ${part}`)
     .join("");
-  const spans: RowSpan[] = [
-    { text: head, tone: "body" },
-    meta(`${facts} · `),
-    { text: run.phase, tone: run.phase === "done" ? "ok" : "bad" },
+  return [
+    head,
+    ...(facts === "" ? [] : [span(facts, "meta", "facts")]),
+    span(" · ", "meta", "separator"),
+    span(run.phase, run.phase === "done" ? "ok" : "bad", "outcome"),
+    ...(run.reason === undefined || run.reason === ""
+      ? []
+      : [span(` · ${run.reason}`, "meta", "reason")]),
   ];
-  if (run.reason !== undefined && run.reason !== "") spans.push(meta(` · ${run.reason}`));
-  return spans;
 }
 
 export function toolRowText(run: ToolRun): string {
   return toolRowSpans(run)
-    .map((span) => span.text)
+    .map((item) => item.text)
     .join("");
 }
 
@@ -60,8 +63,12 @@ const favoredSubjectKeys = [
   "pattern",
 ];
 
-function meta(text: string): RowSpan {
-  return { text, tone: "meta" };
+function headText(run: ToolRun): string {
+  return run.subject === "" ? run.name : `${run.name} ${run.subject}`;
+}
+
+function span(text: string, tone: SpanTone, part: SpanPart): RowSpan {
+  return { text, tone, part };
 }
 
 function durationText(run: ToolRun): string | undefined {

@@ -18,6 +18,7 @@
   --kw-density-medium: var(--kw-text-mid);
   --kw-density-heavy: var(--kw-text);
   --kw-density-full: var(--kw-accent);
+  --kw-appearance: dark;
   --kw-font-mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  --kw-font-prose: "Newsreader", "Source Serif 4", Georgia, "Times New Roman", serif;
+  --kw-font-prose: "Source Serif 4", "Newsreader", Georgia, "Times New Roman", serif;
 }

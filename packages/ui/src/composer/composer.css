@@ -1,0 +1,63 @@
+.kw-composer {
+  border-top: 1px solid var(--kw-border);
+  background: var(--kw-background);
+  font-family: var(--kw-font-mono);
+  font-size: 0.875rem;
+}
+
+.kw-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-queue-item {
+  display: flex;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.kw-queue-mark {
+  color: var(--kw-density-light);
+}
+
+.kw-composer-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-items: start;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+}
+
+.kw-composer-prompt {
+  text-align: center;
+  color: var(--kw-accent);
+  line-height: 1.5;
+}
+
+.kw-composer-input {
+  width: 100%;
+  min-height: 1.5rem;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--kw-text);
+  font: inherit;
+  line-height: 1.5;
+  field-sizing: content;
+}
+
+.kw-composer-input::placeholder {
+  color: var(--kw-text-dim);
+}
+
+.kw-composer[data-busy] .kw-composer-prompt {
+  color: var(--kw-density-medium);
+}

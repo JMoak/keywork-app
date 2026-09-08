@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ConversationPane over the recorded fixtures > renders denied 1`] = `
+[
+  "user run echo served",
+  "machine bash echo served · refused · no one to ask",
+  "agent I could not run it.",
+]
+`;
+
+exports[`ConversationPane over the recorded fixtures > renders interrupt 1`] = `
+[
+  "user wait forever",
+  "agent Working on it",
+  "blank · interrupted",
+]
+`;
+
+exports[`ConversationPane over the recorded fixtures > renders plain 1`] = `
+[
+  "user say hello",
+  "agent Hello from keywork.",
+]
+`;
+
+exports[`ConversationPane over the recorded fixtures > renders queued 1`] = `
+[
+  "user first",
+  "agent First answer, finished.",
+  "user second",
+  "agent Second answer.",
+]
+`;
+
+exports[`ConversationPane over the recorded fixtures > renders thinking 1`] = `
+[
+  "user what changed?",
+  "agent thinking · 7 words",
+  "agent The change is in layout.ts.",
+]
+`;
+
+exports[`ConversationPane over the recorded fixtures > renders tool 1`] = `
+[
+  "user run echo served",
+  "machine bash echo served · 1.3s · done",
+  "agent It printed served.",
+]
+`;

@@ -1,9 +1,11 @@
 import { render, screen } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 import { App } from "./app.tsx";
+import { browserHost } from "./host/browser.ts";
 import type { HostPort } from "./host/port.ts";
 
 const host: HostPort = {
+  ...browserHost(),
   about: async () => ({ shell: "browser", platform: "test", version: "0" }),
 };
 

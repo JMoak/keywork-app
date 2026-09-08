@@ -12,6 +12,13 @@ export {
   type ServerTicket,
 } from "./client.ts";
 export {
+  type BatchListener,
+  type FeedOptions,
+  nextFrame,
+  type ServerFeed,
+  serverFeed,
+} from "./feed.ts";
+export {
   batchPerFrame,
   coalesceEnvelopes,
   type FrameBatcher,
@@ -22,6 +29,7 @@ export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {
   compactJson,
   type RowSpan,
+  type SpanPart,
   type SpanTone,
   toolRowSpans,
   toolRowText,

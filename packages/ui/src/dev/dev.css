@@ -1,0 +1,115 @@
+.kw-dev {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--kw-background);
+  color: var(--kw-text);
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+}
+
+.kw-dev-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  color: var(--kw-text-mid);
+}
+
+.kw-dev-brand {
+  color: var(--kw-accent);
+  letter-spacing: 0.06em;
+}
+
+.kw-dev-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-dev-field select,
+.kw-dev-replay {
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-background);
+  border: 1px solid var(--kw-border);
+  border-radius: 3px;
+  padding: 0.15rem 0.4rem;
+}
+
+.kw-dev-replay {
+  margin-left: auto;
+  cursor: pointer;
+}
+.kw-dev-replay:hover {
+  border-color: var(--kw-border-focus);
+}
+
+.kw-dev-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  overflow: auto;
+}
+
+.kw-dev-frame {
+  display: flex;
+  flex-direction: column;
+  height: min(100%, 52rem);
+  max-width: 100%;
+  border: 1px solid var(--kw-ramp-1);
+  background: var(--kw-background);
+  transition: width 0ms;
+}
+
+.kw-dev-title {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.75rem 0.2rem 0;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-mid);
+}
+
+.kw-dev-stamp {
+  text-align: center;
+  color: var(--kw-density-full);
+}
+.kw-dev-stamp[data-live] {
+  animation: kw-tile 720ms steps(1, end) infinite;
+}
+@keyframes kw-tile {
+  0% {
+    color: var(--kw-density-light);
+  }
+  50% {
+    color: var(--kw-density-heavy);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kw-dev-stamp[data-live] {
+    animation: none;
+  }
+}
+
+.kw-dev-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kw-text);
+}
+
+.kw-dev-telemetry {
+  color: var(--kw-text-dim);
+}
+
+.kw-dev-pane {
+  flex: 1;
+  min-height: 0;
+}

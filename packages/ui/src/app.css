@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "./flavor/keywork-night.css";
+@import "./page/page.css";
+@import "./composer/composer.css";
 
 :root {
   color-scheme: dark;
