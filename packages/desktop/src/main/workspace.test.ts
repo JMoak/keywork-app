@@ -89,6 +89,9 @@ function harness(options: {
     seams: {
       ticketFile,
       readText: fs.readText,
+      removeFile: async (path) => {
+        fs.files.delete(path);
+      },
       fetchDocument: async (): Promise<ServerDocument> => {
         if (answers === "dead") throw new Error("refused");
         return { version: answers === "old" ? "0.0.0" : expectedServerVersion, operationIds: [] };
@@ -190,6 +193,40 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(h.processes[0]?.stopped).toBe(1);
     await host.close("/work");
     expect(h.processes[0]?.stopped).toBe(1);
+  });
+
+  it("follows a restarted server to its new ticket, and only ever hands the ticket to main", async () => {
+    const h = harness({});
+    const host = workspaceHost(h.seams);
+    await host.open("/work");
+    expect(host.ticketFor("/work")).toEqual({ url: "http://127.0.0.1:4771", token: "spawned" });
+    h.processes[0]?.listeners[0]?.({
+      kind: "ready",
+      ticket: { url: "http://127.0.0.1:4799", token: "restarted" },
+      version: expectedServerVersion,
+      pid: 6,
+    });
+    expect(host.ticketFor("/work")).toEqual({ url: "http://127.0.0.1:4799", token: "restarted" });
+    expect(host.ticketFor("/elsewhere")).toBeUndefined();
+  });
+
+  it("clears the ticket a force-killed server of its own left behind, never a foreign one", async () => {
+    const own = harness({});
+    const ownHost = workspaceHost(own.seams);
+    await ownHost.open("/work");
+    own.fs.files.set(
+      own.seams.ticketFile,
+      JSON.stringify({ url: "http://127.0.0.1:4771", token: "spawned" }),
+    );
+    await ownHost.close("/work");
+    expect(own.fs.files.has(own.seams.ticketFile)).toBe(false);
+
+    const foreign = harness({});
+    const foreignHost = workspaceHost(foreign.seams);
+    await foreignHost.open("/work");
+    foreign.fs.files.set(foreign.seams.ticketFile, JSON.stringify(terminalTicket));
+    await foreignHost.close("/work");
+    expect(foreign.fs.files.has(foreign.seams.ticketFile)).toBe(true);
   });
 
   it("closes everything it holds on closeAll", async () => {

@@ -181,7 +181,10 @@ export function exitFailureOf(
   port: number | undefined,
 ): ServeFailure {
   const detail = stderr.trim();
-  if (code === 0 || (code === null && detail === "")) {
+  if (code === null && detail === "") {
+    return { kind: "failed", exitCode: null, detail: "keywork could not be started" };
+  }
+  if (code === 0) {
     return { kind: "no-ticket", detail: "keywork serve exited before announcing its address" };
   }
   if (code === 2) return { kind: "usage", detail };

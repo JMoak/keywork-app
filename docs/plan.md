@@ -259,6 +259,40 @@ app's transcript, which is the two-surfaces-one-bus story proven for the first t
 **Also fixed.** Tailwind's preflight had removed list markers from transcript prose; the
 accent markers the design language calls for are back.
 
+### M2 ledger, rung 3 (landed 2026-09-07): the native window
+
+**What landed.** The token never enters the renderer: `desktop/src/main/server-relay.ts`
+performs every request in main with the held ticket, overwriting any renderer-supplied
+authorization, and streams bodies back over IPC as chunks; the preload assembles them
+through a pure `chunk-queue`; `ui/src/host/transport.ts` turns the host port into the
+client's `Fetch`, so the renderer's `keyworkClientOver(hostFetch(host, workspace))` is the
+same client as before with no credential in it. `OpenedWorkspace` now carries a
+`serverLabel`, not a ticket. The workspace host follows a restarted server to its new
+ticket transparently (the feed reconnects on its own) and clears a ticket file that a
+server it force-killed left behind, never a foreign one. Window state is remembered
+(bounds and maximized, validated, placed only on a connected display). The mock server
+gained `--write-ticket` so the app attaches to it in dev. `keyworkOnPath` picks a
+launchable entry on Windows (`.exe`, then `.cmd`), and `.cmd` shims spawn through the
+shell. The preload builds as CommonJS and workspace packages bundle into main.
+
+**Evidence.** 138 tests. The real Electron window, driven over the remote debugging
+port: attach-first to the mock through keywork's ticket file, a session created, a
+bash tool turn streamed through the main-process relay; then, with no ticket, a real
+`keywork serve` from PATH spawned and ready in two seconds; then the app closed and
+the server tree was gone with the port released.
+
+**Findings, all found by launching, all fixed.**
+- electron-vite externalized the workspace packages, so Electron's Node loaded raw
+  TypeScript and rejected a parameter property. Bundled now, and `erasableSyntaxOnly`
+  ratchets the codebase.
+- A sandboxed preload cannot be ESM; the `.mjs` preload silently exposed nothing.
+- `before-quit` fired the tree kill without awaiting it, so the app exited first and the
+  spawned server survived as an orphan. Quit now waits for `closeAll`.
+- A force-killed `keywork serve` leaves its ticket file behind, which would mislead a
+  later `keywork attach`. The app removes a stale ticket that names the server it killed.
+- `where keywork` lists a shell script before the `.cmd` shim on Windows; spawning the
+  script fails silently. The launcher choice and shell spawn fix that.
+
 ## M3: The workspace (16pt)
 
 The tiler, the keyboard, and the trust ladder. After M3 the app is a daily driver for

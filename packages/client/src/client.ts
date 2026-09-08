@@ -53,12 +53,12 @@ export interface ClientSeams {
 }
 
 export class ServerRefusal extends Error {
-  constructor(
-    readonly status: number,
-    detail: string,
-  ) {
+  readonly status: number;
+
+  constructor(status: number, detail: string) {
     super(detail);
     this.name = "ServerRefusal";
+    this.status = status;
   }
 }
 
@@ -69,16 +69,33 @@ export function reconnectDelayMs(attempt: number): number {
 }
 
 export function keyworkClient(ticket: ServerTicket, seams: ClientSeams = {}): KeyworkClient {
-  const url = ticket.url.replace(/\/+$/, "");
-  const call: Fetch = seams.fetch ?? fetch;
+  return clientOver(
+    ticket.url.replace(/\/+$/, ""),
+    authorizedFetch(ticket, seams.fetch ?? fetch),
+    seams,
+  );
+}
+
+export function keyworkClientOver(transport: Fetch, seams: ClientSeams = {}): KeyworkClient {
+  return clientOver("", transport, seams);
+}
+
+export function authorizedFetch(ticket: ServerTicket, transport: Fetch): Fetch {
+  return (input, init = {}) =>
+    transport(input, {
+      ...init,
+      headers: { authorization: `Bearer ${ticket.token}`, ...(init.headers ?? {}) },
+    });
+}
+
+function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkClient {
   const readFrames = seams.readFrames ?? sseFrames;
   const delay = seams.delay ?? sleep;
   const request = (method: string, path: string, body?: unknown, init: RequestInit = {}) =>
-    call(`${url}${path}`, {
+    transport(`${url}${path}`, {
       ...init,
       method,
       headers: {
-        authorization: `Bearer ${ticket.token}`,
         ...(body !== undefined && { "content-type": "application/json" }),
         ...(init.headers ?? {}),
       },
@@ -86,7 +103,7 @@ export function keyworkClient(ticket: ServerTicket, seams: ClientSeams = {}): Ke
     });
   return {
     url,
-    document: async () => documentOf(await json<OpenApiShape>(await call(`${url}/doc`))),
+    document: async () => documentOf(await json<OpenApiShape>(await request("GET", "/doc"))),
     sessions: async () => {
       const listed = await json<{ sessions: SessionSummary[] }>(await request("GET", "/sessions"));
       return listed.sessions;

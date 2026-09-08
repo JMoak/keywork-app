@@ -7,6 +7,11 @@ export interface HostPort {
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
   openExternal(url: string): Promise<void>;
   notify(notice: HostNotice): Promise<void>;
+  serverFetch(
+    workspace: string,
+    path: string,
+    init: ServerRequestInit,
+  ): Promise<ServerResponseHead>;
 }
 
 export interface HostAbout {
@@ -20,17 +25,26 @@ export interface RecentWorkspace {
   openedAt: string;
 }
 
-export interface ServerTicket {
-  url: string;
-  token: string;
-}
-
 export interface OpenedWorkspace {
   workspace: string;
-  server: ServerTicket;
+  serverLabel: string;
   attached: boolean;
   version: string;
   binary: string | undefined;
+}
+
+export interface ServerRequestInit {
+  method?: string | undefined;
+  headers?: Record<string, string> | undefined;
+  body?: string | undefined;
+}
+
+export interface ServerResponseHead {
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  read(): Promise<Uint8Array | undefined>;
+  cancel(): void;
 }
 
 export type WorkspaceFailure =
@@ -38,8 +52,8 @@ export type WorkspaceFailure =
   | { kind: "unresolved"; message: string; nextAction: string }
   | { kind: "port-in-use"; port: number; detail: string }
   | { kind: "failed"; exitCode: number | null; detail: string }
-  | { kind: "unreachable"; ticket: ServerTicket; detail: string }
-  | { kind: "version-mismatch"; expected: string; actual: string; ticket: ServerTicket }
+  | { kind: "unreachable"; ticket: { url: string }; detail: string }
+  | { kind: "version-mismatch"; expected: string; actual: string }
   | { kind: "no-ticket"; detail: string };
 
 export type WorkspaceOpen =
@@ -87,6 +101,7 @@ function isHostPort(candidate: unknown): candidate is HostPort {
     typeof candidate === "object" &&
     candidate !== null &&
     "about" in candidate &&
-    "openWorkspace" in candidate
+    "openWorkspace" in candidate &&
+    "serverFetch" in candidate
   );
 }

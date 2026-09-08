@@ -1,5 +1,5 @@
-import { mkdir, mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -145,7 +145,11 @@ function lastUserText(messages: ProviderRequest["messages"]): string {
 
 if (import.meta.main) {
   const { values } = parseArgs({
-    options: { port: { type: "string" }, cadence: { type: "string", default: "40" } },
+    options: {
+      port: { type: "string" },
+      cadence: { type: "string", default: "40" },
+      "write-ticket": { type: "boolean", default: false },
+    },
   });
   const server = (await import(moduleUrl("packages/server/src/index.ts"))) as ServerModule;
   const serve = (await import(moduleUrl("packages/cli/src/serve.ts"))) as ServeModule;
@@ -180,7 +184,19 @@ if (import.meta.main) {
   console.log(
     `page http://127.0.0.1:5173/?token=${token}  (start vite with KEYWORK_SERVER=${listening.url})`,
   );
+  const ticketFile = join(homedir(), ".keywork", "server.json");
+  if (values["write-ticket"]) {
+    await mkdir(join(homedir(), ".keywork"), { recursive: true });
+    await writeFile(
+      ticketFile,
+      `${JSON.stringify({ url: listening.url, token })}
+`,
+      { mode: 0o600 },
+    );
+    console.log(`ticket ${ticketFile} (the app will attach to this mock; removed on exit)`);
+  }
   const stop = async (): Promise<void> => {
+    if (values["write-ticket"]) await rm(ticketFile, { force: true });
     await listening.close();
     process.exit(0);
   };

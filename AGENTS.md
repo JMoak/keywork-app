@@ -45,7 +45,14 @@ subagent writing keywork-app code; the perspective is the point.
   mirrors them and `scripts/check-contract.ts` fails when a real `keywork serve` disagrees.
 - The Electron main process stays thin: windows, sidecar, PTY, menus, tray, notifications,
   updater. Product logic lives in the renderer. `contextIsolation` on, `nodeIntegration` off,
-  `sandbox` on; the preload exposes one typed `HostPort` and nothing else.
+  `sandbox` on; the preload exposes one typed `HostPort` and nothing else. **The server
+  token never enters the renderer**: main holds the ticket and relays every request and
+  stream through `HostPort.serverFetch`. A sandboxed preload must be CommonJS, so the
+  preload build emits `index.js` in `cjs`; workspace packages are bundled into main and
+  preload rather than externalized, because Electron's Node would otherwise load raw
+  TypeScript.
+- `erasableSyntaxOnly` is on: no parameter properties, enums, or namespaces anywhere, so
+  every file is loadable by a type-stripping runtime.
 - Solid, not React: components run once. Never destructure `props`; read them inside JSX or
   through `splitProps`. Derived values are functions or `createMemo`, never plain `const`s
   computed from a signal. Lists use `<For>` / `<Index>`, conditionals `<Show>` / `<Switch>`;

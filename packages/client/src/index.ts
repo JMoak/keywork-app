@@ -1,10 +1,12 @@
 export {
+  authorizedFetch,
   type ClientSeams,
   type Delay,
   type EventStreamOptions,
   type Fetch,
   type KeyworkClient,
   keyworkClient,
+  keyworkClientOver,
   reconnectDelayMs,
   reconnectDelaysMs,
   type ServerDocument,

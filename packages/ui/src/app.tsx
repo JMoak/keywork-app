@@ -1,11 +1,12 @@
 import {
   type KeyworkClient,
-  keyworkClient,
+  keyworkClientOver,
   type ServerFeed,
   serverFeed,
 } from "@keywork-app/client";
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
 import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
+import { hostFetch } from "./host/transport.ts";
 import { frameTick } from "./shell/frame-tick.ts";
 import { OpenScreen } from "./shell/open-screen.tsx";
 import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
@@ -14,7 +15,7 @@ import "./shell/shell.css";
 
 export interface AppProps {
   host: HostPort;
-  connect?: ((ticket: { url: string; token: string }) => KeyworkClient) | undefined;
+  connect?: ((host: HostPort, workspace: string) => KeyworkClient) | undefined;
 }
 
 interface Connected {
@@ -29,7 +30,9 @@ export function App(props: AppProps) {
   const [failure, setFailure] = createSignal<string>();
   const [current, setCurrent] = createSignal<string>();
 
-  const connect = props.connect ?? keyworkClient;
+  const connect =
+    props.connect ??
+    ((host: HostPort, workspace: string) => keyworkClientOver(hostFetch(host, workspace)));
 
   const open = async (path: string): Promise<void> => {
     setFailure(undefined);
@@ -40,7 +43,7 @@ export function App(props: AppProps) {
       setFailure(describeFailure(result.failure));
       return;
     }
-    const client = connect(result.opened.server);
+    const client = connect(props.host, result.opened.workspace);
     const feed = serverFeed(client, { tick: frameTick() });
     const store = createSessionStore(client, feed);
     setConnected({ opened: result.opened, feed, store });
@@ -93,6 +96,5 @@ export function App(props: AppProps) {
 }
 
 function serverLabel(opened: OpenedWorkspace): string {
-  const hostPort = opened.server.url.replace(/^https?:\/\//, "");
-  return opened.attached ? `attached · ${hostPort}` : hostPort;
+  return opened.attached ? `attached · ${opened.serverLabel}` : opened.serverLabel;
 }

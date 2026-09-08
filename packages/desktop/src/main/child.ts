@@ -1,12 +1,14 @@
 import { spawn as spawnProcess } from "node:child_process";
 import { createServer } from "node:net";
 import type { ChildHandle, Spawn } from "./serve-process.ts";
+import { spawnsThroughShell } from "./system.ts";
 
 export const spawnChild: Spawn = (command, args, cwd) => {
   const child = spawnProcess(command, [...args], {
     cwd,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    shell: spawnsThroughShell(command, process.platform),
   });
   const exited = new Promise<number | null>((resolve) => {
     child.once("exit", (code) => resolve(code));

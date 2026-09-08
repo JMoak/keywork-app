@@ -1,14 +1,22 @@
-import type { HostPort, RecentWorkspace, ServerLoss, WorkspaceOpen } from "./port.ts";
+import type {
+  HostPort,
+  RecentWorkspace,
+  ServerLoss,
+  ServerResponseHead,
+  WorkspaceOpen,
+} from "./port.ts";
 
 export interface BrowserHostOptions {
   server?: { url: string; token: string } | undefined;
   recents?: readonly RecentWorkspace[] | undefined;
+  fetch?: typeof fetch | undefined;
 }
 
 export function browserHost(options: BrowserHostOptions = {}): HostPort {
   const lossListeners = new Set<(loss: ServerLoss) => void>();
   const recents = [...(options.recents ?? [])];
   const server = options.server ?? serverFromLocation();
+  const transport = options.fetch ?? fetch;
   return {
     about: async () => ({ shell: "browser", platform: navigator.platform, version: "dev" }),
     pickFolder: async () => window.prompt("workspace folder") ?? undefined,
@@ -26,7 +34,13 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       recents.unshift({ path, openedAt: new Date().toISOString() });
       return {
         ok: true,
-        opened: { workspace: path, server, attached: true, version: "dev", binary: undefined },
+        opened: {
+          workspace: path,
+          serverLabel: server.url.replace(/^https?:\/\//, ""),
+          attached: true,
+          version: "dev",
+          binary: undefined,
+        },
       };
     },
     closeWorkspace: async () => undefined,
@@ -39,6 +53,28 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
     },
     notify: async (notice) => {
       console.info(`[notify] ${notice.title}: ${notice.body}`);
+    },
+    serverFetch: async (_workspace, path, init): Promise<ServerResponseHead> => {
+      if (server === undefined) throw new Error("no server");
+      const controller = new AbortController();
+      const response = await transport(`${server.url}${path}`, {
+        method: init.method ?? "GET",
+        headers: { ...(init.headers ?? {}), authorization: `Bearer ${server.token}` },
+        ...(init.body !== undefined && { body: init.body }),
+        signal: controller.signal,
+      });
+      const reader = response.body?.getReader();
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        headers: [...response.headers.entries()],
+        read: async () => {
+          if (reader === undefined) return undefined;
+          const { value, done } = await reader.read();
+          return done ? undefined : value;
+        },
+        cancel: () => controller.abort(),
+      };
     },
   };
 }

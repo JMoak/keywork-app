@@ -24,6 +24,7 @@ export type WorkspaceOpen =
 export interface WorkspaceSeams {
   ticketFile: string;
   readText(path: string): Promise<string | undefined>;
+  removeFile(path: string): Promise<void>;
   fetchDocument(ticket: ServerTicket): Promise<ServerDocument>;
   supervise(spec: ServeSpec): ServerProcess;
   keyworkOnPath(): Promise<string | undefined>;
@@ -37,6 +38,7 @@ export interface WorkspaceHost {
   close(path: string): Promise<void>;
   closeAll(): Promise<void>;
   recent(): Promise<readonly RecentWorkspace[]>;
+  ticketFor(path: string): ServerTicket | undefined;
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
 }
 
@@ -98,6 +100,18 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     };
   };
 
+  const release = async (entry: Held): Promise<void> => {
+    entry.unwatch();
+    if (entry.process === undefined) return;
+    await entry.process.stop();
+    await clearStaleTicket(entry.opened.server.url);
+  };
+
+  const clearStaleTicket = async (url: string): Promise<void> => {
+    const ticket = await readTicket(seams.ticketFile, seams.readText);
+    if (ticket?.url === url) await seams.removeFile(seams.ticketFile);
+  };
+
   const hold = (
     path: string,
     opened: OpenedWorkspace,
@@ -107,6 +121,10 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
       process?.watch((state) => {
         const failure = lossOf(state);
         if (failure !== undefined) announceLoss(path, failure);
+        if (state.kind === "ready") {
+          const entry = held.get(path);
+          if (entry !== undefined) entry.opened = { ...entry.opened, server: state.ticket };
+        }
       }) ?? (() => undefined);
     held.set(path, { opened, process, unwatch });
   };
@@ -136,18 +154,17 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
       const entry = held.get(path);
       if (entry === undefined) return;
       held.delete(path);
-      entry.unwatch();
-      await entry.process?.stop();
+      await release(entry);
     },
     closeAll: async () => {
       for (const path of [...held.keys()]) {
         const entry = held.get(path);
         held.delete(path);
-        entry?.unwatch();
-        await entry?.process?.stop();
+        if (entry !== undefined) await release(entry);
       }
     },
     recent: () => seams.recents.list(),
+    ticketFor: (path) => held.get(path)?.opened.server,
     onServerLost: (listener) => {
       lossListeners.add(listener);
       return () => lossListeners.delete(listener);

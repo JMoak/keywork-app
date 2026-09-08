@@ -20,6 +20,7 @@ bun run setup:electron   # once: fetches the Electron binary Bun's install skips
 bun run check            # types, pins, guardrails, colors, contract, lint
 bun run test             # vitest: node projects + the Solid renderer under happy-dom
 bun run fixtures:record  # re-record wire fixtures from ../keywork (KEYWORK_REPO overrides)
+bun scripts/fixtures/serve-mock.ts --write-ticket   # keywork's real server with a scripted provider; the app attaches to it
 bun run check:contract -- --url http://127.0.0.1:4770   # against a live keywork serve
 bun run dev              # the Electron app with the renderer on Vite HMR
 bun run --cwd packages/ui dev   # the renderer alone in a browser, against the mock host

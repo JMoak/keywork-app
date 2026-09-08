@@ -98,7 +98,7 @@ describe("keyworkClient routes", () => {
     await expect(client.prompt("s1", "")).rejects.toThrow("the body is not { text }");
   });
 
-  it("reads the server document without a token and summarizes it", async () => {
+  it("reads the server document and summarizes it", async () => {
     const { calls, fetch } = recordingFetch(() =>
       json(200, {
         info: { version: "0.0.1" },
@@ -116,7 +116,7 @@ describe("keyworkClient routes", () => {
       version: "0.0.1",
       operationIds: ["createSession", "getDocument", "listSessions"],
     });
-    expect(calls[0]?.headers.authorization).toBeUndefined();
+    expect(calls[0]?.headers.authorization).toBe("Bearer t0k3n");
   });
 });
 
