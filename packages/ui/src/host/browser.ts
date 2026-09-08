@@ -19,7 +19,7 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
           ok: false,
           failure: {
             kind: "no-ticket",
-            detail: "no server: add ?url=…&token=… to the page or run against the mock",
+            detail: "no server: add ?token=… to the page (the dev proxy at /kw carries it)",
           },
         };
       }
@@ -45,7 +45,9 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
 
 function serverFromLocation(): { url: string; token: string } | undefined {
   const params = new URLSearchParams(window.location.search);
-  const url = params.get("url");
   const token = params.get("token");
-  return url !== null && token !== null ? { url, token } : undefined;
+  if (token === null) return undefined;
+  return { url: params.get("url") ?? `${window.location.origin}${devProxyPath}`, token };
 }
+
+const devProxyPath = "/kw";

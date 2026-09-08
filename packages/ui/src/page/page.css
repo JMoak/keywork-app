@@ -193,6 +193,12 @@ h4.kw-heading {
   margin: 0 0 0.75em;
   padding-left: 1.4em;
 }
+ul.kw-list {
+  list-style: disc;
+}
+ol.kw-list {
+  list-style: decimal;
+}
 .kw-list-item::marker {
   color: var(--kw-accent);
 }

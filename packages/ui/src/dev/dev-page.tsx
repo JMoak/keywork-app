@@ -7,10 +7,12 @@ import {
 } from "@keywork-app/client";
 import type { BusEnvelope } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
+import { telemetry } from "../chrome/telemetry.ts";
 import { Composer } from "../composer/composer.tsx";
 import { applyFlavor, type Flavor, gallery, keyworkDay, keyworkNight } from "../flavor/index.ts";
 import { ConversationPane } from "../page/pane.tsx";
 import { tierPresetPx, type WidthTier } from "../page/tiers.ts";
+import { frameTick } from "../shell/frame-tick.ts";
 import { type Replay, replayEnvelopes } from "./replay.ts";
 import { scenarios } from "./scenarios.ts";
 import "./dev.css";
@@ -42,7 +44,7 @@ export function DevPage() {
     replay?.stop();
     batcher?.flush();
     setProjection(emptyProjection);
-    batcher = batchPerFrame(absorb, (flush) => requestAnimationFrame(flush));
+    batcher = batchPerFrame(absorb, frameTick());
     if (chosen === undefined) return;
     replay = replayEnvelopes(chosen.envelopes, (envelope) => batcher?.push(envelope));
   });
@@ -152,15 +154,6 @@ export function DevPage() {
       </div>
     </main>
   );
-}
-
-export function telemetry(projection: SessionProjection): string {
-  const { usage } = projection;
-  if (usage.turns === 0) return "";
-  const tokens = `${usage.inputTokens + usage.outputTokens} tokens`;
-  return usage.unpricedTurns === 0
-    ? `${tokens} · $${usage.costUsd.toFixed(4)}`
-    : `${tokens} · unpriced`;
 }
 
 export function resolveFlavor(choice: FlavorChoice): Flavor {

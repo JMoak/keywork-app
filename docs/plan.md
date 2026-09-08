@@ -221,9 +221,43 @@ broadsheet only; `keywork-day`'s palette is a first design; links allow http(s),
 and anchors only; the version check is exact on `0.0.1`; a dead or corrupt ticket counts
 as absent; unresolved inference is read from stderr's first line.
 
-**Left for rung 2 and 3.** Wiring the feed and projection into the app shell against a
-live server (sessions list, composer intents to routes, status line), then the workspace
-open flow in the window.
+**Left for rung 3.** The workspace open flow in the window, and the token-in-main
+decision below.
+
+### M2 ledger, rung 2 (landed 2026-09-07): the shell, live
+
+**What landed.** `packages/ui/src/shell/`: `session-store.ts` (a Solid store of
+projections keyed by session, history from `GET /sessions/{id}` replayed through
+`historyEnvelopes`, live batches applied per session, envelopes that arrive while history
+loads held and applied after it, summaries refreshed on `turn.started` and
+`turn.completed`, gap and loss surfaced), `workspace-view.tsx` (sessions rail with density
+liveness marks and relative ages, the title row with the lifecycle stamp and telemetry,
+the conversation pane, the composer wired to prompt and abort, the status line in
+keywork's grammar with every item justified or absent), `open-screen.tsx` (recents, the
+folder picker, and a typed path in the browser build), `frame-tick.ts`, and `app.tsx` as
+the state machine over `HostPort.openWorkspace`. `scripts/fixtures/serve-mock.ts` runs
+keywork's real server package on a real socket with a scripted provider that streams at
+a human cadence and runs the real bash tool, so the shell can be exercised end to end
+with no key. `bun run --cwd packages/ui dev` proxies `/kw` to it (`KEYWORK_SERVER`).
+
+**Evidence.** 119 tests. Driven live in Electron against the mock server: open, new
+session, a tool turn with the real bash tool (60 ms), a priced prose turn showing
+`380 tokens · $0.0031`, and a prompt posted from a second client (curl) appearing in the
+app's transcript, which is the two-surfaces-one-bus story proven for the first time.
+
+**Findings, both found by looking, both fixed.**
+- keywork's server sends no CORS headers by design, so a renderer on another origin
+  cannot call it. The dev build now goes through a same-origin Vite proxy. For the
+  product this decides AD3's shape further: **the token never enters the renderer.** The
+  Electron main process owns the ticket and performs every request and the event stream;
+  the renderer reaches the server only through `HostPort`. Rung 3 builds that transport
+  (IPC-backed fetch with streamed bodies) and drops `server` from `OpenedWorkspace`.
+- Batching on `requestAnimationFrame` alone freezes the projection in a hidden or
+  minimized window, because Chromium stops painting. `frameTick` now takes the frame
+  when one comes and a 32 ms timer backstop otherwise, so state never depends on paint.
+
+**Also fixed.** Tailwind's preflight had removed list markers from transcript prose; the
+accent markers the design language calls for are back.
 
 ## M3: The workspace (16pt)
 

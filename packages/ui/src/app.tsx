@@ -1,22 +1,98 @@
-import { createResource, Show } from "solid-js";
-import type { HostPort } from "./host/port.ts";
+import {
+  type KeyworkClient,
+  keyworkClient,
+  type ServerFeed,
+  serverFeed,
+} from "@keywork-app/client";
+import { createSignal, Match, onCleanup, Switch } from "solid-js";
+import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
+import { frameTick } from "./shell/frame-tick.ts";
+import { OpenScreen } from "./shell/open-screen.tsx";
+import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
+import { WorkspaceView } from "./shell/workspace-view.tsx";
+import "./shell/shell.css";
 
 export interface AppProps {
   host: HostPort;
+  connect?: ((ticket: { url: string; token: string }) => KeyworkClient) | undefined;
+}
+
+interface Connected {
+  opened: OpenedWorkspace;
+  feed: ServerFeed;
+  store: SessionStore;
 }
 
 export function App(props: AppProps) {
-  const [about] = createResource(() => props.host.about());
+  const [connected, setConnected] = createSignal<Connected>();
+  const [opening, setOpening] = createSignal<string>();
+  const [failure, setFailure] = createSignal<string>();
+  const [current, setCurrent] = createSignal<string>();
+
+  const connect = props.connect ?? keyworkClient;
+
+  const open = async (path: string): Promise<void> => {
+    setFailure(undefined);
+    setOpening(path);
+    const result = await props.host.openWorkspace(path);
+    setOpening(undefined);
+    if (!result.ok) {
+      setFailure(describeFailure(result.failure));
+      return;
+    }
+    const client = connect(result.opened.server);
+    const feed = serverFeed(client, { tick: frameTick() });
+    const store = createSessionStore(client, feed);
+    setConnected({ opened: result.opened, feed, store });
+    await store.refresh();
+    const first = store.state.summaries[0]?.id;
+    if (first !== undefined) select(store, first);
+  };
+
+  const select = (store: SessionStore, id: string): void => {
+    setCurrent(id);
+    void store.open(id);
+  };
+
+  const create = async (store: SessionStore): Promise<void> => {
+    select(store, await store.create());
+  };
+
+  const stopLoss = props.host.onServerLost((loss) => {
+    const live = connected();
+    if (live === undefined || loss.workspace !== live.opened.workspace) return;
+    setFailure(describeFailure(loss.failure));
+  });
+
+  onCleanup(() => {
+    stopLoss();
+    const live = connected();
+    live?.store.dispose();
+    live?.feed.close();
+  });
+
   return (
-    <main class="kw-ground">
-      <p class="kw-masthead">keywork</p>
-      <Show when={about()} fallback={<p class="kw-dim">starting</p>}>
-        {(info) => (
-          <p class="kw-dim">
-            {info().shell} · {info().platform}
-          </p>
+    <Switch>
+      <Match when={connected()}>
+        {(live) => (
+          <WorkspaceView
+            workspace={live().opened.workspace}
+            serverLabel={serverLabel(live().opened)}
+            store={live().store}
+            current={current()}
+            onSelect={(id) => select(live().store, id)}
+            onCreate={() => void create(live().store)}
+          />
         )}
-      </Show>
-    </main>
+      </Match>
+      <Match when={connected() === undefined}>
+        <OpenScreen host={props.host} failure={failure()} opening={opening()} onOpen={open} />
+      </Match>
+    </Switch>
   );
+}
+
+function serverLabel(opened: OpenedWorkspace): string {
+  const hostPort = opened.server.url.replace(/^https?:\/\//, "");
+  return opened.attached ? `attached · ${hostPort}` : hostPort;
 }
