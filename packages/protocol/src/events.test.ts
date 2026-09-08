@@ -11,7 +11,7 @@ describe("the event vocabulary", () => {
     expect([...engineEventTypes].sort()).toEqual([...documented].sort());
   });
 
-  it("has fifteen types with no duplicates", () => {
-    expect(new Set(engineEventTypes).size).toBe(15);
+  it("has sixteen types with no duplicates", () => {
+    expect(new Set(engineEventTypes).size).toBe(16);
   });
 });

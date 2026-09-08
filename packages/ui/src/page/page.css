@@ -356,3 +356,57 @@ button.kw-tool {
 .kw-notice[data-level="error"] {
   color: var(--kw-error);
 }
+
+.kw-ask {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 1rem;
+  margin: 0.35em 0 0;
+  padding: 0.45em 0.75em;
+  border-left: 2px solid var(--kw-density-full);
+  background: var(--kw-panel);
+  font-family: var(--kw-font-mono);
+}
+.kw-ask-why {
+  color: var(--kw-text-mid);
+}
+.kw-ask-args {
+  color: var(--kw-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.kw-ask-actions {
+  display: flex;
+  gap: 1rem;
+  margin-left: auto;
+}
+.kw-ask-approve,
+.kw-ask-deny {
+  font: inherit;
+  color: var(--kw-text);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.kw-ask-approve {
+  color: var(--kw-success);
+}
+.kw-ask-deny {
+  color: var(--kw-error);
+}
+.kw-ask kbd {
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+.kw-ask-approve:focus-visible,
+.kw-ask-deny:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}

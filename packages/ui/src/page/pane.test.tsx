@@ -83,7 +83,7 @@ describe("ConversationPane over the recorded fixtures", () => {
     const tool = container.querySelector(".kw-tool") as HTMLElement;
     expect(tool.getAttribute("data-phase")).toBe("refused");
     expect(tool.querySelector("[data-tone='bad']")?.textContent).toBe("refused");
-    expect(tool.textContent).toContain("no one to ask");
+    expect(tool.textContent).toContain("no one answered");
   });
 
   it("folds thinking to one line and unfolds on click", async () => {

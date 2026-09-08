@@ -64,6 +64,7 @@ interface ServeModule {
     projectTrusted: boolean;
     provider: Provider;
     permissions: (call: unknown) => "allow" | "ask" | "deny" | undefined;
+    askTimeoutMs?: number;
     log: EventLogLike;
   }): unknown;
 }
@@ -74,6 +75,7 @@ interface Scenario {
   permissions: "allow" | "default";
   drive(stage: Stage): Promise<void>;
   capacity?: number;
+  askTimeoutMs?: number;
 }
 
 interface Stage {
@@ -81,6 +83,7 @@ interface Stage {
   call(path: string, init?: RequestInit): Promise<Response>;
   prompt(text: string): Promise<void>;
   abort(): Promise<void>;
+  answer(callId: string, verdict: "granted" | "denied"): Promise<void>;
   until(type: string, count?: number): Promise<void>;
   seen: BusEnvelope[];
 }
@@ -147,8 +150,39 @@ export const scenarios: readonly Scenario[] = [
         "mock-model",
       ),
     permissions: "default",
+    askTimeoutMs: 50,
     drive: async (stage) => {
       await stage.prompt("run echo served");
+      await stage.until("turn.completed");
+    },
+  },
+  {
+    name: "asked-granted",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [engine.toolCallTurn(bashCall), engine.textTurn("It printed served.", usage)],
+        "mock-model",
+      ),
+    permissions: "default",
+    drive: async (stage) => {
+      await stage.prompt("run echo served");
+      await stage.until("gate.ask");
+      await stage.answer("c1", "granted");
+      await stage.until("turn.completed");
+    },
+  },
+  {
+    name: "asked-denied",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [engine.toolCallTurn(bashCall), engine.textTurn("Understood, I will not.", usage)],
+        "mock-model",
+      ),
+    permissions: "default",
+    drive: async (stage) => {
+      await stage.prompt("run echo served");
+      await stage.until("gate.ask");
+      await stage.answer("c1", "denied");
       await stage.until("turn.completed");
     },
   },
@@ -246,6 +280,7 @@ interface Recorded {
 }
 
 async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
+  const keepAlive = setInterval(() => undefined, 1000);
   const cwd = await mkdtemp(join(tmpdir(), "keywork-app-fixture-"));
   const sessionDir = join(cwd, ".sessions");
   const userRoot = join(cwd, ".user");
@@ -263,6 +298,7 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
     projectTrusted: false,
     provider: scenario.provider(modules.engine),
     permissions: () => (scenario.permissions === "allow" ? "allow" : undefined),
+    ...(scenario.askTimeoutMs !== undefined && { askTimeoutMs: scenario.askTimeoutMs }),
     log,
   });
   const server = modules.server.createKeyworkServer({ token, host, log, version: "fixture" });
@@ -303,6 +339,9 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
       abort: async () => {
         await call(`/sessions/${created.id}/abort`, { method: "POST" });
       },
+      answer: async (callId, verdict) => {
+        await call(`/asks/${callId}`, { method: "POST", body: JSON.stringify({ verdict }) });
+      },
       until: (type, count = 1) =>
         new Promise<void>((resolveWait) => {
           if (seen.filter((item) => item.type === type).length >= count) resolveWait();
@@ -321,6 +360,7 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
       ),
     };
   } finally {
+    clearInterval(keepAlive);
     await rm(cwd, { recursive: true, force: true }).catch(() => undefined);
   }
 }

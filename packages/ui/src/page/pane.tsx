@@ -4,10 +4,12 @@ import {
   type SessionProjection,
   type ThinkingEntry,
   type ToolEntry,
+  type ToolRun,
   type TranscriptEntry,
   toolRowSpans,
   type UserEntry,
 } from "@keywork-app/client";
+import type { AskVerdict } from "@keywork-app/protocol";
 import { For, type JSX, Match, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Markdown } from "./markdown.tsx";
@@ -16,6 +18,7 @@ import "./page.css";
 export interface ConversationPaneProps {
   projection: SessionProjection;
   title?: string | undefined;
+  onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
 }
 
 export type Voice = "user" | "agent" | "machine" | "blank";
@@ -41,6 +44,7 @@ export function ConversationPane(props: ConversationPaneProps) {
               streaming={props.projection.streaming === index()}
               unfolded={unfolded(index())}
               onToggle={() => toggle(index())}
+              onAnswerAsk={props.onAnswerAsk}
             />
           )}
         </For>
@@ -67,6 +71,7 @@ interface EntryProps {
   streaming: boolean;
   unfolded: boolean;
   onToggle: () => void;
+  onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
 }
 
 function Entry(props: EntryProps) {
@@ -112,7 +117,12 @@ function Entry(props: EntryProps) {
       </Match>
       <Match when={as<ToolEntry>(entry(), "tool")}>
         {(tool) => (
-          <ToolRow tool={tool()} unfolded={props.unfolded} onToggle={() => props.onToggle()} />
+          <ToolRow
+            tool={tool()}
+            unfolded={props.unfolded}
+            onToggle={() => props.onToggle()}
+            onAnswerAsk={props.onAnswerAsk}
+          />
         )}
       </Match>
       <Match when={as<NoticeEntry>(entry(), "notice")}>
@@ -174,6 +184,7 @@ interface ToolRowProps {
   tool: ToolEntry;
   unfolded: boolean;
   onToggle: () => void;
+  onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
 }
 
 function ToolRow(props: ToolRowProps) {
@@ -220,10 +231,39 @@ function ToolRow(props: ToolRowProps) {
           {spanElements()}
         </button>
       </Show>
+      <Show when={run().phase === "asking" && props.onAnswerAsk !== undefined}>
+        <AskCard run={run()} onAnswer={(verdict) => props.onAnswerAsk?.(run().callId, verdict)} />
+      </Show>
       <Show when={props.unfolded && disclosable()}>
         <pre class="kw-tool-detail">{run().detail?.join("\n")}</pre>
       </Show>
     </Row>
+  );
+}
+
+interface AskCardProps {
+  run: ToolRun;
+  onAnswer: (verdict: AskVerdict) => void;
+}
+
+function AskCard(props: AskCardProps) {
+  const why = () =>
+    props.run.ask?.rule === "policy"
+      ? "a rule asks before this tool runs"
+      : "this tool changes things";
+  return (
+    <fieldset class="kw-ask" aria-label="permission ask">
+      <span class="kw-ask-why">{why()}</span>
+      <span class="kw-ask-args">{props.run.args}</span>
+      <span class="kw-ask-actions">
+        <button type="button" class="kw-ask-approve" onClick={() => props.onAnswer("granted")}>
+          approve <kbd>ctrl+y</kbd>
+        </button>
+        <button type="button" class="kw-ask-deny" onClick={() => props.onAnswer("denied")}>
+          deny <kbd>ctrl+n</kbd>
+        </button>
+      </span>
+    </fieldset>
   );
 }
 

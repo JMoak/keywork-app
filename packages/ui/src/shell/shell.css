@@ -1,11 +1,3 @@
-.kw-shell {
-  display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
-  height: 100%;
-  background: var(--kw-background);
-  color: var(--kw-text);
-}
-
 .kw-sessions {
   display: flex;
   flex-direction: column;
@@ -16,7 +8,7 @@
 .kw-sessions-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 0.45rem 0.75rem;
   border-bottom: 1px solid var(--kw-border);
   color: var(--kw-text-dim);
@@ -197,4 +189,41 @@
 .kw-open-failure {
   margin: 0;
   color: var(--kw-error);
+}
+
+.kw-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--kw-background);
+  color: var(--kw-text);
+}
+
+.kw-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kw-slot {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.kw-empty-main {
+  display: grid;
+  place-content: center;
+  color: var(--kw-text-dim);
+}
+
+.kw-sessions {
+  border-right: none;
+}
+
+.kw-status-leader {
+  color: var(--kw-accent);
+}
+.kw-status-notice {
+  color: var(--kw-text-mid);
 }

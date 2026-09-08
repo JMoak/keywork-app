@@ -16,7 +16,8 @@ export function sessionName(
 ): string {
   if (summary !== undefined && summary.title !== untitled) return summary.title;
   const firstPrompt = projection?.entries.find((entry) => entry.kind === "user");
-  return firstPrompt?.kind === "user" ? firstPrompt.text : "new session";
+  if (firstPrompt?.kind === "user") return firstPrompt.text;
+  return summary === undefined ? "new session" : "session";
 }
 
 export function relativeAge(iso: string, now: number = Date.now()): string {

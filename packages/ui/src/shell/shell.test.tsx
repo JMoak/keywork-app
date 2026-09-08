@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const fixture = (name: string): string =>
   readFileSync(join(process.cwd(), "packages/client/src/fixtures", name), "utf8");
@@ -19,12 +22,14 @@ const toolStream = fixture("tool.jsonl")
 
 const storedDetail = JSON.parse(fixture("session-detail.json")) as SessionDetail;
 
-function fakeClient(): {
+function fakeClient(options: { pendingAsk?: boolean } = {}): {
   client: KeyworkClient;
   prompts: string[];
   aborts: string[];
+  answers: string[];
   emit: (envelopes: BusEnvelope[]) => void;
 } {
+  const answers: string[] = [];
   const prompts: string[] = [];
   const aborts: string[] = [];
   const summaries: SessionSummary[] = [
@@ -62,6 +67,22 @@ function fakeClient(): {
       aborts.push(id);
       return "aborted";
     },
+    asks: async () =>
+      options.pendingAsk
+        ? [
+            {
+              sessionId: "s1",
+              callId: "c9",
+              tool: "bash",
+              arguments: { command: "rm -rf dist" },
+              askedAt: new Date().toISOString(),
+            },
+          ]
+        : [],
+    answerAsk: async (callId, verdict) => {
+      answers.push(`${callId}:${verdict}`);
+      return "settled" as const;
+    },
     events: async function* (options) {
       options?.onOpen?.();
       for (;;) {
@@ -84,6 +105,7 @@ function fakeClient(): {
     client,
     prompts,
     aborts,
+    answers,
     emit: (envelopes) => {
       for (const envelope of envelopes) {
         if (push === undefined) queue.push(envelope);
@@ -120,7 +142,7 @@ describe("the app shell", () => {
     fake.emit(later);
     await waitFor(() => expect(screen.getAllByText("It printed served.")).toHaveLength(2));
     expect(
-      screen.getByText("17 tokens · unpriced", { selector: ".kw-title-telemetry" }),
+      screen.getByText("17 tokens · unpriced", { selector: ".kw-frame-telemetry" }),
     ).toBeTruthy();
   });
 
@@ -136,6 +158,16 @@ describe("the app shell", () => {
     await waitFor(() => expect(fake.prompts).toEqual(["hello there"]));
     fireEvent.keyDown(input, { key: "Escape" });
     await waitFor(() => expect(fake.aborts).toEqual(["s1"]));
+  });
+
+  it("restores a pending ask from the server and answers it with the approve chord", async () => {
+    const fake = fakeClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    const card = await screen.findByRole("group", { name: "permission ask" });
+    expect(card.textContent).toContain("rm -rf dist");
+    fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+    await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
   });
 
   it("shows the host's failure text when a workspace cannot open", async () => {

@@ -6,7 +6,9 @@ export {
   engineEventTypes,
   type Message,
   type MessagePart,
+  type PermissionAsk,
   type PermissionDecision,
+  type PermissionGate,
   type QueuedPrompt,
   type Replayable,
   type SpillReference,
@@ -15,4 +17,12 @@ export {
   type Usage,
 } from "./events.ts";
 export { type OperationId, operationIds, protocolVersion } from "./routes.ts";
-export type { AbortOutcome, PromptOutcome, SessionDetail, SessionSummary } from "./sessions.ts";
+export type {
+  AbortOutcome,
+  AnswerOutcome,
+  AskVerdict,
+  PendingAsk,
+  PromptOutcome,
+  SessionDetail,
+  SessionSummary,
+} from "./sessions.ts";

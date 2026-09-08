@@ -1,5 +1,149 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > asked-denied 1`] = `
+{
+  "decisions": {
+    "c1": {
+      "callId": "c1",
+      "gate": "user",
+      "tool": "bash",
+      "verdict": "denied",
+    },
+  },
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "run echo served",
+    },
+    {
+      "kind": "tool",
+      "run": {
+        "args": "{"command":"echo served"}",
+        "ask": undefined,
+        "callId": "c1",
+        "decision": {
+          "callId": "c1",
+          "gate": "user",
+          "tool": "bash",
+          "verdict": "denied",
+        },
+        "detail": [
+          "declined by user",
+        ],
+        "durationMs": undefined,
+        "live": undefined,
+        "name": "bash",
+        "outputChars": 16,
+        "phase": "refused",
+        "reason": "you said no",
+        "replay": false,
+        "spill": undefined,
+        "startedAt": "2026-09-07T12:00:01.000Z",
+        "subject": "echo served",
+      },
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "Understood, I will not.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 10,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > asked-granted 1`] = `
+{
+  "decisions": {
+    "c1": {
+      "callId": "c1",
+      "gate": "user",
+      "tool": "bash",
+      "verdict": "granted",
+    },
+  },
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "run echo served",
+    },
+    {
+      "kind": "tool",
+      "run": {
+        "args": "{"command":"echo served"}",
+        "ask": undefined,
+        "callId": "c1",
+        "decision": {
+          "callId": "c1",
+          "gate": "user",
+          "tool": "bash",
+          "verdict": "granted",
+        },
+        "detail": [
+          "served",
+        ],
+        "durationMs": 1500,
+        "live": undefined,
+        "name": "bash",
+        "outputChars": 6,
+        "phase": "done",
+        "reason": undefined,
+        "replay": false,
+        "spill": undefined,
+        "startedAt": "2026-09-07T12:00:01.000Z",
+        "subject": "echo served",
+      },
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "It printed served.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 13,
+  "mode": undefined,
+  "preset": undefined,
+  "queue": [],
+  "running": {},
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
 exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > denied 1`] = `
 {
   "decisions": {
@@ -21,6 +165,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "kind": "tool",
       "run": {
         "args": "{"command":"echo served"}",
+        "ask": undefined,
         "callId": "c1",
         "decision": {
           "callId": "c1",
@@ -36,7 +181,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "name": "bash",
         "outputChars": 65,
         "phase": "refused",
-        "reason": "no one to ask",
+        "reason": "no one answered",
         "replay": false,
         "spill": undefined,
         "startedAt": "2026-09-07T12:00:01.000Z",
@@ -52,7 +197,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   ],
   "injections": [],
   "lastError": undefined,
-  "lastEventId": 9,
+  "lastEventId": 10,
   "mode": undefined,
   "preset": undefined,
   "queue": [],
@@ -265,6 +410,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "kind": "tool",
       "run": {
         "args": "{"command":"echo served"}",
+        "ask": undefined,
         "callId": "c1",
         "decision": {
           "callId": "c1",

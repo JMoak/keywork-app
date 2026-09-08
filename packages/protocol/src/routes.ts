@@ -8,6 +8,8 @@ export const operationIds = [
   "readSession",
   "promptSession",
   "abortSession",
+  "listAsks",
+  "answerAsk",
 ] as const;
 
 export type OperationId = (typeof operationIds)[number];

@@ -65,10 +65,7 @@ export function Composer(props: ComposerProps) {
           class="kw-composer-input"
           aria-label="prompt"
           rows={1}
-          placeholder={
-            props.placeholder ??
-            "say what you want done · enter steers · alt+enter queues · esc interrupts"
-          }
+          placeholder={props.placeholder ?? "say what you want done"}
           value={draft()}
           onInput={(event) => setDraft(event.currentTarget.value)}
           onKeyDown={onKeyDown}

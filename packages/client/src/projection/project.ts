@@ -1,6 +1,7 @@
 import type {
   BusEnvelope,
   EnginePayloads,
+  PermissionAsk,
   PermissionDecision,
   ToolCallPart,
   TurnDelta,
@@ -52,6 +53,8 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       return tailTool(state, envelope.payload.chunk, envelope.payload.callId);
     case "tool.finished":
       return settleTool(state, envelope.payload, envelope.ts);
+    case "gate.ask":
+      return replay ? state : askFor(state, envelope.payload.ask, envelope.ts);
     case "gate.permission":
       return decide(state, envelope.payload.decision);
     case "gate.preset":
@@ -222,6 +225,24 @@ function settleTool(
   return { ...settled, running };
 }
 
+function askFor(state: SessionProjection, ask: PermissionAsk, ts: string): SessionProjection {
+  const index = state.running[ask.callId];
+  if (index !== undefined) {
+    return updateRun(state, index, (run) => ({ ...run, phase: "asking", ask }));
+  }
+  const call: ToolCallPart = {
+    type: "tool-call",
+    callId: ask.callId,
+    name: ask.tool,
+    arguments: argumentsOf(ask.arguments),
+  };
+  return appendRun(settleStream(state), {
+    ...newRun(call, false, "proposed", ts),
+    phase: "asking",
+    ask,
+  });
+}
+
 function decide(state: SessionProjection, decision: PermissionDecision): SessionProjection {
   const decisions = { ...state.decisions, [decision.callId]: decision };
   const index = state.running[decision.callId];
@@ -231,11 +252,16 @@ function decide(state: SessionProjection, decision: PermissionDecision): Session
     ...updateRun(state, index, (run) => ({
       ...run,
       decision,
-      phase: refused ? "refused" : run.phase,
+      ask: undefined,
+      phase: refused ? "refused" : run.phase === "asking" ? "running" : run.phase,
       reason: refused ? refusalReason(decision) : run.reason,
     })),
     decisions,
   };
+}
+
+function argumentsOf(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 function settleUsage(state: SessionProjection, usage: Usage, replay: boolean): SessionProjection {
@@ -285,6 +311,7 @@ function newRun(
     detail: undefined,
     spill: undefined,
     decision: undefined,
+    ask: undefined,
   };
 }
 
@@ -322,7 +349,14 @@ function liveRunIndex(state: SessionProjection, callId: string | undefined): num
 }
 
 function refusalReason(decision: PermissionDecision): string {
-  return decision.gate === "headless" ? "no one to ask" : `denied by ${decision.gate}`;
+  switch (decision.gate) {
+    case "headless":
+      return "no one answered";
+    case "user":
+      return "you said no";
+    default:
+      return `denied by ${decision.gate}`;
+  }
 }
 
 function replaceAt<T>(items: readonly T[], index: number, item: T): T[] {

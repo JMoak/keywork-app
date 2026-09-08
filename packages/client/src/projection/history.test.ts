@@ -12,6 +12,7 @@ const detail: SessionDetail = {
   messageCount: 4,
   cwd: "/work",
   live: false,
+  asOf: 12,
   messages: [
     { role: "user", parts: [{ type: "text", text: "echo one" }] },
     {

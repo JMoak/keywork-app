@@ -1,0 +1,102 @@
+.kw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding-top: 12vh;
+}
+.kw-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  cursor: default;
+  background: color-mix(in oklch, var(--kw-background) 55%, transparent);
+}
+.kw-palette,
+.kw-help {
+  position: relative;
+  width: min(40rem, 90vw);
+  max-height: 70vh;
+  overflow: auto;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  border: 1px solid var(--kw-border-focus);
+}
+
+.kw-palette-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+  border-bottom: 1px solid var(--kw-border);
+  outline: none;
+}
+
+.kw-palette-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.kw-palette-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  color: var(--kw-text-mid);
+}
+.kw-palette-name {
+  color: var(--kw-text);
+}
+.kw-palette-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kw-palette-shortcut {
+  color: var(--kw-text-dim);
+}
+.kw-palette-row[data-selected] {
+  color: var(--kw-background);
+  background: var(--kw-accent);
+}
+.kw-palette-row[data-selected] .kw-palette-name,
+.kw-palette-row[data-selected] .kw-palette-description,
+.kw-palette-row[data-selected] .kw-palette-shortcut {
+  color: var(--kw-background);
+}
+.kw-palette-empty {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-help {
+  padding: 0.5rem 0.75rem;
+  outline: none;
+}
+.kw-help-title {
+  margin: 0 0 0.5rem;
+  color: var(--kw-text-dim);
+}
+.kw-help-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.15rem 1rem;
+  margin: 0;
+}
+.kw-help-keys {
+  color: var(--kw-accent);
+}
+.kw-help-text {
+  margin: 0;
+  color: var(--kw-text-mid);
+}

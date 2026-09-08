@@ -6,7 +6,14 @@ import {
   type ServerFeed,
   type SessionProjection,
 } from "@keywork-app/client";
-import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
+import type {
+  AnswerOutcome,
+  AskVerdict,
+  BusEnvelope,
+  PendingAsk,
+  SessionDetail,
+  SessionSummary,
+} from "@keywork-app/protocol";
 import { createStore, produce, reconcile } from "solid-js/store";
 
 export interface SessionStore {
@@ -16,6 +23,7 @@ export interface SessionStore {
   create(): Promise<string>;
   prompt(id: string, text: string): Promise<void>;
   abort(id: string): Promise<void>;
+  answerAsk(callId: string, verdict: AskVerdict): Promise<AnswerOutcome>;
   dispose(): void;
 }
 
@@ -89,13 +97,15 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       if (state.projections[id] !== undefined || arrivedWhileLoading.has(id)) return;
       arrivedWhileLoading.set(id, []);
       setState("loading", id, true);
-      const detail = await client.session(id);
+      const [detail, pendingAsks] = await Promise.all([client.session(id), client.asks()]);
       const history = detail === undefined ? [] : historyEnvelopes(detail);
-      const live = arrivedWhileLoading.get(id) ?? [];
+      const asOf = detail?.asOf ?? -1;
+      const asks = detail === undefined ? [] : askEnvelopes(detail, pendingAsks);
+      const live = (arrivedWhileLoading.get(id) ?? []).filter((envelope) => envelope.id > asOf);
       arrivedWhileLoading.delete(id);
       setState(
         produce((draft) => {
-          draft.projections[id] = projectAll(emptyProjection, [...history, ...live]);
+          draft.projections[id] = projectAll(emptyProjection, [...history, ...asks, ...live]);
           draft.loading[id] = false;
         }),
       );
@@ -111,10 +121,30 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     abort: async (id) => {
       await client.abort(id);
     },
+    answerAsk: (callId, verdict) => client.answerAsk(callId, verdict),
     dispose: () => {
       for (const stop of stops) stop();
     },
   };
+}
+
+function askEnvelopes(detail: SessionDetail, pending: readonly PendingAsk[]): BusEnvelope[] {
+  return pending
+    .filter((ask) => ask.sessionId === detail.id)
+    .map((ask, index) => ({
+      id: -1_000_000 - index,
+      ts: ask.askedAt,
+      sessionId: detail.id,
+      type: "gate.ask" as const,
+      payload: {
+        ask: {
+          tool: ask.tool,
+          callId: ask.callId,
+          arguments: ask.arguments,
+          rule: "default" as const,
+        },
+      },
+    }));
 }
 
 function bySession(envelopes: readonly BusEnvelope[]): Map<string, BusEnvelope[]> {

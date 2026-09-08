@@ -1,5 +1,6 @@
 import type {
   ContextInjection,
+  PermissionAsk,
   PermissionDecision,
   QueuedPrompt,
   SpillReference,
@@ -69,7 +70,7 @@ export interface NoticeEntry {
   readonly text: string;
 }
 
-export type ToolPhase = "proposed" | "running" | "done" | "failed" | "refused";
+export type ToolPhase = "proposed" | "asking" | "running" | "done" | "failed" | "refused";
 
 export interface ToolRun {
   readonly callId: string;
@@ -86,6 +87,7 @@ export interface ToolRun {
   readonly detail: readonly string[] | undefined;
   readonly spill: SpillReference | undefined;
   readonly decision: PermissionDecision | undefined;
+  readonly ask: PermissionAsk | undefined;
 }
 
 export const emptyUsage: UsageLedger = {

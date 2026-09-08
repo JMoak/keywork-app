@@ -57,7 +57,7 @@
     "/sessions/{id}": {
       "get": {
         "operationId": "readSession",
-        "summary": "One session with its messages.",
+        "summary": "One session with its messages. `asOf` is the latest /events id the messages already reflect, so a client that opened the stream first can drop buffered envelopes with `id <= asOf`.",
         "parameters": [
           {
             "name": "id",
@@ -81,7 +81,7 @@
     "/sessions/{id}/prompt": {
       "post": {
         "operationId": "promptSession",
-        "summary": "Append a user prompt and run a turn. The turn runs headless: any `ask` gate answers no and is reported as a `gate.permission` event. Progress arrives on /events.",
+        "summary": "Append a user prompt and run a turn. When the policy would ask, a `gate.ask` event names the call and the turn waits on POST /asks/{callId}; an unanswered ask times out as a headless denial. Progress arrives on /events.",
         "parameters": [
           {
             "name": "id",
@@ -148,6 +148,70 @@
           }
         }
       }
+    },
+    "/asks": {
+      "get": {
+        "operationId": "listAsks",
+        "summary": "Tool calls waiting on a person: every unanswered `gate.ask`, oldest first.",
+        "responses": {
+          "200": {
+            "description": "The pending asks."
+          }
+        }
+      }
+    },
+    "/asks/{callId}": {
+      "post": {
+        "operationId": "answerAsk",
+        "summary": "Answer a pending ask. The turn resumes with the verdict and reports it as `gate.permission` with `gate: \"user\"`.",
+        "parameters": [
+          {
+            "name": "callId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "verdict"
+                ],
+                "properties": {
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "granted",
+                      "denied"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ask was settled."
+          },
+          "400": {
+            "description": "The body is not `{ verdict: \"granted\" | \"denied\" }`."
+          },
+          "404": {
+            "description": "No ask with that callId is pending."
+          },
+          "409": {
+            "description": "That ask was already answered or timed out."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -184,6 +248,7 @@
               "tool.started",
               "tool.output",
               "tool.finished",
+              "gate.ask",
               "gate.permission",
               "gate.preset",
               "session.mode",

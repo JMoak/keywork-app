@@ -104,13 +104,13 @@ describe("project", () => {
         decision: { tool: "bash", callId: "c1", verdict: "denied", gate: "headless" },
       }),
     ]);
-    expect(runOf(refused, 1)).toMatchObject({ phase: "refused", reason: "no one to ask" });
+    expect(runOf(refused, 1)).toMatchObject({ phase: "refused", reason: "no one answered" });
     const settled = project(
       refused,
       at("tool.finished", { callId: "c1", output: "not approved", isError: true }),
     );
     expect(runOf(settled, 1).phase).toBe("refused");
-    expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · refused · no one to ask");
+    expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · refused · no one answered");
     expect(settled.decisions.c1?.gate).toBe("headless");
   });
 

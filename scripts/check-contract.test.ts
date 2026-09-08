@@ -13,11 +13,11 @@ describe("check:contract", () => {
   it("names operations the server dropped and operations the protocol does not know", () => {
     const violations = contractViolations({
       version: "x",
-      operationIds: [...operationIds.filter((id) => id !== "abortSession"), "answerAsk"],
+      operationIds: [...operationIds.filter((id) => id !== "abortSession"), "renameSession"],
     });
     expect(violations).toEqual([
       "the server no longer serves abortSession",
-      "the server added answerAsk; the protocol does not know it yet",
+      "the server added renameSession; the protocol does not know it yet",
     ]);
   });
 });

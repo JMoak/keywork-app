@@ -1,0 +1,98 @@
+.kw-frame {
+  --kw-pane-border: color-mix(in oklch, var(--kw-pane-hue) 45%, var(--kw-border));
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  container: frame / inline-size;
+  border: 1px solid var(--kw-pane-border);
+  background: var(--kw-background);
+  transition: border-color 120ms steps(3, end);
+}
+.kw-frame[data-focused] {
+  --kw-pane-border: color-mix(in oklch, var(--kw-pane-hue) 85%, var(--kw-text));
+}
+.kw-frame[data-state="needs-you"] {
+  --kw-pane-border: color-mix(in oklch, var(--kw-pane-hue) 100%, var(--kw-border));
+}
+
+.kw-frame-title {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-mid);
+  border-bottom: 1px solid var(--kw-pane-border);
+}
+
+.kw-frame-stamp {
+  text-align: center;
+  color: var(--kw-density-full);
+}
+.kw-frame-stamp[data-state="working"] {
+  color: var(--kw-density-heavy);
+}
+.kw-frame-stamp[data-state="finished-unseen"] {
+  color: var(--kw-density-medium);
+}
+.kw-frame-stamp[data-state="failed"] {
+  color: var(--kw-error);
+}
+
+.kw-frame-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.3rem;
+  margin-left: -0.3rem;
+  color: var(--kw-text);
+  transition: color 120ms steps(3, end);
+}
+.kw-frame[data-focused] .kw-frame-name {
+  color: var(--kw-pane-border);
+}
+.kw-frame-name[data-state="needs-you"] {
+  color: var(--kw-background);
+  background: var(--kw-pane-hue);
+}
+.kw-frame-name[data-state="failed"] {
+  color: var(--kw-error);
+}
+.kw-frame-name[data-state="finished-unseen"] {
+  color: var(--kw-text-mid);
+}
+
+.kw-frame-telemetry,
+.kw-frame-mode {
+  color: var(--kw-text-dim);
+  white-space: nowrap;
+}
+
+@container frame (max-width: 799.98px) {
+  .kw-frame-mode {
+    display: none;
+  }
+}
+@container frame (max-width: 559.98px) {
+  .kw-frame-telemetry {
+    display: none;
+  }
+}
+
+.kw-frame-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-frame,
+  .kw-frame-name {
+    transition: none;
+  }
+}

@@ -3,7 +3,7 @@
 exports[`ConversationPane over the recorded fixtures > renders denied 1`] = `
 [
   "user run echo served",
-  "machine bash echo served · refused · no one to ask",
+  "machine bash echo served · refused · no one answered",
   "agent I could not run it.",
 ]
 `;

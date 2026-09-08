@@ -149,6 +149,7 @@ if (import.meta.main) {
       port: { type: "string" },
       cadence: { type: "string", default: "40" },
       "write-ticket": { type: "boolean", default: false },
+      ask: { type: "boolean", default: false },
     },
   });
   const server = (await import(moduleUrl("packages/server/src/index.ts"))) as ServerModule;
@@ -168,7 +169,7 @@ if (import.meta.main) {
       Number(values.cadence),
       (ms) => new Promise((r) => setTimeout(r, ms)),
     ),
-    permissions: () => "allow",
+    permissions: () => (values.ask ? undefined : "allow"),
     log,
   });
   const token = server.issueToken();

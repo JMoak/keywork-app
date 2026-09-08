@@ -330,6 +330,58 @@ Jordan.
 - **M3.8 (1pt) Multiple workspaces.** A workspace switcher; each with its own sidecar and
   layout; recent list persisted. `OWN`.
 
+### M3 ledger, wave 3 (landed 2026-09-08)
+
+**Lane A, the tiler (`packages/ui`).** `src/layout/`: the pure tiling model mirrored from
+keywork's `layout.ts`: split tree with stepped ratios, two docks with the location cycle,
+rects as the single geometric truth, minimum pane 320×200 so a legal pane never falls
+below the clipping tier, typed refusals instead of overlap, zoom and restore, close with
+focus handoff, ordinal and directional focus, versioned JSON; property tests over random
+verb runs. `src/keys/`: chords, keywork's leader (`ctrl+k`, 2 s, cancel-and-consume),
+keywork's action ids and chords verbatim where shared, a collision test, the hot-path ten
+leaderless, a zod keybindings section with every option described. `src/palette/`: an own
+palette with bindings beside rows and the `?` overlay from the same data.
+`src/chrome/pane-frame.tsx`: the title row with the five lifecycle stamp states, ramp hue
+by spawn rank, focus as the hue lifted, needs-you inversion, tier shedding. The shell is
+the tiler: panes rendered from rects, keyed so layout changes never remount transcripts,
+sessions docked left, layout persisted per workspace.
+
+**Lane B, keywork's server (in the keywork repo, uncommitted there).** S0: `serve --port 0`,
+per-workspace tickets with the user-level file kept one release, a pre-listen health
+check that refuses beside a live server and clears a stale ticket, `attach` finding the
+workspace's server, `/doc` naming the workspace. S1: the `gate.ask` event, `AskQueue` with
+a 120 s default timeout, `GET /asks`, `POST /asks/{callId}`, and `ToolGuard.confirm`
+reporting `user` for an answered ask and `headless` for a timed-out one. `asOf` on session
+detail. The events doc corrected: the engine fires `tool.started` before the gate decides,
+and it stays that way because the row that will carry the outcome must exist before the
+ask lands on it.
+
+**The app side of asks (this ledger's own work).** Protocol and client know the new event
+and routes; the projection has an `asking` phase whose row reads "waiting for your
+answer" and carries the ask's rule; the pane renders an ask card (why, arguments, approve
+and deny with their chords); `ctrl+y` / `ctrl+n` answer the focused pane's pending ask;
+the lifecycle stamp goes needs-you on `asking`; the store drops buffered live envelopes at
+or below the history's `asOf`. Fixtures re-recorded: `denied` now shows the ask timing out
+headlessly, and `asked-granted` / `asked-denied` show a user answer each way. The mock
+server gained `--ask`.
+
+**Evidence.** keywork: 3862 tests. App: 184 tests, rail green.
+
+**Findings.**
+- keywork's `check:guardrails` segfaults under Bun 1.3.9 on this machine on an untouched
+  file (`packages/tui/src/layout.ts`); keywork's CI pins 1.3.14. Upgrade the local Bun.
+- The recorder hung once asks existed: the ask timeout is an unref'd timer, and with
+  nothing else holding Bun's loop the timer never fired. The recorder now keeps the loop
+  alive while a scenario runs; a real `keywork serve` holds a socket and is unaffected.
+- History and a racing live `turn.started` double-painted a prompt; `asOf` closes it.
+- `asOf` alone would have dropped an in-flight ask: history holds messages, not the
+  gate's state, so a `gate.ask` at or below `asOf` vanished. Opening a session now reads
+  `GET /asks` beside the history and re-injects the session's pending asks, which also
+  restores an ask card after the app restarts.
+- Seen live in the shell: a fresh session, the ask card with its reason and arguments,
+  `ctrl+y` granting it and the tool running under a `user` gate; a second ask denied by
+  click. Captures in `artifacts/shots/ask-*.png`.
+
 ## M4: The panes (20pt)
 
 Each pane earns its place with daily use. Order is by how often Jordan reaches for it.

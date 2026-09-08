@@ -28,7 +28,6 @@ export function App(props: AppProps) {
   const [connected, setConnected] = createSignal<Connected>();
   const [opening, setOpening] = createSignal<string>();
   const [failure, setFailure] = createSignal<string>();
-  const [current, setCurrent] = createSignal<string>();
 
   const connect =
     props.connect ??
@@ -46,19 +45,8 @@ export function App(props: AppProps) {
     const client = connect(props.host, result.opened.workspace);
     const feed = serverFeed(client, { tick: frameTick() });
     const store = createSessionStore(client, feed);
-    setConnected({ opened: result.opened, feed, store });
     await store.refresh();
-    const first = store.state.summaries[0]?.id;
-    if (first !== undefined) select(store, first);
-  };
-
-  const select = (store: SessionStore, id: string): void => {
-    setCurrent(id);
-    void store.open(id);
-  };
-
-  const create = async (store: SessionStore): Promise<void> => {
-    select(store, await store.create());
+    setConnected({ opened: result.opened, feed, store });
   };
 
   const stopLoss = props.host.onServerLost((loss) => {
@@ -82,9 +70,6 @@ export function App(props: AppProps) {
             workspace={live().opened.workspace}
             serverLabel={serverLabel(live().opened)}
             store={live().store}
-            current={current()}
-            onSelect={(id) => select(live().store, id)}
-            onCreate={() => void create(live().store)}
           />
         )}
       </Match>

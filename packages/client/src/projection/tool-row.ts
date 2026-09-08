@@ -13,6 +13,7 @@ export interface RowSpan {
 export function toolRowSpans(run: ToolRun): RowSpan[] {
   const head: RowSpan = { text: headText(run), tone: "body", part: "head" };
   if (run.phase === "proposed") return [head, span(" · proposed", "meta", "live")];
+  if (run.phase === "asking") return [head, span(" · waiting for your answer", "meta", "live")];
   if (run.phase === "running") return [head, span(` · ${run.live ?? "running"}`, "meta", "live")];
   const facts = [durationText(run), sizeText(run), elisionText(run)]
     .filter((part) => part !== undefined)

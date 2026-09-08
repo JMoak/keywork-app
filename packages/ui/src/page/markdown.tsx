@@ -63,7 +63,7 @@ function Block(props: { token: Token }) {
       </Match>
       <Match when={is<Tokens.Text>(token(), "text")}>
         {(text) => (
-          <Show when={text().tokens} fallback={<>{decodeEntities(text().text)}</>}>
+          <Show when={text().tokens} fallback={decodeEntities(text().text)}>
             {(inline) => <Inlines tokens={inline()} />}
           </Show>
         )}
@@ -146,7 +146,7 @@ function Inlines(props: { tokens: Token[] }) {
 function Inline(props: { token: Token }) {
   const token = () => props.token;
   return (
-    <Switch fallback={<>{textOf(token())}</>}>
+    <Switch fallback={textOf(token())}>
       <Match when={is<Tokens.Strong>(token(), "strong")}>
         {(strong) => (
           <strong>

@@ -79,13 +79,17 @@ describe("fixtures recorded from keywork serve", () => {
     expect(state.running).toEqual({});
   });
 
-  it("denied: a headless refusal arrives as tool.started, then the denial, then an error result", async () => {
+  it("denied: an unanswered ask arrives as tool.started, the ask, the timed-out denial, then an error result", async () => {
     const stream = await envelopes("denied");
-    expect(stream.map((envelope) => envelope.type).slice(3, 6)).toEqual([
+    expect(stream.map((envelope) => envelope.type).slice(3, 7)).toEqual([
       "tool.started",
+      "gate.ask",
       "gate.permission",
       "tool.finished",
     ]);
+    const asking = projectAll(emptyProjection, stream.slice(0, 5));
+    expect(toolRun(asking, 1)).toMatchObject({ phase: "asking", ask: { rule: "default" } });
+    expect(toolRowText(toolRun(asking, 1))).toBe("bash echo served · waiting for your answer");
     const state = projectAll(emptyProjection, stream);
     const run = toolRun(state, 1);
     expect(run.phase).toBe("refused");
@@ -95,11 +99,34 @@ describe("fixtures recorded from keywork serve", () => {
       verdict: "denied",
       gate: "headless",
     });
-    expect(toolRowText(run)).toBe("bash echo served · refused · no one to ask");
+    expect(toolRowText(run)).toBe("bash echo served · refused · no one answered");
     expect(run.detail).toEqual([
       "not approved: this run has no one to ask, so the call was refused",
     ]);
     expect(state.entries.at(-1)).toMatchObject({ kind: "assistant", text: "I could not run it." });
+  });
+
+  it("asked-granted: answering yes lets the tool run under a user gate", async () => {
+    const stream = await envelopes("asked-granted");
+    const run = toolRun(projectAll(emptyProjection, stream), 1);
+    expect(run).toMatchObject({
+      phase: "done",
+      ask: undefined,
+      decision: { verdict: "granted", gate: "user" },
+    });
+    expect(toolRowText(run)).toBe("bash echo served · 1.5s · done");
+  });
+
+  it("asked-denied: answering no refuses the call with the user's reason", async () => {
+    const stream = await envelopes("asked-denied");
+    const state = projectAll(emptyProjection, stream);
+    const run = toolRun(state, 1);
+    expect(run).toMatchObject({ phase: "refused", decision: { verdict: "denied", gate: "user" } });
+    expect(toolRowText(run)).toBe("bash echo served · refused · you said no");
+    expect(state.entries.at(-1)).toMatchObject({
+      kind: "assistant",
+      text: "Understood, I will not.",
+    });
   });
 
   it("interrupt: the partial answer stays and the turn ends with a notice", async () => {
@@ -127,7 +154,16 @@ describe("fixtures recorded from keywork serve", () => {
   });
 
   it("every fixture projects identically whether or not deltas are coalesced per frame", async () => {
-    for (const name of ["plain", "thinking", "tool", "denied", "interrupt", "queued"]) {
+    for (const name of [
+      "plain",
+      "thinking",
+      "tool",
+      "denied",
+      "asked-granted",
+      "asked-denied",
+      "interrupt",
+      "queued",
+    ]) {
       const stream = await envelopes(name);
       expect(projectAll(emptyProjection, coalesceEnvelopes(stream)), name).toEqual(
         projectAll(emptyProjection, stream),
@@ -136,7 +172,16 @@ describe("fixtures recorded from keywork serve", () => {
   });
 
   it("every fixture snapshot stays stable", async () => {
-    for (const name of ["plain", "thinking", "tool", "denied", "interrupt", "queued"]) {
+    for (const name of [
+      "plain",
+      "thinking",
+      "tool",
+      "denied",
+      "asked-granted",
+      "asked-denied",
+      "interrupt",
+      "queued",
+    ]) {
       expect(await projected(name)).toMatchSnapshot(name);
     }
   });

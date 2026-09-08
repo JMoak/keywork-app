@@ -7,6 +7,7 @@ export const engineEventTypes = [
   "tool.started",
   "tool.output",
   "tool.finished",
+  "gate.ask",
   "gate.permission",
   "gate.preset",
   "session.mode",
@@ -41,6 +42,7 @@ export interface EnginePayloads {
   "tool.started": { call: ToolCallPart };
   "tool.output": { chunk: string; callId?: string };
   "tool.finished": { callId: string; output: string; isError: boolean; spill?: SpillReference };
+  "gate.ask": { ask: PermissionAsk };
   "gate.permission": { decision: PermissionDecision };
   "gate.preset": { from: string; to: string };
   "session.mode": { mode: string };
@@ -97,11 +99,20 @@ export interface SpillReference {
   elidedTo: number;
 }
 
+export type PermissionGate = "policy" | "default" | "user" | "headless";
+
 export interface PermissionDecision {
   tool: string;
   callId: string;
   verdict: "granted" | "denied";
-  gate: "policy" | "default" | "user" | "headless";
+  gate: PermissionGate;
+}
+
+export interface PermissionAsk {
+  tool: string;
+  callId: string;
+  arguments: unknown;
+  rule: "policy" | "default";
 }
 
 export interface ContextInjection {
