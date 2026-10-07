@@ -1,0 +1,110 @@
+.kw-browser {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  container: browser / inline-size;
+  font-family: var(--kw-font-mono);
+}
+
+.kw-browser-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+}
+
+.kw-browser-root {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.kw-browser-filter {
+  font: inherit;
+  padding: 0 0.3rem;
+  border: 1px solid var(--kw-border-focus);
+  background: var(--kw-panel);
+  color: var(--kw-text);
+  width: 10rem;
+  max-width: 50%;
+}
+
+.kw-browser-failure {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--kw-error);
+}
+
+.kw-browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  overflow: auto;
+}
+
+.kw-browser-entry {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.2rem 0.5rem 0.2rem calc(0.5rem + var(--kw-depth, 0) * 1rem);
+  font: inherit;
+  text-align: left;
+  color: var(--kw-text-mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.kw-browser-row[data-kind="dir"] .kw-browser-entry {
+  color: var(--kw-text);
+}
+
+.kw-browser-row[data-ignored] .kw-browser-entry,
+.kw-browser-row[data-hidden] .kw-browser-entry {
+  color: var(--kw-text-dim);
+}
+
+.kw-browser-row[data-lit] .kw-browser-entry {
+  color: var(--kw-accent);
+  background: var(--kw-panel-lift);
+}
+
+.kw-browser-row[data-cursor] .kw-browser-entry {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: -1px;
+  color: var(--kw-text);
+}
+
+.kw-browser-mark {
+  text-align: center;
+  color: var(--kw-density-medium);
+}
+
+.kw-browser-row[data-lit] .kw-browser-mark {
+  color: var(--kw-density-full);
+}
+
+.kw-browser-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-browser-fact {
+  color: var(--kw-text-dim);
+  font-size: 0.85em;
+}
+
+@container browser (max-width: 559.98px) {
+  .kw-browser-fact,
+  .kw-browser-root {
+    display: none;
+  }
+}

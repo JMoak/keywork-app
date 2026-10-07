@@ -1,0 +1,82 @@
+{
+  "sessionId": "s1",
+  "leafId": "q5",
+  "entries": [
+    {
+      "type": "message",
+      "message": {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "which way?"
+          }
+        ]
+      },
+      "id": "q2",
+      "parentId": null,
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "message",
+      "message": {
+        "role": "assistant",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Left it is."
+          }
+        ]
+      },
+      "id": "q1",
+      "parentId": "q2",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "label",
+      "targetId": "q1",
+      "label": "went left",
+      "id": "q4",
+      "parentId": "q1",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "message",
+      "message": {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "no, the other way"
+          }
+        ]
+      },
+      "id": "q6",
+      "parentId": "q2",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "message",
+      "message": {
+        "role": "assistant",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Right, then."
+          }
+        ]
+      },
+      "id": "q5",
+      "parentId": "q6",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    }
+  ],
+  "labels": {
+    "q1": "went left"
+  },
+  "activePath": [
+    "q2",
+    "q6",
+    "q5"
+  ]
+}

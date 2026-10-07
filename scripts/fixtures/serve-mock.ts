@@ -1,11 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { repoRoot } from "../lib/repo-files.ts";
-
-const keyworkRepo = resolve(process.env.KEYWORK_REPO ?? join(repoRoot, "..", "keywork"));
+import { protocolVersion } from "@keywork-app/protocol";
+import { keyworkModuleUrl } from "../lib/keywork-checkout.ts";
+import { seedVault } from "./seed-vault.ts";
 
 interface Usage {
   inputTokens: number;
@@ -53,6 +52,7 @@ interface ServeModule {
     projectTrusted: boolean;
     provider: Provider;
     permissions: (call: unknown) => "allow" | "ask" | "deny" | undefined;
+    checkpointsGitDir?: string;
     log: unknown;
   }): unknown;
 }
@@ -77,6 +77,21 @@ export function scriptedProvider(delayMs: number, delay: (ms: number) => Promise
 function turnFor(prompt: string, call: number, messages: ProviderRequest["messages"]): Delta[] {
   const lastRole = messages.at(-1)?.role;
   if (lastRole === "tool") return [...words("The command ran; its output is above."), done(41, 9)];
+  if (/\b(write|edit|create|save)\b/i.test(prompt)) {
+    return [
+      ...thoughts("A file write answers this."),
+      {
+        type: "tool-call",
+        call: {
+          type: "tool-call",
+          callId: `c${call}`,
+          name: "write",
+          arguments: { path: "notes.txt", content: writtenNotes(call) },
+        },
+      },
+      done(0, 0),
+    ];
+  }
   if (/\b(run|bash|echo|ls|list)\b/i.test(prompt)) {
     return [
       ...thoughts("A shell command answers this fastest."),
@@ -123,6 +138,12 @@ export function tierOf(widthPx: number): WidthTier {
 
 That is the whole grammar; nothing decorative that is not also informative.`;
 
+function writtenNotes(call: number): string {
+  return Array.from({ length: call + 2 }, (_, line) => `note ${line + 1} written on call ${call}`)
+    .join("\n")
+    .concat("\n");
+}
+
 function words(text: string): Delta[] {
   return text.split(/(?<=\s)/).map((piece) => ({ type: "text", text: piece }));
 }
@@ -150,34 +171,44 @@ if (import.meta.main) {
       cadence: { type: "string", default: "40" },
       "write-ticket": { type: "boolean", default: false },
       ask: { type: "boolean", default: false },
+      trust: { type: "boolean", default: false },
+      memory: { type: "boolean", default: false },
     },
   });
-  const server = (await import(moduleUrl("packages/server/src/index.ts"))) as ServerModule;
-  const serve = (await import(moduleUrl("packages/cli/src/serve.ts"))) as ServeModule;
-  const cwd = await mkdtemp(join(tmpdir(), "keywork-app-mock-"));
-  const sessionDir = join(cwd, ".sessions");
-  const userRoot = join(cwd, ".user");
+  const trusted = values.trust || values.memory;
+  const server = (await import(keyworkModuleUrl("packages/server/src/index.ts"))) as ServerModule;
+  const serve = (await import(keyworkModuleUrl("packages/cli/src/serve.ts"))) as ServeModule;
+  const root = await mkdtemp(join(tmpdir(), "keywork-app-mock-"));
+  const cwd = join(root, "workspace");
+  const sessionDir = join(root, "sessions");
+  const userRoot = join(root, "user");
+  await mkdir(cwd, { recursive: true });
   await mkdir(sessionDir, { recursive: true });
   await mkdir(userRoot, { recursive: true });
+  if (values.memory) await seedVault(cwd);
   const log = new server.EventLog();
   const host = serve.fileSessionHost({
     cwd,
     sessionDir,
     userRoot,
-    projectTrusted: false,
+    projectTrusted: trusted,
     provider: scriptedProvider(
       Number(values.cadence),
       (ms) => new Promise((r) => setTimeout(r, ms)),
     ),
     permissions: () => (values.ask ? undefined : "allow"),
+    ...(trusted && { checkpointsGitDir: join(root, "checkpoints") }),
     log,
   });
+  console.log(
+    `workspace ${cwd} (${trusted ? "trusted, checkpoints on" : "untrusted"}${values.memory ? ", vault seeded" : ""})`,
+  );
   const token = server.issueToken();
   const listening = await server.listen({
     token,
     host,
     log,
-    version: "0.0.1",
+    version: protocolVersion,
     ...(values.port !== undefined && { port: Number(values.port) }),
   });
   console.log(`listening on ${listening.url}`);
@@ -204,8 +235,4 @@ if (import.meta.main) {
   process.on("SIGINT", () => void stop());
   process.on("SIGTERM", () => void stop());
   await new Promise(() => undefined);
-}
-
-function moduleUrl(relative: string): string {
-  return pathToFileURL(join(keyworkRepo, relative)).href;
 }

@@ -55,7 +55,7 @@ export function chordOfKey(
   return {
     name,
     ctrl: event.ctrlKey || event.metaKey,
-    shift: event.shiftKey && (chorded || !isPrintable(event.key)),
+    shift: event.shiftKey && (chorded || !isPrintable(event.key) || isLetter(event.key)),
     alt: event.altKey,
   };
 }
@@ -91,4 +91,8 @@ function canonicalName(name: string): string {
 
 function isPrintable(key: string): boolean {
   return [...key].length === 1;
+}
+
+function isLetter(key: string): boolean {
+  return key.length === 1 && key.toLowerCase() !== key.toUpperCase();
 }

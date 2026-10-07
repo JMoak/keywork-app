@@ -38,11 +38,12 @@ describe("fixtures recorded from keywork serve", () => {
     expect(state.usage).toMatchObject({
       inputTokens: 12,
       outputTokens: 5,
+      lastTurnContextTokens: 12,
       turns: 1,
       unpricedTurns: 1,
     });
     expect(state.turn).toBeUndefined();
-    expect(state.lastEventId).toBe(4);
+    expect(state.lastEventId).toBe(5);
   });
 
   it("thinking: visible thinking folds into one entry ahead of the answer", async () => {
@@ -153,6 +154,19 @@ describe("fixtures recorded from keywork serve", () => {
     expect(state.usage.turns).toBe(2);
   });
 
+  it("injected: a prompt from another client queues with its origin and runs as its own turn", async () => {
+    const stream = await envelopes("injected");
+    const origin = { kind: "external", client: "wispr-flow" };
+    const midway = projectAll(emptyProjection, stream.slice(0, 3));
+    expect(midway.queue).toEqual([{ id: "q1", text: "second", behavior: "queue", origin }]);
+    expect(midway.turn).toMatchObject({ userText: "first" });
+    expect(midway.turn?.origin).toBeUndefined();
+    const state = projectAll(midway, stream.slice(3));
+    expect(state.queue).toEqual([]);
+    expect(state.entries[2]).toEqual({ kind: "user", text: "second", origin, replay: false });
+    expect(state.usage.turns).toBe(2);
+  });
+
   it("every fixture projects identically whether or not deltas are coalesced per frame", async () => {
     for (const name of [
       "plain",
@@ -163,6 +177,7 @@ describe("fixtures recorded from keywork serve", () => {
       "asked-denied",
       "interrupt",
       "queued",
+      "injected",
     ]) {
       const stream = await envelopes(name);
       expect(projectAll(emptyProjection, coalesceEnvelopes(stream)), name).toEqual(
@@ -181,6 +196,7 @@ describe("fixtures recorded from keywork serve", () => {
       "asked-denied",
       "interrupt",
       "queued",
+      "injected",
     ]) {
       expect(await projected(name)).toMatchSnapshot(name);
     }

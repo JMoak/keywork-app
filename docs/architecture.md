@@ -112,8 +112,8 @@ dragging a pane between docks is allowed, and every one of those has a keystroke
 no slower.
 
 Keyboard grammar is keywork's: one leader, a palette generated from the live keymap that
-doubles as documentation, and a leaderless hot path (submit as steer, queue follow-up,
-interrupt, approve, deny, mode cycle, palette, pane jump, zoom, overlay). Bindings share
+doubles as documentation, and a leaderless hot path (Enter queues, Alt+Enter steers, as in
+keywork's composer; interrupt, approve, deny, mode cycle, palette, pane jump, zoom, overlay). Bindings share
 action ids with keywork where the action exists in both, so muscle memory transfers.
 
 ### AD6. One theme system: keywork flavors (PD15, T6)

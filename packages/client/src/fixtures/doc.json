@@ -125,6 +125,58 @@
         }
       }
     },
+    "/sessions/{id}/inject": {
+      "post": {
+        "operationId": "injectPrompt",
+        "summary": "Submit a prompt from a client outside keywork, such as a voice assistant or another LLM window. It runs exactly like a typed prompt: it starts a turn when the session is idle and joins the back of the queue when a turn is running. `turn.started` and `queue.changed` carry `origin: { kind: \"external\", client }`, the turn answers to the same permission policy and ask queue, and any memory note it proposes is staged with provenance `untrusted`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text",
+                  "client"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "client": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The prompt was accepted; `queued` is true when it waits behind a running turn."
+          },
+          "400": {
+            "description": "The body is not `{ text, client }`."
+          },
+          "404": {
+            "description": "No session has that id."
+          }
+        }
+      }
+    },
     "/sessions/{id}/abort": {
       "post": {
         "operationId": "abortSession",
@@ -212,6 +264,242 @@
           }
         }
       }
+    },
+    "/sessions/{id}/entries": {
+      "get": {
+        "operationId": "readSessionEntries",
+        "summary": "The session's entry tree as its flat log: every entry with its `parentId`, the current `leafId`, `labels` by entry id, and `activePath` (entry ids from the root to the leaf). Fold the tree client-side by `parentId`; `message` entries carry their message whole.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entries."
+          },
+          "404": {
+            "description": "No session has that id."
+          }
+        }
+      }
+    },
+    "/sessions/{id}/fork": {
+      "post": {
+        "operationId": "forkSession",
+        "summary": "Start a new session whose history is the path from the root to `entryId`. The new session records this one as its `parentSession`; this one is untouched.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "entryId"
+                ],
+                "properties": {
+                  "entryId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new session's summary."
+          },
+          "400": {
+            "description": "The body is not `{ entryId }`."
+          },
+          "404": {
+            "description": "No session has that id, or no entry has that entryId."
+          }
+        }
+      }
+    },
+    "/sessions/{id}/label": {
+      "post": {
+        "operationId": "labelEntry",
+        "summary": "Name an entry so the tree can show it; `label: null` clears the name.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "entryId",
+                  "label"
+                ],
+                "properties": {
+                  "entryId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The entry's label as now recorded."
+          },
+          "400": {
+            "description": "The body is not `{ entryId, label: string | null }`."
+          },
+          "404": {
+            "description": "No session has that id, or no entry has that entryId."
+          }
+        }
+      }
+    },
+    "/sessions/{id}/leaf": {
+      "post": {
+        "operationId": "moveLeaf",
+        "summary": "Move the session's active leaf to `entryId` (`null` for the empty root) without forking: the next prompt continues from there and the conversation is rebuilt over the shorter path. Files are not restored. Refused while a turn is running.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "entryId"
+                ],
+                "properties": {
+                  "entryId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The leaf now active."
+          },
+          "400": {
+            "description": "The body is not `{ entryId: string | null }`."
+          },
+          "404": {
+            "description": "No session has that id, or no entry has that entryId."
+          },
+          "409": {
+            "description": "A turn is running."
+          }
+        }
+      }
+    },
+    "/sessions/{id}/changes": {
+      "get": {
+        "operationId": "readChanges",
+        "summary": "Files the session has changed since its first checkpoint: each with `added` and `deleted` line counts and `turn`, the 1-based turn that last touched it. An untrusted workspace answers `trusted: false` with no files.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The changed files."
+          },
+          "404": {
+            "description": "No session has that id."
+          },
+          "409": {
+            "description": "No baseline: checkpoints are off for this workspace."
+          }
+        }
+      }
+    },
+    "/sessions/{id}/changes/file": {
+      "get": {
+        "operationId": "readChangedFile",
+        "summary": "One changed file's text at the baseline (`before`) and now (`after`), each capped at 1 MiB with `truncated: true` past it; `path` is a query parameter relative to the workspace. `note` says `new`, `deleted`, `binary` (no text is sent) or `unreadable`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Both sides of the file."
+          },
+          "400": {
+            "description": "`path` is missing, absolute, or escapes the workspace."
+          },
+          "404": {
+            "description": "No session has that id."
+          },
+          "409": {
+            "description": "No baseline: checkpoints are off for this workspace."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -255,6 +543,8 @@
               "context.injected",
               "diagnostics.published",
               "shell.reset",
+              "session.tree",
+              "changes.updated",
               "engine.error"
             ]
           },

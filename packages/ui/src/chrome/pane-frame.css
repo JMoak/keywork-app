@@ -71,6 +71,18 @@
   color: var(--kw-text-dim);
   white-space: nowrap;
 }
+.kw-frame-telemetry {
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.kw-frame-title {
+  cursor: grab;
+}
+.kw-stage[data-gesture="dragging"] .kw-frame-title {
+  cursor: grabbing;
+}
 
 @container frame (max-width: 799.98px) {
   .kw-frame-mode {

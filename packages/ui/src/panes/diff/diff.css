@@ -1,0 +1,112 @@
+.kw-diff {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  font-family: var(--kw-font-mono);
+  --kw-diff-inserted-line: color-mix(in oklab, var(--kw-success) 14%, transparent);
+  --kw-diff-deleted-line: color-mix(in oklab, var(--kw-error) 14%, transparent);
+  --kw-diff-inserted-text: color-mix(in oklab, var(--kw-success) 32%, transparent);
+  --kw-diff-deleted-text: color-mix(in oklab, var(--kw-error) 32%, transparent);
+}
+
+.kw-diff-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+}
+
+.kw-diff-back,
+.kw-diff-editor,
+.kw-diff-file-row {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kw-diff-back,
+.kw-diff-editor {
+  color: var(--kw-accent);
+}
+
+.kw-diff-head-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kw-text-mid);
+}
+
+.kw-diff-unavailable,
+.kw-diff-note {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  color: var(--kw-text-dim);
+  border-bottom: 1px solid var(--kw-border);
+}
+
+.kw-diff-turns,
+.kw-diff-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kw-diff-turns {
+  overflow: auto;
+  padding: 0.25rem 0;
+}
+
+.kw-diff-turns[data-stale] {
+  opacity: 0.7;
+}
+
+.kw-diff-turn-stamp {
+  display: block;
+  padding: 0.4rem 0.75rem 0.15rem;
+  color: var(--kw-text-dim);
+  font-size: 0.85em;
+}
+
+.kw-diff-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.25rem 0.75rem;
+  text-align: left;
+  color: var(--kw-text-mid);
+}
+
+.kw-diff-file[data-cursor] .kw-diff-file-row {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: -1px;
+  color: var(--kw-text);
+}
+
+.kw-diff-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-diff-counts {
+  color: var(--kw-text-dim);
+}
+
+.kw-diff-merge {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.kw-diff-merge .cm-mergeView,
+.kw-diff-merge .cm-editor {
+  height: 100%;
+}

@@ -8,7 +8,8 @@ keywork-app is a client of `keywork serve`. It bundles the keywork binary as a s
 starts a server per workspace on loopback, and renders every pane from the typed event
 stream. No engine logic lives here.
 
-Status: M0, the skeleton. Read [`docs/README.md`](docs/README.md) for the architecture, the
+Status: M3.5 has landed (the page, flavors, composer, server feed, sidecar supervision, native
+window) and wave 4 is in progress. Read [`docs/README.md`](docs/README.md) for the architecture, the
 stack, and the milestone plan. [`AGENTS.md`](AGENTS.md) carries the conventions, which apply
 to humans and agents equally.
 
@@ -21,6 +22,8 @@ bun run check            # types, pins, guardrails, colors, contract, lint
 bun run test             # vitest: node projects + the Solid renderer under happy-dom
 bun run fixtures:record  # re-record wire fixtures from ../keywork (KEYWORK_REPO overrides)
 bun scripts/fixtures/serve-mock.ts --write-ticket   # keywork's real server with a scripted provider; the app attaches to it
+bun run check:contract   # route ids, methods and the version pin against ../keywork (KEYWORK_REPO overrides), else the recorded fixture
+bun run check:contract -- --source fixture               # force the recorded fixture, as CI without a checkout runs
 bun run check:contract -- --url http://127.0.0.1:4770   # against a live keywork serve
 bun run dev              # the Electron app with the renderer on Vite HMR
 bun run --cwd packages/ui dev   # the renderer alone in a browser, against the mock host

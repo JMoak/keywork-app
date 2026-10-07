@@ -1,0 +1,10 @@
+{
+  "path": "src/index.ts",
+  "bytes": 68,
+  "from": 0,
+  "to": 68,
+  "truncated": false,
+  "eof": true,
+  "text": "export const greeting = \"hello\";\nexport const farewell = \"goodbye\";\n",
+  "encoding": "utf-8"
+}

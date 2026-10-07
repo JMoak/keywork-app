@@ -70,6 +70,10 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       };
     case "shell.reset":
       return replay ? state : notice(state, "info", "· shell reset");
+    case "session.tree":
+    case "changes.updated":
+    case "memory.inbox":
+      return state;
     case "engine.error":
       return notice(
         endTurn({ ...state, lastError: envelope.payload.error.message }),
@@ -85,16 +89,18 @@ function startTurn(
   ts: string,
   replay: boolean,
 ): SessionProjection {
+  const origin = payload.origin !== undefined && { origin: payload.origin };
   const entry: TranscriptEntry = {
     kind: "user",
     text: payload.userText,
     ...(payload.entryId !== undefined && { entryId: payload.entryId }),
+    ...origin,
     replay,
   };
   return {
     ...settleStream(state),
     entries: [...state.entries, entry],
-    turn: replay ? state.turn : { startedAt: ts, userText: payload.userText },
+    turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
   };
 }
 
@@ -276,6 +282,8 @@ function addUsage(ledger: UsageLedger, usage: Usage): UsageLedger {
     cacheReadInputTokens: ledger.cacheReadInputTokens + (usage.cacheReadInputTokens ?? 0),
     cacheCreationInputTokens:
       ledger.cacheCreationInputTokens + (usage.cacheCreationInputTokens ?? 0),
+    lastTurnContextTokens:
+      usage.inputTokens + (usage.cacheReadInputTokens ?? 0) + (usage.cacheCreationInputTokens ?? 0),
     turns: ledger.turns + 1,
     unpricedTurns: ledger.unpricedTurns + (usage.costUsd === undefined ? 1 : 0),
     costUsd: ledger.costUsd + (usage.costUsd ?? 0),

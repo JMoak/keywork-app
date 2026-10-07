@@ -1,23 +1,103 @@
-import { readFile } from "node:fs/promises";
-import { operationIds } from "@keywork-app/protocol";
-import { describe, expect, it } from "vitest";
-import { contractViolations, docFixture, documentOfFixture } from "./check-contract.ts";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { protocolVersion, routes } from "@keywork-app/protocol";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  contractViolations,
+  documentOfCheckout,
+  documentOfFixture,
+  documentOfOpenApi,
+} from "./check-contract.ts";
 
 describe("check:contract", () => {
-  it("passes against the recorded document", async () => {
-    const document = documentOfFixture(await readFile(docFixture, "utf8"));
-    expect(document.operationIds).toEqual([...operationIds].sort());
+  it("passes against the recorded document, whose version is a placeholder", async () => {
+    const document = await documentOfFixture();
+    expect(document.version).toBeUndefined();
+    expect(document.routes).toEqual(
+      [...routes].sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`)),
+    );
     expect(contractViolations(document)).toEqual([]);
   });
 
-  it("names operations the server dropped and operations the protocol does not know", () => {
-    const violations = contractViolations({
-      version: "x",
-      operationIds: [...operationIds.filter((id) => id !== "abortSession"), "renameSession"],
-    });
-    expect(violations).toEqual([
+  it("names dropped, unknown and moved routes and a version off the pin", () => {
+    const document = documentOfOpenApi(
+      {
+        info: { version: "9.9.9" },
+        paths: {
+          "/doc": { get: { operationId: "getDocument" } },
+          "/events": { get: { operationId: "streamEvents" } },
+          "/sessions": {
+            get: { operationId: "listSessions" },
+            post: { operationId: "createSession" },
+          },
+          "/sessions/{id}": { get: { operationId: "readSession" } },
+          "/sessions/{id}/prompt": { post: { operationId: "promptSession" } },
+          "/sessions/{id}/inject": { put: { operationId: "injectPrompt" } },
+          "/sessions/{id}/rename": { post: { operationId: "renameSession" } },
+          "/sessions/{id}/entries": { get: { operationId: "readSessionEntries" } },
+          "/sessions/{id}/fork": { post: { operationId: "forkSession" } },
+          "/sessions/{id}/label": { post: { operationId: "labelEntry" } },
+          "/sessions/{id}/leaf": { post: { operationId: "moveLeaf" } },
+          "/sessions/{id}/changes": { get: { operationId: "readChanges" } },
+          "/sessions/{id}/changes/file": { get: { operationId: "readChangedFile" } },
+          "/asks": { get: { operationId: "listAsks" } },
+          "/asks/{callId}": { post: { operationId: "answerAsk" } },
+        },
+      },
+      "drifted",
+    );
+    expect(contractViolations(document)).toEqual([
+      `the server reports version 9.9.9; the app pins ${protocolVersion}`,
       "the server no longer serves abortSession",
       "the server added renameSession; the protocol does not know it yet",
+      "injectPrompt moved: the protocol has POST /sessions/{id}/inject, the server PUT /sessions/{id}/inject",
     ]);
   });
+
+  describe("against a keywork checkout", () => {
+    let checkout: string;
+
+    beforeAll(async () => {
+      checkout = await mkdtemp(join(tmpdir(), "keywork-app-drifted-"));
+      await writeDriftedCheckout(checkout);
+    });
+
+    afterAll(async () => {
+      await rm(checkout, { recursive: true, force: true });
+    });
+
+    it("imports openApiDocument by path and fails on a drifted server", async () => {
+      const document = await documentOfCheckout(checkout);
+      expect(document.origin).toBe(checkout);
+      expect(document.version).toBe("0.0.9");
+      expect(contractViolations(document)).toEqual([
+        `the server reports version 0.0.9; the app pins ${protocolVersion}`,
+        "the server no longer serves injectPrompt",
+      ]);
+    });
+  });
 });
+
+async function writeDriftedCheckout(root: string): Promise<void> {
+  const served = routes.filter((route) => route.operationId !== "injectPrompt");
+  await mkdir(join(root, "packages/server/src"), { recursive: true });
+  await mkdir(join(root, "packages/cli"), { recursive: true });
+  await writeFile(
+    join(root, "packages/cli/package.json"),
+    JSON.stringify({ name: "@keywork/cli", version: "0.0.9" }),
+  );
+  await writeFile(
+    join(root, "packages/server/src/openapi.ts"),
+    [
+      "export function openApiDocument(serverUrl: string, version: string) {",
+      "  const paths: Record<string, Record<string, { operationId: string }>> = {};",
+      `  for (const route of ${JSON.stringify(served)}) {`,
+      "    paths[route.path] = { ...paths[route.path], [route.method.toLowerCase()]: { operationId: route.operationId } };",
+      "  }",
+      '  return { openapi: "3.1.0", info: { title: "keywork", version }, servers: [{ url: serverUrl }], paths };',
+      "}",
+      "",
+    ].join("\n"),
+  );
+}

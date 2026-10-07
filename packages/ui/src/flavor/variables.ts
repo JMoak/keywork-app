@@ -49,6 +49,7 @@ export function applyFlavor(flavor: Flavor, root: HTMLElement = document.documen
   }
   root.style.colorScheme = flavor.appearance;
   root.dataset.flavor = flavor.name;
+  root.dataset.instruments = flavor.instruments;
 }
 
 export function variablesOfStylesheet(css: string): FlavorVariables {

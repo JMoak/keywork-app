@@ -36,8 +36,9 @@ describe("intentOf", () => {
         isComposing: false,
         ...overrides,
       });
-    expect(key({})).toBe("steer");
-    expect(key({ altKey: true })).toBe("queue");
+    expect(key({})).toBe("queue");
+    expect(key({ altKey: true })).toBe("steer");
+    expect(key({ ctrlKey: true })).toBe("queue");
     expect(key({ shiftKey: true })).toBe("newline");
     expect(key({ key: "Escape" })).toBe("interrupt");
     expect(key({ key: "a" })).toBe("none");
@@ -46,21 +47,23 @@ describe("intentOf", () => {
 });
 
 describe("Composer", () => {
-  it("steers on enter and clears, ignoring an empty draft", () => {
+  it("queues on enter and clears, ignoring an empty draft", () => {
     const composer = mount();
     fireEvent.keyDown(composer.input, { key: "Enter" });
-    expect(composer.sent).toEqual([]);
+    expect(composer.queued).toEqual([]);
     composer.type("  fix the tests  ");
     fireEvent.keyDown(composer.input, { key: "Enter" });
-    expect(composer.sent).toEqual(["fix the tests"]);
+    expect(composer.queued).toEqual(["fix the tests"]);
+    expect(composer.sent).toEqual([]);
     expect(composer.input.value).toBe("");
   });
 
-  it("queues on alt+enter and interrupts on escape without touching the draft", () => {
+  it("steers on alt+enter and interrupts on escape without touching the draft", () => {
     const composer = mount();
     composer.type("after that");
     fireEvent.keyDown(composer.input, { key: "Enter", altKey: true });
-    expect(composer.queued).toEqual(["after that"]);
+    expect(composer.sent).toEqual(["after that"]);
+    expect(composer.queued).toEqual([]);
     composer.type("still typing");
     fireEvent.keyDown(composer.input, { key: "Escape" });
     expect(composer.interrupts()).toBe(1);
@@ -75,11 +78,31 @@ describe("Composer", () => {
     composer.type("line one\nline two\nline three");
     fireEvent.paste(composer.input);
     expect(composer.sent).toEqual([]);
+    expect(composer.queued).toEqual([]);
     expect(composer.input.value.split("\n")).toHaveLength(3);
   });
 
   it("renders the queue as quiet rows", () => {
     const composer = mount();
     expect(composer.container.querySelector(".kw-queue-item")?.textContent).toBe("░later");
+  });
+
+  it("tags a queued prompt another client injected", () => {
+    const { container } = render(() => (
+      <Composer
+        queue={[
+          {
+            id: "q1",
+            text: "dictated",
+            behavior: "queue",
+            origin: { kind: "external", client: "wispr-flow" },
+          },
+        ]}
+        onSteer={() => undefined}
+        onQueue={() => undefined}
+        onInterrupt={() => undefined}
+      />
+    ));
+    expect(container.querySelector(".kw-queue-origin")?.textContent).toBe("via wispr-flow");
   });
 });

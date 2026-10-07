@@ -1,0 +1,5 @@
+.kw-empty {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  color: var(--kw-text-dim);
+}

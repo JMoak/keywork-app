@@ -14,6 +14,17 @@ export type LayoutNode =
     };
 
 export type SplitNode = Extract<LayoutNode, { kind: "split" }>;
+export type SplitPath = readonly ("first" | "second")[];
+
+export interface SplitSeam {
+  readonly path: SplitPath;
+  readonly orientation: Orientation;
+  readonly at: number;
+  readonly start: number;
+  readonly end: number;
+  readonly origin: number;
+  readonly length: number;
+}
 
 export const minPaneSize = { width: 320, height: 200 } as const;
 export const splitRatioBounds = { min: 0.1, max: 0.9 } as const;
@@ -101,6 +112,33 @@ export function resizeAroundLeaf(node: LayoutNode, id: PaneId, delta: number): L
   };
 }
 
+export function withRatioAt(node: LayoutNode, path: SplitPath, ratio: number): LayoutNode {
+  if (node.kind === "leaf") return node;
+  const [step, ...rest] = path;
+  if (step === undefined) return { ...node, ratio: steppedRatio(ratio) };
+  return { ...node, [step]: withRatioAt(node[step], rest, ratio) };
+}
+
+export function ratioAt(node: LayoutNode, path: SplitPath): number | undefined {
+  if (node.kind === "leaf") return undefined;
+  const [step, ...rest] = path;
+  return step === undefined ? node.ratio : ratioAt(node[step], rest);
+}
+
+export function collectSeams(
+  node: LayoutNode,
+  rect: Rect,
+  path: SplitPath = [],
+  into: SplitSeam[] = [],
+): SplitSeam[] {
+  if (node.kind === "leaf") return into;
+  const [first, second] = splitRects(rect, node);
+  into.push(seamBetween(node, rect, first, path));
+  collectSeams(node.first, first, [...path, "first"], into);
+  collectSeams(node.second, second, [...path, "second"], into);
+  return into;
+}
+
 export function rotateAroundLeaf(node: LayoutNode, id: PaneId): LayoutNode {
   if (node.kind === "leaf") return node;
   if (isLeaf(node.first, id) || isLeaf(node.second, id)) {
@@ -154,6 +192,29 @@ export function splitRects(rect: Rect, split: SplitNode): [Rect, Rect] {
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function seamBetween(split: SplitNode, rect: Rect, first: Rect, path: SplitPath): SplitSeam {
+  if (split.orientation === "row") {
+    return {
+      path,
+      orientation: "row",
+      at: first.x + first.width,
+      start: rect.y,
+      end: rect.y + rect.height,
+      origin: rect.x,
+      length: rect.width,
+    };
+  }
+  return {
+    path,
+    orientation: "column",
+    at: first.y + first.height,
+    start: rect.x,
+    end: rect.x + rect.width,
+    origin: rect.y,
+    length: rect.height,
+  };
 }
 
 function isLeaf(node: LayoutNode, id: PaneId): boolean {

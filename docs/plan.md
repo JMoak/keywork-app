@@ -218,7 +218,7 @@ so the separator and the refusal reason vanished; spans now carry a `part`, and 
 **Decisions Jordan may reverse.** Voice stamps are literal block glyphs in mono; the
 streaming animation steps the stamp's color through density tokens; the measure applies at
 broadsheet only; `keywork-day`'s palette is a first design; links allow http(s), mailto,
-and anchors only; the version check is exact on `0.0.1`; a dead or corrupt ticket counts
+and anchors only; the version check is exact on the pinned `protocolVersion` (0.1.1 since wave 4); a dead or corrupt ticket counts
 as absent; unresolved inference is read from stderr's first line.
 
 **Left for rung 3.** The workspace open flow in the window, and the token-in-main
@@ -381,6 +381,185 @@ server gained `--ask`.
 - Seen live in the shell: a fresh session, the ask card with its reason and arguments,
   `ctrl+y` granting it and the tool running under a `user` gate; a second ask denied by
   click. Captures in `artifacts/shots/ask-*.png`.
+
+### Wave 4 ledger (2026-10-07): the parallel build
+
+Nine lanes ran at once after a short serial wave 0, four of them in the keywork repo. The
+assessment that shaped it: the app sat at M3.5 with 185 tests; keywork sat at 25e9f67
+(v0.1.1, eleven routes, S0 and S1 landed, S2 to S9 absent); the dependency graph was routes
+then panes; the conflict hot spots were four shared UI files and one server dispatch file.
+
+**Wave 0, the app (landed).** The wire resynced to keywork 25e9f67: `injectPrompt`
+(`POST /sessions/{id}/inject`, `{text, client}`) in the protocol routes, the typed client
+(`inject` → `started | queued | missing`) and the re-recorded `/doc` fixture; `PromptOrigin`
+on `turn.started` and `queue.changed` items; the checked-in `events.md` copy current and the
+rest of the vocabulary audited clean. Protocol routes carry method and path, not ids alone,
+and `check:contract` compares ids, methods and the version pin against keywork's real
+`openApiDocument` read by file path from the checkout (`KEYWORK_REPO` or `../keywork`,
+`--source auto|fixture|checkout`, `--url` for a live server), falling back to the fixture
+where no checkout exists, with a temp-dir drifted-checkout test proving it fails. The server
+version pin is `protocolVersion = "0.1.1"` in one place; `expectedServerVersion` and the mock
+server derive from it (it had been `0.0.1`, so attach-first would have refused every real
+keywork). New fixture `injected.jsonl`: a `wispr-flow` prompt queues behind a running turn
+with its origin and then runs as its own turn; the page and composer tag it `via wispr-flow`.
+Submit-key parity with keywork's 2026-09-02 composer flip: **Enter queues, Alt+Enter
+steers**; Shift+Enter newline, Esc interrupt, paste never submits. The keywork checkout
+locator is one helper (`scripts/lib/keywork-checkout.ts`) shared by the recorder, the mock
+server and the contract check. README status corrected.
+
+**Wave 0, the pane registry (`packages/ui/src/panes/`, landed).** One table,
+`paneRegistry`, built from a static tuple of `definePane` definitions; `PaneSpec` derives
+from it, so adding a pane is one directory and one tuple entry. A definition carries its zod
+spec, home dock, title, one-line empty state, Solid component, optional summon (action id,
+chord, palette command, spec factory), pane-local actions, adornments, lifecycle and restore
+hook. The tiler places by home and mints `<kind>-<n>` ids (MIRROR: keywork
+`pane-kinds.ts`); the keymap, palette and frame title read the registry;
+`workspace-view.tsx` is composition only. The keymap learned scopes: a pane-local chord
+fires only while its kind is focused, two panes may share one, and a collision with a global
+chord still throws. M4.9's inventory test lands early: every registered pane has a title, a
+home, a one-line empty state naming exactly one leader chord, a unique summon id and a
+palette open command.
+
+**Wave 0, keywork (landed in the keywork checkout, uncommitted there).**
+`docs/backlog/118-app-surface.md` owns the app's server lane under keywork's ledger
+(registered in the backlog index, pointed to from 80's S0·S1 section, rows in the open
+ledger); it re-cuts S2 to S9 as K0 to K4 with sizes, Accept criteria and questions
+Q-AS1 to Q-AS8 for Jordan. The server dispatch is one module per route family under
+`packages/server/src/routes/` (`family.ts` holds the contract and helpers); `openapi.ts`
+composes `routeFamilies` and a fixture test keeps the composed `/doc` byte-stable; adding a
+family is one file and one line.
+
+**Lane A1, the terminal pane (M4.4, landed).** `desktop/src/main/pty.ts` holds node-pty
+over a typed seam, ConPTY explicit, shell chosen per platform (pwsh → Windows PowerShell →
+`%COMSPEC%`; `$SHELL` → `/bin/sh`), env scrubbed of every keywork token and any value
+carrying a held ticket, output batched per 8 ms frame or 4 KiB, PTYs tied to their
+`webContents` and killed as a tree on quit. node-pty is the one module main does not bundle
+(`nativeModules` in the vite config, `npmRebuild` and `asarUnpack` in the builder).
+`HostPort.pty` is six calls; the preload keeps pty bytes ordered through the same
+`chunkQueue` as the relay. `ui/src/panes/terminal/` is xterm 6 with fit and WebGL (DOM
+fallback on context loss), themed from `--kw-*` tokens and re-themed on flavor change,
+three modes in one spec: shell, mirror (a pure projection→text tail of the agent's bash
+calls), bridge (the real `keywork attach` or `connect` from the binary main resolves, no
+token passed). A keyboard-owning pane is a registry concept: `keyboard: "owned"` makes the
+keymap pass every chord but the leader and the pane's own. Summon `leader shift+t`.
+Evidence, live on Windows 11: a PowerShell prompt, `dir`, resize 57 → 156 columns on zoom,
+Ctrl+C stopping `ping -t`, vim open and quit on the alternate screen, two independent
+shells, a mirror of a real bash turn from the mock, and `keywork --version` through ConPTY.
+Findings: shifted leader keys never fired from a real keyboard (`chord.ts` dropped shift for
+letters; fixed; `shift+.` and `shift+,` still arrive as `>` `<`); ResizeObserver is throttled
+in a hidden window, so fit has a 200 ms backstop like `frameTick`; keywork's own TUI paints
+one blank frame under ConPTY with the cursor placed past the reported width, which is the
+Windows failure keywork's SW11 should record (it is OpenTUI/Bun's terminal layer, not the
+PTY); stale per-workspace tickets shadow the live global one for `keywork attach`; `pane.close`
+refuses silently on a full layout.
+
+**Lane A2, the desktop main process (M3.8, M2.7, M5.1, landed).** Main holds a set of
+windows over a pure `windowRegistry` (window ↔ workspace, MRU order, pending asks per
+workspace); each workspace keeps its attached-or-spawned server, released only when its last
+window closes and only if the app started it; window state is a per-workspace book.
+`HostPort` grew `listOpenWorkspaces`, `switchWorkspace`, `onOpenWorkspacesChanged`,
+`onOpenRequested`, `onNotificationActivated`, `setPendingAsks`. Single instance and
+`keywork://open?path=…` (plus a bare folder argument) parse through `deep-link.ts`, every
+refusal typed and none thrown. A per-platform menu from a pure `menuModel`, a tray from
+`trayModel` with a runtime-built monochrome mark and a Windows overlay while asks pend, and
+the needs-you rule in `shouldNotify`: a toast only for a pending ask (or the inbox
+threshold) in an unfocused window, click focusing the window and naming the pane.
+Evidence: the built app driven over CDP; a second-instance deep link routed into the front
+door, three windows across three workspaces, a toast shown for an ask and refused for a bare
+notice, and after closing the last window the spawned server, its port and its ticket were
+gone. Findings, found by launching, fixed: `closeAll` could not see a close already in
+flight, so quit outran taskkill; dev argv carried the entry script as a folder; the relay
+sent stream ends to destroyed webContents. Open: the renderer does not yet call
+`setPendingAsks`; the app still reads keywork's user-level ticket rather than the
+per-workspace one.
+
+**Lane A3, mouse garnish, first run, instruments (M3.7, M4.9, M4.8 part, landed).**
+`layout/hit.ts` and `pointer.ts`: hit-testing is a pure function over the layout's own
+rects and seams, and the pointer is a pure machine (down/move/up/cancel → focus, resize,
+drop) tested over sequences including cancel, escape mid-drag, same-home drops and drags past
+the minimum. Gestures land on the verbs the keyboard already has: a seam drag is
+`resizeSeam` snapping to the stepped ratio with the same minimum clamp as `pane.grow`; a
+title drag onto a dock is `send`; click focuses on press; wheel is never intercepted.
+Feedback is ink only through density tokens, stepped, none under reduced motion.
+`chrome/first-run.tsx`: the first run teaches exactly five keys (enter, split, sessions, go,
+keys) rendered from the live keymap, shown only while the workspace has zero sessions.
+`instruments/`: `formatTokens` and `formatCost` mirror keywork's rounding; the context gauge
+is a level, not progress (steps in calm, bar in cockpit), drawn from the last turn's context
+tokens against an assumed 200k window and labelled `basis: assumed` until the server's
+`/context` is consumed; the cost item never renders a total that hides unpriced turns. The
+gauge sits in the pane frame's telemetry slot and sheds at the clipping tier.
+
+**Lane A4, the release rail (M5.2, M5.3, M5.5, landed).** `scripts/fetch-sidecar.ts`
+resolves keywork's release asset per platform and arch from `protocolVersion`, verifies the
+published `.sha256` before writing, and places the binary at the one shared `sidecar/`
+constant; v0.1.1 Windows fetched and verified for real. `release.yml` on `v*` tags: three
+runners, SHA-pinned actions, check + test + sidecar + `electron-builder --publish never`,
+per-artifact sums, a publish job that re-verifies, writes `SHA256SUMS`, times the deb
+install to `--version` (fails above 60 s) and creates a draft release; no secrets needed for
+green, signing gated on `WIN_CSC_*`, `MAC_CSC_*`, `APPLE_*`. Updater: electron-updater 6.8.9
+against the app's GitHub releases, a check 30 s after launch then every 6 h, download
+silently, surface `onUpdateReady`, install on quit only after `acceptUpdate`, off in dev.
+Parity scaffold: Playwright 1.63.0 captures the transcript scenarios per flavor and width
+tier on three runners; `scripts/compare-shots.ts` diffs across OS with a 5% tolerance for
+font fallback, advisory until the first baselines exist. `docs/release.md` records the ritual.
+Decision for Jordan: `productName: keywork` makes the deb executable `keywork`, shadowing
+the CLI on PATH; `executableName: keywork-app` would avoid it.
+
+**Server lane K0 to K4 (landed in keywork on branches `app-surface/k1..k4`, worktrees under
+`C:\src\keywork-lanes\`, uncommitted; an integration worktree `all` folds them).**
+- K0/K1 (`app-surface/k1`): `keywork serve` composes checkpoints like the TUI
+  (`--no-checkpoints` opts out) and resolves model, thinking and effort per session from the
+  JSONL; `SessionHost.checkpointsOf(id)`. Routes
+  `POST /sessions/{id}/{model,thinking,effort,compact,undo,redo,export,rename}`,
+  `GET /sessions/{id}/{context,cost}`, `POST /preset` (loosening needs `confirmed: true`),
+  `/prompt` `behavior: "steer"|"queue"` (default queue), `GET /events?session=<id>[&only=session]`.
+  `SessionSummary` carries `model`, `thinking`, `effort`. New server event `session.state`
+  `{ model?, thinking, effort?, title, leafId, undoable, redoable }`; `gate.preset` now fires
+  process-wide. `/undo` returns the prompt text so the composer re-seeds it. The retired-model
+  map moved from the TUI ledger into `engine/src/usage-ledger.ts`, so `/cost` carries real
+  per-model rows. Found and fixed: `turn.completed` fires before persistence, so verbs await
+  the pending persist.
+- K2 (`app-surface/k2`): `GET /sessions/{id}/entries` (flat JSONL with `parentId`,
+  `leafId`, `labels`, `activePath`), `POST …/fork {entryId}` → 201 summary, `POST …/label`,
+  `POST …/leaf` (409 while a turn runs); `GET /sessions/{id}/changes` (`trusted`, `baseline`,
+  files with 1-based `turn`), `GET …/changes/file?path=` (both sides, 1 MiB cap per side,
+  `note` for new/deleted/binary/unreadable). Events `session.tree` and `changes.updated`
+  fired where the TUI's feeds fire; `engine/src/mutations.ts` is the shared
+  `followMutations`.
+- K3 (`app-surface/k3`): `GET /workspace`, `GET /tree?path=`, `GET /files?path=&from=&to=`
+  (jailed to the tool scope, 403 outside, ignored entries flagged never dropped, reading
+  needs no trust, `[from,to)` 1 MiB per request, 415 on NUL), `POST /workspace/trust {}` →
+  `{ trusted, root, reopens }` (the server does not recompose; the app restarts the sidecar),
+  `GET /flavors` with a `system` placeholder; `/mcp` + restart/enabled/tools, `/arcs` +
+  new/close/abandon and per-session bind, `/bots` + create and per-session switch (409
+  mid-turn), `/workspaces` + new/use (`reopens: true`)/focus/unfocus. One
+  `surface.changed { kind }` event with `sessionId: ""`. Session summaries carry `arc` and
+  `bot`. `/doc` has 28 paths on this branch.
+- K4 (`app-surface/k4`): `GET /memory`, `/memory/inbox` + approve/discard,
+  `/memory/notes[?layer=]`, `/memory/notes/{name}`, `/memory/daily[/{date}]`,
+  `/memory/ledger` + revert (`needs-rebase` is a 200 outcome), `/memory/ask {query, arc?}`,
+  and the arc airlock (`GET /arcs/{slug}/airlock`, candidates and questions triage including
+  `carry`, deliver, finish `{force}`). Wire shapes are the engine's own `StagedItem`, `Note`,
+  `LedgerEntry`, `AuditEntry`, `DailyEntry`. Untrusted: reads `{ trusted: false, …empty }`,
+  writes 403 `memory is inert`. First server event `memory.inbox { count, kinds }`; the
+  needs-you threshold (3, rising edge) stays in the app. `keywork serve` now composes arcs,
+  bots and citations as the TUI does.
+- The envelope `type` enum in `/doc` is now engine ∪ server events (`surface.changed`,
+  `memory.inbox`, `session.state`); the protocol package mirrors both lists.
+
+**Findings across the wave.**
+- keywork has no modes: Plan, Recall and Agent are a spec (`docs/modes.md`) with no code, so
+  M3.6's mode half waits on keywork PD12, not on a route. Presets are process-level.
+- The main keywork checkout carried ~107 dirty files from another session while this wave
+  ran, so the K lanes were isolated in worktrees; Jordan merges `app-surface/*`.
+- `check:contract` in auto mode drifts against the main checkout until those branches merge;
+  the fixture mode stays green in CI.
+- The TUI's browser and file readers are unconfined; the HTTP routes apply the tool jail.
+
+**Decisions for Jordan.** Q-AS1 to Q-AS8 in keywork's 118 doc (the trust route, preset
+loosening over HTTP, rename pinning and `effort: null`, cost lineage, the events filter,
+one `surface.changed` or four, context-dir linking, the `system` flavor placeholder); the
+deb executable name; installing Bun 1.3.14 locally; whether to persist injection origin.
 
 ## M4: The panes (20pt)
 

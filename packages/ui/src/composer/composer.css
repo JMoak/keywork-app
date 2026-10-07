@@ -25,6 +25,11 @@
   color: var(--kw-density-light);
 }
 
+.kw-queue-origin {
+  color: var(--kw-density-light);
+  white-space: nowrap;
+}
+
 .kw-composer-row {
   display: grid;
   grid-template-columns: 1.5rem minmax(0, 1fr);

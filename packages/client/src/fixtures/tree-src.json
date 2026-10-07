@@ -1,0 +1,17 @@
+{
+  "path": "src",
+  "entries": [
+    {
+      "name": "util",
+      "kind": "dir",
+      "ignored": false,
+      "hidden": false
+    },
+    {
+      "name": "index.ts",
+      "kind": "file",
+      "ignored": false,
+      "hidden": false
+    }
+  ]
+}

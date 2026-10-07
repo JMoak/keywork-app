@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { appActions, appBindings, composerHotPath, hotPathActions } from "./actions.ts";
+import {
+  actionScopes,
+  appActions,
+  appBindings,
+  composerHotPath,
+  hotPathActions,
+} from "./actions.ts";
 import { chordOfKey, formatChord, parseChord } from "./chord.ts";
 import { keybindingsSchema, keymapFromConfig } from "./config.ts";
 import { Keymap, KeymapError } from "./keymap.ts";
@@ -40,6 +46,13 @@ describe("chords", () => {
     expect(chordOfKey(key({ key: "ArrowLeft" }))?.name).toBe("left");
     expect(chordOfKey(key({ key: " " }))?.name).toBe("space");
     expect(chordOfKey(key({ key: "Shift", shiftKey: true }))).toBeUndefined();
+    expect(chordOfKey(key({ key: "T", shiftKey: true }))).toEqual({
+      name: "t",
+      ctrl: false,
+      shift: true,
+      alt: false,
+    });
+    expect(chordOfKey(key({ key: ">", shiftKey: true }))?.shift).toBe(false);
     expect(chordOfKey({ ...key({ key: "a" }), isComposing: true })).toBeUndefined();
   });
 });
@@ -84,13 +97,48 @@ describe("Keymap", () => {
   });
 });
 
+describe("scoped bindings", () => {
+  const scoped = () =>
+    new Keymap({
+      bindings: { "pane.zoom": "leader z", "diff.next": "leader n", "tree.next": "leader n" },
+      scopes: { "diff.next": "diff", "tree.next": "session-tree" },
+    });
+
+  it("let two panes share a local chord and fire only for the focused kind", () => {
+    const map = scoped();
+    map.press(parseChord("ctrl+k"), 0);
+    expect(map.press(parseChord("n"), 1, "diff")).toEqual({ type: "action", action: "diff.next" });
+    map.press(parseChord("ctrl+k"), 10);
+    expect(map.press(parseChord("n"), 11, "session-tree")).toEqual({
+      type: "action",
+      action: "tree.next",
+    });
+    map.press(parseChord("ctrl+k"), 20);
+    expect(map.press(parseChord("n"), 21, "conversation")).toEqual({ type: "cancelled" });
+    map.press(parseChord("ctrl+k"), 30);
+    expect(map.press(parseChord("z"), 31, "diff")).toEqual({ type: "action", action: "pane.zoom" });
+    expect(map.scopeOf("diff.next")).toBe("diff");
+    expect(map.scopeOf("pane.zoom")).toBeUndefined();
+  });
+
+  it("still refuse a local chord that collides with a global one", () => {
+    expect(
+      () =>
+        new Keymap({
+          bindings: { "pane.zoom": "leader z", "diff.zoom": "leader z" },
+          scopes: { "diff.zoom": "diff" },
+        }),
+    ).toThrow('bound to both "pane.zoom" and "diff.zoom"');
+  });
+});
+
 describe("the app's bindings", () => {
-  it("compile without a single collision", () => {
-    expect(() => new Keymap({ bindings: appBindings })).not.toThrow();
+  it("compile without a single collision, pane-local chords included", () => {
+    expect(() => new Keymap({ bindings: appBindings, scopes: actionScopes })).not.toThrow();
   });
 
   it("keep the hot path leaderless: zoom, mode, approve, deny, help, palette, pane jump, and the composer trio", () => {
-    const map = new Keymap({ bindings: appBindings });
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
     for (const action of hotPathActions) expect(map.isLeaderless(action), action).toBe(true);
     expect(hotPathActions).toEqual(
       expect.arrayContaining([
@@ -108,7 +156,7 @@ describe("the app's bindings", () => {
   });
 
   it("mirror keywork's leader chords for the verbs both surfaces share", () => {
-    const map = new Keymap({ bindings: appBindings });
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
     expect(map.describe("pane.split")).toBe("ctrl+k s");
     expect(map.describe("pane.close")).toBe("ctrl+k x");
     expect(map.describe("pane.zoom")).toBe("ctrl+k z");
@@ -116,6 +164,7 @@ describe("the app's bindings", () => {
     expect(map.describe("dock.cycle")).toBe("ctrl+k c");
     expect(map.describe("palette.commands")).toBe("ctrl+k i");
     expect(map.describe("palette.go")).toBe("ctrl+p");
+    expect(map.describe("tree.summon")).toBe("ctrl+k t");
     expect(map.describeAll("help.toggle")).toEqual(["ctrl+k /", "f1"]);
   });
 
@@ -146,5 +195,54 @@ describe("keybindings config", () => {
     expect(() => keymapFromConfig({ bindings: { "pane.nope": "f2" } })).toThrow(
       'no action named "pane.nope"',
     );
+  });
+});
+
+describe("a pane that owns the keyboard", () => {
+  const press = (keymap: Keymap, spec: string, scope?: string, at = 0) =>
+    keymap.press(parseChord(spec), at, scope);
+
+  it("lets every chord through to the pane except the leader and the pane's own", () => {
+    const keymap = new Keymap({
+      bindings: {
+        "palette.go": "ctrl+p",
+        "pane.zoom": "leader z",
+        "terminal.copy": "ctrl+shift+c",
+        "terminal.clear": "leader e",
+      },
+      scopes: { "terminal.copy": "terminal", "terminal.clear": "terminal" },
+      exclusiveScopes: ["terminal"],
+    });
+    expect(press(keymap, "ctrl+p", "terminal")).toEqual({ type: "pass" });
+    expect(press(keymap, "ctrl+p", "conversation")).toEqual({
+      type: "action",
+      action: "palette.go",
+    });
+    expect(press(keymap, "ctrl+shift+c", "terminal")).toEqual({
+      type: "action",
+      action: "terminal.copy",
+    });
+    expect(press(keymap, "ctrl+k", "terminal")).toEqual({ type: "leader-pending" });
+    expect(press(keymap, "z", "terminal", 10)).toEqual({ type: "action", action: "pane.zoom" });
+    expect(press(keymap, "ctrl+k", "terminal", 20)).toEqual({ type: "leader-pending" });
+    expect(press(keymap, "e", "terminal", 30)).toEqual({
+      type: "action",
+      action: "terminal.clear",
+    });
+    expect(keymap.ownsKeyboard("terminal")).toBe(true);
+    expect(keymap.ownsKeyboard("conversation")).toBe(false);
+    expect(keymap.ownsKeyboard(undefined)).toBe(false);
+  });
+
+  it("is declared by the terminal pane in the app keymap", () => {
+    const keymap = keymapFromConfig();
+    expect(keymap.ownsKeyboard("terminal")).toBe(true);
+    expect(keymap.press(parseChord("ctrl+y"), 0, "terminal")).toEqual({ type: "pass" });
+    expect(keymap.press(parseChord("ctrl+y"), 0, "conversation")).toEqual({
+      type: "action",
+      action: "ask.approve",
+    });
+    expect(keymap.describe("terminal.summon")).toBe("ctrl+k shift+t");
+    expect(keymap.describe("terminal.summon.mirror")).toBeUndefined();
   });
 });

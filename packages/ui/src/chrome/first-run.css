@@ -1,0 +1,23 @@
+.kw-first-run {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 1.5rem 1.25rem;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-dim);
+}
+
+.kw-first-run-row {
+  display: grid;
+  grid-template-columns: 7ch 1fr;
+  gap: 1rem;
+}
+
+.kw-first-run-chord {
+  color: var(--kw-text-mid);
+  white-space: nowrap;
+}
+
+.kw-first-run-does {
+  margin: 0;
+}

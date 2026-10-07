@@ -1,3 +1,5 @@
+import type { SurfaceKind } from "./workspace.ts";
+
 export const engineEventTypes = [
   "turn.started",
   "turn.delta",
@@ -14,27 +16,50 @@ export const engineEventTypes = [
   "context.injected",
   "diagnostics.published",
   "shell.reset",
+  "session.tree",
+  "changes.updated",
   "engine.error",
 ] as const;
 
 export type EngineEventType = (typeof engineEventTypes)[number];
 
-export type BusEnvelope<T extends EngineEventType = EngineEventType> = {
+export const serverEventTypes = ["memory.inbox", "surface.changed"] as const;
+
+export type ServerEventType = (typeof serverEventTypes)[number];
+
+export const eventTypes = [...engineEventTypes, ...serverEventTypes] as const;
+
+export type EventType = EngineEventType | ServerEventType;
+
+export const processLevelSessionId = "";
+
+export interface ServerPayloads {
+  "memory.inbox": { count: number; kinds: Record<string, number> };
+  "surface.changed": { kind: SurfaceKind };
+}
+
+export type EventPayloads = EnginePayloads & ServerPayloads;
+
+export type BusEnvelope<T extends EventType = EventType> = {
   [K in T]: {
     id: number;
     ts: string;
     sessionId: string;
     type: K;
-    payload: EnginePayloads[K] & Replayable;
+    payload: EventPayloads[K] & Replayable;
   };
 }[T];
+
+export function isServerEvent(envelope: BusEnvelope): envelope is BusEnvelope<ServerEventType> {
+  return (serverEventTypes as readonly string[]).includes(envelope.type);
+}
 
 export interface Replayable {
   replay?: boolean;
 }
 
 export interface EnginePayloads {
-  "turn.started": { userText: string; entryId?: string };
+  "turn.started": { userText: string; entryId?: string; origin?: PromptOrigin };
   "turn.delta": { delta: TurnDelta };
   "turn.completed": { message: Message; usage: Usage };
   "turn.interrupted": { message: Message };
@@ -49,7 +74,19 @@ export interface EnginePayloads {
   "context.injected": { injection: ContextInjection };
   "diagnostics.published": { path: string; count: number };
   "shell.reset": Record<never, never>;
+  "session.tree": TreeChange;
+  "changes.updated": { sessionId: string; paths: readonly string[] };
   "engine.error": { error: { name: string; message: string } };
+}
+
+export type TreeChangeReason = "fork" | "label" | "leaf" | "entry";
+
+export interface TreeChange {
+  sessionId: string;
+  leafId: string | null;
+  reason: TreeChangeReason;
+  entryId?: string;
+  forkedTo?: string;
 }
 
 export type TurnDelta =
@@ -86,10 +123,16 @@ export interface Usage {
   costUsd?: number;
 }
 
+export interface PromptOrigin {
+  kind: "external";
+  client: string;
+}
+
 export interface QueuedPrompt {
   id: string;
   text: string;
   behavior: "steer" | "queue";
+  origin?: PromptOrigin;
 }
 
 export interface SpillReference {

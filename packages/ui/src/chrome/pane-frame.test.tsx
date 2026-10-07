@@ -1,5 +1,6 @@
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { assumedContextLevel } from "../instruments/context.ts";
 import { hueStop, type LifecycleState, PaneFrame, stampGlyph, tileFill } from "./pane-frame.tsx";
 
 afterEach(cleanup);
@@ -65,5 +66,40 @@ describe("PaneFrame", () => {
       new MouseEvent("mousedown", { bubbles: true }),
     );
     expect(focused).toBe(1);
+  });
+});
+
+describe("PaneFrame instruments", () => {
+  it("draws the context gauge in the telemetry slot beside the usage text", () => {
+    const { container } = render(() => (
+      <PaneFrame
+        name="fix the tests"
+        state="idle"
+        focused={false}
+        spawnRank={0}
+        telemetry="380 tokens · $0.0031"
+        context={assumedContextLevel(90_000)}
+      >
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const slot = container.querySelector(".kw-frame-telemetry") as HTMLElement;
+    expect(slot.querySelector(".kw-gauge")?.textContent).toBe("░▒··90k");
+    expect(slot.textContent).toContain("380 tokens · $0.0031");
+  });
+
+  it("keeps the telemetry slot for the gauge alone when there is no usage text", () => {
+    const { container } = render(() => (
+      <PaneFrame
+        name="quiet"
+        state="idle"
+        focused={false}
+        spawnRank={0}
+        context={assumedContextLevel(1)}
+      >
+        <p>body</p>
+      </PaneFrame>
+    ));
+    expect(container.querySelector(".kw-frame-telemetry .kw-gauge")).toBeTruthy();
   });
 });

@@ -1,0 +1,10 @@
+{
+  "path": "src/index.ts",
+  "bytes": 68,
+  "from": 34,
+  "to": 60,
+  "truncated": false,
+  "eof": false,
+  "text": "xport const farewell = \"go",
+  "encoding": "utf-8"
+}

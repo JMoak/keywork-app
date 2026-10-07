@@ -2,6 +2,7 @@ import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { inertMemoryClient } from "./memory-store.test.ts";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 
@@ -48,6 +49,14 @@ function quietClient(): KeyworkClient {
     events: async function* (): AsyncIterable<BusEnvelope> {
       await new Promise(() => undefined);
     },
+    inject: async () => "started",
+    entries: async () => undefined,
+    fork: async () => "missing",
+    label: async () => "missing",
+    moveLeaf: async () => "missing",
+    changes: async () => "missing",
+    ...inertMemoryClient(),
+    changedFile: async () => "missing",
     asks: async () => [],
     answerAsk: async () => "settled" as const,
   };
@@ -120,7 +129,7 @@ describe("keyboard workflows", () => {
 
     press("F1");
     const help = await screen.findByRole("dialog", { name: "keys" });
-    expect(screen.getByText("ctrl+k s")).toBeTruthy();
+    expect(screen.getByText("ctrl+k s", { selector: ".kw-help-keys" })).toBeTruthy();
     fireEvent.keyDown(help, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "keys" })).toBeNull());
   });
@@ -147,5 +156,95 @@ describe("keyboard workflows", () => {
     fireEvent.input(palette);
     fireEvent.keyDown(palette, { key: "Enter" });
     await waitFor(() => expect(frames()).toHaveLength(3));
+  });
+});
+
+function pointer(type: string, target: EventTarget, x: number, y: number): void {
+  target.dispatchEvent(
+    new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y }),
+  );
+}
+
+const stage = () => document.querySelector(".kw-stage") as HTMLElement;
+const seams = () => [...document.querySelectorAll(".kw-seam")] as HTMLElement[];
+const slotOf = (name: string): HTMLElement =>
+  (
+    [...document.querySelectorAll(".kw-frame-name")].find((node) => node.textContent === name) as
+      | HTMLElement
+      | undefined
+  )?.closest(".kw-slot") as HTMLElement;
+
+describe("the first run", () => {
+  it("teaches five keys while the workspace has no sessions and nothing once one exists", async () => {
+    await openWorkspace();
+    const block = document.querySelector(".kw-first-run") as HTMLElement;
+    expect(block.querySelectorAll(".kw-first-run-row")).toHaveLength(5);
+    expect(block.textContent).toContain("ctrl+k s");
+    press("k", { ctrlKey: true });
+    press("s");
+    await waitFor(() => expect(frames()).toHaveLength(3));
+    await waitFor(() => expect(document.querySelector(".kw-first-run")).toBeNull());
+  });
+});
+
+describe("pointer gestures", () => {
+  it("drags the dock seam to a stepped ratio and shows the seam only while dragging", async () => {
+    await openWorkspace();
+    expect(seams()).toHaveLength(1);
+    const seam = seams()[0] as HTMLElement;
+    expect(seam.dataset.axis).toBe("x");
+    expect(seam.style.left).toBe("316px");
+    pointer("pointerdown", seam, 320, 100);
+    pointer("pointermove", window, 640, 100);
+    expect(stage().dataset.gesture).toBe("resizing");
+    expect((seams()[0] as HTMLElement).hasAttribute("data-active")).toBe(true);
+    expect((seams()[0] as HTMLElement).style.left).toBe("636px");
+    pointer("pointerup", window, 640, 100);
+    expect(stage().dataset.gesture).toBe("idle");
+    expect((seams()[0] as HTMLElement).hasAttribute("data-active")).toBe(false);
+    expect(slotOf("new session").style.left).toBe("640px");
+  });
+
+  it("drags a pane by its title row onto the other dock and lifts the target's ink on the way", async () => {
+    await openWorkspace();
+    const title = slotOf("sessions").querySelector(".kw-frame-title") as HTMLElement;
+    pointer("pointerdown", title, 10, 10);
+    pointer("pointermove", window, 400, 300);
+    expect(stage().dataset.gesture).toBe("dragging");
+    pointer("pointermove", window, 1270, 300);
+    const hot = document.querySelector(".kw-drop[data-hot]") as HTMLElement;
+    expect(hot.dataset.zone).toBe("right");
+    pointer("pointerup", window, 1270, 300);
+    expect(document.querySelector(".kw-drop")).toBeNull();
+    expect(Number.parseInt(slotOf("sessions").style.left, 10)).toBeGreaterThan(640);
+    expect(slotOf("new session").style.left).toBe("0px");
+  });
+
+  it("abandons a drag on escape, leaving only the focus the press already gave", async () => {
+    await openWorkspace();
+    const before = slotOf("sessions").style.left;
+    const title = slotOf("sessions").querySelector(".kw-frame-title") as HTMLElement;
+    pointer("pointerdown", title, 10, 10);
+    expect(focusedName()).toBe("sessions");
+    pointer("pointermove", window, 1270, 300);
+    expect(document.querySelector(".kw-drop[data-hot]")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(stage().dataset.gesture).toBe("idle");
+    expect(document.querySelector(".kw-drop")).toBeNull();
+    pointer("pointerup", window, 1270, 300);
+    expect(slotOf("sessions").style.left).toBe(before);
+  });
+
+  it("focuses on a body press and never drags from it", async () => {
+    await openWorkspace();
+    expect(focusedName()).toBe("new session");
+    const before = slotOf("sessions").style.left;
+    const body = slotOf("sessions").querySelector(".kw-frame-body") as HTMLElement;
+    pointer("pointerdown", body, 100, 300);
+    pointer("pointermove", window, 900, 300);
+    expect(stage().dataset.gesture).not.toBe("dragging");
+    pointer("pointerup", window, 900, 300);
+    expect(focusedName()).toBe("sessions");
+    expect(slotOf("sessions").style.left).toBe(before);
   });
 });

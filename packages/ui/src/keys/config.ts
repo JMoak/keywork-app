@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { appBindings } from "./actions.ts";
+import { actionScopes, appBindings, exclusiveScopes } from "./actions.ts";
 import { defaultLeader, defaultLeaderTimeoutMs, Keymap, KeymapError } from "./keymap.ts";
 
 const bindingSpec = z.union([z.string(), z.array(z.string())]);
@@ -43,5 +43,7 @@ export function keymapFromConfig(config: Partial<KeybindingsConfig> = {}): Keyma
     leader: parsed.leader,
     timeoutMs: parsed.timeoutMs,
     bindings: { ...appBindings, ...parsed.bindings },
+    scopes: actionScopes,
+    exclusiveScopes,
   });
 }

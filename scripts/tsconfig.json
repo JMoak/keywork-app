@@ -8,5 +8,15 @@
   },
   "include": ["**/*.ts", "*.json"],
   "exclude": ["dist"],
-  "references": [{ "path": "../packages/protocol" }, { "path": "../packages/client" }]
+  "references": [
+    {
+      "path": "../packages/protocol"
+    },
+    {
+      "path": "../packages/client"
+    },
+    {
+      "path": "../packages/desktop"
+    }
+  ]
 }

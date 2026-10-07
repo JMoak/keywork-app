@@ -114,8 +114,8 @@ export interface HelpRow {
 }
 
 export const composerKeys: readonly HelpRow[] = [
-  { keys: "enter", help: "send · steers a running turn" },
-  { keys: "alt+enter", help: "queue behind the running turn" },
+  { keys: "enter", help: "send · queues behind a running turn" },
+  { keys: "alt+enter", help: "steer the running turn" },
   { keys: "shift+enter", help: "newline in the prompt" },
   { keys: "esc", help: "interrupt the running turn" },
 ];

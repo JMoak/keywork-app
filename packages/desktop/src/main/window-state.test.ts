@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { FileSeams } from "./recents.ts";
-import { defaultWindowState, fitsAnyDisplay, windowStateStore } from "./window-state.ts";
+import {
+  defaultWindowState,
+  fitsAnyDisplay,
+  frontDoorKey,
+  windowStateBook,
+  windowStateKey,
+} from "./window-state.ts";
 
 function memoryFiles(): FileSeams & { files: Map<string, string> } {
   const files = new Map<string, string>();
@@ -19,18 +25,48 @@ function memoryFiles(): FileSeams & { files: Map<string, string> } {
   };
 }
 
-describe("windowStateStore", () => {
-  it("round-trips through an atomic write and falls back on a corrupt or missing file", async () => {
+describe("windowStateBook", () => {
+  it("remembers one placement per key through an atomic write", async () => {
     const seams = memoryFiles();
-    const store = windowStateStore("state.json", seams);
-    expect(await store.read()).toEqual(defaultWindowState);
-    await store.write({ x: 10, y: 20, width: 900, height: 700, maximized: true });
-    expect(seams.files.has("state.json.tmp")).toBe(false);
-    expect(await store.read()).toEqual({ x: 10, y: 20, width: 900, height: 700, maximized: true });
-    seams.files.set("state.json", "{ nope");
-    expect(await store.read()).toEqual(defaultWindowState);
-    seams.files.set("state.json", JSON.stringify({ width: 50, height: 50 }));
-    expect(await store.read()).toEqual(defaultWindowState);
+    const book = windowStateBook("windows.json", seams);
+    expect(await book.read("c:/work")).toEqual(defaultWindowState);
+    await book.write("c:/work", { x: 10, y: 20, width: 900, height: 700, maximized: true });
+    await book.write(frontDoorKey, { width: 800, height: 600, maximized: false });
+    expect(seams.files.has("windows.json.tmp")).toBe(false);
+    expect(await book.read("c:/work")).toEqual({
+      x: 10,
+      y: 20,
+      width: 900,
+      height: 700,
+      maximized: true,
+    });
+    expect(await book.read(frontDoorKey)).toEqual({ width: 800, height: 600, maximized: false });
+    expect(await book.read("c:/other")).toEqual(defaultWindowState);
+  });
+
+  it("falls back on a corrupt, invalid, or legacy single-window file", async () => {
+    const seams = memoryFiles();
+    const book = windowStateBook("windows.json", seams);
+    seams.files.set("windows.json", "{ nope");
+    expect(await book.read("c:/work")).toEqual(defaultWindowState);
+    seams.files.set("windows.json", JSON.stringify({ width: 1200, height: 800 }));
+    expect(await book.read("c:/work")).toEqual(defaultWindowState);
+    seams.files.set(
+      "windows.json",
+      JSON.stringify({ version: 1, windows: { "c:/work": { width: 50, height: 50 } } }),
+    );
+    expect(await book.read("c:/work")).toEqual(defaultWindowState);
+  });
+});
+
+describe("windowStateKey", () => {
+  it("names the front door for a window with no workspace", () => {
+    expect(windowStateKey(undefined, "win32")).toBe(frontDoorKey);
+  });
+
+  it("folds slashes and case on Windows, and only slashes elsewhere", () => {
+    expect(windowStateKey("C:\\Work\\App\\", "win32")).toBe("c:/work/app");
+    expect(windowStateKey("/home/Me/app/", "linux")).toBe("/home/Me/app");
   });
 });
 

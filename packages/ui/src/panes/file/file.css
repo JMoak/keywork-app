@@ -1,0 +1,55 @@
+.kw-file {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  container: file / inline-size;
+  font-family: var(--kw-font-mono);
+  background: var(--kw-panel);
+}
+
+.kw-file-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+  white-space: nowrap;
+}
+
+.kw-file-facts {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kw-file-more {
+  color: var(--kw-text-dim);
+}
+
+.kw-file-text {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kw-file-text .cm-editor {
+  height: 100%;
+}
+
+.kw-file-note {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-file-note[data-level="error"] {
+  color: var(--kw-error);
+}
+
+@container file (max-width: 559.98px) {
+  .kw-file-facts,
+  .kw-file-more {
+    display: none;
+  }
+}

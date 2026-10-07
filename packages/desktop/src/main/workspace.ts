@@ -35,9 +35,11 @@ export interface WorkspaceSeams {
 
 export interface WorkspaceHost {
   open(path: string): Promise<WorkspaceOpen>;
+  restart(path: string): Promise<WorkspaceOpen>;
   close(path: string): Promise<void>;
   closeAll(): Promise<void>;
   recent(): Promise<readonly RecentWorkspace[]>;
+  openRoots(): readonly string[];
   ticketFor(path: string): ServerTicket | undefined;
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
 }
@@ -107,6 +109,13 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     await clearStaleTicket(entry.opened.server.url);
   };
 
+  const releasing = new Set<Promise<void>>();
+  const releaseTracked = (entry: Held): Promise<void> => {
+    const done = release(entry).finally(() => releasing.delete(done));
+    releasing.add(done);
+    return done;
+  };
+
   const clearStaleTicket = async (url: string): Promise<void> => {
     const ticket = await readTicket(seams.ticketFile, seams.readText);
     if (ticket?.url === url) await seams.removeFile(seams.ticketFile);
@@ -129,7 +138,7 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     held.set(path, { opened, process, unwatch });
   };
 
-  return {
+  const host: WorkspaceHost = {
     open: async (path) => {
       const already = held.get(path);
       if (already !== undefined) return { ok: true, opened: already.opened };
@@ -150,26 +159,37 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
       await seams.recents.touch(path);
       return result;
     },
+    restart: async (path) => {
+      const entry = held.get(path);
+      if (entry !== undefined) {
+        held.delete(path);
+        await releaseTracked(entry);
+      }
+      return host.open(path);
+    },
     close: async (path) => {
       const entry = held.get(path);
       if (entry === undefined) return;
       held.delete(path);
-      await release(entry);
+      await releaseTracked(entry);
     },
     closeAll: async () => {
       for (const path of [...held.keys()]) {
         const entry = held.get(path);
         held.delete(path);
-        if (entry !== undefined) await release(entry);
+        if (entry !== undefined) await releaseTracked(entry);
       }
+      await Promise.all([...releasing]);
     },
     recent: () => seams.recents.list(),
+    openRoots: () => [...held.keys()],
     ticketFor: (path) => held.get(path)?.opened.server,
     onServerLost: (listener) => {
       lossListeners.add(listener);
       return () => lossListeners.delete(listener);
     },
   };
+  return host;
 }
 
 export async function readTicket(

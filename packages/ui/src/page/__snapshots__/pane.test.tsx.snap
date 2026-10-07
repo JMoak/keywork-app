@@ -8,6 +8,15 @@ exports[`ConversationPane over the recorded fixtures > renders denied 1`] = `
 ]
 `;
 
+exports[`ConversationPane over the recorded fixtures > renders injected 1`] = `
+[
+  "user first",
+  "agent First answer, finished.",
+  "user secondvia wispr-flow",
+  "agent Second answer.",
+]
+`;
+
 exports[`ConversationPane over the recorded fixtures > renders interrupt 1`] = `
 [
   "user wait forever",

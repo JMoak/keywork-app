@@ -1,5 +1,8 @@
+import { echoPty } from "./echo-pty.ts";
 import type {
   HostPort,
+  NeedsYouTrigger,
+  OpenWorkspaceEntry,
   RecentWorkspace,
   ServerLoss,
   ServerResponseHead,
@@ -14,10 +17,18 @@ export interface BrowserHostOptions {
 
 export function browserHost(options: BrowserHostOptions = {}): HostPort {
   const lossListeners = new Set<(loss: ServerLoss) => void>();
+  const openListeners = new Set<(open: readonly OpenWorkspaceEntry[]) => void>();
+  const requestListeners = new Set<(path: string) => void>();
+  const activationListeners = new Set<(trigger: NeedsYouTrigger) => void>();
   const recents = [...(options.recents ?? [])];
+  const open = new Map<string, OpenWorkspaceEntry>();
+  const announceOpen = (): void => {
+    for (const listener of [...openListeners]) listener([...open.values()]);
+  };
   const server = options.server ?? serverFromLocation();
   const transport = options.fetch ?? fetch;
-  return {
+  const host: HostPort = {
+    pty: echoPty(),
     about: async () => ({ shell: "browser", platform: navigator.platform, version: "dev" }),
     pickFolder: async () => window.prompt("workspace folder") ?? undefined,
     recentWorkspaces: async () => recents,
@@ -32,6 +43,8 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
         };
       }
       recents.unshift({ path, openedAt: new Date().toISOString() });
+      open.set(path, { workspace: path, windows: 1, pendingAsks: 0 });
+      announceOpen();
       return {
         ok: true,
         opened: {
@@ -43,7 +56,24 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
         },
       };
     },
-    closeWorkspace: async () => undefined,
+    restartServer: (path) => host.openWorkspace(path),
+    closeWorkspace: async (path) => {
+      if (open.delete(path)) announceOpen();
+    },
+    listOpenWorkspaces: async () => [...open.values()],
+    switchWorkspace: async (path) => {
+      for (const listener of [...requestListeners]) listener(path);
+    },
+    onOpenWorkspacesChanged: (listener) => {
+      openListeners.add(listener);
+      return () => openListeners.delete(listener);
+    },
+    onOpenRequested: (listener) => {
+      requestListeners.add(listener);
+      return () => requestListeners.delete(listener);
+    },
+    onUpdateReady: () => () => {},
+    acceptUpdate: async () => {},
     onServerLost: (listener) => {
       lossListeners.add(listener);
       return () => lossListeners.delete(listener);
@@ -52,7 +82,15 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       window.open(url, "_blank", "noopener");
     },
     notify: async (notice) => {
-      console.info(`[notify] ${notice.title}: ${notice.body}`);
+      console.info(`[notify] ${notice.title}: ${notice.body}`, notice.trigger);
+    },
+    onNotificationActivated: (listener) => {
+      activationListeners.add(listener);
+      return () => activationListeners.delete(listener);
+    },
+    setPendingAsks: async (count) => {
+      for (const entry of open.values()) entry.pendingAsks = count;
+      document.title = count === 0 ? "keywork" : `(${count}) keywork`;
     },
     serverFetch: async (_workspace, path, init): Promise<ServerResponseHead> => {
       if (server === undefined) throw new Error("no server");
@@ -77,6 +115,7 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       };
     },
   };
+  return host;
 }
 
 function serverFromLocation(): { url: string; token: string } | undefined {

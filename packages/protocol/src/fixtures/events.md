@@ -4,7 +4,9 @@ The engine emits typed events on an in-process bus (`packages/engine/src/bus.ts`
 `EngineEvents`). The TUI subscribes in process; `keywork serve` streams the same events over
 SSE (`packages/server/src/events.ts`, `sse.ts`). Names are API: a new event gets a section
 here in the same change that adds it to `EngineEvents`, and `packages/engine/src/bus.test.ts`
-fails when the two drift. Vision D7 is the decision behind the shape.
+fails when the two drift. Vision D7 is the decision behind the shape. The server adds a
+second, process-level vocabulary of its own (`ServerEvents`, the "Server events" section at
+the end); `packages/server/src/server.test.ts` holds that section to the same rule.
 
 ## Envelope
 
@@ -19,7 +21,7 @@ stamps each payload into an envelope before it leaves the process:
 |---|---|
 | `id` | Monotonic per server process, starting at 1. The SSE `id:` line carries the same number. |
 | `ts` | ISO 8601 time the envelope was stamped. |
-| `sessionId` | The session whose bus produced the event. |
+| `sessionId` | The session whose bus produced the event; the empty string for a server event, which belongs to the process rather than to a session. |
 | `type` | One of the event names below. |
 | `payload` | The event's fields, exactly as emitted, with one translation (see `engine.error`). |
 
@@ -52,6 +54,7 @@ Fires when a prompt begins its turn, after the user message joins the context.
 |---|---|---|
 | `userText` | `string` | The prompt text. |
 | `entryId` | `string`, optional | The session entry id, present on replay of a stored user message. |
+| `origin` | `PromptOrigin`, optional | `{ kind: "external", client }` when the prompt came through `POST /sessions/{id}/inject` on `keywork serve`; absent for a typed prompt. |
 
 On replay, a compaction or branch summary also fires `turn.started` with the summary as
 `userText`, so the transcript shows where history was folded.
@@ -102,7 +105,7 @@ Fires whenever the list of prompts waiting behind the active turn changes.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `queued` | `QueuedPrompt[]` | Each `{ id, text, behavior }`; `behavior` is `steer` or `queue`. |
+| `queued` | `QueuedPrompt[]` | Each `{ id, text, behavior, origin? }`; `behavior` is `steer` or `queue`, and `origin` is the same as on `turn.started`. |
 
 ## Tool lifecycle
 
@@ -213,6 +216,40 @@ Fires after a file save when the language port publishes diagnostics for it.
 Fires when the session's shell state was reset. The payload has no fields beyond the
 optional `replay`.
 
+## Tree and files
+
+These two events carry what the TUI's in-process feeds carry: the session tree pane's
+`SessionChangeFeed` and the diff pane's `FileChangeFeed`. `keywork serve` records them on the
+session's log where those feeds fire; a remote tree or diff pane refetches on them instead of
+polling. Neither is replayed.
+
+### session.tree
+
+Fires when the session's entry tree changes other than by streaming a turn: after a fork,
+a label, a leaf move, or once a finished turn's messages are written to the JSONL.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sessionId` | `string` | The session whose tree changed (the source session, for a fork). |
+| `leafId` | `string \| null` | The session's active leaf after the change; `null` is the empty root. |
+| `reason` | `"fork" \| "label" \| "leaf" \| "entry"` | What changed. |
+| `entryId` | `string`, optional | The entry forked at, labelled, or moved to. |
+| `forkedTo` | `string`, optional | The new session's id, on `fork`. |
+
+A client answers it by refetching `GET /sessions/{id}/entries`.
+
+### changes.updated
+
+Fires after a `write`, `edit` or `bash` tool call finishes, once the checkpoint store has
+re-read the worktree.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sessionId` | `string` | The session whose turn ran the tool. |
+| `paths` | `string[]` | Every path changed since the session's baseline, after the refresh; a client replaces its list rather than merging. |
+
+The counts and provenance behind each path come from `GET /sessions/{id}/changes`.
+
 ### engine.error
 
 Fires when a listener throws, when a turn fails, or when post-turn settling fails. A listener
@@ -221,6 +258,32 @@ that throws while handling `engine.error` is dropped silently, so the bus cannot
 | Field | Type | Meaning |
 |---|---|---|
 | `error` | `Error` | The failure. |
+
+## Server events
+
+`keywork serve` records a few events that no session's bus emits, because they describe
+process-level state that every connected client needs. They ride the same `/events` stream in
+the same envelope with `sessionId` empty, are listed in `serverEventTypes`
+(`packages/server/src/events.ts`), and never replay. The engine vocabulary above is
+unchanged by them.
+
+### memory.inbox
+
+Fires whenever the memory review inbox changes under the server: a staged write landing at
+the end of a turn, an approval or discard through `POST /memory/inbox/{id}/...`, a revert
+that re-stages or un-stages an item, and every arc airlock verb (a close review staged by
+`finish`, a triage, a delivery). Fired only when the count or the kind tally actually
+differs from the last one announced, so a verb that leaves the inbox as it was is silent.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `count` | `number` | How many items wait in the inbox, the workspace vault's and every bot layer's together. |
+| `kinds` | `Record<string, number>` | The count per staged kind, keyed by the engine's own `StagedItem.kind` (`note`, `daily`, `moc`, `borderline-promotion`, `contradiction`, `arc-question`, ...), so a kind the engine adds later appears here without a server change. |
+
+The needs-you threshold stays on the client: the TUI notifies on the rising edge of
+`count >= 3` (`defaultInboxThreshold`, `packages/tui/src/notifications.ts`), and a remote
+client applies the same rule to this payload. The server carries the count, never the
+decision.
 
 ## SSE framing
 
@@ -253,7 +316,7 @@ oldest envelope, the replay is preceded by a comment naming the loss:
 
 ## The one translation: `engine.error`
 
-Fourteen of the fifteen types cross the wire as `JSON.stringify(envelope)` with no per-type
+Every type but one crosses the wire as `JSON.stringify(envelope)` with no per-type
 code. `engine.error` carries an `Error` instance, which `JSON.stringify` would flatten to
 `{}`. The server serializes every `Error` value anywhere in an envelope as
 

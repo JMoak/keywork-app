@@ -81,7 +81,12 @@ function Entry(props: EntryProps) {
       <Match when={as<UserEntry>(entry(), "user")}>
         {(user) => (
           <Row voice="user" replay={user().replay}>
-            <p class="kw-user">{user().text}</p>
+            <p class="kw-user">
+              {user().text}
+              <Show when={user().origin}>
+                {(origin) => <span class="kw-origin">via {origin().client}</span>}
+              </Show>
+            </p>
           </Row>
         )}
       </Match>

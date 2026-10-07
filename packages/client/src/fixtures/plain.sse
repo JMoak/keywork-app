@@ -16,3 +16,7 @@ id: 4
 event: turn.completed
 data: {"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Hello from keywork."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
 
+id: 5
+event: session.tree
+data: {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"entry"}}
+

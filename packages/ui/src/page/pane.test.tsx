@@ -21,7 +21,7 @@ function rows(container: HTMLElement): string[] {
 }
 
 describe("ConversationPane over the recorded fixtures", () => {
-  it.each(["plain", "thinking", "tool", "denied", "interrupt", "queued"])(
+  it.each(["plain", "thinking", "tool", "denied", "interrupt", "queued", "injected"])(
     "renders %s",
     async (name) => {
       const projection = await fixture(name);
@@ -39,6 +39,21 @@ describe("ConversationPane over the recorded fixtures", () => {
     );
     expect(stamps).toEqual(["user", "machine", "agent"]);
     expect(container.querySelector(".kw-stamp[data-streaming]")).toBeNull();
+  });
+
+  it("tags a prompt another client injected with its machine voice", () => {
+    const projection = projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: "2026-09-07T12:00:00.000Z",
+        sessionId: "s1",
+        type: "turn.started",
+        payload: { userText: "dictated", origin: { kind: "external", client: "wispr-flow" } },
+      },
+    ]);
+    const { container } = render(() => <ConversationPane projection={projection} />);
+    expect(container.querySelector(".kw-origin")?.textContent).toBe("via wispr-flow");
+    expect(container.querySelector(".kw-user")?.textContent).toBe("dictatedvia wispr-flow");
   });
 
   it("animates the agent stamp while the answer streams", async () => {

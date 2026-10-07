@@ -20,10 +20,14 @@
     "fixtures:record": "bun scripts/fixtures/record.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "fetch:sidecar": "bun scripts/fetch-sidecar.ts",
+    "screenshots": "bun run --cwd packages/ui screenshots",
+    "compare:shots": "bun scripts/compare-shots.ts"
   },
   "trustedDependencies": [
-    "electron"
+    "electron",
+    "node-pty"
   ],
   "devDependencies": {
     "@biomejs/biome": "2.5.12",

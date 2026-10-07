@@ -14,6 +14,8 @@ export interface KeymapOptions {
   leader?: string | undefined;
   timeoutMs?: number | undefined;
   bindings: Record<string, BindingSpec>;
+  scopes?: Record<string, string> | undefined;
+  exclusiveScopes?: readonly string[] | undefined;
 }
 
 export class KeymapError extends Error {
@@ -44,9 +46,9 @@ export class Keymap {
     this.disarm();
   }
 
-  press(chord: Chord, nowMs: number): KeymapResult {
+  press(chord: Chord, nowMs: number, activeScope?: string): KeymapResult {
     if (this.isPending(nowMs)) {
-      if (!chordsEqual(chord, this.table.leader)) return this.resolveLeaderKey(chord);
+      if (!chordsEqual(chord, this.table.leader)) return this.resolveLeaderKey(chord, activeScope);
       this.disarm();
       return cancelled;
     }
@@ -54,8 +56,12 @@ export class Keymap {
       this.pendingSince = nowMs;
       return { type: "leader-pending" };
     }
-    const action = this.findByChord(chord);
+    const action = this.findByChord(chord, activeScope, this.ownsKeyboard(activeScope));
     return action === undefined ? { type: "pass" } : { type: "action", action };
+  }
+
+  ownsKeyboard(scope: string | undefined): boolean {
+    return scope !== undefined && this.table.exclusiveScopes.has(scope);
   }
 
   armed(nowMs: number): boolean {
@@ -86,6 +92,10 @@ export class Keymap {
     return [...this.table.bindings.keys()];
   }
 
+  scopeOf(action: string): string | undefined {
+    return this.table.scopes.get(action);
+  }
+
   private isPending(nowMs: number): boolean {
     if (this.pendingSince === undefined) return false;
     if (nowMs - this.pendingSince <= this.table.timeoutMs) return true;
@@ -93,28 +103,43 @@ export class Keymap {
     return false;
   }
 
-  private resolveLeaderKey(chord: Chord): KeymapResult {
+  private resolveLeaderKey(chord: Chord, activeScope: string | undefined): KeymapResult {
     this.disarm();
     if (chord.name === "escape" || chord.ctrl || chord.alt) return cancelled;
-    const action = this.findByLeaderKey(chord);
+    const action = this.findByLeaderKey(chord, activeScope);
     return action === undefined ? cancelled : { type: "action", action };
   }
 
-  private findByChord(chord: Chord): string | undefined {
-    for (const [action, bindings] of this.table.bindings) {
-      for (const binding of bindings) {
-        if (binding.kind === "chord" && chordsEqual(binding.chord, chord)) return action;
-      }
-    }
-    return undefined;
+  private findByChord(
+    chord: Chord,
+    activeScope: string | undefined,
+    scopedOnly = false,
+  ): string | undefined {
+    return this.find(
+      (binding) => binding.kind === "chord" && chordsEqual(binding.chord, chord),
+      activeScope,
+      scopedOnly,
+    );
   }
 
-  private findByLeaderKey(chord: Chord): string | undefined {
+  private findByLeaderKey(chord: Chord, activeScope: string | undefined): string | undefined {
     const pressed = leaderKeyOf(chord);
+    return this.find(
+      (binding) => binding.kind === "leader" && binding.key === pressed,
+      activeScope,
+    );
+  }
+
+  private find(
+    matches: (binding: Binding) => boolean,
+    activeScope: string | undefined,
+    scopedOnly = false,
+  ): string | undefined {
     for (const [action, bindings] of this.table.bindings) {
-      for (const binding of bindings) {
-        if (binding.kind === "leader" && binding.key === pressed) return action;
-      }
+      const scope = this.table.scopes.get(action);
+      if (scope !== undefined && scope !== activeScope) continue;
+      if (scope === undefined && scopedOnly) continue;
+      if (bindings.some(matches)) return action;
     }
     return undefined;
   }
@@ -126,33 +151,63 @@ interface BindingTable {
   readonly leader: Chord;
   readonly timeoutMs: number;
   readonly bindings: ReadonlyMap<string, readonly Binding[]>;
+  readonly scopes: ReadonlyMap<string, string>;
+  readonly exclusiveScopes: ReadonlySet<string>;
+}
+
+interface Claim {
+  readonly action: string;
+  readonly scope: string | undefined;
 }
 
 function compile(options: KeymapOptions): BindingTable {
   const leader = parseChord(options.leader ?? defaultLeader);
+  const scopes = new Map(Object.entries(options.scopes ?? {}));
   const bindings = new Map<string, Binding[]>();
-  const claims = new Map<string, string>();
+  const claims = new Map<string, Claim[]>();
   for (const [action, spec] of Object.entries(options.bindings)) {
     const specs = typeof spec === "string" ? [spec] : spec;
     const parsed = specs.filter((entry) => entry !== "none").map((entry) => parseBinding(entry));
-    for (const binding of parsed) claim(claims, leader, binding, action);
+    for (const binding of parsed) {
+      claim(claims, leader, binding, { action, scope: scopes.get(action) });
+    }
     if (parsed.length > 0) bindings.set(action, parsed);
   }
-  return { leader, timeoutMs: options.timeoutMs ?? defaultLeaderTimeoutMs, bindings };
+  return {
+    leader,
+    timeoutMs: options.timeoutMs ?? defaultLeaderTimeoutMs,
+    bindings,
+    scopes,
+    exclusiveScopes: new Set(options.exclusiveScopes ?? []),
+  };
 }
 
-function claim(claims: Map<string, string>, leader: Chord, binding: Binding, action: string): void {
+function claim(
+  claims: Map<string, Claim[]>,
+  leader: Chord,
+  binding: Binding,
+  claimant: Claim,
+): void {
   const spec =
     binding.kind === "chord" ? formatChord(binding.chord) : `${formatChord(leader)} ${binding.key}`;
   if (binding.kind === "chord" && chordsEqual(binding.chord, leader)) {
-    throw new KeymapError(`"${spec}" is the leader and cannot also run "${action}"`);
+    throw new KeymapError(`"${spec}" is the leader and cannot also run "${claimant.action}"`);
   }
-  const holder = claims.get(spec);
-  if (holder === action) throw new KeymapError(`"${spec}" is listed twice for "${action}"`);
-  if (holder !== undefined) {
-    throw new KeymapError(`"${spec}" is bound to both "${holder}" and "${action}"`);
+  const holders = claims.get(spec) ?? [];
+  const rival = holders.find((holder) => contends(holder, claimant));
+  if (rival?.action === claimant.action) {
+    throw new KeymapError(`"${spec}" is listed twice for "${claimant.action}"`);
   }
-  claims.set(spec, action);
+  if (rival !== undefined) {
+    throw new KeymapError(`"${spec}" is bound to both "${rival.action}" and "${claimant.action}"`);
+  }
+  claims.set(spec, [...holders, claimant]);
+}
+
+function contends(holder: Claim, claimant: Claim): boolean {
+  return (
+    holder.scope === undefined || claimant.scope === undefined || holder.scope === claimant.scope
+  );
 }
 
 function parseBinding(spec: string): Binding {

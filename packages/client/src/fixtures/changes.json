@@ -1,0 +1,12 @@
+{
+  "trusted": true,
+  "baseline": "session start",
+  "files": [
+    {
+      "path": "notes.txt",
+      "added": 2,
+      "deleted": 0,
+      "turn": 1
+    }
+  ]
+}

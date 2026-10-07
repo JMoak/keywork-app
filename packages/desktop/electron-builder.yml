@@ -2,8 +2,12 @@ appId: dev.keywork.app
 productName: keywork
 directories:
   output: release
+artifactName: ${productName}-app-${version}-${os}-${arch}.${ext}
 files:
   - out/**
+npmRebuild: true
+asarUnpack:
+  - node_modules/node-pty/**
 extraResources:
   - from: sidecar
     to: sidecar
@@ -17,3 +21,7 @@ linux:
   target:
     - AppImage
     - deb
+publish:
+  provider: github
+  owner: JMoak
+  repo: keywork-app

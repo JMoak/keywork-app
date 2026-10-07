@@ -3,15 +3,55 @@ export interface HostPort {
   pickFolder(): Promise<string | undefined>;
   recentWorkspaces(): Promise<readonly RecentWorkspace[]>;
   openWorkspace(path: string): Promise<WorkspaceOpen>;
+  restartServer(path: string): Promise<WorkspaceOpen>;
   closeWorkspace(path: string): Promise<void>;
+  listOpenWorkspaces(): Promise<readonly OpenWorkspaceEntry[]>;
+  switchWorkspace(path: string): Promise<void>;
+  onOpenWorkspacesChanged(listener: (open: readonly OpenWorkspaceEntry[]) => void): () => void;
+  onOpenRequested(listener: (path: string) => void): () => void;
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
+  onUpdateReady(listener: (update: UpdateReady) => void): () => void;
+  acceptUpdate(): Promise<void>;
   openExternal(url: string): Promise<void>;
   notify(notice: HostNotice): Promise<void>;
+  onNotificationActivated(listener: (trigger: NeedsYouTrigger) => void): () => void;
+  setPendingAsks(count: number): Promise<void>;
   serverFetch(
     workspace: string,
     path: string,
     init: ServerRequestInit,
   ): Promise<ServerResponseHead>;
+  readonly pty: PtyPort;
+}
+
+export interface PtyPort {
+  open(request: PtyOpenRequest): Promise<PtyOpened>;
+  write(id: number, data: string): void;
+  resize(id: number, cols: number, rows: number): void;
+  close(id: number): void;
+  onData(id: number, listener: (bytes: Uint8Array) => void): () => void;
+  onExit(id: number, listener: (exit: PtyExit) => void): () => void;
+}
+
+export type PtyProgram = "shell" | "keywork";
+
+export interface PtyOpenRequest {
+  workspace: string;
+  program: PtyProgram;
+  args?: readonly string[] | undefined;
+  cols: number;
+  rows: number;
+}
+
+export interface PtyOpened {
+  id: number;
+  title: string;
+}
+
+export interface PtyExit {
+  id: number;
+  exitCode: number;
+  signal: number | undefined;
 }
 
 export interface HostAbout {
@@ -60,14 +100,29 @@ export type WorkspaceOpen =
   | { ok: true; opened: OpenedWorkspace }
   | { ok: false; failure: WorkspaceFailure };
 
+export interface UpdateReady {
+  version: string;
+}
+
 export interface ServerLoss {
   workspace: string;
   failure: WorkspaceFailure;
 }
 
+export interface OpenWorkspaceEntry {
+  workspace: string;
+  windows: number;
+  pendingAsks: number;
+}
+
+export type NeedsYouTrigger =
+  | { kind: "ask"; workspace: string; sessionId: string; callId: string }
+  | { kind: "memory-inbox"; workspace: string; pending: number };
+
 export interface HostNotice {
   title: string;
   body: string;
+  trigger: NeedsYouTrigger;
 }
 
 export const hostGlobal = "keyworkHost";
@@ -102,6 +157,7 @@ function isHostPort(candidate: unknown): candidate is HostPort {
     candidate !== null &&
     "about" in candidate &&
     "openWorkspace" in candidate &&
-    "serverFetch" in candidate
+    "serverFetch" in candidate &&
+    "pty" in candidate
   );
 }

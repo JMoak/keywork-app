@@ -1,0 +1,31 @@
+.kw-gauge {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-family: var(--kw-font-mono);
+  white-space: nowrap;
+}
+
+.kw-gauge-cells {
+  letter-spacing: 0.02em;
+}
+
+.kw-gauge-cell[data-level="empty"] {
+  color: var(--kw-text-dim);
+}
+.kw-gauge-cell[data-level="light"] {
+  color: var(--kw-density-light);
+}
+.kw-gauge-cell[data-level="medium"] {
+  color: var(--kw-density-medium);
+}
+.kw-gauge-cell[data-level="heavy"] {
+  color: var(--kw-density-heavy);
+}
+.kw-gauge-cell[data-level="full"] {
+  color: var(--kw-density-full);
+}
+
+.kw-gauge-count {
+  color: var(--kw-text-dim);
+}

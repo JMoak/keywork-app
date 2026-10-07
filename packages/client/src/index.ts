@@ -26,7 +26,28 @@ export {
   type FrameBatcher,
   type TickScheduler,
 } from "./projection/coalesce.ts";
+export {
+  type ChangesAvailability,
+  type ChangesState,
+  changesByTurn,
+  changesSnapshot,
+  changesState,
+  countsOf,
+  emptyChangesState,
+  type TurnGroup,
+} from "./projection/changes.ts";
 export { historyEnvelopes } from "./projection/history.ts";
+export {
+  emptyTreeState,
+  entryText,
+  type TreeNode,
+  type TreeRow,
+  type TreeState,
+  treeNodes,
+  treeRows,
+  treeSnapshot,
+  treeState,
+} from "./projection/tree.ts";
 export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {
   compactJson,

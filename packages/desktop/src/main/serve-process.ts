@@ -8,8 +8,9 @@ import {
   type ServerTicket,
   serveTicket,
 } from "@keywork-app/client";
+import { protocolVersion } from "@keywork-app/protocol";
 
-export const expectedServerVersion = "0.0.1";
+export const expectedServerVersion = protocolVersion;
 
 export interface ChildHandle {
   readonly pid: number;

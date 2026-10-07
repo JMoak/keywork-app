@@ -1,0 +1,33 @@
+{
+  "servers": [
+    {
+      "name": "filesystem",
+      "state": "connected",
+      "enabled": true,
+      "toolCount": 11,
+      "transport": "stdio"
+    },
+    {
+      "name": "remote-docs",
+      "state": "connecting",
+      "enabled": true,
+      "toolCount": 0,
+      "transport": "http"
+    },
+    {
+      "name": "broken",
+      "state": "down",
+      "enabled": true,
+      "toolCount": 0,
+      "transport": "stdio",
+      "lastError": "spawn nonexistent-server ENOENT"
+    },
+    {
+      "name": "parked",
+      "state": "down",
+      "enabled": false,
+      "toolCount": 0,
+      "transport": "stdio"
+    }
+  ]
+}

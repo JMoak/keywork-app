@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { bundledSidecar } from "../shared/sidecar.ts";
 import { commandOutput } from "./child.ts";
 import type { FileSeams } from "./recents.ts";
 import { versionOfLine } from "./workspace.ts";
@@ -65,5 +66,5 @@ export function bundledBinary(
   resourcesPath: string,
   platform: NodeJS.Platform = process.platform,
 ): string {
-  return join(resourcesPath, "sidecar", platform === "win32" ? "keywork.exe" : "keywork");
+  return bundledSidecar(resourcesPath, platform);
 }

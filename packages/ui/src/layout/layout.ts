@@ -22,19 +22,24 @@ import {
   type Rect,
   type Screen,
 } from "./geometry.ts";
-import { arrangementRects, holds, regionsOf } from "./scene.ts";
+import type { DropZone, Scene, Seam, SeamHandle } from "./hit.ts";
+import { arrangementRects, holds, type Regions, regionsOf } from "./scene.ts";
 import { arrangementOf, type LayoutState, layoutStateOf, parseLayoutState } from "./state.ts";
 import {
   attachAtEdge,
+  collectSeams,
   type LayoutNode,
   leaf,
   type Orientation,
   type PaneId,
+  ratioAt,
   removeLeaf,
   resizeAroundLeaf,
   rotateAroundLeaf,
   splitLeaf,
+  steppedRatio,
   swapLeaves,
+  withRatioAt,
 } from "./tree.ts";
 
 export type Verdict = { ok: true } | { ok: false; refused: Refusal };
@@ -93,6 +98,27 @@ export class Layout {
   rects(screen: Screen): Map<PaneId, Rect> {
     if (this.zoomedId !== undefined) return new Map([[this.zoomedId, fullRect(screen)]]);
     return arrangementRects(this.arrangement, screen);
+  }
+
+  regions(screen: Screen): Regions {
+    return regionsOf(this.arrangement, screen);
+  }
+
+  scene(screen: Screen): Scene {
+    const rects = this.rects(screen);
+    const homes = new Map(this.panes().map((id) => [id, this.dockSideOf(id) ?? "main"] as const));
+    return { screen, rects, homes, seams: this.seams(screen), regions: this.regions(screen) };
+  }
+
+  seams(screen: Screen): Seam[] {
+    if (this.zoomedId !== undefined) return [];
+    const regions = this.regions(screen);
+    const tree = this.arrangement.tree;
+    return [
+      ...(regions.left === undefined ? [] : [dockSeam("left", regions.left, screen)]),
+      ...(tree === undefined ? [] : collectSeams(tree, regions.main).map(splitSeam)),
+      ...(regions.right === undefined ? [] : [dockSeam("right", regions.right, screen)]),
+    ];
   }
 
   emptyMainRect(screen: Screen): Rect | undefined {
@@ -203,19 +229,42 @@ export class Layout {
   }
 
   dockFocused(side: DockSide, screen: Screen): Verdict {
-    const id = this.focusedId;
-    if (id === undefined) return refused("no-focus");
+    if (this.focusedId === undefined) return refused("no-focus");
+    return this.dock(this.focusedId, side, screen);
+  }
+
+  undockFocused(screen: Screen): Verdict {
+    if (this.focusedId === undefined) return refused("no-focus");
+    return this.undock(this.focusedId, screen);
+  }
+
+  dock(id: PaneId, side: DockSide, screen: Screen): Verdict {
+    if (!this.panes().includes(id)) return refused("unknown-pane");
     if (this.dockSideOf(id) === side) return refused("nothing-to-do");
     return this.commit(dockedAt(lifted(this.arrangement, id), side, id), screen);
   }
 
-  undockFocused(screen: Screen): Verdict {
-    const id = this.focusedId;
-    const from = id === undefined ? undefined : this.dockSideOf(id);
-    if (id === undefined) return refused("no-focus");
+  undock(id: PaneId, screen: Screen): Verdict {
+    if (!this.panes().includes(id)) return refused("unknown-pane");
+    const from = this.dockSideOf(id);
     if (from === undefined) return refused("nothing-to-do");
     const remaining = lifted(this.arrangement, id);
     return this.commit(withTree(remaining, this.landing(id, remaining.tree, from, screen)), screen);
+  }
+
+  send(id: PaneId, zone: DropZone, screen: Screen): Verdict {
+    return zone === "main" ? this.undock(id, screen) : this.dock(id, zone, screen);
+  }
+
+  resizeSeam(handle: SeamHandle, ratio: number, screen: Screen): Verdict {
+    const candidate = this.withSeamRatio(handle, steppedRatio(ratio));
+    if (
+      candidate === undefined ||
+      seamRatio(candidate, handle) === seamRatio(this.arrangement, handle)
+    ) {
+      return refused("nothing-to-do");
+    }
+    return this.commit(candidate, screen);
   }
 
   cycleFocused(screen: Screen): Verdict {
@@ -240,6 +289,16 @@ export class Layout {
       withTree(this.arrangement, resizeAroundLeaf(tree, this.focusedId, delta)),
       screen,
     );
+  }
+
+  private withSeamRatio(handle: SeamHandle, ratio: number): Arrangement | undefined {
+    if (handle.kind === "dock") {
+      if (this.arrangement.docks[handle.side].panes.length === 0) return undefined;
+      return withDockRatio(this.arrangement, handle.side, ratio);
+    }
+    const tree = this.arrangement.tree;
+    if (tree === undefined || ratioAt(tree, handle.path) === undefined) return undefined;
+    return withTree(this.arrangement, withRatioAt(tree, handle.path, ratio));
   }
 
   private tiledRects(screen: Screen): Map<PaneId, Rect> {
@@ -354,4 +413,26 @@ function refused(refusal: Refusal): Verdict {
 
 function splitOrientation(rect: Rect | undefined): Orientation {
   return rect !== undefined && isWide(rect) ? "row" : "column";
+}
+
+function seamRatio(arrangement: Arrangement, handle: SeamHandle): number | undefined {
+  if (handle.kind === "dock") return arrangement.docks[handle.side].ratio;
+  return arrangement.tree === undefined ? undefined : ratioAt(arrangement.tree, handle.path);
+}
+
+function splitSeam(seam: ReturnType<typeof collectSeams>[number]): Seam {
+  const { path, orientation, ...span } = seam;
+  return { handle: { kind: "split", path }, axis: orientation === "row" ? "x" : "y", ...span };
+}
+
+function dockSeam(side: DockSide, dock: Rect, screen: Screen): Seam {
+  return {
+    handle: { kind: "dock", side },
+    axis: "x",
+    at: side === "left" ? dock.x + dock.width : dock.x,
+    start: dock.y,
+    end: dock.y + dock.height,
+    origin: 0,
+    length: screen.width,
+  };
 }

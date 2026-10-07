@@ -1,0 +1,108 @@
+import type { UsageLedger } from "@keywork-app/client";
+import type { DensityLevel } from "../flavor/schema.ts";
+import { formatTokens } from "./format.ts";
+
+export type ContextBasis = "assumed" | "reported";
+
+export interface ContextLevel {
+  readonly used: number;
+  readonly window: number;
+  readonly flushAt: number;
+  readonly compactAt: number;
+  readonly basis: ContextBasis;
+}
+
+export type GaugeStyle = "steps" | "bar";
+
+export interface GaugeCell {
+  readonly glyph: string;
+  readonly level: DensityLevel | "empty";
+}
+
+export const assumedContextWindow = 200_000;
+export const barCells = 10;
+
+export function contextLevelOf(ledger: UsageLedger): ContextLevel | undefined {
+  if (ledger.turns === 0) return undefined;
+  return assumedContextLevel(ledger.lastTurnContextTokens);
+}
+
+export function assumedContextLevel(used: number): ContextLevel {
+  return reportedContextLevel(used, assumedContextWindow, "assumed");
+}
+
+export function reportedContextLevel(
+  used: number,
+  window: number,
+  basis: ContextBasis = "reported",
+): ContextLevel {
+  return {
+    used: Math.max(0, Math.round(used)),
+    window,
+    flushAt: window - reserve(window, reserveShares.flush, reserveCaps.flush),
+    compactAt: window - reserve(window, reserveShares.compaction, reserveCaps.compaction),
+    basis,
+  };
+}
+
+export function gaugeCells(level: ContextLevel, style: GaugeStyle): GaugeCell[] {
+  return style === "bar" ? barGaugeCells(level) : stepGaugeCells(level);
+}
+
+export function gaugeCount(level: ContextLevel, style: GaugeStyle): string {
+  const used = formatTokens(level.used);
+  if (style === "steps") return used;
+  return `${used}/${level.basis === "assumed" ? "~" : ""}${formatTokens(level.window)}`;
+}
+
+export function gaugeReadout(level: ContextLevel): string {
+  const window =
+    level.basis === "assumed"
+      ? `window assumed at ${formatTokens(level.window)} until the server reports one`
+      : `window reported at ${formatTokens(level.window)}`;
+  return [
+    `context ${formatTokens(level.used)} of ${formatTokens(level.window)} tokens`,
+    `memory flush at ${formatTokens(level.flushAt)} · compaction at ${formatTokens(level.compactAt)}`,
+    window,
+  ].join(" · ");
+}
+
+const densityRamp: readonly { glyph: string; level: DensityLevel }[] = [
+  { glyph: "░", level: "light" },
+  { glyph: "▒", level: "medium" },
+  { glyph: "▓", level: "heavy" },
+  { glyph: "█", level: "full" },
+];
+const emptyCell: GaugeCell = { glyph: "·", level: "empty" };
+
+const reserveCaps = { flush: 24_576, compaction: 16_384 } as const;
+const reserveShares = { flush: 1 / 8, compaction: 1 / 12 } as const;
+
+function reserve(window: number, share: number, cap: number): number {
+  return Math.min(cap, Math.max(1, Math.floor(window * share)));
+}
+
+function stepGaugeCells(level: ContextLevel): GaugeCell[] {
+  const bounds = [0, level.flushAt / 2, level.flushAt, level.compactAt];
+  return bounds.map((from, zone) =>
+    level.used > from ? (densityRamp[zone] ?? emptyCell) : emptyCell,
+  );
+}
+
+function barGaugeCells(level: ContextLevel): GaugeCell[] {
+  const [room, flush, compaction, used] = densityRamp as [
+    GaugeCell,
+    GaugeCell,
+    GaugeCell,
+    GaugeCell,
+  ];
+  const cellWidth = level.window / barCells;
+  const usedCells = Math.min(barCells, Math.round(level.used / cellWidth));
+  return Array.from({ length: barCells }, (_, index) => {
+    if (index < usedCells) return used;
+    const end = (index + 1) * cellWidth;
+    if (level.compactAt < end) return compaction;
+    if (level.flushAt < end) return flush;
+    return room;
+  });
+}

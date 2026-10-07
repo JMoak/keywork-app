@@ -1,0 +1,8 @@
+{
+  "arcs": [
+    { "slug": "arc-1", "status": "active", "created": "2026-10-06T09:00:00.000Z", "sessions": 2 },
+    { "slug": "pricing", "status": "active", "created": "2026-10-06T10:30:00.000Z", "sessions": 0 },
+    { "slug": "arc-0", "status": "archived", "created": "2026-10-05T08:00:00.000Z", "sessions": 1 }
+  ],
+  "ordinals": { "arc-0": 0, "arc-1": 1, "pricing": 2 }
+}

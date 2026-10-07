@@ -1,11 +1,11 @@
 import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
+import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { BindingSpec } from "./keymap.ts";
 
 export type FocusContext = "pane" | "composer" | "overlay";
 
 export interface ActionTarget {
-  splitPane(): void;
   closePane(): void;
   zoomPane(): void;
   rotatePane(): void;
@@ -16,7 +16,8 @@ export interface ActionTarget {
   dockPane(side: DockSide): void;
   resizeDock(delta: number): void;
   resizePane(delta: number): void;
-  summonSessions(): void;
+  summon(kind: PaneKind, variant?: string): void;
+  paneAction(action: string): void;
   cycleMode(): void;
   approveAsk(): void;
   denyAsk(): void;
@@ -28,6 +29,7 @@ export interface AppAction {
   readonly chords: BindingSpec;
   readonly help: string;
   readonly hotPath?: true;
+  readonly scope?: PaneKind;
   readonly command?: ActionCommand;
   readonly invoke: (target: ActionTarget) => void;
 }
@@ -38,13 +40,7 @@ export interface ActionCommand {
   readonly aliases?: readonly string[];
 }
 
-export const appActions: Record<string, AppAction> = {
-  "pane.split": {
-    chords: "leader s",
-    help: "new session pane",
-    invoke: (target) => target.splitPane(),
-    command: { name: "split", description: "open a new session pane beside this one" },
-  },
+export const coreActions: Record<string, AppAction> = {
   "pane.close": {
     chords: "leader x",
     help: "close focused pane",
@@ -159,12 +155,6 @@ export const appActions: Record<string, AppAction> = {
     invoke: (target) => target.resizePane(-0.05),
     command: { name: "shrink", description: "shrink the focused pane" },
   },
-  "sessions.summon": {
-    chords: "leader t",
-    help: "sessions pane",
-    invoke: (target) => target.summonSessions(),
-    command: { name: "sessions", description: "open the sessions pane", aliases: ["tree"] },
-  },
   "mode.cycle": {
     chords: "shift+tab",
     help: "cycle the pane's mode",
@@ -209,6 +199,8 @@ export const appActions: Record<string, AppAction> = {
   },
 };
 
+export const appActions: Record<string, AppAction> = { ...coreActions, ...paneActions };
+
 export const composerHotPath = ["enter", "alt+enter", "escape"] as const;
 
 export const appBindings: Record<string, BindingSpec> = Object.fromEntries(
@@ -217,6 +209,14 @@ export const appBindings: Record<string, BindingSpec> = Object.fromEntries(
 
 export const bindingHelp: Record<string, string> = Object.fromEntries(
   Object.entries(appActions).map(([name, action]) => [name, action.help]),
+);
+
+export const exclusiveScopes: readonly PaneKind[] = keyboardOwners;
+
+export const actionScopes: Record<string, PaneKind> = Object.fromEntries(
+  Object.entries(appActions).flatMap(([name, action]) =>
+    action.scope === undefined ? [] : [[name, action.scope]],
+  ),
 );
 
 export const hotPathActions: readonly string[] = Object.entries(appActions)

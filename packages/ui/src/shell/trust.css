@@ -1,0 +1,45 @@
+.kw-trust {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  color: var(--kw-text-mid);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-trust p {
+  margin: 0;
+}
+
+.kw-trust-ask {
+  color: var(--kw-text);
+}
+
+.kw-trust-enables,
+.kw-trust-restarting {
+  color: var(--kw-text-dim);
+}
+
+.kw-trust-refusal {
+  color: var(--kw-error);
+}
+
+.kw-trust-keys {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.kw-trust-accept {
+  font: inherit;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--kw-border-focus);
+  background: none;
+  color: var(--kw-accent);
+  cursor: pointer;
+}
+
+.kw-trust-keys kbd {
+  color: var(--kw-text-dim);
+}

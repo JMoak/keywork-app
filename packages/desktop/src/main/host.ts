@@ -1,12 +1,17 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { keyworkClient } from "@keywork-app/client";
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell, type WebContents } from "electron";
 import { hostChannels, type RelayRequest } from "../shared/channels.ts";
 import { freePort, spawnChild } from "./child.ts";
+import { showToast } from "./native.ts";
+import { isNotice, shouldNotify } from "./notify.ts";
+import { externalVerdict } from "./open-external.ts";
+import { registerPtyHandlers } from "./pty-ipc.ts";
 import { recentStore } from "./recents.ts";
 import { superviseServer } from "./serve-process.ts";
 import { serverRelay } from "./server-relay.ts";
+import type { DesktopShell } from "./shell.ts";
 import {
   bundledBinary,
   fileSeams,
@@ -14,10 +19,25 @@ import {
   keyworkTicketFile,
   keyworkVersion,
 } from "./system.ts";
-import { type OpenedWorkspace, type WorkspaceHost, workspaceHost } from "./workspace.ts";
+import {
+  chooseBinary,
+  type OpenedWorkspace,
+  type WorkspaceHost,
+  workspaceHost,
+} from "./workspace.ts";
 
-export function registerHostHandlers(): WorkspaceHost {
-  const workspaces = workspaceHost({
+export interface HostAbout {
+  shell: "electron";
+  platform: NodeJS.Platform;
+  version: string;
+}
+
+export function aboutInfo(): HostAbout {
+  return { shell: "electron", platform: process.platform, version: app.getVersion() };
+}
+
+export function createWorkspaces(): WorkspaceHost {
+  return workspaceHost({
     ticketFile: keyworkTicketFile(),
     readText: fileSeams.readText,
     removeFile: (path) => rm(path, { force: true }),
@@ -35,53 +55,92 @@ export function registerHostHandlers(): WorkspaceHost {
     bundledBinary: bundledBinary(process.resourcesPath),
     recents: recentStore(join(app.getPath("userData"), "recents.json"), fileSeams),
   });
+}
+
+export async function pickFolder(): Promise<string | undefined> {
+  const picked = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+  return picked.canceled ? undefined : picked.filePaths[0];
+}
+
+export interface HostHandlers {
+  abortRelays(): void;
+}
+
+export function registerHostHandlers(
+  workspaces: WorkspaceHost,
+  desktop: DesktopShell,
+  onWorkspaceOpened: () => void,
+): HostHandlers {
   const relay = serverRelay({
     ticketFor: (workspace) => workspaces.ticketFor(workspace),
     fetch: (input, init) => fetch(input, init),
   });
 
-  ipcMain.handle(hostChannels.about, () => ({
-    shell: "electron",
-    platform: process.platform,
-    version: app.getVersion(),
-  }));
-  ipcMain.handle(hostChannels.pickFolder, async () => {
-    const picked = await dialog.showOpenDialog({ properties: ["openDirectory"] });
-    return picked.canceled ? undefined : picked.filePaths[0];
-  });
+  ipcMain.handle(hostChannels.about, () => aboutInfo());
+  ipcMain.handle(hostChannels.pickFolder, () => pickFolder());
   ipcMain.handle(hostChannels.recentWorkspaces, () => workspaces.recent());
-  ipcMain.handle(hostChannels.openWorkspace, async (_event, path: string) => {
+  ipcMain.handle(hostChannels.openWorkspace, async (event, path: string) => {
     const result = await workspaces.open(path);
+    if (!result.ok) return result;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window !== null) await desktop.bindWindow(window.id, result.opened.workspace);
+    onWorkspaceOpened();
+    return { ok: true, opened: publicView(result.opened) };
+  });
+  ipcMain.handle(hostChannels.restartServer, async (_event, path: string) => {
+    const result = await workspaces.restart(path);
     return result.ok ? { ok: true, opened: publicView(result.opened) } : result;
   });
-  ipcMain.handle(hostChannels.closeWorkspace, (_event, path: string) => workspaces.close(path));
-  ipcMain.handle(hostChannels.openExternal, (_event, url: string) => openExternal(url));
-  ipcMain.handle(hostChannels.notify, (_event, notice: { title: string; body: string }) => {
-    if (Notification.isSupported()) new Notification(notice).show();
+  ipcMain.handle(hostChannels.closeWorkspace, async (event, path: string) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window !== null && desktop.windows.workspaceOf(window.id) === path) {
+      await desktop.unbindWindow(window.id);
+    }
+  });
+  ipcMain.handle(hostChannels.listOpenWorkspaces, () => desktop.windows.list());
+  ipcMain.handle(hostChannels.switchWorkspace, (_event, path: string) => desktop.openPath(path));
+  ipcMain.handle(hostChannels.setPendingAsks, (event, count: number) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window !== null) desktop.windows.setPendingAsks(window.id, count);
+  });
+  ipcMain.handle(hostChannels.openExternal, (_event, url: string) =>
+    openExternal(url, workspaces.openRoots()),
+  );
+  ipcMain.handle(hostChannels.notify, (event, notice: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window === null || !isNotice(notice)) return false;
+    if (!shouldNotify(notice.trigger, window.isFocused())) return false;
+    return showToast(notice, () => {
+      desktop.focusWindow(window.id);
+      window.webContents.send(hostChannels.notificationActivated, notice.trigger);
+    });
   });
   ipcMain.handle(hostChannels.serverFetch, (event, request: RelayRequest) =>
     relay.start(request, {
-      chunk: (requestId, bytes) => event.sender.send(hostChannels.serverChunk, requestId, bytes),
-      end: (end) => event.sender.send(hostChannels.serverEnd, end),
+      chunk: (requestId, bytes) =>
+        sendUnlessGone(event.sender, hostChannels.serverChunk, requestId, bytes),
+      end: (end) => sendUnlessGone(event.sender, hostChannels.serverEnd, end),
     }),
   );
   ipcMain.on(hostChannels.serverAbort, (_event, requestId: number) => relay.abort(requestId));
-  workspaces.onServerLost((loss) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send(hostChannels.serverLost, loss);
-    }
+  workspaces.onServerLost((loss) => desktop.broadcast(hostChannels.serverLost, loss));
+  desktop.onOpenWorkspacesChanged((open) =>
+    desktop.broadcast(hostChannels.openWorkspacesChanged, open),
+  );
+  registerPtyHandlers({
+    keyworkBinary: () =>
+      chooseBinary({
+        keyworkOnPath,
+        binaryVersion: keyworkVersion,
+        bundledBinary: bundledBinary(process.resourcesPath),
+      }),
+    secretsFor: (workspace) => [workspaces.ticketFor(workspace)?.token ?? ""],
   });
-  let serversStopped = false;
-  app.on("before-quit", (event) => {
-    if (serversStopped) return;
-    event.preventDefault();
-    relay.abortAll();
-    void workspaces.closeAll().finally(() => {
-      serversStopped = true;
-      app.quit();
-    });
-  });
-  return workspaces;
+  return { abortRelays: () => relay.abortAll() };
+}
+
+function sendUnlessGone(target: WebContents, channel: string, ...payload: unknown[]): void {
+  if (!target.isDestroyed()) target.send(channel, ...payload);
 }
 
 function publicView(opened: OpenedWorkspace) {
@@ -94,12 +153,9 @@ function publicView(opened: OpenedWorkspace) {
   };
 }
 
-function openExternal(url: string): Promise<void> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    return Promise.reject(new Error(`refusing to open ${parsed.protocol} links`));
-  }
-  return shell.openExternal(url);
+function openExternal(url: string, workspaceRoots: readonly string[]): Promise<void> {
+  const verdict = externalVerdict(url, workspaceRoots);
+  return verdict.ok ? shell.openExternal(verdict.url) : Promise.reject(new Error(verdict.reason));
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

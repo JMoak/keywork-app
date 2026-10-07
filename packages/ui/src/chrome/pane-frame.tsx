@@ -1,4 +1,6 @@
 import { createEffect, createSignal, type JSX, onCleanup, onMount, Show } from "solid-js";
+import type { ContextLevel } from "../instruments/context.ts";
+import { ContextGauge } from "../instruments/gauge.tsx";
 import "./pane-frame.css";
 
 export type LifecycleState = "idle" | "working" | "needs-you" | "finished-unseen" | "failed";
@@ -9,6 +11,7 @@ export interface PaneFrameProps {
   focused: boolean;
   spawnRank: number;
   telemetry?: string | undefined;
+  context?: ContextLevel | undefined;
   modeWord?: string | undefined;
   onFocus?: (() => void) | undefined;
   children: JSX.Element;
@@ -76,8 +79,13 @@ export function PaneFrame(props: PaneFrameProps) {
         <span class="kw-frame-name" data-state={shownState()}>
           {props.name}
         </span>
-        <Show when={props.telemetry}>
-          {(text) => <span class="kw-frame-telemetry">{text()}</span>}
+        <Show when={props.context !== undefined || props.telemetry}>
+          <span class="kw-frame-telemetry">
+            <Show when={props.context}>{(level) => <ContextGauge level={level()} />}</Show>
+            <Show when={props.telemetry}>
+              {(text) => <span class="kw-frame-usage">{text()}</span>}
+            </Show>
+          </span>
         </Show>
         <Show when={props.modeWord}>{(word) => <span class="kw-frame-mode">{word()}</span>}</Show>
       </header>

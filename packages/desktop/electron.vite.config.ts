@@ -7,8 +7,13 @@ const ui = resolve(import.meta.dirname, "../ui");
 
 const workspacePackages = ["@keywork-app/client", "@keywork-app/protocol"];
 
+export const nativeModules = ["node-pty"];
+
 export default defineConfig({
-  main: { plugins: [externalizeDepsPlugin({ exclude: workspacePackages })] },
+  main: {
+    plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
+    build: { rollupOptions: { external: nativeModules } },
+  },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
     build: { rollupOptions: { output: { format: "cjs", entryFileNames: "[name].js" } } },

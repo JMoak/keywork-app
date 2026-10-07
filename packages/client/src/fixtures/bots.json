@@ -1,0 +1,22 @@
+{
+  "bots": [
+    {
+      "name": "reviewer",
+      "sigil": "◆",
+      "source": "project",
+      "description": "reads diffs and asks the awkward questions",
+      "sessions": 3,
+      "lastUsed": "2026-10-07T08:12:00.000Z",
+      "costNanos": 412000000
+    },
+    {
+      "name": "scribe",
+      "sigil": "✎",
+      "source": "user",
+      "description": "turns a session into notes",
+      "model": "anthropic/claude-sonnet-4-5",
+      "learning": "notes",
+      "sessions": 0
+    }
+  ]
+}

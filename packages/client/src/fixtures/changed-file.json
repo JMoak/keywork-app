@@ -1,0 +1,8 @@
+{
+  "trusted": true,
+  "path": "notes.txt",
+  "before": null,
+  "after": "one\ntwo\n",
+  "note": "new",
+  "truncated": false
+}

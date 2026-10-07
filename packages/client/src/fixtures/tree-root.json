@@ -1,0 +1,35 @@
+{
+  "path": "",
+  "entries": [
+    {
+      "name": "dist",
+      "kind": "dir",
+      "ignored": true,
+      "hidden": false
+    },
+    {
+      "name": "src",
+      "kind": "dir",
+      "ignored": false,
+      "hidden": false
+    },
+    {
+      "name": ".editorconfig",
+      "kind": "file",
+      "ignored": false,
+      "hidden": true
+    },
+    {
+      "name": ".gitignore",
+      "kind": "file",
+      "ignored": false,
+      "hidden": true
+    },
+    {
+      "name": "README.md",
+      "kind": "file",
+      "ignored": false,
+      "hidden": false
+    }
+  ]
+}

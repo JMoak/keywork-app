@@ -1,6 +1,8 @@
 import { createResource, createSignal, For, Show } from "solid-js";
+import { FirstRun } from "../chrome/first-run.tsx";
 import { relativeAge } from "../chrome/telemetry.ts";
 import type { HostPort } from "../host/port.ts";
+import { keymapFromConfig } from "../keys/config.ts";
 
 export interface OpenScreenProps {
   host: HostPort;
@@ -13,6 +15,9 @@ export function OpenScreen(props: OpenScreenProps) {
   const [recents] = createResource(() => props.host.recentWorkspaces());
   const [about] = createResource(() => props.host.about());
   const [typed, setTyped] = createSignal("");
+  const keymap = keymapFromConfig();
+  const keys = { chord: (action: string) => keymap.describe(action) ?? "an unbound key" };
+  const neverOpened = () => recents.state === "ready" && (recents() ?? []).length === 0;
   const pick = async (): Promise<void> => {
     const chosen = await props.host.pickFolder();
     if (chosen !== undefined) props.onOpen(chosen);
@@ -57,6 +62,9 @@ export function OpenScreen(props: OpenScreenProps) {
             )}
           </For>
         </ol>
+      </Show>
+      <Show when={neverOpened()}>
+        <FirstRun keys={keys} />
       </Show>
       <Show when={props.opening}>
         {(path) => <p class="kw-open-note">starting keywork in {path()}</p>}

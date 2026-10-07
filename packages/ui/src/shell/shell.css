@@ -1,67 +1,12 @@
-.kw-sessions {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--kw-border);
-}
-
-.kw-sessions-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-  padding: 0.45rem 0.75rem;
-  border-bottom: 1px solid var(--kw-border);
-  color: var(--kw-text-dim);
-}
-
-.kw-sessions-new,
 .kw-open-pick,
 .kw-status-gap,
-.kw-open-recent,
-.kw-session-button {
+.kw-open-recent {
   font: inherit;
   color: inherit;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-}
-
-.kw-sessions-new {
-  color: var(--kw-accent);
-}
-
-.kw-session-list {
-  list-style: none;
-  margin: 0;
-  padding: 0.25rem 0;
-  overflow: auto;
-}
-
-.kw-session-button {
-  display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  width: 100%;
-  padding: 0.3rem 0.75rem 0.3rem 0.5rem;
-  text-align: left;
-  color: var(--kw-text-mid);
-}
-.kw-session-row[data-current] .kw-session-button {
-  color: var(--kw-text);
-  background: var(--kw-panel);
-}
-.kw-session-mark {
-  text-align: center;
-  color: var(--kw-density-medium);
-}
-.kw-session-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.kw-session-age {
-  color: var(--kw-text-dim);
 }
 
 .kw-main {
@@ -113,12 +58,6 @@
 .kw-page {
   flex: 1;
   min-height: 0;
-}
-
-.kw-empty {
-  margin: 0;
-  padding: 1rem 1.25rem;
-  color: var(--kw-text-dim);
 }
 
 .kw-status {
@@ -217,8 +156,47 @@
   color: var(--kw-text-dim);
 }
 
-.kw-sessions {
-  border-right: none;
+.kw-seam {
+  position: absolute;
+  z-index: 2;
+  background: var(--kw-density-medium);
+  opacity: 0;
+  transition: opacity 120ms steps(3, end);
+}
+.kw-seam[data-axis="x"] {
+  cursor: col-resize;
+}
+.kw-seam[data-axis="y"] {
+  cursor: row-resize;
+}
+.kw-seam:hover {
+  opacity: 0.35;
+}
+.kw-seam[data-active] {
+  opacity: 0.7;
+}
+
+.kw-drop {
+  position: absolute;
+  z-index: 3;
+  background: var(--kw-density-light);
+  opacity: 0.12;
+  transition: opacity 120ms steps(3, end);
+}
+.kw-drop[data-hot] {
+  opacity: 0.4;
+}
+
+.kw-stage[data-gesture="dragging"],
+.kw-stage[data-gesture="resizing"] {
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-seam,
+  .kw-drop {
+    transition: none;
+  }
 }
 
 .kw-status-leader {

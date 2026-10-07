@@ -1,10 +1,18 @@
 import { createSignal } from "solid-js";
-import type { Direction, DockSide, PaneId, Rect, Screen } from "../layout/index.ts";
+import type {
+  Direction,
+  DockSide,
+  DropZone,
+  PaneId,
+  Rect,
+  Scene,
+  Screen,
+  SeamHandle,
+} from "../layout/index.ts";
 import { Layout, parseLayoutState, type Verdict } from "../layout/index.ts";
+import { definitionOf, type PaneKind, type PaneSpec, parsePaneSpec } from "../panes/index.ts";
 
-export type PaneSpec =
-  | { readonly kind: "conversation"; readonly sessionId: string | undefined }
-  | { readonly kind: "sessions" };
+export type { PaneKind, PaneSpec } from "../panes/index.ts";
 
 export interface PaneSlot {
   readonly id: PaneId;
@@ -20,12 +28,13 @@ export interface Tiler {
   panes(): readonly PaneId[];
   spec(id: PaneId): PaneSpec | undefined;
   slots(screen: Screen): PaneSlot[];
+  scene(screen: Screen): Scene;
   emptyMain(screen: Screen): Rect | undefined;
   focused(): PaneId | undefined;
   focusedSpec(): PaneSpec | undefined;
-  openConversation(sessionId: string | undefined, screen: Screen): Verdict;
-  bindSession(id: PaneId, sessionId: string): void;
-  summonSessions(screen: Screen): Verdict;
+  open(spec: PaneSpec, screen: Screen): Verdict;
+  summon(spec: PaneSpec, screen: Screen): Verdict;
+  bind(id: PaneId, spec: PaneSpec): void;
   close(id: PaneId): Verdict;
   focus(id: PaneId): Verdict;
   focusOrdinal(ordinal: number): Verdict;
@@ -37,6 +46,8 @@ export interface Tiler {
   dock(side: DockSide, screen: Screen): Verdict;
   resizeDock(delta: number, screen: Screen): Verdict;
   resizePane(delta: number, screen: Screen): Verdict;
+  resizeSeam(handle: SeamHandle, ratio: number, screen: Screen): Verdict;
+  send(id: PaneId, zone: DropZone, screen: Screen): Verdict;
   snapshot(): TilerState;
 }
 
@@ -45,23 +56,33 @@ export interface TilerState {
   readonly specs: Readonly<Record<PaneId, PaneSpec>>;
 }
 
-export const sessionsPaneId = "sessions";
-
 export function createTiler(restored?: TilerState): Tiler {
   const layout = new Layout();
   const specs = new Map<PaneId, PaneSpec>();
+  const ids = new PaneIds();
   const [version, setVersion] = createSignal(0);
-  let nextConversation = 1;
   if (restored !== undefined) revive(layout, specs, restored);
-  for (const id of specs.keys()) nextConversation = Math.max(nextConversation, ordinalOf(id) + 1);
+  for (const id of specs.keys()) ids.adopt(id);
 
   const touched = (verdict: Verdict): Verdict => {
     if (verdict.ok) setVersion((at) => at + 1);
     return verdict;
   };
 
-  const forget = (id: PaneId): void => {
-    specs.delete(id);
+  const place = (id: PaneId, spec: PaneSpec, screen: Screen): Verdict => {
+    const home = definitionOf(spec.kind).home;
+    if (home !== "main") return layout.openInDock(id, home, screen);
+    const beside = mainAnchor(layout);
+    return beside === undefined ? layout.openInMain(id, screen) : layout.open(id, screen, beside);
+  };
+
+  const open = (spec: PaneSpec, screen: Screen): Verdict => {
+    const id = ids.mint(spec.kind);
+    const verdict = place(id, spec, screen);
+    if (!verdict.ok) return verdict;
+    ids.adopt(id);
+    specs.set(id, spec);
+    return touched(verdict);
   };
 
   return {
@@ -78,6 +99,10 @@ export function createTiler(restored?: TilerState): Tiler {
         return [{ id, spec, rect, focused: id === focused, spawnRank: layout.spawnRank(id) }];
       });
     },
+    scene: (screen) => {
+      version();
+      return layout.scene(screen);
+    },
     emptyMain: (screen) => {
       version();
       return layout.emptyMainRect(screen);
@@ -91,30 +116,20 @@ export function createTiler(restored?: TilerState): Tiler {
       const id = layout.focused();
       return id === undefined ? undefined : specs.get(id);
     },
-    openConversation: (sessionId, screen) => {
-      const id = `conversation-${nextConversation}`;
-      const beside = mainAnchor(layout, specs);
-      const verdict =
-        beside === undefined ? layout.openInMain(id, screen) : layout.open(id, screen, beside);
-      if (!verdict.ok) return verdict;
-      nextConversation += 1;
-      specs.set(id, { kind: "conversation", sessionId });
-      return touched(verdict);
+    open,
+    summon: (spec, screen) => {
+      if (definitionOf(spec.kind).home === "main") return open(spec, screen);
+      const existing = layout.panes().find((id) => specs.get(id)?.kind === spec.kind);
+      return existing === undefined ? open(spec, screen) : touched(layout.focus(existing));
     },
-    bindSession: (id, sessionId) => {
-      if (specs.get(id)?.kind !== "conversation") return;
-      specs.set(id, { kind: "conversation", sessionId });
+    bind: (id, spec) => {
+      if (specs.get(id)?.kind !== spec.kind) return;
+      specs.set(id, spec);
       setVersion((at) => at + 1);
-    },
-    summonSessions: (screen) => {
-      if (layout.panes().includes(sessionsPaneId)) return touched(layout.focus(sessionsPaneId));
-      const verdict = layout.openInDock(sessionsPaneId, "left", screen);
-      if (verdict.ok) specs.set(sessionsPaneId, { kind: "sessions" });
-      return touched(verdict);
     },
     close: (id) => {
       const verdict = layout.close(id);
-      if (verdict.ok) forget(id);
+      if (verdict.ok) specs.delete(id);
       return touched(verdict);
     },
     focus: (id) => touched(layout.focus(id)),
@@ -132,6 +147,8 @@ export function createTiler(restored?: TilerState): Tiler {
       return touched(layout.resizeDock(side, delta, screen));
     },
     resizePane: (delta, screen) => touched(layout.resizeFocused(delta, screen)),
+    resizeSeam: (handle, ratio, screen) => touched(layout.resizeSeam(handle, ratio, screen)),
+    send: (id, zone, screen) => touched(layout.send(id, zone, screen)),
     snapshot: () => ({ layout: layout.toJSON(), specs: Object.fromEntries(specs) }),
   };
 }
@@ -149,11 +166,31 @@ export function parseTilerState(value: unknown): TilerState | undefined {
   }
   const specs: Record<PaneId, PaneSpec> = {};
   for (const [id, spec] of Object.entries(candidate.specs as Record<string, unknown>)) {
-    const parsed = parseSpec(spec);
+    const parsed = parsePaneSpec(spec);
     if (parsed === undefined) return undefined;
     specs[id] = parsed;
   }
   return { layout: layoutState, specs };
+}
+
+export function paneIdOf(kind: PaneKind, ordinal: number): PaneId {
+  return `${kind}-${ordinal}`;
+}
+
+class PaneIds {
+  private readonly next = new Map<string, number>();
+
+  mint(kind: PaneKind): PaneId {
+    return paneIdOf(kind, this.next.get(kind) ?? 1);
+  }
+
+  adopt(id: PaneId): void {
+    const dash = id.lastIndexOf("-");
+    const kind = id.slice(0, dash);
+    const ordinal = Number(id.slice(dash + 1));
+    if (dash === -1 || !Number.isInteger(ordinal)) return;
+    this.next.set(kind, Math.max(this.next.get(kind) ?? 1, ordinal + 1));
+  }
 }
 
 function revive(layout: Layout, specs: Map<PaneId, PaneSpec>, state: TilerState): void {
@@ -165,24 +202,9 @@ function revive(layout: Layout, specs: Map<PaneId, PaneSpec>, state: TilerState)
   }
 }
 
-function parseSpec(value: unknown): PaneSpec | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  const spec = value as { kind?: unknown; sessionId?: unknown };
-  if (spec.kind === "sessions") return { kind: "sessions" };
-  if (spec.kind !== "conversation") return undefined;
-  return {
-    kind: "conversation",
-    sessionId: typeof spec.sessionId === "string" ? spec.sessionId : undefined,
-  };
-}
-
-function mainAnchor(layout: Layout, specs: Map<PaneId, PaneSpec>): PaneId | undefined {
+function mainAnchor(layout: Layout): PaneId | undefined {
+  const inMain = (id: PaneId): boolean => layout.dockSideOf(id) === undefined;
   const focused = layout.focused();
-  if (focused !== undefined && specs.get(focused)?.kind === "conversation") return focused;
-  return layout.recentlyFocused().find((id) => specs.get(id)?.kind === "conversation");
-}
-
-function ordinalOf(id: PaneId): number {
-  const match = id.match(/^conversation-(\d+)$/);
-  return match?.[1] === undefined ? 0 : Number(match[1]);
+  if (focused !== undefined && inMain(focused)) return focused;
+  return layout.recentlyFocused().find(inMain);
 }

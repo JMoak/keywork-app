@@ -8,6 +8,13 @@
     "jsx": "preserve",
     "jsxImportSource": "solid-js"
   },
-  "include": ["src", "vite.config.ts"],
-  "references": [{ "path": "../protocol" }, { "path": "../client" }]
+  "include": ["src", "vite.config.ts", "playwright.config.ts", "screenshots"],
+  "references": [
+    {
+      "path": "../protocol"
+    },
+    {
+      "path": "../client"
+    }
+  ]
 }

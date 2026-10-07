@@ -1,10 +1,12 @@
 export {
   type ActionTarget,
   type AppAction,
+  actionScopes,
   appActions,
   appBindings,
   bindingHelp,
   composerHotPath,
+  coreActions,
   type FocusContext,
   hotPathActions,
 } from "./actions.ts";

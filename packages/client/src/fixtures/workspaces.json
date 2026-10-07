@@ -1,0 +1,32 @@
+{
+  "workspaces": [
+    {
+      "name": "keywork-app",
+      "declared": true,
+      "current": true,
+      "notes": 14,
+      "focusDirs": ["packages/ui"],
+      "sessions": 6,
+      "lastUsed": 1759824000000
+    },
+    {
+      "slug": "docs",
+      "name": "docs",
+      "declared": true,
+      "current": false,
+      "notes": 3,
+      "focusDirs": ["docs", "packages/protocol/src/fixtures"],
+      "sessions": 1,
+      "lastUsed": 1759737600000
+    },
+    {
+      "slug": "spike",
+      "name": "spike",
+      "declared": false,
+      "current": false,
+      "notes": 0,
+      "focusDirs": [],
+      "sessions": 0
+    }
+  ]
+}

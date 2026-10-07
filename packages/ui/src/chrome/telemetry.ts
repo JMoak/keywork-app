@@ -1,13 +1,9 @@
 import type { SessionProjection } from "@keywork-app/client";
 import type { SessionSummary } from "@keywork-app/protocol";
+import { usageLine } from "../instruments/cost.ts";
 
 export function telemetry(projection: SessionProjection): string {
-  const { usage } = projection;
-  if (usage.turns === 0) return "";
-  const tokens = `${usage.inputTokens + usage.outputTokens} tokens`;
-  return usage.unpricedTurns === 0
-    ? `${tokens} · $${usage.costUsd.toFixed(4)}`
-    : `${tokens} · unpriced`;
+  return usageLine(projection.usage);
 }
 
 export function sessionName(

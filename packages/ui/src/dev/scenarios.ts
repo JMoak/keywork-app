@@ -1,5 +1,6 @@
 import type { BusEnvelope } from "@keywork-app/protocol";
 import denied from "../../../client/src/fixtures/denied.jsonl?raw";
+import injected from "../../../client/src/fixtures/injected.jsonl?raw";
 import interrupt from "../../../client/src/fixtures/interrupt.jsonl?raw";
 import plain from "../../../client/src/fixtures/plain.jsonl?raw";
 import queued from "../../../client/src/fixtures/queued.jsonl?raw";
@@ -61,5 +62,6 @@ export const scenarios: readonly Scenario[] = [
   { name: "denied", envelopes: parseJsonl(denied) },
   { name: "interrupt", envelopes: parseJsonl(interrupt) },
   { name: "queued", envelopes: parseJsonl(queued) },
+  { name: "injected", envelopes: parseJsonl(injected) },
   { name: "prose", envelopes: parseJsonl(proseFixture) },
 ];

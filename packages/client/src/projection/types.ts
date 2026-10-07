@@ -2,6 +2,7 @@ import type {
   ContextInjection,
   PermissionAsk,
   PermissionDecision,
+  PromptOrigin,
   QueuedPrompt,
   SpillReference,
 } from "@keywork-app/protocol";
@@ -25,6 +26,7 @@ export interface SessionProjection {
 export interface LiveTurn {
   readonly startedAt: string;
   readonly userText: string;
+  readonly origin?: PromptOrigin;
 }
 
 export interface UsageLedger {
@@ -32,6 +34,7 @@ export interface UsageLedger {
   readonly outputTokens: number;
   readonly cacheReadInputTokens: number;
   readonly cacheCreationInputTokens: number;
+  readonly lastTurnContextTokens: number;
   readonly turns: number;
   readonly unpricedTurns: number;
   readonly costUsd: number;
@@ -43,6 +46,7 @@ export interface UserEntry {
   readonly kind: "user";
   readonly text: string;
   readonly entryId?: string;
+  readonly origin?: PromptOrigin;
   readonly replay: boolean;
 }
 
@@ -95,6 +99,7 @@ export const emptyUsage: UsageLedger = {
   outputTokens: 0,
   cacheReadInputTokens: 0,
   cacheCreationInputTokens: 0,
+  lastTurnContextTokens: 0,
   turns: 0,
   unpricedTurns: 0,
   costUsd: 0,

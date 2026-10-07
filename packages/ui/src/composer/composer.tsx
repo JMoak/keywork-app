@@ -20,9 +20,8 @@ export function intentOf(
   if (event.key === "Escape") return "interrupt";
   if (event.key !== "Enter") return "none";
   if (event.shiftKey) return "newline";
-  if (event.altKey) return "queue";
-  if (event.ctrlKey || event.metaKey) return "steer";
-  return "steer";
+  if (event.altKey) return "steer";
+  return "queue";
 }
 
 export function Composer(props: ComposerProps) {
@@ -52,6 +51,9 @@ export function Composer(props: ComposerProps) {
                   ░
                 </span>
                 {prompt.text}
+                <Show when={prompt.origin}>
+                  {(origin) => <span class="kw-queue-origin">via {origin().client}</span>}
+                </Show>
               </li>
             )}
           </For>

@@ -165,6 +165,20 @@ describe("project", () => {
     });
   });
 
+  it("carries an external origin on the live turn, its entry and the queue", () => {
+    const origin = { kind: "external", client: "wispr-flow" } as const;
+    const state = projectAll(emptyProjection, [
+      at("turn.started", { userText: "dictated", origin }),
+      at("queue.changed", { queued: [{ id: "q1", text: "then this", behavior: "queue", origin }] }),
+    ]);
+    expect(state.turn).toMatchObject({ userText: "dictated", origin });
+    expect(state.entries[0]).toEqual({ kind: "user", text: "dictated", origin, replay: false });
+    expect(state.queue[0]?.origin).toEqual(origin);
+    const typed = projectAll(emptyProjection, [at("turn.started", { userText: "typed" })]);
+    expect(typed.turn).toEqual({ startedAt: typed.turn?.startedAt, userText: "typed" });
+    expect(typed.entries[0]).toEqual({ kind: "user", text: "typed", replay: false });
+  });
+
   it("never mutates a prior state", () => {
     const before = projectAll(emptyProjection, [at("turn.started", { userText: "a" })]);
     const frozen = JSON.stringify(before);

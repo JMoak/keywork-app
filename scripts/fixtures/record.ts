@@ -1,14 +1,13 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { parseArgs } from "node:util";
 import { sseFrames } from "@keywork-app/client";
 import { type BusEnvelope, engineEventTypes } from "@keywork-app/protocol";
+import { keyworkModuleUrl, keyworkRepo } from "../lib/keywork-checkout.ts";
 import { repoRoot } from "../lib/repo-files.ts";
 
 export const fixturesDir = join(repoRoot, "packages/client/src/fixtures");
-
-const keyworkRepo = resolve(process.env.KEYWORK_REPO ?? join(repoRoot, "..", "keywork"));
 const token = "fixture-token";
 const origin = "http://keywork.fixture";
 
@@ -65,6 +64,7 @@ interface ServeModule {
     provider: Provider;
     permissions: (call: unknown) => "allow" | "ask" | "deny" | undefined;
     askTimeoutMs?: number;
+    checkpointsGitDir?: string;
     log: EventLogLike;
   }): unknown;
 }
@@ -76,12 +76,15 @@ interface Scenario {
   drive(stage: Stage): Promise<void>;
   capacity?: number;
   askTimeoutMs?: number;
+  trusted?: boolean;
+  prepare?(cwd: string): Promise<void>;
 }
 
 interface Stage {
   sessionId: string;
   call(path: string, init?: RequestInit): Promise<Response>;
   prompt(text: string): Promise<void>;
+  inject(text: string, client: string): Promise<void>;
   abort(): Promise<void>;
   answer(callId: string, verdict: "granted" | "denied"): Promise<void>;
   until(type: string, count?: number): Promise<void>;
@@ -96,6 +99,20 @@ const bashCall = {
   name: "bash",
   arguments: { command: "echo served" },
 } as const;
+
+const writeCall = {
+  type: "tool-call",
+  callId: "w1",
+  name: "write",
+  arguments: { path: "notes.txt", content: "one\ntwo\n" },
+} as const;
+
+async function entryIdsOf(stage: Stage): Promise<string[]> {
+  const tree = (await (await stage.call(`/sessions/${stage.sessionId}/entries`)).json()) as {
+    entries: Array<{ id: string }>;
+  };
+  return tree.entries.map((entry) => entry.id);
+}
 
 export const scenarios: readonly Scenario[] = [
   {
@@ -210,7 +227,90 @@ export const scenarios: readonly Scenario[] = [
       await stage.until("turn.completed", 2);
     },
   },
+  {
+    name: "injected",
+    provider: (engine) => releasingProvider(engine),
+    permissions: "allow",
+    drive: async (stage) => {
+      await stage.prompt("first");
+      await stage.until("turn.delta");
+      await stage.inject("second", "wispr-flow");
+      await stage.until("queue.changed");
+      release?.();
+      await stage.until("turn.completed", 2);
+    },
+  },
+  {
+    name: "tree",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [engine.textTurn("Left it is.", usage), engine.textTurn("Right, then.", usage)],
+        "mock-model",
+      ),
+    permissions: "allow",
+    drive: async (stage) => {
+      await stage.prompt("which way?");
+      await stage.until("session.tree");
+      const [question, answer] = await entryIdsOf(stage);
+      await stage.call(`/sessions/${stage.sessionId}/fork`, {
+        method: "POST",
+        body: JSON.stringify({ entryId: question }),
+      });
+      await stage.call(`/sessions/${stage.sessionId}/label`, {
+        method: "POST",
+        body: JSON.stringify({ entryId: answer, label: "went left" }),
+      });
+      await stage.call(`/sessions/${stage.sessionId}/leaf`, {
+        method: "POST",
+        body: JSON.stringify({ entryId: question }),
+      });
+      await stage.prompt("no, the other way");
+      await stage.until("session.tree", 5);
+    },
+  },
+  {
+    name: "changes",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [engine.toolCallTurn(writeCall), engine.textTurn("Wrote notes.txt.", usage)],
+        "mock-model",
+      ),
+    permissions: "allow",
+    trusted: true,
+    drive: async (stage) => {
+      await stage.prompt("write two lines to notes.txt");
+      await stage.until("changes.updated");
+      await stage.until("turn.completed");
+    },
+  },
+  {
+    name: "workspace",
+    provider: (engine) =>
+      new engine.MockProvider([engine.textTurn("The tree is small.", usage)], "mock-model"),
+    permissions: "allow",
+    prepare: (cwd) => plantWorkspaceFiles(cwd),
+    drive: async (stage) => {
+      await stage.prompt("look around");
+      await stage.until("turn.completed");
+    },
+  },
 ];
+
+const workspaceFiles: Record<string, string> = {
+  ".gitignore": "dist/\n",
+  ".editorconfig": "root = true\n",
+  "README.md": "# fixture\n\nA workspace the browser pane can walk.\n",
+  "src/index.ts": 'export const greeting = "hello";\nexport const farewell = "goodbye";\n',
+  "src/util/pad.ts": "export const pad = (s: string) => ` ${s} `;\n",
+  "dist/index.js": "module.exports = {};\n",
+};
+
+async function plantWorkspaceFiles(cwd: string): Promise<void> {
+  for (const [relative, text] of Object.entries(workspaceFiles)) {
+    await mkdir(dirname(join(cwd, relative)), { recursive: true });
+    await writeFile(join(cwd, relative), text);
+  }
+}
 
 let release: (() => void) | undefined;
 
@@ -250,13 +350,15 @@ function releasingProvider(engine: EngineModule): Provider {
   };
 }
 
-export async function recordAll(): Promise<string[]> {
-  const engine = (await import(moduleUrl("packages/engine/src/index.ts"))) as EngineModule;
-  const server = (await import(moduleUrl("packages/server/src/index.ts"))) as ServerModule;
-  const serve = (await import(moduleUrl("packages/cli/src/serve.ts"))) as ServeModule;
+export async function recordAll(only?: string): Promise<string[]> {
+  const engine = (await import(keyworkModuleUrl("packages/engine/src/index.ts"))) as EngineModule;
+  const server = (await import(keyworkModuleUrl("packages/server/src/index.ts"))) as ServerModule;
+  const serve = (await import(keyworkModuleUrl("packages/cli/src/serve.ts"))) as ServeModule;
   await mkdir(fixturesDir, { recursive: true });
   const written: string[] = [];
-  for (const scenario of scenarios) {
+  const chosen = scenarios.filter((scenario) => only === undefined || scenario.name === only);
+  if (chosen.length === 0) throw new Error(`no scenario named "${only}"`);
+  for (const scenario of chosen) {
     const recorded = await record(scenario, { engine, server, serve });
     await writeFile(join(fixturesDir, `${scenario.name}.jsonl`), recorded.jsonl);
     written.push(`${scenario.name}.jsonl`);
@@ -281,11 +383,14 @@ interface Recorded {
 
 async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
   const keepAlive = setInterval(() => undefined, 1000);
-  const cwd = await mkdtemp(join(tmpdir(), "keywork-app-fixture-"));
-  const sessionDir = join(cwd, ".sessions");
-  const userRoot = join(cwd, ".user");
+  const root = await mkdtemp(join(tmpdir(), "keywork-app-fixture-"));
+  const cwd = join(root, "workspace");
+  const sessionDir = join(root, "sessions");
+  const userRoot = join(root, "user");
+  await mkdir(cwd, { recursive: true });
   await mkdir(sessionDir, { recursive: true });
   await mkdir(userRoot, { recursive: true });
+  await scenario.prepare?.(cwd);
   const clock = steppingClock();
   const log = new modules.server.EventLog({
     now: clock,
@@ -295,10 +400,11 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
     cwd,
     sessionDir,
     userRoot,
-    projectTrusted: false,
+    projectTrusted: scenario.trusted === true,
     provider: scenario.provider(modules.engine),
     permissions: () => (scenario.permissions === "allow" ? "allow" : undefined),
     ...(scenario.askTimeoutMs !== undefined && { askTimeoutMs: scenario.askTimeoutMs }),
+    ...(scenario.trusted === true && { checkpointsGitDir: join(root, "checkpoints") }),
     log,
   });
   const server = modules.server.createKeyworkServer({ token, host, log, version: "fixture" });
@@ -336,6 +442,12 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
           body: JSON.stringify({ text }),
         });
       },
+      inject: async (text, client) => {
+        await call(`/sessions/${created.id}/inject`, {
+          method: "POST",
+          body: JSON.stringify({ text, client }),
+        });
+      },
       abort: async () => {
         await call(`/sessions/${created.id}/abort`, { method: "POST" });
       },
@@ -349,6 +461,7 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
         }),
     };
     await scenario.drive(stage);
+    await persisted(stage);
     const extras = await extrasFor(scenario, stage, call);
     await server.close();
     await pump.catch(() => undefined);
@@ -361,8 +474,16 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
     };
   } finally {
     clearInterval(keepAlive);
-    await rm(cwd, { recursive: true, force: true }).catch(() => undefined);
+    await rm(root, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+const persistGraceMs = 750;
+
+function persisted(stage: Stage): Promise<void> {
+  const settledTurns = stage.seen.filter((envelope) => envelope.type === "turn.completed").length;
+  const written = stage.until("session.tree", settledTurns);
+  return Promise.race([written, new Promise<void>((grace) => setTimeout(grace, persistGraceMs))]);
 }
 
 async function extrasFor(
@@ -385,7 +506,32 @@ async function extrasFor(
       "sessions.json": `${JSON.stringify(JSON.parse(sessions), null, 2)}\n`,
     };
   }
+  if (scenario.name === "tree") {
+    const entries = await (await call(`/sessions/${stage.sessionId}/entries`)).text();
+    return { "entries.json": pretty(entries) };
+  }
+  if (scenario.name === "workspace") {
+    const read = async (path: string) => pretty(await (await call(path)).text());
+    return {
+      "workspace.json": await read("/workspace"),
+      "tree-root.json": await read("/tree?path="),
+      "tree-src.json": await read("/tree?path=src"),
+      "file.json": await read("/files?path=src%2Findex.ts"),
+      "file-range.json": await read("/files?path=src%2Findex.ts&from=34&to=60"),
+    };
+  }
+  if (scenario.name === "changes") {
+    const changes = await (await call(`/sessions/${stage.sessionId}/changes`)).text();
+    const file = await (
+      await call(`/sessions/${stage.sessionId}/changes/file?path=notes.txt`)
+    ).text();
+    return { "changes.json": pretty(changes), "changed-file.json": pretty(file) };
+  }
   return {};
+}
+
+function pretty(text: string): string {
+  return `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
 }
 
 async function readUntil(response: Response, marker: string): Promise<string> {
@@ -406,12 +552,12 @@ async function readUntil(response: Response, marker: string): Promise<string> {
 
 function normalizer(sessionId: string, cwd: string): (text: string) => string {
   const escapedCwd = JSON.stringify(cwd).slice(1, -1);
-  const queueIds = new Map<string, string>();
-  const queueId = (raw: string): string => {
-    const known = queueIds.get(raw);
+  const shortIds = new Map<string, string>();
+  const shortId = (raw: string): string => {
+    const known = shortIds.get(raw);
     if (known !== undefined) return known;
-    const assigned = `q${queueIds.size + 1}`;
-    queueIds.set(raw, assigned);
+    const assigned = `q${shortIds.size + 1}`;
+    shortIds.set(raw, assigned);
     return assigned;
   };
   return (text) =>
@@ -419,12 +565,14 @@ function normalizer(sessionId: string, cwd: string): (text: string) => string {
       .replaceAll(sessionId, "s1")
       .replaceAll(escapedCwd, "<cwd>")
       .replaceAll(cwd, "<cwd>")
-      .replace(uuid, queueId)
-      .replace(wallClockField, '"$1": "2026-09-07T12:00:00.000Z"');
+      .replace(uuid, shortId)
+      .replace(wallClockField, '"$1": "2026-09-07T12:00:00.000Z"')
+      .replace(gitObjectField, '"$1": "<sha>"');
 }
 
 const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
-const wallClockField = /"(createdAt|lastActivityAt)":\s*"[^"]+"/g;
+const wallClockField = /"(createdAt|lastActivityAt|timestamp)":\s*"[^"]+"/g;
+const gitObjectField = /"(checkpoint)":\s*"[0-9a-f]{40}"/g;
 
 function steppingClock(): () => Date {
   let now = Date.parse("2026-09-07T12:00:00.000Z");
@@ -434,12 +582,9 @@ function steppingClock(): () => Date {
   };
 }
 
-function moduleUrl(relative: string): string {
-  return pathToFileURL(join(keyworkRepo, relative)).href;
-}
-
 if (import.meta.main) {
-  const written = await recordAll();
+  const { values } = parseArgs({ options: { only: { type: "string" } } });
+  const written = await recordAll(values.only);
   console.log(`recorded ${written.length} fixtures from ${keyworkRepo} into ${fixturesDir}`);
   for (const name of written) console.log(`  ${name}`);
   console.log(`event vocabulary: ${engineEventTypes.length} types`);

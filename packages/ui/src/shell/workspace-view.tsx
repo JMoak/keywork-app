@@ -1,5 +1,5 @@
 import { emptyProjection, type SessionProjection } from "@keywork-app/client";
-import type { AskVerdict, SessionSummary } from "@keywork-app/protocol";
+import type { AskVerdict } from "@keywork-app/protocol";
 import {
   createEffect,
   createMemo,
@@ -11,9 +11,11 @@ import {
   Show,
   Switch,
 } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { FirstRun } from "../chrome/first-run.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
-import { relativeAge, sessionName, telemetry } from "../chrome/telemetry.ts";
-import { Composer } from "../composer/composer.tsx";
+import type { HostPort } from "../host/port.ts";
+import { usageLine } from "../instruments/cost.ts";
 import {
   type ActionTarget,
   appActions,
@@ -22,20 +24,33 @@ import {
   type Keymap,
   keymapFromConfig,
 } from "../keys/index.ts";
-import type { PaneId, Screen } from "../layout/index.ts";
-import { ConversationPane } from "../page/pane.tsx";
+import { scopeWhileTyping } from "../keys/typing.ts";
+import {
+  type DropZone,
+  dropZoneRects,
+  type PaneId,
+  type PointerIntent,
+  type Rect,
+  type Scene,
+  type Screen,
+  sameSeam,
+  seamZoneRect,
+} from "../layout/index.ts";
 import { CommandRegistry } from "../palette/commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
-import type { SessionStore } from "./session-store.ts";
 import {
-  createTiler,
-  type PaneSlot,
-  parseTilerState,
-  sessionsPaneId,
-  type Tiler,
-} from "./tiler.ts";
+  definitionOf,
+  type PaneDefinition,
+  type PaneSpec,
+  parsePaneSpec,
+  type ShellSeams,
+} from "../panes/index.ts";
+import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
+import type { SessionStore } from "./session-store.ts";
+import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
 
 export interface WorkspaceViewProps {
+  host: HostPort;
   workspace: string;
   serverLabel: string;
   store: SessionStore;
@@ -56,6 +71,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const [leaderArmed, setLeaderArmed] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
+  const localHandlers = new Map<PaneId, (action: string) => void>();
+  const [gestures, setGestures] = createSignal<PointerGestures>();
   let stage: HTMLDivElement | undefined;
 
   const say = (text: string): void => {
@@ -65,45 +82,63 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const act = (verdict: { ok: boolean; refused?: string }): void => {
     if (!verdict.ok && verdict.refused === "no-room") say("no room for that here");
   };
-  const projectionOf = (sessionId: string | undefined): SessionProjection =>
-    sessionId === undefined
-      ? emptyProjection
-      : (props.store.state.projections[sessionId] ?? emptyProjection);
-  const summaryOf = (sessionId: string | undefined): SessionSummary | undefined =>
-    props.store.state.summaries.find((item) => item.id === sessionId);
-
-  const openSession = (sessionId: string | undefined): void => {
-    const focused = tiler.focused();
+  const focusedSession = (): string | undefined => {
     const spec = tiler.focusedSpec();
-    if (focused !== undefined && spec?.kind === "conversation" && spec.sessionId === undefined) {
-      if (sessionId !== undefined) tiler.bindSession(focused, sessionId);
-    } else {
-      act(tiler.openConversation(sessionId, screen()));
-    }
-    if (sessionId !== undefined) void props.store.open(sessionId);
-  };
-  const newSession = async (): Promise<void> => {
-    const id = await props.store.create();
-    openSession(id);
-  };
-  const startSession = async (paneId: PaneId, text: string): Promise<void> => {
-    const id = await props.store.create();
-    tiler.bindSession(paneId, id);
-    await props.store.open(id);
-    await props.store.prompt(id, text);
-  };
-  const splitSession = async (): Promise<void> => {
-    const id = await props.store.create();
-    act(tiler.openConversation(id, screen()));
-    void props.store.open(id);
+    return spec?.kind === "conversation" ? spec.sessionId : undefined;
   };
 
+  const shell: ShellSeams = {
+    store: props.store,
+    keys: {
+      chord: (action) => keymap.describe(action) ?? "an unbound key",
+      leader: () => keymap.leader,
+    },
+    host: props.host,
+    workspace: props.workspace,
+    currentSession: focusedSession,
+    rebind: (paneId, spec) => {
+      const parsed = parsePaneSpec(spec);
+      if (parsed !== undefined) tiler.bind(paneId, parsed);
+    },
+    unseen: (view, completed) => {
+      const unseen = (seen()[view.id] ?? 0) < completed;
+      if (!view.focused) return unseen && completed > 0;
+      if (unseen) setSeen((current) => ({ ...current, [view.id]: completed }));
+      return false;
+    },
+    sessions: {
+      openSession: (sessionId) => {
+        const focused = tiler.focused();
+        const spec = tiler.focusedSpec();
+        if (
+          focused !== undefined &&
+          spec?.kind === "conversation" &&
+          spec.sessionId === undefined
+        ) {
+          tiler.bind(focused, { kind: "conversation", sessionId });
+        } else {
+          act(tiler.open({ kind: "conversation", sessionId }, screen()));
+        }
+        void props.store.open(sessionId);
+      },
+      newSession: async () => shell.sessions.openSession(await props.store.create()),
+      startSession: async (paneId, text) => {
+        const sessionId = await props.store.create();
+        tiler.bind(paneId, { kind: "conversation", sessionId });
+        await props.store.open(sessionId);
+        await props.store.prompt(sessionId, text);
+      },
+    },
+  };
+
+  const summon = async (definition: PaneDefinition<PaneSpec>, variant?: string): Promise<void> => {
+    if (definition.summon === undefined) return;
+    act(tiler.summon(await definition.summon.spec(shell, variant), screen()));
+  };
   const answerFocusedAsk = (verdict: AskVerdict): void => {
-    const spec = tiler.focusedSpec();
-    const projection = projectionOf(spec?.kind === "conversation" ? spec.sessionId : undefined);
-    const asking = projection.entries.find(
-      (entry) => entry.kind === "tool" && entry.run.phase === "asking",
-    );
+    const asking = props.store
+      .projection(focusedSession())
+      .entries.find((entry) => entry.kind === "tool" && entry.run.phase === "asking");
     if (asking?.kind !== "tool") {
       say("nothing is waiting for an answer here");
       return;
@@ -112,7 +147,6 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   };
 
   const target: ActionTarget = {
-    splitPane: () => void splitSession(),
     closePane: () => {
       const id = tiler.focused();
       if (id !== undefined) act(tiler.close(id));
@@ -126,7 +160,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     dockPane: (side) => act(tiler.dock(side, screen())),
     resizeDock: (delta) => act(tiler.resizeDock(delta, screen())),
     resizePane: (delta) => act(tiler.resizePane(delta, screen())),
-    summonSessions: () => act(tiler.summonSessions(screen())),
+    summon: (kind, variant) => void summon(definitionOf(kind), variant),
+    paneAction: (action) => {
+      const id = tiler.focused();
+      if (id !== undefined) localHandlers.get(id)?.(action);
+    },
     cycleMode: () => say("modes arrive with the server's mode route"),
     approveAsk: () => answerFocusedAsk("granted"),
     denyAsk: () => answerFocusedAsk("denied"),
@@ -146,7 +184,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   registry.addSource(() =>
     tiler.slots(screen()).map((slot) => ({
       name: `go-${slot.id}`,
-      label: paneName(slot, summaryOf, projectionOf),
+      label: titleOf(slot),
       description: "jump to this pane",
       jump: true as const,
       run: () => act(tiler.focus(slot.id)),
@@ -157,7 +195,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     if (overlay() !== undefined) return;
     const chord = chordOfKey(event);
     if (chord === undefined) return;
-    const result = keymap.press(chord, performance.now());
+    const scope = scopeWhileTyping(tiler.focusedSpec()?.kind, event.target, keymap);
+    const result = keymap.press(chord, performance.now(), scope);
     setLeaderArmed(result.type === "leader-pending");
     if (result.type === "pass") return;
     event.preventDefault();
@@ -165,10 +204,17 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     if (result.type === "action") appActions[result.action]?.invoke(target);
   };
 
+  const applyGesture = (intent: PointerIntent): void => {
+    if (intent.type === "focus") act(tiler.focus(intent.id));
+    else if (intent.type === "resize") act(tiler.resizeSeam(intent.handle, intent.ratio, screen()));
+    else act(tiler.send(intent.id, intent.zone, screen()));
+  };
+
   onMount(() => {
     document.addEventListener("keydown", onKeyDown, true);
     onCleanup(() => document.removeEventListener("keydown", onKeyDown, true));
     if (stage === undefined) return;
+    setGestures(bindPointerGestures(stage, { scene: () => scene(), apply: applyGesture }));
     const measure = (): void => {
       if (stage === undefined || stage.clientWidth === 0 || stage.clientHeight === 0) return;
       setScreen({ width: stage.clientWidth, height: stage.clientHeight });
@@ -179,94 +225,77 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       observer.observe(stage);
       onCleanup(() => observer.disconnect());
     }
-    if (tiler.panes().length === 0) {
-      tiler.summonSessions(screen());
-      const first = props.store.state.summaries[0]?.id;
-      act(tiler.openConversation(first, screen()));
-      if (first !== undefined) void props.store.open(first);
-    } else {
-      for (const id of tiler.panes()) {
-        const spec = tiler.spec(id);
-        if (spec?.kind === "conversation" && spec.sessionId !== undefined)
-          void props.store.open(spec.sessionId);
-      }
-    }
+    if (tiler.panes().length === 0) firstLayout();
+    else restorePanes();
   });
+
+  const firstLayout = (): void => {
+    tiler.summon({ kind: "tree" }, screen());
+    const sessionId = props.store.state.summaries[0]?.id;
+    act(tiler.open({ kind: "conversation", sessionId }, screen()));
+    if (sessionId !== undefined) void props.store.open(sessionId);
+  };
+  const restorePanes = (): void => {
+    for (const id of tiler.panes()) {
+      const spec = tiler.spec(id);
+      if (spec !== undefined) definitionOf(spec.kind).onRestore?.(spec, shell);
+    }
+  };
 
   createEffect(() => {
     tiler.version();
     storage?.setItem(storageKey, JSON.stringify(tiler.snapshot()));
   });
 
+  const titleOf = (slot: PaneSlot): string => definitionOf(slot.spec.kind).title(slot.spec, shell);
+  const lifecycleOf = (slot: PaneSlot): LifecycleState =>
+    definitionOf(slot.spec.kind).lifecycle?.(slot, shell) ?? "idle";
+  const adornmentsOf = (slot: PaneSlot) =>
+    definitionOf(slot.spec.kind).adornments?.(slot.spec, shell) ?? {};
+
   const slots = createMemo(() => tiler.slots(screen()));
+  const scene = createMemo((): Scene => tiler.scene(screen()));
+  const pointer = () => gestures()?.state() ?? { phase: "idle" };
+  const activeSeam = () => {
+    const state = pointer();
+    return state.phase === "resizing" ? state.seam : undefined;
+  };
+  const dragging = () => {
+    const state = pointer();
+    return state.phase === "dragging" ? state : undefined;
+  };
+  const dropZones = () => Object.entries(dropZoneRects(scene())) as [DropZone, Rect][];
   const paneIds = createMemo(() => slots().map((slot) => slot.id));
   const slotOf = (id: PaneId): PaneSlot | undefined => slots().find((slot) => slot.id === id);
-  const lifecycleOf = (slot: PaneSlot): LifecycleState => {
-    if (slot.spec.kind !== "conversation") return "idle";
-    const projection = projectionOf(slot.spec.sessionId);
-    const turns = projection.usage.turns;
-    if (projection.turn !== undefined) return "working";
-    if (projection.entries.some((entry) => entry.kind === "tool" && entry.run.phase === "asking")) {
-      return "needs-you";
-    }
-    const last = projection.entries.at(-1);
-    if (last?.kind === "notice" && last.level === "error") return "failed";
-    const unseen = (seen()[slot.id] ?? 0) < turns;
-    if (slot.focused) {
-      if (unseen) setSeen((current) => ({ ...current, [slot.id]: turns }));
-      return "idle";
-    }
-    return unseen && turns > 0 ? "finished-unseen" : "idle";
-  };
-
-  const focusedProjection = () => {
-    const spec = tiler.focusedSpec();
-    return spec?.kind === "conversation" ? projectionOf(spec.sessionId) : emptyProjection;
-  };
+  const focusedProjection = (): SessionProjection =>
+    tiler.focusedSpec()?.kind === "conversation"
+      ? props.store.projection(focusedSession())
+      : emptyProjection;
 
   const PaneSlotView = (view: { slot: PaneSlot }) => {
     const slot = () => view.slot;
     return (
-      <div
-        class="kw-slot"
-        style={{
-          left: `${slot().rect.x}px`,
-          top: `${slot().rect.y}px`,
-          width: `${slot().rect.width}px`,
-          height: `${slot().rect.height}px`,
-        }}
-      >
+      <div class="kw-slot" style={rectStyle(slot().rect)}>
         <PaneFrame
-          name={paneName(slot(), summaryOf, projectionOf)}
+          name={titleOf(slot())}
           state={lifecycleOf(slot())}
           focused={slot().focused}
           spawnRank={slot().spawnRank}
-          telemetry={
-            slot().spec.kind === "conversation"
-              ? telemetry(projectionOf(sessionIdOf(slot())))
-              : undefined
-          }
-          modeWord={modeWordOf(slot(), projectionOf)}
-          onFocus={() => act(tiler.focus(slot().id))}
+          telemetry={adornmentsOf(slot()).telemetry}
+          context={adornmentsOf(slot()).context}
+          modeWord={adornmentsOf(slot()).modeWord}
         >
-          <Switch>
-            <Match when={slot().spec.kind === "sessions"}>
-              <SessionsPane
-                store={props.store}
-                current={currentSession(tiler)}
-                onSelect={(id) => openSession(id)}
-                onCreate={() => void newSession()}
-              />
-            </Match>
-            <Match when={slot().spec.kind === "conversation"}>
-              <ConversationSlot
-                slot={slot()}
-                store={props.store}
-                projection={projectionOf(sessionIdOf(slot()))}
-                onStart={(text) => startSession(slot().id, text)}
-              />
-            </Match>
-          </Switch>
+          <Dynamic
+            component={definitionOf(slot().spec.kind).component}
+            id={slot().id}
+            spec={slot().spec}
+            focused={slot().focused}
+            shell={shell}
+            onAction={(handler) => {
+              localHandlers.set(slot().id, handler);
+              onCleanup(() => localHandlers.delete(slot().id));
+            }}
+          />
         </PaneFrame>
       </div>
     );
@@ -274,23 +303,49 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 
   return (
     <div class="kw-workspace">
-      <div class="kw-stage" ref={stage}>
+      <div class="kw-stage" ref={stage} data-gesture={pointer().phase}>
         <For each={paneIds()}>
-          {(id) => <Show when={slotOf(id)}>{(slotNow) => <PaneSlotView slot={slotNow()} />}</Show>}
+          {(id) => {
+            const lastSlot = createMemo((previous) => slotOf(id) ?? previous, slotOf(id));
+            return (
+              <Show when={slotOf(id) !== undefined}>
+                <PaneSlotView slot={lastSlot() as PaneSlot} />
+              </Show>
+            );
+          }}
         </For>
         <Show when={tiler.emptyMain(screen())}>
           {(rect) => (
-            <div
-              class="kw-slot kw-empty-main"
-              style={{
-                left: `${rect().x}px`,
-                top: `${rect().y}px`,
-                width: `${rect().width}px`,
-                height: `${rect().height}px`,
-              }}
-            >
+            <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
               <p class="kw-empty">{keymap.describe("pane.split")} opens a session here</p>
+              <Show when={props.store.state.summaries.length === 0}>
+                <FirstRun keys={shell.keys} />
+              </Show>
             </div>
+          )}
+        </Show>
+        <For each={scene().seams}>
+          {(seam) => (
+            <div
+              class="kw-seam"
+              data-axis={seam.axis}
+              data-active={sameSeam(activeSeam(), seam) ? "" : undefined}
+              style={rectStyle(seamZoneRect(seam))}
+            />
+          )}
+        </For>
+        <Show when={dragging()}>
+          {(drag) => (
+            <For each={dropZones()}>
+              {([zone, rect]) => (
+                <div
+                  class="kw-drop"
+                  data-zone={zone}
+                  data-hot={drag().over === zone ? "" : undefined}
+                  style={rectStyle(rect)}
+                />
+              )}
+            </For>
           )}
         </Show>
       </div>
@@ -327,93 +382,6 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   );
 }
 
-interface ConversationSlotProps {
-  slot: PaneSlot;
-  store: SessionStore;
-  projection: SessionProjection;
-  onStart: (text: string) => Promise<void>;
-}
-
-function ConversationSlot(props: ConversationSlotProps) {
-  const sessionId = () => sessionIdOf(props.slot);
-  const send = (text: string): void => {
-    const id = sessionId();
-    if (id === undefined) void props.onStart(text);
-    else void props.store.prompt(id, text);
-  };
-  const interrupt = (): void => {
-    const id = sessionId();
-    if (id !== undefined) void props.store.abort(id);
-  };
-  return (
-    <>
-      <div class="kw-page">
-        <Show
-          when={sessionId() !== undefined}
-          fallback={<p class="kw-empty">pick a session, or send a prompt to start one</p>}
-        >
-          <ConversationPane
-            projection={props.projection}
-            onAnswerAsk={(callId, verdict) => void props.store.answerAsk(callId, verdict)}
-          />
-        </Show>
-      </div>
-      <Composer
-        queue={props.projection.queue}
-        busy={props.projection.turn !== undefined}
-        onSteer={send}
-        onQueue={send}
-        onInterrupt={interrupt}
-      />
-    </>
-  );
-}
-
-interface SessionsPaneProps {
-  store: SessionStore;
-  current: string | undefined;
-  onSelect: (id: string) => void;
-  onCreate: () => void;
-}
-
-function SessionsPane(props: SessionsPaneProps) {
-  return (
-    <aside class="kw-sessions" aria-label="sessions">
-      <div class="kw-sessions-head">
-        <button type="button" class="kw-sessions-new" onClick={() => props.onCreate()}>
-          + new session
-        </button>
-      </div>
-      <Show
-        when={props.store.state.summaries.length > 0}
-        fallback={<p class="kw-empty">no sessions yet · new starts one</p>}
-      >
-        <ol class="kw-session-list">
-          <For each={props.store.state.summaries}>
-            {(item) => (
-              <li class="kw-session-row" data-current={item.id === props.current ? "" : undefined}>
-                <button
-                  type="button"
-                  class="kw-session-button"
-                  onClick={() => props.onSelect(item.id)}
-                >
-                  <span class="kw-session-mark" aria-hidden="true">
-                    {props.store.state.projections[item.id]?.turn !== undefined ? "▓" : "░"}
-                  </span>
-                  <span class="kw-session-name">
-                    {sessionName(item, props.store.state.projections[item.id])}
-                  </span>
-                  <span class="kw-session-age">{relativeAge(item.lastActivityAt)}</span>
-                </button>
-              </li>
-            )}
-          </For>
-        </ol>
-      </Show>
-    </aside>
-  );
-}
-
 interface StatusLineProps {
   serverLabel: string;
   projection: SessionProjection;
@@ -430,7 +398,7 @@ function StatusLine(props: StatusLineProps) {
       props.serverLabel,
       props.projection.preset,
       props.projection.mode,
-      telemetry(props.projection),
+      usageLine(props.projection.usage),
     ].filter((item): item is string => item !== undefined && item !== "");
   return (
     <footer class="kw-status" data-lost={props.lost !== undefined ? "" : undefined}>
@@ -451,34 +419,13 @@ function StatusLine(props: StatusLineProps) {
   );
 }
 
-function sessionIdOf(slot: PaneSlot): string | undefined {
-  return slot.spec.kind === "conversation" ? slot.spec.sessionId : undefined;
-}
-
-function currentSession(tiler: Tiler): string | undefined {
-  const spec = tiler.focusedSpec();
-  return spec?.kind === "conversation" ? spec.sessionId : undefined;
-}
-
-function paneName(
-  slot: PaneSlot,
-  summaryOf: (sessionId: string | undefined) => SessionSummary | undefined,
-  projectionOf: (sessionId: string | undefined) => SessionProjection,
-): string {
-  if (slot.spec.kind === "sessions") return "sessions";
-  const sessionId = slot.spec.sessionId;
-  return sessionId === undefined
-    ? "new session"
-    : sessionName(summaryOf(sessionId), projectionOf(sessionId));
-}
-
-function modeWordOf(
-  slot: PaneSlot,
-  projectionOf: (sessionId: string | undefined) => SessionProjection,
-): string | undefined {
-  if (slot.spec.kind !== "conversation") return undefined;
-  const mode = projectionOf(slot.spec.sessionId).mode;
-  return mode === undefined || mode === "agent" ? undefined : mode;
+function rectStyle(rect: { x: number; y: number; width: number; height: number }) {
+  return {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+  };
 }
 
 function restoredState(storage: Pick<Storage, "getItem"> | undefined, key: string) {
@@ -498,5 +445,3 @@ function localStorageOrNone(): Storage | undefined {
     return undefined;
   }
 }
-
-export { sessionsPaneId };

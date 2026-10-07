@@ -229,6 +229,31 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(foreign.fs.files.has(foreign.seams.ticketFile)).toBe(true);
   });
 
+  it("restarts a server it started by stopping it and spawning afresh, and lists its open roots", async () => {
+    const h = harness({});
+    const host = workspaceHost(h.seams);
+    const first = await host.open("/work");
+    expect(host.openRoots()).toEqual(["/work"]);
+    const restarted = await host.restart("/work");
+    expect(restarted.ok).toBe(true);
+    expect(h.processes).toHaveLength(2);
+    expect(h.processes[0]?.stopped).toBe(1);
+    expect(h.processes[1]?.stopped).toBe(0);
+    expect(restarted).toEqual(first);
+    expect(host.openRoots()).toEqual(["/work"]);
+    await host.close("/work");
+    expect(host.openRoots()).toEqual([]);
+  });
+
+  it("restarts an attached workspace by attaching again, never spawning beside the terminal's server", async () => {
+    const h = harness({ ticket: terminalTicket });
+    const host = workspaceHost(h.seams);
+    await host.open("/work");
+    const restarted = await host.restart("/work");
+    expect(restarted).toMatchObject({ ok: true, opened: { attached: true } });
+    expect(h.processes).toHaveLength(0);
+  });
+
   it("closes everything it holds on closeAll", async () => {
     const h = harness({});
     const host = workspaceHost(h.seams);
@@ -236,6 +261,35 @@ describe("workspaceHost: attach first, spawn second", () => {
     await host.open("/b");
     await host.closeAll();
     expect(h.processes.map((process) => process.stopped)).toEqual([1, 1]);
+  });
+
+  it("makes closeAll wait for a close already in flight, so quit cannot outrun a stopping server", async () => {
+    const h = harness({});
+    let finishStop: () => void = () => undefined;
+    const supervise = h.seams.supervise;
+    h.seams.supervise = (spec) => {
+      const process = supervise(spec);
+      process.stop = () =>
+        new Promise((resolve) => {
+          finishStop = () => {
+            (process as FakeProcess).stopped += 1;
+            resolve();
+          };
+        });
+      return process;
+    };
+    const host = workspaceHost(h.seams);
+    await host.open("/a");
+    const closing = host.close("/a");
+    let allClosed = false;
+    const all = host.closeAll().then(() => {
+      allClosed = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(allClosed).toBe(false);
+    finishStop();
+    await Promise.all([closing, all]);
+    expect(h.processes[0]?.stopped).toBe(1);
   });
 });
 
@@ -255,7 +309,7 @@ describe("binary choice", () => {
   });
 
   it("reads keywork --version output and the ticket file shape", async () => {
-    expect(versionOfLine("keywork 0.0.1\n")).toBe("0.0.1");
+    expect(versionOfLine("keywork 0.1.1\n")).toBe("0.1.1");
     expect(versionOfLine("nope")).toBeUndefined();
     expect(await readTicket("/t", async () => '{"url":"http://x","token":"y"}')).toEqual({
       url: "http://x",

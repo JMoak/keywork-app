@@ -145,6 +145,15 @@
   max-width: var(--kw-measure);
 }
 
+.kw-origin {
+  margin-left: 1ch;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125em;
+  color: var(--kw-density-light);
+  white-space: nowrap;
+  user-select: none;
+}
+
 .kw-prose {
   font-family: var(--kw-font-prose);
   font-size: 1.0625rem;

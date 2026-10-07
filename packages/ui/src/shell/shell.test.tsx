@@ -4,6 +4,8 @@ import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, SessionDetail, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { inertMemoryClient } from "./memory-store.test.ts";
+import { emptySurfacesClient } from "./surfaces-store.test.ts";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 
@@ -67,6 +69,15 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
       aborts.push(id);
       return "aborted";
     },
+    inject: async () => "started",
+    entries: async () => undefined,
+    fork: async () => "missing",
+    label: async () => "missing",
+    moveLeaf: async () => "missing",
+    changes: async () => "missing",
+    ...inertMemoryClient(),
+    ...emptySurfacesClient(),
+    changedFile: async () => "missing",
     asks: async () =>
       options.pendingAsk
         ? [
@@ -130,7 +141,7 @@ describe("the app shell", () => {
     const fake = fakeClient();
     render(() => <App host={hostWithServer()} connect={() => fake.client} />);
     await openTyped("C:/work");
-    await screen.findByText("run echo served", { selector: ".kw-session-name" });
+    await screen.findByText("run echo served", { selector: ".kw-tree-name" });
     await screen.findByText("It printed served.");
     expect(screen.getByText("bash echo served", { selector: ".kw-tool-span" })).toBeTruthy();
 
@@ -141,9 +152,7 @@ describe("the app shell", () => {
     }));
     fake.emit(later);
     await waitFor(() => expect(screen.getAllByText("It printed served.")).toHaveLength(2));
-    expect(
-      screen.getByText("17 tokens · unpriced", { selector: ".kw-frame-telemetry" }),
-    ).toBeTruthy();
+    expect(screen.getByText("17 tokens · unpriced", { selector: ".kw-frame-usage" })).toBeTruthy();
   });
 
   it("sends the composer's prompt and interrupt to the server", async () => {
