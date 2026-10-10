@@ -13,6 +13,8 @@ export interface PaneFrameProps {
   telemetry?: string | undefined;
   context?: ContextLevel | undefined;
   modeWord?: string | undefined;
+  bot?: string | undefined;
+  hueRank?: number | undefined;
   onFocus?: (() => void) | undefined;
   children: JSX.Element;
 }
@@ -70,7 +72,7 @@ export function PaneFrame(props: PaneFrameProps) {
       class="kw-frame"
       data-state={shownState()}
       data-focused={props.focused ? "" : undefined}
-      style={{ "--kw-pane-hue": `var(--kw-ramp-${hueStop(props.spawnRank)})` }}
+      style={{ "--kw-pane-hue": `var(--kw-ramp-${hueStop(props.hueRank ?? props.spawnRank)})` }}
     >
       <header class="kw-frame-title">
         <span class="kw-frame-stamp" aria-hidden="true" data-state={shownState()}>
@@ -79,6 +81,7 @@ export function PaneFrame(props: PaneFrameProps) {
         <span class="kw-frame-name" data-state={shownState()}>
           {props.name}
         </span>
+        <Show when={props.bot}>{(label) => <span class="kw-frame-bot">{label()}</span>}</Show>
         <Show when={props.context !== undefined || props.telemetry}>
           <span class="kw-frame-telemetry">
             <Show when={props.context}>{(level) => <ContextGauge level={level()} />}</Show>

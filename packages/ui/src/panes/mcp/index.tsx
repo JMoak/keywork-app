@@ -118,7 +118,9 @@ function McpList(props: PaneProps<McpSpec>) {
     onCleanup(() => clearInterval(timer));
   });
 
-  const say = (text: string | undefined): void => setNotice(text);
+  const say = (text: string): void => {
+    setNotice(text);
+  };
 
   const listTools = async (server: McpServerStatus): Promise<void> => {
     if (opened()[server.name] !== undefined) {
@@ -143,10 +145,7 @@ function McpList(props: PaneProps<McpSpec>) {
 
   const toggle = async (server: McpServerStatus): Promise<void> => {
     setBusy(server.name);
-    const status = await surfaces().verbs.setMcpServerEnabled(
-      server.name,
-      !server.enabled,
-    );
+    const status = await surfaces().verbs.setMcpServerEnabled(server.name, !server.enabled);
     setBusy(undefined);
     say(
       isSurfaceRefusal(status)
@@ -192,7 +191,11 @@ function McpList(props: PaneProps<McpSpec>) {
                 <OverviewRow
                   cursor={index() === cursor.index()}
                   muted={!server.enabled}
-                  mark={busy() === server.name ? tileFill[step() % tileFill.length] : serverMark(server, step())}
+                  mark={
+                    busy() === server.name
+                      ? tileFill[step() % tileFill.length]
+                      : serverMark(server, step())
+                  }
                   density={serverDensity(server)}
                   aside={serverAside(server)}
                   onClick={() => {

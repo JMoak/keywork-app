@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { type HttpMethod, protocolVersion, type RouteShape, routes } from "@keywork-app/protocol";
+import {
+  eventTypes,
+  type HttpMethod,
+  protocolVersion,
+  type RouteShape,
+  routes,
+} from "@keywork-app/protocol";
 import { keyworkCheckoutPresent, keyworkModuleUrl, keyworkRepo } from "./lib/keywork-checkout.ts";
 import { repoRoot, reportViolations } from "./lib/repo-files.ts";
 
@@ -17,10 +23,15 @@ export interface ContractDocument {
   readonly origin: string;
   readonly version: string | undefined;
   readonly routes: readonly RouteShape[];
+  readonly events: readonly string[] | undefined;
 }
 
 export function contractViolations(document: ContractDocument): string[] {
-  return [...versionViolations(document.version), ...routeViolations(document.routes)];
+  return [
+    ...versionViolations(document.version),
+    ...routeViolations(document.routes),
+    ...eventViolations(document.events),
+  ];
 }
 
 export function documentOfOpenApi(doc: OpenApiShape, origin: string): ContractDocument {
@@ -38,6 +49,7 @@ export function documentOfOpenApi(doc: OpenApiShape, origin: string): ContractDo
     origin,
     version: doc.info.version === recordedVersion ? undefined : doc.info.version,
     routes: served.sort(byRoute),
+    events: doc.components?.schemas?.BusEnvelope?.properties?.type?.enum,
   };
 }
 
@@ -69,6 +81,9 @@ export async function documentOfSource(source: ContractSource): Promise<Contract
 export interface OpenApiShape {
   info: { version: string };
   paths: Record<string, Record<string, { operationId: string }>>;
+  components?: {
+    schemas?: { BusEnvelope?: { properties?: { type?: { enum?: string[] } } } };
+  };
 }
 
 const recordedVersion = "fixture";
@@ -93,6 +108,19 @@ function routeViolations(served: readonly RouteShape[]): string[] {
     ...moved.map(
       (route) =>
         `${route.operationId} moved: the protocol has ${routeKey(route)}, the server ${routeKey(actual.get(route.operationId) as RouteShape)}`,
+    ),
+  ];
+}
+
+function eventViolations(served: readonly string[] | undefined): string[] {
+  if (served === undefined) return [];
+  const known = new Set<string>(eventTypes);
+  const missing = eventTypes.filter((type) => !served.includes(type));
+  const unknown = served.filter((type) => !known.has(type));
+  return [
+    ...missing.map((type) => `the server no longer emits ${type}`),
+    ...unknown.map(
+      (type) => `the server added the event ${type}; the protocol does not know it yet`,
     ),
   ];
 }

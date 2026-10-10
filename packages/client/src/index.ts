@@ -21,12 +21,6 @@ export {
   serverFeed,
 } from "./feed.ts";
 export {
-  batchPerFrame,
-  coalesceEnvelopes,
-  type FrameBatcher,
-  type TickScheduler,
-} from "./projection/coalesce.ts";
-export {
   type ChangesAvailability,
   type ChangesState,
   changesByTurn,
@@ -36,7 +30,23 @@ export {
   emptyChangesState,
   type TurnGroup,
 } from "./projection/changes.ts";
+export {
+  batchPerFrame,
+  coalesceEnvelopes,
+  type FrameBatcher,
+  type TickScheduler,
+} from "./projection/coalesce.ts";
 export { historyEnvelopes } from "./projection/history.ts";
+export { detailLineLimit, project, projectAll } from "./projection/project.ts";
+export {
+  compactJson,
+  type RowSpan,
+  type SpanPart,
+  type SpanTone,
+  toolRowSpans,
+  toolRowText,
+  toolSubject,
+} from "./projection/tool-row.ts";
 export {
   emptyTreeState,
   entryText,
@@ -48,16 +58,6 @@ export {
   treeSnapshot,
   treeState,
 } from "./projection/tree.ts";
-export { detailLineLimit, project, projectAll } from "./projection/project.ts";
-export {
-  compactJson,
-  type RowSpan,
-  type SpanPart,
-  type SpanTone,
-  toolRowSpans,
-  toolRowText,
-  toolSubject,
-} from "./projection/tool-row.ts";
 export {
   type AssistantEntry,
   emptyProjection,

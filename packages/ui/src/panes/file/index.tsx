@@ -116,7 +116,8 @@ function FileSlot(props: PaneProps<FileSpec>) {
     setState({ kind: "loading" });
     try {
       const wanted = range === "tail" ? await tailOf(props.shell, props.spec.path) : range;
-      const reading = wanted === undefined ? "missing" : await props.shell.client.file(props.spec.path, wanted);
+      const reading =
+        wanted === undefined ? "missing" : await props.shell.client.file(props.spec.path, wanted);
       setState(
         typeof reading === "string"
           ? { kind: "refused", reading, path: props.spec.path }
@@ -132,8 +133,11 @@ function FileSlot(props: PaneProps<FileSpec>) {
   });
 
   createEffect(() => {
-    const loaded = slice();
-    if (loaded === undefined || holder === undefined || loaded.text === "") {
+    const current = state();
+    if (current.kind === "loading") return;
+    const loaded =
+      current.kind === "loaded" && current.slice.text !== "" ? current.slice : undefined;
+    if (loaded === undefined || holder === undefined) {
       mount()?.destroy();
       setMount(undefined);
       return;
@@ -148,17 +152,17 @@ function FileSlot(props: PaneProps<FileSpec>) {
   const openInEditor = (): void => {
     const line = mount()?.lineAtTop();
     const path = props.spec.path;
-    if (props.shell.openInEditor !== undefined) return props.shell.openInEditor(path, line ?? 1);
-    void props.shell.host.openExternal(fileUrlOf(props.shell.workspace, path, line));
+    if (props.shell.openInEditor !== undefined) props.shell.openInEditor(path, line ?? 1);
+    else void props.shell.host.openExternal(fileUrlOf(props.shell.workspace, path, line));
   };
 
   props.onAction((action) => {
     const loaded = slice();
     switch (action) {
       case "file.top":
-        return loaded !== undefined && loaded.from === 0 ? mount()?.scrollTo("top") : void read({});
+        return loaded?.from === 0 ? mount()?.scrollTo("top") : void read({});
       case "file.end":
-        return loaded !== undefined && loaded.eof ? mount()?.scrollTo("end") : void read("tail");
+        return loaded?.eof ? mount()?.scrollTo("end") : void read("tail");
       case "file.next": {
         const next = loaded === undefined ? undefined : rangeAfter(loaded);
         return next === undefined ? undefined : void read(next);
@@ -183,12 +187,14 @@ function FileSlot(props: PaneProps<FileSpec>) {
           <div class="kw-file-head">
             <span class="kw-file-facts">{sliceFacts(loaded())}</span>
             <Show when={!loaded().eof}>
-              <span class="kw-file-more">] loads more · {props.shell.keys.chord("file.end")} the tail</span>
+              <span class="kw-file-more">
+                ] loads more · {props.shell.keys.chord("file.end")} the tail
+              </span>
             </Show>
           </div>
         )}
       </Show>
-      <div class="kw-file-text" ref={holder} hidden={slice()?.text === "" || slice() === undefined} />
+      <div class="kw-file-text" ref={holder} hidden={mount() === undefined} />
       <Switch>
         <Match when={state().kind === "loading"}>
           <p class="kw-file-note">reading {props.spec.path} …</p>

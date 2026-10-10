@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -6,6 +6,7 @@ import { sseFrames } from "@keywork-app/client";
 import { type BusEnvelope, engineEventTypes } from "@keywork-app/protocol";
 import { keyworkModuleUrl, keyworkRepo } from "../lib/keywork-checkout.ts";
 import { repoRoot } from "../lib/repo-files.ts";
+import { seedVault } from "./seed-vault.ts";
 
 export const fixturesDir = join(repoRoot, "packages/client/src/fixtures");
 const token = "fixture-token";
@@ -294,6 +295,29 @@ export const scenarios: readonly Scenario[] = [
       await stage.until("turn.completed");
     },
   },
+  {
+    name: "memory",
+    provider: (engine) => new engine.MockProvider([], "mock-model"),
+    permissions: "allow",
+    trusted: true,
+    prepare: seedVault,
+    drive: async (stage) => {
+      const inbox = (await (await stage.call("/memory/inbox")).json()) as {
+        items: Array<{ id: string }>;
+      };
+      const [first, second] = inbox.items;
+      await stage.call(`/memory/inbox/${first?.id}/approve`, { method: "POST" });
+      await stage.until("memory.inbox");
+      await stage.call(`/memory/inbox/${second?.id}/discard`, { method: "POST" });
+      await stage.until("memory.inbox", 2);
+      const ledger = (await (await stage.call("/memory/ledger")).json()) as {
+        entries: Array<{ id: string; op: string }>;
+      };
+      const approved = ledger.entries.find((entry) => entry.op === "approve");
+      await stage.call(`/memory/ledger/${approved?.id}/revert`, { method: "POST" });
+      await stage.until("memory.inbox", 3);
+    },
+  },
 ];
 
 const workspaceFiles: Record<string, string> = {
@@ -301,7 +325,7 @@ const workspaceFiles: Record<string, string> = {
   ".editorconfig": "root = true\n",
   "README.md": "# fixture\n\nA workspace the browser pane can walk.\n",
   "src/index.ts": 'export const greeting = "hello";\nexport const farewell = "goodbye";\n',
-  "src/util/pad.ts": "export const pad = (s: string) => ` ${s} `;\n",
+  "src/util/pad.ts": 'export const pad = (s: string) => " " + s + " ";\n',
   "dist/index.js": "module.exports = {};\n",
 };
 
@@ -482,7 +506,10 @@ const persistGraceMs = 750;
 
 function persisted(stage: Stage): Promise<void> {
   const settledTurns = stage.seen.filter((envelope) => envelope.type === "turn.completed").length;
-  const written = stage.until("session.tree", settledTurns);
+  const written = Promise.all([
+    stage.until("session.tree", settledTurns),
+    stage.until("memory.inbox", settledTurns),
+  ]).then(() => undefined);
   return Promise.race([written, new Promise<void>((grace) => setTimeout(grace, persistGraceMs))]);
 }
 
@@ -496,7 +523,7 @@ async function extrasFor(
     const lastId = stage.seen.at(-1)?.id ?? 0;
     const replayed = await call("/events", { headers: { "last-event-id": "0" } });
     const raw = await readUntil(replayed, `\nid: ${lastId}\n`);
-    return { "doc.json": `${JSON.stringify(JSON.parse(doc), null, 2)}\n`, "plain.sse": raw };
+    return { "doc.json": await mergedIntoDocFixture(doc), "plain.sse": raw };
   }
   if (scenario.name === "tool") {
     const detail = await (await call(`/sessions/${stage.sessionId}`)).text();
@@ -520,6 +547,11 @@ async function extrasFor(
       "file-range.json": await read("/files?path=src%2Findex.ts&from=34&to=60"),
     };
   }
+  if (scenario.name === "memory") {
+    const garden = await (await call("/memory")).text();
+    const inbox = await (await call("/memory/inbox")).text();
+    return { "memory-garden.json": pretty(garden), "memory-inbox.json": pretty(inbox) };
+  }
   if (scenario.name === "changes") {
     const changes = await (await call(`/sessions/${stage.sessionId}/changes`)).text();
     const file = await (
@@ -528,6 +560,66 @@ async function extrasFor(
     return { "changes.json": pretty(changes), "changed-file.json": pretty(file) };
   }
   return {};
+}
+
+export interface DocLike {
+  paths: Record<string, Record<string, unknown>>;
+  components?: { schemas?: Record<string, { properties?: Record<string, { enum?: string[] }> }> };
+  [key: string]: unknown;
+}
+
+async function mergedIntoDocFixture(recorded: string): Promise<string> {
+  const existing = await readFile(join(fixturesDir, "doc.json"), "utf8").catch(() => undefined);
+  const merged =
+    existing === undefined
+      ? (JSON.parse(recorded) as DocLike)
+      : mergeDocuments(JSON.parse(existing) as DocLike, JSON.parse(recorded) as DocLike);
+  return `${JSON.stringify(merged, null, 2)}\n`;
+}
+
+export function mergeDocuments(existing: DocLike, recorded: DocLike): DocLike {
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const path of mergedOrder(Object.keys(existing.paths), Object.keys(recorded.paths))) {
+    paths[path] = { ...existing.paths[path], ...recorded.paths[path] };
+  }
+  return { ...existing, ...recorded, paths, ...mergedEnvelopeTypes(existing, recorded) };
+}
+
+function mergedEnvelopeTypes(existing: DocLike, recorded: DocLike): Pick<DocLike, "components"> {
+  const envelope = recorded.components?.schemas?.BusEnvelope;
+  const type = envelope?.properties?.type;
+  if (envelope === undefined || type?.enum === undefined) return {};
+  const known = existing.components?.schemas?.BusEnvelope?.properties?.type?.enum ?? [];
+  return {
+    components: {
+      ...recorded.components,
+      schemas: {
+        ...recorded.components?.schemas,
+        BusEnvelope: {
+          ...envelope,
+          properties: {
+            ...envelope.properties,
+            type: { ...type, enum: mergedOrder(known, type.enum) },
+          },
+        },
+      },
+    },
+  };
+}
+
+export function mergedOrder(existing: readonly string[], recorded: readonly string[]): string[] {
+  const order = [...recorded];
+  let anchor = -1;
+  for (const key of existing) {
+    const at = order.indexOf(key);
+    if (at !== -1) {
+      anchor = at;
+      continue;
+    }
+    order.splice(anchor + 1, 0, key);
+    anchor += 1;
+  }
+  return order;
 }
 
 function pretty(text: string): string {
@@ -567,11 +659,13 @@ function normalizer(sessionId: string, cwd: string): (text: string) => string {
       .replaceAll(cwd, "<cwd>")
       .replace(uuid, shortId)
       .replace(wallClockField, '"$1": "2026-09-07T12:00:00.000Z"')
+      .replace(embeddedClock, '$1\\"2026-09-07T12:00:00.000Z\\"')
       .replace(gitObjectField, '"$1": "<sha>"');
 }
 
 const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
-const wallClockField = /"(createdAt|lastActivityAt|timestamp)":\s*"[^"]+"/g;
+const wallClockField = /"(createdAt|lastActivityAt|timestamp|created|sweptAt)":\s*"[^"]+"/g;
+const embeddedClock = /(created: |\\"created\\":)\\"[^"\\]+\\"/g;
 const gitObjectField = /"(checkpoint)":\s*"[0-9a-f]{40}"/g;
 
 function steppingClock(): () => Date {

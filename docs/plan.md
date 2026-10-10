@@ -546,6 +546,77 @@ the CLI on PATH; `executableName: keywork-app` would avoid it.
   bots and citations as the TUI does.
 - The envelope `type` enum in `/doc` is now engine ∪ server events (`surface.changed`,
   `memory.inbox`, `session.state`); the protocol package mirrors both lists.
+- Integration: `app-surface/all` (worktree `C:\src\keywork-lanes\all`) folds K2, K3 and K4
+  onto the wave 0 split with every conflict recorded in `C:\src\keywork-lanes\INTEGRATION.md`;
+  50 `/doc` paths across nine families, 4304 tests green. K1 is folded the same way
+  (the file gives the command sequence); its `session.state` joins `serverEventTypes` then.
+
+**Wave 2, the panes (landed 2026-10-07 against the K worktrees).**
+- **M4.1 and M4.2, the tree and the changes.** Protocol: six routes (`/entries`, `/fork`,
+  `/label`, `/leaf`, `/changes`, `/changes/file`), two events (`session.tree`,
+  `changes.updated`), the entry union mirrored from keywork's `entries.ts`; client methods
+  with status mapping and fixtures `tree`, `changes` recorded from K2. Pure reducers
+  `treeState` and `changesState` fold the bus into stale-marked state the store refetches;
+  `treeRows` folds the flat log by `parentId` with keywork's branch-depth rule. One `tree`
+  pane on `leader t` replaces `sessions`: overview above, entry tree below, labels inline,
+  the leaf marked, `f` forking and opening the new session; old `sessions-N` layouts revive.
+  The `diff` pane on `leader g`: files by turn with +/- counts, keywork's untrusted and
+  no-baseline lines, a read-only CodeMirror merge view (`@codemirror/merge` 6.12.2, `view`
+  6.43.11, `state` 6.7.4) themed only from `--kw-*` tokens, unified below broadsheet and
+  side-by-side at it. Seams left honest: `openInEditor?`, `onUndoTurn?` (K1). Verified live:
+  fork, label, a write turn appearing as `turn 1 / notes.txt +6 −0`, the merge view in both
+  layouts. Findings: a pane hidden by zoom read a stale `<Show>` accessor (fixed in the slot
+  renderer); pane-local single keys need the pane to own DOM focus and to yield while a text
+  field is typing (`keepKeyboardHome`, `scopeWhileTyping`).
+- **M4.3, the files pane, the spill viewer and the trust flow.** Protocol mirrors K3's
+  workspace family (`readWorkspace`, `listTree`, `readFile`, `trustWorkspace`;
+  `surface.changed` beside `memory.inbox`); the client maps 403/404/413/415 and both trust
+  refusals to typed readings. The `browser` pane (`leader f`) walks the jail lazily through
+  `/tree`, folders first, gitignored entries as lighter density, dotfiles behind `.`, `/`
+  filters, and `tool.started` read/write/edit paths lift their row for four seconds. The
+  `file` pane reads byte ranges through `/files` with CodeMirror's read-only view and a
+  numbered rail, `g`/`G` reach head and tail, `]`/`[` step slices, `o` deep-links
+  `file://…#L<n>` through main's allowlist (now `file:` inside an open workspace root). The
+  trust flow reads `GET /workspace`, shows a quiet card in keywork's words, the mode word
+  `untrusted` and `leader u` in the status line; accepting posts `/workspace/trust` and on
+  `reopens: true` restarts the sidecar through the new `HostPort.restartServer`. Spills are
+  wired to open a file pane at `elidedFrom..elidedTo` but need a server route that resolves a
+  spill id (a server-lane row). Live verification deferred.
+- **M4.5, the memory pane.** `protocol/src/memory.ts` mirrors K4's wire shapes verbatim;
+  sixteen routes; `serverEventTypes` beside the engine's with the envelope typed over the
+  union; `memory.inbox` as the first process-level event. One client method per route
+  (403 → inert, 404 → missing, 409 → the airlock's typed refusals); `memory.jsonl` recorded
+  from a seeded trusted vault. The pane renders keywork's three lenses: garden (layers with
+  the curing tally as a density ramp, the prompt budget as a level, the inbox grouped by kind
+  with provenance as density, airlocks with candidates, questions and the close row), note,
+  ledger (`needs-rebase` shown honestly), plus daily from the dates row; inert state names
+  the next action. Summon `leader shift+m` (`leader m` is the terminal's mode cycle).
+  `shell/memory-store.ts` folds the event into a count, the stamp goes needs-you at three,
+  and `shell/needs-you.ts` is the pure rising edge feeding `HostPort.notify`; the desktop
+  threshold is 3. Live verification deferred.
+- **M4.6, M4.7, S9, the overview panes.** `protocol/src/surfaces.ts` mirrors K3's status
+  surfaces whole; eighteen routes; every refusal typed as `{refused, detail}` carrying the
+  server's words. `shell/surfaces-store.ts` holds mcp, arcs with ordinals, bots, workspaces
+  and flavors, refetching exactly the kind a `surface.changed` names. Panes `mcp` (tile-fill
+  while connecting, missing tile down, `enter` tools, `r`, `t`), `arcs` on `leader a` (hue
+  chip by ordinal, sessions grouped, `n`/`c`/`shift+a` with a confirm, `b`/`u`), `bots`
+  (`sigil name`, never hue; `enter` switches, a mid-turn 409 shown as the server says),
+  `workspaces` (`enter` uses one and restarts the sidecar on `reopens`). The conversation
+  title row shows the bound bot typographically and takes its hue from the arc's ordinal
+  (AD5). `flavor/wardrobe.ts` lists server flavors beside the gallery, `system` from the OS,
+  a flavor below the APCA floor refused with keywork's exact message. Live verification
+  deferred.
+- **Consolidation.** `record.ts` now merges `doc.json` additively and waits for the
+  post-turn `session.tree` and `memory.inbox` before cutting the SSE capture; every fixture
+  re-recorded from the integration worktree. **Evidence:** 76 files, 633 tests; the rail green
+  with `KEYWORK_REPO` at the integration worktree (54 routes, 0.1.1) and in fixture mode.
+
+**Left after wave 4.** Consuming K1 in the app (model, thinking, effort, compact, undo and
+redo in the diff pane and composer, rename, export, the preset control, the context gauge's
+`reported` basis, cost lineage; `session.state`); folding K1 into the integration worktree;
+live verification of the files, memory and overview panes; a spill-by-id route; the
+renderer's `setPendingAsks` call and reading the per-workspace ticket; `pane.close` refusing
+silently on a full layout; `shift+.` and `shift+,` chords; M3.6 when keywork builds modes.
 
 **Findings across the wave.**
 - keywork has no modes: Plan, Recall and Agent are a spec (`docs/modes.md`) with no code, so

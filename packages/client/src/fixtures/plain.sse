@@ -20,3 +20,7 @@ id: 5
 event: session.tree
 data: {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"entry"}}
 
+id: 6
+event: memory.inbox
+data: {"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"","type":"memory.inbox","payload":{"count":0,"kinds":{}}}
+

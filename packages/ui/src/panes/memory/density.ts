@@ -57,10 +57,9 @@ function shareCells(counts: readonly number[], width: number): number[] {
     cells[index] = (cells[index] ?? 0) + 1;
     spare -= 1;
   }
-  for (const index of rank(cells)) {
-    if (spare >= 0) break;
-    if ((cells[index] ?? 0) <= 1) continue;
-    cells[index] = (cells[index] ?? 0) - 1;
+  while (spare < 0) {
+    const largest = rank(cells)[0] ?? 0;
+    cells[largest] = (cells[largest] ?? 1) - 1;
     spare += 1;
   }
   return cells;

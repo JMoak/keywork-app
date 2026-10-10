@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { externalVerdict } from "./open-external.ts";
 
-const roots = ["C:\work\app", "D:\other"];
+const roots = ["C:/work/app", "D:/other"];
 
 describe("openExternal's allowlist", () => {
   it("passes web links through untouched", () => {

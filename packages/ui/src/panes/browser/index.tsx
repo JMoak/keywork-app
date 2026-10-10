@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { z } from "zod";
-import { rememberAgentFile } from "../file/recent.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { rememberAgentFile } from "../file/recent.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 import {
   agentPathOf,
@@ -19,8 +19,8 @@ import {
   parentOf,
   rootPath,
   rows,
-  toggleHidden,
   type TreeState,
+  toggleHidden,
   withFailure,
   withFilter,
   withListing,
@@ -123,10 +123,13 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
   createEffect(() => {
     const expiry = nextExpiry(tree());
     if (expiry === undefined) return;
-    const timer = setTimeout(() => {
-      setNow(Date.now());
-      setTree((state) => expireLit(state, Date.now()));
-    }, Math.max(0, expiry - Date.now()));
+    const timer = setTimeout(
+      () => {
+        setNow(Date.now());
+        setTree((state) => expireLit(state, Date.now()));
+      },
+      Math.max(0, expiry - Date.now()),
+    );
     onCleanup(() => clearTimeout(timer));
   });
 

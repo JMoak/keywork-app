@@ -1,0 +1,20 @@
+{
+  "trusted": true,
+  "items": [
+    {
+      "id": "q1",
+      "content": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+      "kind": "note",
+      "target": "Stray Claim.md",
+      "created": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "id": "q2",
+      "content": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThe tray shows a mark while asks are pending.\n",
+      "kind": "note",
+      "target": "Tray Mark.md",
+      "created": "2026-09-07T12:00:00.000Z"
+    }
+  ],
+  "count": 2
+}

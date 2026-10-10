@@ -81,10 +81,7 @@ export function ledgerSummary(entry: LedgerEntry): string {
   return `${entry.op} ${subject}`;
 }
 
-export function entriesTouching(
-  ledger: readonly LedgerEntry[],
-  notePath: string,
-): LedgerEntry[] {
+export function entriesTouching(ledger: readonly LedgerEntry[], notePath: string): LedgerEntry[] {
   return ledger.filter((entry) => entry.deltas.some((delta) => delta.path === notePath));
 }
 
@@ -226,7 +223,12 @@ function stagedView(item: InboxItem): InboxView {
         note: item.note,
       };
     case "arc-question":
-      return { group: "airlock", title: `triage ${item.note}`, provenance: "agent", note: item.note };
+      return {
+        group: "airlock",
+        title: `triage ${item.note}`,
+        provenance: "agent",
+        note: item.note,
+      };
     case "preference-proposal":
       return {
         group: "proposal",

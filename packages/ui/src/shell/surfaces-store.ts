@@ -63,7 +63,13 @@ export interface SurfacesSeams {
   sessionsChanged?: (() => void) | undefined;
 }
 
-export const surfaceNames: readonly SurfaceName[] = ["mcp", "arcs", "bots", "workspaces", "flavors"];
+export const surfaceNames: readonly SurfaceName[] = [
+  "mcp",
+  "arcs",
+  "bots",
+  "workspaces",
+  "flavors",
+];
 
 export function surfacesOfKind(kind: SurfaceKind): readonly SurfaceName[] {
   return kind === "workspace" ? ["arcs", "bots"] : [kind];

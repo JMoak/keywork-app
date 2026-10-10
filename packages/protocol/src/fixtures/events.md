@@ -261,11 +261,27 @@ that throws while handling `engine.error` is dropped silently, so the bus cannot
 
 ## Server events
 
-`keywork serve` records a few events that no session's bus emits, because they describe
-process-level state that every connected client needs. They ride the same `/events` stream in
-the same envelope with `sessionId` empty, are listed in `serverEventTypes`
-(`packages/server/src/events.ts`), and never replay. The engine vocabulary above is
-unchanged by them.
+`keywork serve` adds a second, process-level vocabulary beside the engine's
+(`serverEventTypes` in `packages/server/src/events.ts`; the envelope's `type` is the union of
+both lists, and `/doc` publishes the union). These events belong to no session: their
+envelope carries an empty `sessionId` (`""`), and a client filtering `/events` by session
+keeps them. They never replay. The engine vocabulary above is unchanged by them.
+
+### surface.changed
+
+Fires when one of the process-level surfaces changed and a client should fetch it whole
+again. It fires where the terminal's own panes refresh today: on every `McpRegistry` status
+change (`kind: "mcp"`), on every arc registry change and session binding (`kind: "arcs"`),
+after a bot is defined or a session switches bot (`kind: "bots"`), after a workspace is
+declared, chosen, focused or unfocused (`kind: "workspaces"`), and after trust is recorded for
+the served root (`kind: "workspace"`).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `kind` | `"mcp" \| "arcs" \| "bots" \| "workspaces" \| "workspace"` | Which surface changed: `GET /mcp`, `GET /arcs`, `GET /bots`, `GET /workspaces` or `GET /workspace`. |
+
+One event with a `kind` rather than four names, because every surface is cheap to re-fetch
+whole and read by exactly one pane (118-3; Q-AS6 may split it).
 
 ### memory.inbox
 

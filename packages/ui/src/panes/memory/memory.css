@@ -74,7 +74,17 @@
   padding: 0;
 }
 
+.kw-memory-item {
+  display: block;
+}
 .kw-memory-row {
+  appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: inherit;
+  width: 100%;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 0.5rem;
@@ -83,12 +93,12 @@
   color: var(--kw-text-mid);
   cursor: default;
 }
-.kw-memory-row[data-cursor] {
+.kw-memory-item[data-cursor] > .kw-memory-row {
   color: var(--kw-text);
   background: var(--kw-panel);
   box-shadow: inset 2px 0 0 var(--kw-accent);
 }
-.kw-memory-row[data-kind="layer"] {
+.kw-memory-item[data-kind="layer"] > .kw-memory-row {
   color: var(--kw-text);
 }
 

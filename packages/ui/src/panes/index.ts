@@ -1,10 +1,16 @@
 import type { AppAction } from "../keys/actions.ts";
+import { arcsPane } from "./arcs/index.tsx";
+import { botsPane } from "./bots/index.tsx";
+import { browserPane } from "./browser/index.tsx";
 import { conversationPane } from "./conversation/index.tsx";
 import { diffPane } from "./diff/index.tsx";
+import { filePane } from "./file/index.tsx";
+import { mcpPane } from "./mcp/index.tsx";
 import { memoryPane } from "./memory/index.tsx";
 import type { PaneDefinition } from "./registry.ts";
 import { terminalPane } from "./terminal/index.tsx";
 import { treePane } from "./tree/index.tsx";
+import { workspacesPane } from "./workspaces/index.tsx";
 
 export const paneDefinitions = [
   conversationPane,
@@ -12,6 +18,12 @@ export const paneDefinitions = [
   diffPane,
   terminalPane,
   memoryPane,
+  mcpPane,
+  arcsPane,
+  botsPane,
+  workspacesPane,
+  browserPane,
+  filePane,
 ] as const;
 
 export type PaneSpec = SpecOf<(typeof paneDefinitions)[number]>;

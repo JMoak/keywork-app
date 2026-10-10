@@ -18,7 +18,8 @@ export function externalVerdict(url: string, workspaceRoots: readonly string[]):
 function fileVerdict(parsed: URL, workspaceRoots: readonly string[]): ExternalVerdict {
   const target = resolve(fileURLToPath(parsed));
   const inside = workspaceRoots.some((root) => contains(resolve(root), target));
-  if (!inside) return { ok: false, reason: `refusing to open ${target}: outside the open workspaces` };
+  if (!inside)
+    return { ok: false, reason: `refusing to open ${target}: outside the open workspaces` };
   return { ok: true, url: parsed.href };
 }
 

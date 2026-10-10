@@ -21,32 +21,14 @@ describe("check:contract", () => {
   });
 
   it("names dropped, unknown and moved routes and a version off the pin", () => {
-    const document = documentOfOpenApi(
-      {
-        info: { version: "9.9.9" },
-        paths: {
-          "/doc": { get: { operationId: "getDocument" } },
-          "/events": { get: { operationId: "streamEvents" } },
-          "/sessions": {
-            get: { operationId: "listSessions" },
-            post: { operationId: "createSession" },
-          },
-          "/sessions/{id}": { get: { operationId: "readSession" } },
-          "/sessions/{id}/prompt": { post: { operationId: "promptSession" } },
-          "/sessions/{id}/inject": { put: { operationId: "injectPrompt" } },
-          "/sessions/{id}/rename": { post: { operationId: "renameSession" } },
-          "/sessions/{id}/entries": { get: { operationId: "readSessionEntries" } },
-          "/sessions/{id}/fork": { post: { operationId: "forkSession" } },
-          "/sessions/{id}/label": { post: { operationId: "labelEntry" } },
-          "/sessions/{id}/leaf": { post: { operationId: "moveLeaf" } },
-          "/sessions/{id}/changes": { get: { operationId: "readChanges" } },
-          "/sessions/{id}/changes/file": { get: { operationId: "readChangedFile" } },
-          "/asks": { get: { operationId: "listAsks" } },
-          "/asks/{callId}": { post: { operationId: "answerAsk" } },
-        },
-      },
-      "drifted",
-    );
+    const paths: Record<string, Record<string, { operationId: string }>> = {};
+    for (const route of routes) {
+      if (route.operationId === "abortSession") continue;
+      const method = route.operationId === "injectPrompt" ? "put" : route.method.toLowerCase();
+      paths[route.path] = { ...paths[route.path], [method]: { operationId: route.operationId } };
+    }
+    paths["/sessions/{id}/rename"] = { post: { operationId: "renameSession" } };
+    const document = documentOfOpenApi({ info: { version: "9.9.9" }, paths }, "drifted");
     expect(contractViolations(document)).toEqual([
       `the server reports version 9.9.9; the app pins ${protocolVersion}`,
       "the server no longer serves abortSession",

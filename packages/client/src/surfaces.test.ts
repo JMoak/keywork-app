@@ -127,8 +127,7 @@ describe("the surface routes", () => {
 
   it("drives the bot and workspace verbs with the default workspace spelled out", async () => {
     const { calls, fetch } = recordingFetch((call) => {
-      if (call.path === "/bots")
-        return json(201, { name: "scribe", sigil: "✎", source: "user" });
+      if (call.path === "/bots") return json(201, { name: "scribe", sigil: "✎", source: "user" });
       if (call.path === "/sessions/s1/bot") return json(200, { sessionId: "s1", bot: "scribe" });
       if (call.path === "/workspaces") return json(201, { slug: "docs" });
       if (call.path === "/workspaces/use") return json(200, { slug: "docs", reopens: true });
@@ -192,9 +191,15 @@ describe("the surface routes", () => {
       client.createWorkspace("docs"),
       client.switchSessionBot("s1", "scribe"),
     ]);
-    expect(refusals.map((refusal) => (isSurfaceRefusal(refusal) ? refusal.refused : "?"))).toEqual(
-      ["archived", "archived", "archived", "exists", "exists", "exists", "busy"],
-    );
+    expect(refusals.map((refusal) => (isSurfaceRefusal(refusal) ? refusal.refused : "?"))).toEqual([
+      "archived",
+      "archived",
+      "archived",
+      "exists",
+      "exists",
+      "exists",
+      "busy",
+    ]);
     expect(refusals.at(-1)).toEqual({ refused: "busy", detail: "a turn is running" });
   });
 });

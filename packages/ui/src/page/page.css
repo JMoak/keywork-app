@@ -346,6 +346,23 @@ button.kw-tool {
   color: var(--kw-error);
 }
 
+.kw-tool-spill {
+  display: block;
+  margin: 0.25em 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  color: var(--kw-accent);
+  cursor: pointer;
+}
+.kw-tool-spill:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
 .kw-tool-detail {
   margin: 0.35em 0 0;
   padding: 0.35em 0 0;

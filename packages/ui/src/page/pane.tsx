@@ -9,7 +9,7 @@ import {
   toolRowSpans,
   type UserEntry,
 } from "@keywork-app/client";
-import type { AskVerdict } from "@keywork-app/protocol";
+import type { AskVerdict, SpillReference } from "@keywork-app/protocol";
 import { For, type JSX, Match, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Markdown } from "./markdown.tsx";
@@ -19,6 +19,7 @@ export interface ConversationPaneProps {
   projection: SessionProjection;
   title?: string | undefined;
   onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
+  onOpenSpill?: ((spill: SpillReference) => void) | undefined;
 }
 
 export type Voice = "user" | "agent" | "machine" | "blank";
@@ -45,6 +46,7 @@ export function ConversationPane(props: ConversationPaneProps) {
               unfolded={unfolded(index())}
               onToggle={() => toggle(index())}
               onAnswerAsk={props.onAnswerAsk}
+              onOpenSpill={props.onOpenSpill}
             />
           )}
         </For>
@@ -72,6 +74,7 @@ interface EntryProps {
   unfolded: boolean;
   onToggle: () => void;
   onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
+  onOpenSpill?: ((spill: SpillReference) => void) | undefined;
 }
 
 function Entry(props: EntryProps) {
@@ -127,6 +130,7 @@ function Entry(props: EntryProps) {
             unfolded={props.unfolded}
             onToggle={() => props.onToggle()}
             onAnswerAsk={props.onAnswerAsk}
+            onOpenSpill={props.onOpenSpill}
           />
         )}
       </Match>
@@ -190,6 +194,7 @@ interface ToolRowProps {
   unfolded: boolean;
   onToggle: () => void;
   onAnswerAsk?: ((callId: string, verdict: AskVerdict) => void) | undefined;
+  onOpenSpill?: ((spill: SpillReference) => void) | undefined;
 }
 
 function ToolRow(props: ToolRowProps) {
@@ -238,6 +243,13 @@ function ToolRow(props: ToolRowProps) {
       </Show>
       <Show when={run().phase === "asking" && props.onAnswerAsk !== undefined}>
         <AskCard run={run()} onAnswer={(verdict) => props.onAnswerAsk?.(run().callId, verdict)} />
+      </Show>
+      <Show when={props.onOpenSpill !== undefined && run().spill}>
+        {(spill) => (
+          <button type="button" class="kw-tool-spill" onClick={() => props.onOpenSpill?.(spill())}>
+            open the spill · bytes {spill().elidedFrom}..{spill().elidedTo} of {spill().bytes}
+          </button>
+        )}
       </Show>
       <Show when={props.unfolded && disclosable()}>
         <pre class="kw-tool-detail">{run().detail?.join("\n")}</pre>

@@ -2,12 +2,14 @@ import type { SessionProjection } from "@keywork-app/client";
 import { Show } from "solid-js";
 import { z } from "zod";
 import { FirstRun } from "../../chrome/first-run.tsx";
+import { arcHueRank, botTitle } from "../../chrome/identity.ts";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { sessionName, telemetry } from "../../chrome/telemetry.ts";
 import { Composer } from "../../composer/composer.tsx";
 import { contextLevelOf } from "../../instruments/context.ts";
 import { ConversationPane } from "../../page/pane.tsx";
 import { EmptyState } from "../empty-state.tsx";
+import { spillFileSpec } from "../file/index.tsx";
 import { definePane, type PaneProps } from "../registry.ts";
 
 const conversationSpec = z.object({
@@ -37,11 +39,17 @@ export const conversationPane = definePane<ConversationSpec>({
   },
   adornments: (spec, shell) => {
     const projection = shell.store.projection(spec.sessionId);
+    const summary = shell.store.summary(spec.sessionId);
     return {
       telemetry: telemetry(projection),
       context: contextLevelOf(projection.usage),
-      modeWord:
-        projection.mode === undefined || projection.mode === "agent" ? undefined : projection.mode,
+      bot: botTitle(summary, shell.store.surfaces.state.bots),
+      hueRank: arcHueRank(summary, shell.store.surfaces.state.ordinals),
+      modeWord: shell.trust.untrusted()
+        ? "untrusted"
+        : projection.mode === undefined || projection.mode === "agent"
+          ? undefined
+          : projection.mode,
     };
   },
   lifecycle: (view, shell) => {
@@ -84,6 +92,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
           <ConversationPane
             projection={projection()}
             onAnswerAsk={(callId, verdict) => void props.shell.store.answerAsk(callId, verdict)}
+            onOpenSpill={(spill) => props.shell.openPane(spillFileSpec(spill))}
           />
         </Show>
       </div>

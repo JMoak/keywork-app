@@ -8,8 +8,8 @@ import { createSignal, Match, onCleanup, Switch } from "solid-js";
 import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
 import { hostFetch } from "./host/transport.ts";
 import { frameTick } from "./shell/frame-tick.ts";
-import { OpenScreen } from "./shell/open-screen.tsx";
 import { notifyOnInbox } from "./shell/needs-you.ts";
+import { OpenScreen } from "./shell/open-screen.tsx";
 import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
 import { WorkspaceView } from "./shell/workspace-view.tsx";
 import "./shell/shell.css";
@@ -21,6 +21,7 @@ export interface AppProps {
 
 interface Connected {
   opened: OpenedWorkspace;
+  client: KeyworkClient;
   feed: ServerFeed;
   store: SessionStore;
   stopNotifying: () => void;
@@ -50,7 +51,7 @@ export function App(props: AppProps) {
     const stopNotifying = notifyOnInbox(store.memory, props.host, result.opened.workspace);
     await store.refresh();
     void store.surfaces.load();
-    setConnected({ opened: result.opened, feed, store, stopNotifying });
+    setConnected({ opened: result.opened, client, feed, store, stopNotifying });
   };
 
   const stopLoss = props.host.onServerLost((loss) => {
@@ -79,6 +80,8 @@ export function App(props: AppProps) {
             workspace={live().opened.workspace}
             serverLabel={serverLabel(live().opened)}
             store={live().store}
+            client={live().client}
+            feed={live().feed}
           />
         )}
       </Match>

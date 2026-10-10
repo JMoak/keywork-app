@@ -63,7 +63,13 @@ export interface StagedWrite {
 export type StagedReview = { id: string; key: string; created: string } & ReviewProposal;
 
 export type ReviewProposal =
-  | { kind: "borderline-promotion"; title: string; body: string; confidence: number; source: string }
+  | {
+      kind: "borderline-promotion";
+      title: string;
+      body: string;
+      confidence: number;
+      source: string;
+    }
   | {
       kind: "contradiction";
       a: string;
@@ -260,10 +266,15 @@ export type DiscardOutcome = "discarded" | MemoryWriteRefusal;
 
 export type RevertReply = { kind: "reverted" } | { kind: "needs-rebase" } | MemoryWriteRefusal;
 
-export type AirlockTriage = { kind: "digest"; digest: AirlockDigest } | AirlockRefusal | MemoryWriteRefusal;
+export type AirlockTriage =
+  | { kind: "digest"; digest: AirlockDigest }
+  | AirlockRefusal
+  | MemoryWriteRefusal;
 
 export type AirlockDelivery = { kind: "delivered"; delivered: number } | MemoryWriteRefusal;
 
-export type AirlockFinish = { kind: "finished"; outcome: AirlockFinishOutcome } | MemoryWriteRefusal;
+export type AirlockFinish =
+  | { kind: "finished"; outcome: AirlockFinishOutcome }
+  | MemoryWriteRefusal;
 
 export const inertMemoryDetail = "memory is inert: this workspace is untrusted";

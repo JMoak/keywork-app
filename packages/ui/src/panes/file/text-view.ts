@@ -15,7 +15,11 @@ export interface LineNumbering {
 
 export const highlighting: Extension[] = [];
 
-export function mountTextView(host: HTMLElement, text: string, numbering: LineNumbering): TextMount {
+export function mountTextView(
+  host: HTMLElement,
+  text: string,
+  numbering: LineNumbering,
+): TextMount {
   let view = build(host, text, numbering);
   return {
     replace: (next, nextNumbering) => {

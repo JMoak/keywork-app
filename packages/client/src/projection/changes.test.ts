@@ -28,8 +28,9 @@ describe("the changes reducer over the recorded write turn", () => {
     const stream = await envelopes("changes");
     const updated = stream.filter((envelope) => envelope.type === "changes.updated");
     expect(updated).toHaveLength(1);
-    expect(stream.map((envelope) => envelope.type).slice(-2)).toEqual([
+    expect(stream.map((envelope) => envelope.type).slice(-3)).toEqual([
       "session.tree",
+      "memory.inbox",
       "changes.updated",
     ]);
     const state = stream.reduce(changesState, emptyChangesState);

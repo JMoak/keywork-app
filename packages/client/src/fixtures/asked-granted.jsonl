@@ -12,3 +12,4 @@
 {"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"It printed served."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
 {"id":14,"ts":"2026-09-07T12:00:03.500Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"entry"}}
+{"id":15,"ts":"2026-09-07T12:00:03.750Z","sessionId":"","type":"memory.inbox","payload":{"count":0,"kinds":{}}}

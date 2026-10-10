@@ -1,0 +1,130 @@
+{
+  "trusted": true,
+  "layers": [
+    {
+      "id": "workspace",
+      "kind": "workspace",
+      "label": "workspace",
+      "notes": 2,
+      "curing": {
+        "0": 0,
+        "1": 1,
+        "2": 0,
+        "3": 1
+      },
+      "prompt": {
+        "budget": 4096,
+        "used": 0
+      }
+    }
+  ],
+  "inbox": [
+    {
+      "id": "q1",
+      "content": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+      "kind": "note",
+      "target": "Stray Claim.md",
+      "created": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "id": "q2",
+      "content": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThe tray shows a mark while asks are pending.\n",
+      "kind": "note",
+      "target": "Tray Mark.md",
+      "created": "2026-09-07T12:00:00.000Z"
+    }
+  ],
+  "ledger": [
+    {
+      "id": "q3",
+      "op": "approve",
+      "timestamp": "2026-09-07T12:00:00.000Z",
+      "deltas": [
+        {
+          "path": "Stray Claim.md",
+          "before": null,
+          "beforeHash": null,
+          "after": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+          "afterHash": "c780547fa8870bbb01fd5d01fefc39f15cbc67e538089d1ec6938045c414f16a"
+        },
+        {
+          "path": ".staging/q1.md",
+          "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+          "beforeHash": "c780547fa8870bbb01fd5d01fefc39f15cbc67e538089d1ec6938045c414f16a",
+          "after": null,
+          "afterHash": null
+        },
+        {
+          "path": ".staging/q1.json",
+          "before": "{\"kind\":\"note\",\"target\":\"Stray Claim.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
+          "beforeHash": "4f0ad932d6875e5aeebbed1ad9072ad4381f8f4d3bd0c41cf55ff724469b5e7f",
+          "after": null,
+          "afterHash": null
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "op": "discard",
+      "timestamp": "2026-09-07T12:00:00.000Z",
+      "deltas": [
+        {
+          "path": ".staging/q5.md",
+          "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nAny flavor file can be imported from the palette.\n",
+          "beforeHash": "dd30957dcb5944f321fdb242e73ac3bce74be5a2704cb07c87a80bad87fbae49",
+          "after": null,
+          "afterHash": null
+        },
+        {
+          "path": ".staging/q5.json",
+          "before": "{\"kind\":\"note\",\"target\":\"Flavor Import.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
+          "beforeHash": "6f3853ad60d6562bba9611723108d8e539542dcbf24631dfe9798a17342dd1c7",
+          "after": null,
+          "afterHash": null
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "op": "revert",
+      "timestamp": "2026-09-07T12:00:00.000Z",
+      "deltas": [
+        {
+          "path": "Stray Claim.md",
+          "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+          "beforeHash": "c780547fa8870bbb01fd5d01fefc39f15cbc67e538089d1ec6938045c414f16a",
+          "after": null,
+          "afterHash": null
+        },
+        {
+          "path": ".staging/q1.md",
+          "before": null,
+          "beforeHash": null,
+          "after": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
+          "afterHash": "c780547fa8870bbb01fd5d01fefc39f15cbc67e538089d1ec6938045c414f16a"
+        },
+        {
+          "path": ".staging/q1.json",
+          "before": null,
+          "beforeHash": null,
+          "after": "{\"kind\":\"note\",\"target\":\"Stray Claim.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
+          "afterHash": "4f0ad932d6875e5aeebbed1ad9072ad4381f8f4d3bd0c41cf55ff724469b5e7f"
+        }
+      ]
+    }
+  ],
+  "audit": [
+    {
+      "timestamp": "2026-09-07T12:00:00.000Z",
+      "event": "approved note → Stray Claim.md"
+    },
+    {
+      "timestamp": "2026-09-07T12:00:00.000Z",
+      "event": "discarded note → Flavor Import.md"
+    }
+  ],
+  "gardener": {
+    "state": "idle"
+  },
+  "airlocks": []
+}

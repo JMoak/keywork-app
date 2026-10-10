@@ -36,8 +36,7 @@ export function NoteLens(props: NoteLensProps) {
               <For each={note().relations}>
                 {(relation) => (
                   <li class="kw-memory-relation">
-                    {relation.direction === "out" ? "→" : "←"} {relation.predicate}{" "}
-                    {relation.name}
+                    {relation.direction === "out" ? "→" : "←"} {relation.predicate} {relation.name}
                   </li>
                 )}
               </For>

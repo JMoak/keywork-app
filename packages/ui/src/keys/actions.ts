@@ -23,6 +23,7 @@ export interface ActionTarget {
   denyAsk(): void;
   toggleHelp(): void;
   openPalette(initialQuery?: string): void;
+  trustWorkspace(): void;
 }
 
 export interface AppAction {
@@ -196,6 +197,15 @@ export const coreActions: Record<string, AppAction> = {
     hotPath: true,
     invoke: (target) => target.openPalette("/"),
     command: { name: "palette", description: "open the command palette", aliases: ["commands"] },
+  },
+  "trust.workspace": {
+    chords: "leader u",
+    help: "trust this workspace",
+    invoke: (target) => target.trustWorkspace(),
+    command: {
+      name: "trust",
+      description: "trust this workspace: memory, changes, terminal, LSP and project config",
+    },
   },
 };
 

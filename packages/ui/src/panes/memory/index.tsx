@@ -54,7 +54,11 @@ export const memoryPane = definePane<MemorySpec>({
     spec: () => ({ kind: "memory" }),
   },
   localActions: {
-    "memory.ask": { chords: "?", help: "ask the garden" },
+    "memory.ask": {
+      chords: "?",
+      help: "ask the garden",
+      command: { name: "ask", description: "search the memory garden" },
+    },
     "memory.approve": {
       chords: "a",
       help: "approve the focused item",
@@ -70,18 +74,46 @@ export const memoryPane = definePane<MemorySpec>({
       help: "revert the focused write",
       command: { name: "revert", description: "revert the focused ledger entry" },
     },
-    "memory.carry": { chords: "c", help: "carry the focused question to the next arc" },
-    "memory.force": { chords: "f", help: "force-close the focused airlock" },
-    "memory.inbox": { chords: "i", help: "jump to the inbox" },
+    "memory.carry": {
+      chords: "c",
+      help: "carry the focused question to the next arc",
+      command: { name: "carry", description: "carry the focused airlock question forward" },
+    },
+    "memory.force": {
+      chords: "f",
+      help: "force-close the focused airlock",
+      command: { name: "force-close", description: "close the focused arc past wedged sessions" },
+    },
+    "memory.inbox": {
+      chords: "i",
+      help: "jump to the inbox",
+      command: { name: "inbox", description: "jump to the memory review inbox" },
+    },
     "memory.ledger": {
       chords: "l",
       help: "the write ledger",
       command: { name: "ledger", description: "show this run's memory writes" },
     },
-    "memory.open": { chords: "enter", help: "open the focused row" },
-    "memory.back": { chords: "escape", help: "back to the garden" },
-    "memory.next": { chords: ["j", "down"], help: "next row" },
-    "memory.prev": { chords: ["k", "up"], help: "previous row" },
+    "memory.open": {
+      chords: "enter",
+      help: "open the focused row",
+      command: { name: "open-note", description: "open the focused note or day" },
+    },
+    "memory.back": {
+      chords: "escape",
+      help: "back to the garden",
+      command: { name: "garden", description: "back to the memory garden" },
+    },
+    "memory.next": {
+      chords: ["j", "down"],
+      help: "next row",
+      command: { name: "memory-next", description: "move to the next memory row" },
+    },
+    "memory.prev": {
+      chords: ["k", "up"],
+      help: "previous row",
+      command: { name: "memory-prev", description: "move to the previous memory row" },
+    },
   },
   lifecycle: (_view, shell) => lifecycleOf(shell.store.memory.state.inbox.count),
   onRestore: (_spec, shell) => void shell.store.memory.refresh(),
@@ -159,7 +191,10 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   );
 
   const move = (delta: number): void => {
-    const ids = lens().kind === "ledger" ? ledgerEntries().map((entry) => entry.id) : rows().map((row) => row.id);
+    const ids =
+      lens().kind === "ledger"
+        ? ledgerEntries().map((entry) => entry.id)
+        : rows().map((row) => row.id);
     const current = lens().kind === "ledger" ? focusedLedgerId() : focusedRow()?.id;
     const at = ids.indexOf(current ?? "");
     const next = ids[Math.min(ids.length - 1, Math.max(0, at + delta))];
@@ -174,30 +209,50 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const approve = (row: MemoryRow | undefined): void => {
     if (row?.kind === "inbox") void memory().approve(row.item.id).then(report("approved"));
     else if (row?.kind === "candidate")
-      void memory().airlock.triageCandidate(row.arc, row.candidate.note, "deliver").then(report("deliver"));
+      void memory()
+        .airlock.triageCandidate(row.arc, row.candidate.note, "deliver")
+        .then(report("deliver"));
     else if (row?.kind === "question")
-      void memory().airlock.triageQuestion(row.arc, row.question.title, "resolve").then(report("resolved"));
-    else if (row?.kind === "finish") void memory().airlock.deliver(row.arc).then(report("delivered"));
+      void memory()
+        .airlock.triageQuestion(row.arc, row.question.title, "resolve")
+        .then(report("resolved"));
+    else if (row?.kind === "finish")
+      void memory().airlock.deliver(row.arc).then(report("delivered"));
     else say("nothing here to approve");
   };
 
   const discard = (row: MemoryRow | undefined): void => {
     if (row?.kind === "inbox") void memory().discard(row.item.id).then(report("discarded"));
     else if (row?.kind === "candidate")
-      void memory().airlock.triageCandidate(row.arc, row.candidate.note, "leave").then(report("left"));
+      void memory()
+        .airlock.triageCandidate(row.arc, row.candidate.note, "leave")
+        .then(report("left"));
     else if (row?.kind === "question")
-      void memory().airlock.triageQuestion(row.arc, row.question.title, "drop").then(report("dropped"));
+      void memory()
+        .airlock.triageQuestion(row.arc, row.question.title, "drop")
+        .then(report("dropped"));
     else say("nothing here to discard");
   };
 
   const carry = (row: MemoryRow | undefined): void => {
-    if (row?.kind !== "question") return say("select an open question to carry it");
-    void memory().airlock.triageQuestion(row.arc, row.question.title, "carry").then(report("carried"));
+    if (row?.kind !== "question") {
+      say("select an open question to carry it");
+      return;
+    }
+    void memory()
+      .airlock.triageQuestion(row.arc, row.question.title, "carry")
+      .then(report("carried"));
   };
 
   const forceClose = (row: MemoryRow | undefined): void => {
-    const arc = row?.kind === "finish" || row?.kind === "candidate" || row?.kind === "question" ? row.arc : undefined;
-    if (arc === undefined) return say("select an airlock to close it");
+    const arc =
+      row?.kind === "finish" || row?.kind === "candidate" || row?.kind === "question"
+        ? row.arc
+        : undefined;
+    if (arc === undefined) {
+      say("select an airlock to close it");
+      return;
+    }
     void memory()
       .airlock.finish(arc, true)
       .then((outcome) => say(describeFinish(outcome)));
@@ -209,19 +264,29 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
       current.kind === "ledger"
         ? ledgerEntries().find((item) => item.id === focusedLedgerId())
         : lastEntryFor(current, openedNote(), focusedRow(), state().garden.ledger);
-    if (entry === undefined) return say("no change to revert here this run");
+    if (entry === undefined) {
+      say("no change to revert here this run");
+      return;
+    }
     void memory()
       .revert(entry.id)
       .then((reply) => {
         if (typeof reply === "string") return say(describeRefusal(reply));
         setReverted((known) => ({ ...known, [entry.id]: reply.kind }));
-        say(reply.kind === "reverted" ? `reverted ${entry.op}` : "needs rebase · the file moved on, nothing touched");
+        say(
+          reply.kind === "reverted"
+            ? `reverted ${entry.op}`
+            : "needs rebase · the file moved on, nothing touched",
+        );
       });
   };
 
   const jumpToInbox = (): void => {
     const first = rows().find((row) => row.kind === "inbox");
-    if (first === undefined) return say("the inbox is empty");
+    if (first === undefined) {
+      say("the inbox is empty");
+      return;
+    }
     setLens({ kind: "garden" });
     setCursor(first.id);
   };
@@ -250,7 +315,10 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   };
 
   const back = (): void => {
-    if (asking()) return closeAsk();
+    if (asking()) {
+      closeAsk();
+      return;
+    }
     setLens({ kind: "garden" });
   };
 
@@ -339,7 +407,9 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
           />
         </Match>
         <Match when={lensAs(lens(), "daily")}>
-          {(current) => <DailyLens date={current().date} entries={daily() as DailyEntry[] | undefined} />}
+          {(current) => (
+            <DailyLens date={current().date} entries={daily() as DailyEntry[] | undefined} />
+          )}
         </Match>
         <Match when={gardenEmpty() && state().garden.inbox.length === 0 && answer() === undefined}>
           <EmptyState line={memoryPane.emptyState(props.shell.keys)} />
@@ -414,7 +484,14 @@ function describeRefusal(refusal: string): string {
   return refusal === "inert" ? "memory is inert: this workspace is untrusted" : "that item is gone";
 }
 
-function describeFinish(finish: { kind: string; outcome?: { kind: string; items?: string[]; sessions?: string[]; delivered?: number } } | string): string {
+function describeFinish(
+  finish:
+    | {
+        kind: string;
+        outcome?: { kind: string; items?: string[]; sessions?: string[]; delivered?: number };
+      }
+    | string,
+): string {
   if (typeof finish === "string") return describeRefusal(finish);
   const outcome = finish.outcome;
   if (outcome === undefined) return finish.kind;

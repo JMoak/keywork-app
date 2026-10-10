@@ -5,6 +5,7 @@ import { z } from "zod";
 import { relativeAge, sessionName } from "../../chrome/telemetry.ts";
 import { formatCost } from "../../instruments/format.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import "./tree.css";
 
@@ -108,6 +109,11 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
   const sessions = createMemo(() => sessionsNewestFirst(props.shell.store.state.summaries));
   const current = (): SessionSummary | undefined => sessions()[cursor()];
   const dive = (id: string): void => props.shell.rebind(props.id, { kind: "tree", sessionId: id });
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
 
   props.onAction((action) => {
     const chosen = current();
@@ -131,7 +137,7 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
   });
 
   return (
-    <aside class="kw-tree" aria-label="sessions">
+    <aside class="kw-tree" aria-label="sessions" tabIndex={-1} ref={root}>
       <div class="kw-tree-head">
         <button
           type="button"
@@ -225,6 +231,12 @@ function EntriesLevel(props: PaneProps<TreeSpec> & { sessionId: string }) {
     }
   };
 
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused && labelDraft() === undefined,
+  );
+
   createEffect(() => {
     void props.shell.store.openTree(props.sessionId);
   });
@@ -275,7 +287,7 @@ function EntriesLevel(props: PaneProps<TreeSpec> & { sessionId: string }) {
   });
 
   return (
-    <section class="kw-tree" aria-label="entry tree">
+    <section class="kw-tree" aria-label="entry tree" tabIndex={-1} ref={root}>
       <div class="kw-tree-head">
         <button type="button" class="kw-tree-back" onClick={back}>
           ‹ sessions

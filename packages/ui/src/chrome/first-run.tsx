@@ -10,12 +10,7 @@ export interface Lesson {
   readonly does: string;
 }
 
-export const firstRunActions = [
-  "pane.split",
-  "tree.summon",
-  "palette.go",
-  "help.toggle",
-] as const;
+export const firstRunActions = ["pane.split", "tree.summon", "palette.go", "help.toggle"] as const;
 
 export function firstRunLessons(keys: KeyChords): Lesson[] {
   return [

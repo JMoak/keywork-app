@@ -2,9 +2,11 @@ import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
-import { inertMemoryClient } from "./memory-store.test.ts";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
+import { inertMemoryClient } from "./memory-store.test.ts";
+import { emptySurfacesClient } from "./surfaces-store.test.ts";
+import { inertWorkspaceClient } from "./trust.test.ts";
 
 afterEach(() => {
   cleanup();
@@ -56,6 +58,8 @@ function quietClient(): KeyworkClient {
     moveLeaf: async () => "missing",
     changes: async () => "missing",
     ...inertMemoryClient(),
+    ...emptySurfacesClient(),
+    ...inertWorkspaceClient(),
     changedFile: async () => "missing",
     asks: async () => [],
     answerAsk: async () => "settled" as const,

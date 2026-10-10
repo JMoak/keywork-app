@@ -53,6 +53,14 @@ describe("the pane inventory", () => {
       sessionId: "s1",
       path: "a.ts",
     });
+    expect(parsePaneSpec({ kind: "browser" })).toEqual({ kind: "browser" });
+    expect(parsePaneSpec({ kind: "file", path: "src/a.ts", from: 3, to: 9 })).toEqual({
+      kind: "file",
+      path: "src/a.ts",
+      from: 3,
+      to: 9,
+    });
+    expect(parsePaneSpec({ kind: "file" })).toBeUndefined();
     expect(parsePaneSpec({ kind: "nope" })).toBeUndefined();
   });
 

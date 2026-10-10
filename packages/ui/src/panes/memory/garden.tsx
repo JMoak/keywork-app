@@ -38,14 +38,19 @@ export function Garden(props: GardenProps) {
               <For each={section.rows}>
                 {(row) => (
                   <li
-                    class="kw-memory-row"
+                    class="kw-memory-item"
                     data-kind={row.kind}
                     data-row={row.id}
                     data-cursor={props.cursor === row.id ? "" : undefined}
-                    onClick={() => props.onSelect(row)}
-                    onDblClick={() => props.onOpen(row)}
                   >
-                    <RowBody row={row} />
+                    <button
+                      type="button"
+                      class="kw-memory-row"
+                      onClick={() => props.onSelect(row)}
+                      onDblClick={() => props.onOpen(row)}
+                    >
+                      <RowBody row={row} />
+                    </button>
                   </li>
                 )}
               </For>
@@ -86,7 +91,7 @@ function LayerRow(props: { layer: MemoryLayer }) {
         label={`curing · ${curingReadout(props.layer.curing) || "no notes"}`}
       />
       <span class="kw-memory-title">
-        {props.layer.notes} {props.layer.notes === 1 ? "note" : "notes"}
+        {`${props.layer.notes} ${props.layer.notes === 1 ? "note" : "notes"}`}
       </span>
       <Show when={props.layer.prompt}>
         {(prompt) => (
@@ -157,7 +162,9 @@ function InboxRow(props: { row: Extract<MemoryRow, { kind: "inbox" }> }) {
       </span>
       <span class="kw-memory-title">{view().title}</span>
       <span class="kw-memory-facts">
-        <Show when={view().detail}>{(detail) => <span class="kw-memory-fact">{detail()}</span>}</Show>
+        <Show when={view().detail}>
+          {(detail) => <span class="kw-memory-fact">{detail()}</span>}
+        </Show>
         <span class="kw-memory-fact">{relativeAge(props.row.item.created)}</span>
       </span>
     </>

@@ -1,0 +1,3 @@
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"","type":"memory.inbox","payload":{"count":2,"kinds":{"note":2}}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"","type":"memory.inbox","payload":{"count":1,"kinds":{"note":1}}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"","type":"memory.inbox","payload":{"count":2,"kinds":{"note":2}}}

@@ -1,10 +1,13 @@
-import type { KeyworkClient } from "@keywork-app/client";
+import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
 import type { BusEnvelope, TrustOutcome, WorkspaceView } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
+import type { ShellSeams } from "../panes/registry.ts";
 import {
   createTrustFlow,
   isUntrusted,
+  type TrustFlow,
+  type TrustState,
   trustPrompt,
   trustStateOf,
   untrustedNotice,
@@ -23,15 +26,47 @@ export const undecidedWorkspace: WorkspaceView = {
   readiness: "undecided",
 };
 
-export function inertWorkspaceClient(
-  overrides: Partial<WorkspaceClient> = {},
-): WorkspaceClient {
+export function inertWorkspaceClient(overrides: Partial<WorkspaceClient> = {}): WorkspaceClient {
   return {
     workspace: async () => undecidedWorkspace,
     tree: async () => ({ path: "", entries: [] }),
     file: async () => "missing",
     trustWorkspace: async () => ({ trusted: true, root: "C:/work", reopens: false }),
     ...overrides,
+  };
+}
+
+export function inertShellExtras(
+  overrides: Partial<Pick<ShellSeams, "client" | "feed" | "trust" | "openPane">> = {},
+): Pick<ShellSeams, "client" | "feed" | "trust" | "openPane"> {
+  return {
+    client: inertWorkspaceClient() as unknown as KeyworkClient,
+    feed: inertFeed(),
+    trust: inertTrust(),
+    openPane: () => undefined,
+    ...overrides,
+  };
+}
+
+export function inertFeed(): ServerFeed {
+  return {
+    open: async () => undefined,
+    subscribe: () => () => undefined,
+    subscribeSession: () => () => undefined,
+    onNotice: () => () => undefined,
+    whenLost: () => () => undefined,
+    close: () => undefined,
+  };
+}
+
+export function inertTrust(state: TrustState = { kind: "trusted", root: "C:/work" }): TrustFlow {
+  return {
+    state: () => state,
+    workspace: () => undefined,
+    untrusted: () => isUntrusted(state),
+    refresh: async () => undefined,
+    accept: async () => undefined,
+    dispose: () => undefined,
   };
 }
 

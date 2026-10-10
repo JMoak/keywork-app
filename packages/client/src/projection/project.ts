@@ -73,6 +73,7 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "session.tree":
     case "changes.updated":
     case "memory.inbox":
+    case "surface.changed":
       return state;
     case "engine.error":
       return notice(

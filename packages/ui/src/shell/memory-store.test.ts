@@ -2,6 +2,8 @@ import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
 import type { BusEnvelope, InboxItem, MemoryGarden } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
+import recordedEvents from "../../../client/src/fixtures/memory.jsonl?raw";
+import recordedGarden from "../../../client/src/fixtures/memory-garden.json";
 import { createMemoryStore, inboxAfter, inboxTallyOf, inertGarden } from "./memory-store.ts";
 
 export type MemoryClient = Pick<
@@ -167,5 +169,24 @@ describe("the memory store", () => {
       expect(reads).toBe(1);
       dispose();
     });
+  });
+});
+
+describe("the recorded memory fixture", () => {
+  it("folds approve, discard and the revert of the approve back to two waiting items", async () => {
+    const garden = recordedGarden as MemoryGarden;
+    const envelopes = recordedEvents
+      .split("\n")
+      .filter((line) => line !== "")
+      .map((line) => JSON.parse(line) as BusEnvelope);
+    expect(envelopes.map((envelope) => envelope.payload)).toEqual([
+      { count: 2, kinds: { note: 2 } },
+      { count: 1, kinds: { note: 1 } },
+      { count: 2, kinds: { note: 2 } },
+    ]);
+    expect(envelopes.every((envelope) => envelope.sessionId === "")).toBe(true);
+    const seeded = { count: 3, kinds: { note: 3 } };
+    expect(inboxAfter(seeded, envelopes)).toEqual(inboxTallyOf(garden));
+    expect(garden.ledger.map((entry) => entry.op)).toEqual(["approve", "discard", "revert"]);
   });
 });

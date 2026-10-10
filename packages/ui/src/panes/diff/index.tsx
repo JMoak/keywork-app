@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { z } from "zod";
 import { tierOf, type WidthTier } from "../../page/tiers.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 import { type MergeMount, mergeLayoutFor, mountMergeView } from "./merge-view.ts";
 import "./diff.css";
@@ -129,6 +130,12 @@ function FilesLevel(props: PaneProps<DiffSpec> & { sessionId: string }) {
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId, path: file.path });
   };
 
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
+
   createEffect(() => {
     void props.shell.store.openChanges(props.sessionId);
   });
@@ -151,7 +158,7 @@ function FilesLevel(props: PaneProps<DiffSpec> & { sessionId: string }) {
   });
 
   return (
-    <section class="kw-diff" aria-label="changed files">
+    <section class="kw-diff" aria-label="changed files" tabIndex={-1} ref={root}>
       <Show when={availabilityLine(changes())}>
         {(line) => <p class="kw-diff-unavailable">{line()}</p>}
       </Show>
@@ -200,7 +207,12 @@ function FileLevel(props: PaneProps<DiffSpec> & { sessionId: string; path: strin
   const [tier, setTier] = createSignal<WidthTier>("column");
   const [hunks, setHunks] = createSignal(0);
   let host: HTMLDivElement | undefined;
+  let root: HTMLElement | undefined;
   let mounted: MergeMount | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const back = (): void =>
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId });
   const sides = () => {
@@ -262,7 +274,7 @@ function FileLevel(props: PaneProps<DiffSpec> & { sessionId: string; path: strin
   });
 
   return (
-    <section class="kw-diff" aria-label="file diff">
+    <section class="kw-diff" aria-label="file diff" tabIndex={-1} ref={root}>
       <div class="kw-diff-head">
         <button type="button" class="kw-diff-back" onClick={back}>
           ‹ changes

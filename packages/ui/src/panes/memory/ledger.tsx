@@ -21,34 +21,35 @@ export function LedgerLens(props: LedgerLensProps) {
         <For each={props.entries}>
           {(entry) => (
             <li
-              class="kw-memory-row"
+              class="kw-memory-item"
               data-kind="ledger"
               data-row={entry.id}
               data-cursor={props.cursor === entry.id ? "" : undefined}
-              onClick={() => props.onSelect(entry.id)}
             >
-              <span class="kw-memory-marks">
-                <DensityMark
-                  cell={provenanceCell(entry.op === "revert" ? "untrusted" : "agent")}
-                  label={entry.op}
-                />
-              </span>
-              <span class="kw-memory-title">{ledgerSummary(entry)}</span>
-              <span class="kw-memory-facts">
-                <span class="kw-memory-fact">{entry.timestamp}</span>
-                <span class="kw-memory-fact">
-                  {entry.deltas.length} {entry.deltas.length === 1 ? "file" : "files"}
+              <button type="button" class="kw-memory-row" onClick={() => props.onSelect(entry.id)}>
+                <span class="kw-memory-marks">
+                  <DensityMark
+                    cell={provenanceCell(entry.op === "revert" ? "untrusted" : "agent")}
+                    label={entry.op}
+                  />
                 </span>
-                <Show when={props.reverted[entry.id]}>
-                  {(outcome) => (
-                    <span class="kw-memory-fact" data-outcome={outcome()}>
-                      {outcome() === "reverted"
-                        ? "reverted"
-                        : "needs rebase · the file moved on, nothing touched"}
-                    </span>
-                  )}
-                </Show>
-              </span>
+                <span class="kw-memory-title">{ledgerSummary(entry)}</span>
+                <span class="kw-memory-facts">
+                  <span class="kw-memory-fact">{entry.timestamp}</span>
+                  <span class="kw-memory-fact">
+                    {entry.deltas.length} {entry.deltas.length === 1 ? "file" : "files"}
+                  </span>
+                  <Show when={props.reverted[entry.id]}>
+                    {(outcome) => (
+                      <span class="kw-memory-fact" data-outcome={outcome()}>
+                        {outcome() === "reverted"
+                          ? "reverted"
+                          : "needs rebase · the file moved on, nothing touched"}
+                      </span>
+                    )}
+                  </Show>
+                </span>
+              </button>
             </li>
           )}
         </For>
@@ -66,10 +67,7 @@ export function DailyLens(props: DailyLensProps) {
   return (
     <section class="kw-memory-daily">
       <h2 class="kw-memory-note-title">{props.date}</h2>
-      <Show
-        when={props.entries}
-        fallback={<p class="kw-memory-line">░ reading…</p>}
-      >
+      <Show when={props.entries} fallback={<p class="kw-memory-line">░ reading…</p>}>
         {(entries) => (
           <Show
             when={entries().length > 0}

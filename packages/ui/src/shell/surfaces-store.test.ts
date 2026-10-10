@@ -29,12 +29,14 @@ export function fixtureSurfacesClient(
   overrides: Partial<SurfacesClient> = {},
 ): SurfacesClient & { calls: string[] } {
   const calls: string[] = [];
-  const counted =
-    <K extends keyof SurfacesClient>(name: K, answer: SurfacesClient[K]): SurfacesClient[K] =>
-      ((...args: unknown[]) => {
-        calls.push(name);
-        return (answer as (...inner: unknown[]) => unknown)(...args);
-      }) as SurfacesClient[K];
+  const counted = <K extends keyof SurfacesClient>(
+    name: K,
+    answer: SurfacesClient[K],
+  ): SurfacesClient[K] =>
+    ((...args: unknown[]) => {
+      calls.push(name);
+      return (answer as (...inner: unknown[]) => unknown)(...args);
+    }) as SurfacesClient[K];
   return {
     ...emptySurfacesClient(),
     ...overrides,

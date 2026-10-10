@@ -66,6 +66,8 @@ export interface PaneAdornments {
   readonly telemetry?: string | undefined;
   readonly context?: ContextLevel | undefined;
   readonly modeWord?: string | undefined;
+  readonly bot?: string | undefined;
+  readonly hueRank?: number | undefined;
 }
 
 export interface PaneView<Spec extends PaneSpecBase> {
@@ -104,7 +106,7 @@ export interface ShellSeams {
   readonly client: KeyworkClient;
   readonly feed: ServerFeed;
   readonly trust: TrustFlow;
-  openPane(spec: PaneSpecBase): void;
+  openPane<Spec extends PaneSpecBase>(spec: Spec): void;
 }
 
 export function definePane<Spec extends PaneSpecBase>(

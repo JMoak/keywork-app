@@ -43,7 +43,7 @@ describe("fixtures recorded from keywork serve", () => {
       unpricedTurns: 1,
     });
     expect(state.turn).toBeUndefined();
-    expect(state.lastEventId).toBe(5);
+    expect(state.lastEventId).toBe(6);
   });
 
   it("thinking: visible thinking folds into one entry ahead of the answer", async () => {

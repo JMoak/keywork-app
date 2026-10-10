@@ -1,4 +1,9 @@
-import { emptyProjection, type SessionProjection } from "@keywork-app/client";
+import {
+  emptyProjection,
+  type KeyworkClient,
+  type ServerFeed,
+  type SessionProjection,
+} from "@keywork-app/client";
 import type { AskVerdict } from "@keywork-app/protocol";
 import {
   createEffect,
@@ -14,6 +19,7 @@ import {
 import { Dynamic } from "solid-js/web";
 import { FirstRun } from "../chrome/first-run.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { createWardrobe } from "../flavor/wardrobe.ts";
 import type { HostPort } from "../host/port.ts";
 import { usageLine } from "../instruments/cost.ts";
 import {
@@ -38,6 +44,7 @@ import {
 } from "../layout/index.ts";
 import { CommandRegistry } from "../palette/commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
+import { fileUrlOf } from "../panes/file/range.ts";
 import {
   definitionOf,
   type PaneDefinition,
@@ -48,12 +55,16 @@ import {
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import type { SessionStore } from "./session-store.ts";
 import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
+import { createTrustFlow, type TrustFlow } from "./trust.ts";
+import { TrustCard } from "./trust-card.tsx";
 
 export interface WorkspaceViewProps {
   host: HostPort;
   workspace: string;
   serverLabel: string;
   store: SessionStore;
+  client: KeyworkClient;
+  feed: ServerFeed;
   keymap?: Keymap | undefined;
   storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
 }
@@ -66,6 +77,10 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const tiler = createTiler(restoredState(storage, storageKey));
   const keymap = props.keymap ?? keymapFromConfig();
   const registry = new CommandRegistry();
+  const wardrobe = createWardrobe({
+    serverFlavors: () => props.store.surfaces.state.flavors,
+    storage,
+  });
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
   const [leaderArmed, setLeaderArmed] = createSignal(false);
@@ -87,8 +102,28 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     return spec?.kind === "conversation" ? spec.sessionId : undefined;
   };
 
+  const trust = createTrustFlow({
+    client: props.client,
+    feed: props.feed,
+    restart: async () => {
+      await props.host.restartServer(props.workspace);
+      await props.store.refresh();
+    },
+  });
+  onCleanup(() => trust.dispose());
+
   const shell: ShellSeams = {
     store: props.store,
+    client: props.client,
+    feed: props.feed,
+    trust,
+    openPane: (spec) => {
+      const parsed = parsePaneSpec(spec);
+      if (parsed !== undefined) act(tiler.open(parsed, screen()));
+    },
+    openInEditor: (path, line) => {
+      void props.host.openExternal(fileUrlOf(props.workspace, path, line));
+    },
     keys: {
       chord: (action) => keymap.describe(action) ?? "an unbound key",
       leader: () => keymap.leader,
@@ -171,6 +206,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     toggleHelp: () =>
       setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
     openPalette: (query) => setOverlay({ kind: "palette", query }),
+    trustWorkspace: () => void trust.accept(),
   };
 
   for (const [name, action] of Object.entries(appActions)) {
@@ -181,6 +217,16 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       run: () => action.invoke(target),
     });
   }
+  registry.addSource(() =>
+    wardrobe.choices().map((choice) => ({
+      name: `flavor-${choice.name}`,
+      description: `wear ${choice.name} (${choice.source} flavor)`,
+      run: () => {
+        const refusal = wardrobe.wear(choice.name);
+        if (refusal !== undefined) say(refusal);
+      },
+    })),
+  );
   registry.addSource(() =>
     tiler.slots(screen()).map((slot) => ({
       name: `go-${slot.id}`,
@@ -284,6 +330,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           telemetry={adornmentsOf(slot()).telemetry}
           context={adornmentsOf(slot()).context}
           modeWord={adornmentsOf(slot()).modeWord}
+          bot={adornmentsOf(slot()).bot}
+          hueRank={adornmentsOf(slot()).hueRank}
         >
           <Dynamic
             component={definitionOf(slot().spec.kind).component}
@@ -349,9 +397,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           )}
         </Show>
       </div>
+      <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
       <StatusLine
         serverLabel={props.serverLabel}
         projection={focusedProjection()}
+        trust={trustStatusItem(trust, shell.keys.chord("trust.workspace"))}
         leader={leaderArmed() ? keymap.leader : undefined}
         notice={notice()}
         gap={props.store.state.gap}
@@ -385,6 +435,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 interface StatusLineProps {
   serverLabel: string;
   projection: SessionProjection;
+  trust: string | undefined;
   leader: string | undefined;
   notice: string | undefined;
   gap: { from: number; to: number } | undefined;
@@ -396,6 +447,7 @@ function StatusLine(props: StatusLineProps) {
     [
       "keywork",
       props.serverLabel,
+      props.trust,
       props.projection.preset,
       props.projection.mode,
       usageLine(props.projection.usage),
@@ -417,6 +469,12 @@ function StatusLine(props: StatusLineProps) {
       </Show>
     </footer>
   );
+}
+
+function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
+  const state = trust.state();
+  if (state.kind === "restarting") return "restarting keywork serve with trust recorded";
+  return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
 }
 
 function rectStyle(rect: { x: number; y: number; width: number; height: number }) {

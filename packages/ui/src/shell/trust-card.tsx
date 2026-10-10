@@ -22,7 +22,11 @@ export function TrustCard(props: TrustCardProps) {
               {(message) => <p class="kw-trust-refusal">{message()}</p>}
             </Show>
             <p class="kw-trust-keys">
-              <button type="button" class="kw-trust-accept" onClick={() => void props.trust.accept()}>
+              <button
+                type="button"
+                class="kw-trust-accept"
+                onClick={() => void props.trust.accept()}
+              >
                 trust this workspace
               </button>
               <kbd>{props.chord}</kbd>

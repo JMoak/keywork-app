@@ -110,14 +110,22 @@ describe("the browser tree", () => {
     const lit = lift(loaded, "src/util/pad.ts", 1000);
     expect(lit.expanded).toEqual(["", "src"]);
     expect(rows(lit, 1000).find((row) => row.path === "src/util")?.lit).toBe(false);
-    const litFile = lift(expand(withListing(lit, { path: "src/util", entries: [
-      { name: "pad.ts", kind: "file", ignored: false, hidden: false },
-    ] }), "src/util"), "src/util/pad.ts", 2000);
-    expect(rows(litFile, 2000).find((row) => row.path === "src/util/pad.ts")?.lit).toBe(true);
-    expect(rows(litFile, 2000 + followHoldMs).find((row) => row.path === "src/util/pad.ts")?.lit).toBe(
-      false,
+    const litFile = lift(
+      expand(
+        withListing(lit, {
+          path: "src/util",
+          entries: [{ name: "pad.ts", kind: "file", ignored: false, hidden: false }],
+        }),
+        "src/util",
+      ),
+      "src/util/pad.ts",
+      2000,
     );
-    expect(nextExpiry(litFile)).toBe(1000 + followHoldMs);
+    expect(rows(litFile, 2000).find((row) => row.path === "src/util/pad.ts")?.lit).toBe(true);
+    expect(
+      rows(litFile, 2000 + followHoldMs).find((row) => row.path === "src/util/pad.ts")?.lit,
+    ).toBe(false);
+    expect(nextExpiry(litFile)).toBe(2000 + followHoldMs);
     expect(expireLit(litFile, 2000 + followHoldMs).lit).toEqual({});
     expect(expireLit(litFile, 1500)).toBe(litFile);
   });

@@ -85,7 +85,12 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
     loaded: boolean;
     revision: number;
     inbox: InboxTally;
-  }>({ garden: inertGarden, loaded: false, revision: 0, inbox: { count: 0, kinds: {} } });
+  }>({
+    garden: structuredClone(inertGarden),
+    loaded: false,
+    revision: 0,
+    inbox: { count: 0, kinds: {} },
+  });
   const listeners = new Set<(count: number) => void>();
 
   const announce = (tally: InboxTally): void => {
@@ -96,7 +101,7 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
 
   const refresh = async (): Promise<void> => {
     const garden = await client.memory();
-    setState("garden", reconcile(garden));
+    setState("garden", reconcile(structuredClone(garden)));
     setState("loaded", true);
     setState("revision", (revision) => revision + 1);
     announce(inboxTallyOf(garden));

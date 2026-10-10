@@ -9,7 +9,7 @@ async function documentedSections(): Promise<{ engine: string[]; server: string[
   const marker = "\n## Server events\n";
   const split = doc.indexOf(marker);
   const engineDoc = split === -1 ? doc : doc.slice(0, split);
-  const serverDoc = split === -1 ? "" : doc.slice(split).split("\n## ")[1] ?? "";
+  const serverDoc = split === -1 ? "" : (doc.slice(split).split("\n## ")[1] ?? "");
   return { engine: headings(engineDoc), server: headings(serverDoc) };
 }
 
@@ -44,7 +44,13 @@ describe("the event vocabulary", () => {
       }),
     ).toBe(true);
     expect(
-      isServerEvent({ id: 2, ts: "t", sessionId: "s1", type: "session.mode", payload: { mode: "m" } }),
+      isServerEvent({
+        id: 2,
+        ts: "t",
+        sessionId: "s1",
+        type: "session.mode",
+        payload: { mode: "m" },
+      }),
     ).toBe(false);
   });
 });

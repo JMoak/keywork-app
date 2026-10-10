@@ -4,7 +4,7 @@ import {
   isSurfaceRefusal,
   type SessionSummary,
 } from "@keywork-app/protocol";
-import { createMemo, createSignal, For, Show, Switch, Match } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { z } from "zod";
 import { hueStop } from "../../chrome/pane-frame.tsx";
 import { relativeAge, sessionName } from "../../chrome/telemetry.ts";
@@ -52,7 +52,10 @@ export const arcsPane = definePane<ArcsSpec>({
     "arcs.open": {
       chords: "enter",
       help: "show the arc's sessions · open a session",
-      command: { name: "arcs-open", description: "unfold this arc's sessions, or open this session" },
+      command: {
+        name: "arcs-open",
+        description: "unfold this arc's sessions, or open this session",
+      },
     },
     "arcs.new": {
       chords: "n",
@@ -99,7 +102,10 @@ export function arcRows(
       .map((summary): ArcRow => ({ kind: "session", summary }));
   const rows = arcs.flatMap((arc): ArcRow[] => {
     const open = opened.has(arc.slug);
-    return [{ kind: "arc", arc, ordinal: ordinals[arc.slug], open }, ...(open ? under(arc.slug) : [])];
+    return [
+      { kind: "arc", arc, ordinal: ordinals[arc.slug], open },
+      ...(open ? under(arc.slug) : []),
+    ];
   });
   const unbound = under(undefined);
   if (unbound.length === 0) return rows;
@@ -152,13 +158,14 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
     return pending?.kind === "abandon" ? pending.slug : undefined;
   };
 
-  const toggle = (key: string): void =>
+  const toggle = (key: string): void => {
     setOpened((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+  };
 
   const open = (row: ArcRow | undefined): void => {
     if (row === undefined) return;
@@ -246,9 +253,7 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
         <span class="kw-ov-head-detail">{activeCount(surfaces().state.arcs)}</span>
       </div>
       <Switch>
-        <Match when={surfaces().state.notices.arcs}>
-          {(text) => <EmptyState line={text()} />}
-        </Match>
+        <Match when={surfaces().state.notices.arcs}>{(text) => <EmptyState line={text()} />}</Match>
         <Match when={rows().length === 0}>
           <EmptyState line={arcsPane.emptyState(props.shell.keys)} />
         </Match>
@@ -350,7 +355,9 @@ function ArcRowView(props: ArcRowViewProps) {
 
 function arcAside(arc: ArcSummary): string {
   const sessions = `${arc.sessions} ${arc.sessions === 1 ? "session" : "sessions"}`;
-  return arc.status === "archived" ? `archived · ${sessions}` : `${sessions} · ${relativeAge(arc.created)}`;
+  return arc.status === "archived"
+    ? `archived · ${sessions}`
+    : `${sessions} · ${relativeAge(arc.created)}`;
 }
 
 function activeCount(arcs: readonly ArcSummary[]): string {

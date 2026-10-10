@@ -3,11 +3,12 @@
 {"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Left it is."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
 {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"entry"}}
-{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"fork","entryId":"q2","forkedTo":"q3"}}
-{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q4","reason":"label","entryId":"q1"}}
-{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q2","reason":"leaf","entryId":"q2"}}
-{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"no, the other way"}}
-{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Right, then."}}}
-{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
-{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Right, then."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
-{"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q5","reason":"entry"}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"","type":"memory.inbox","payload":{"count":0,"kinds":{}}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"fork","entryId":"q2","forkedTo":"q3"}}
+{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q4","reason":"label","entryId":"q1"}}
+{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q2","reason":"leaf","entryId":"q2"}}
+{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"no, the other way"}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Right, then."}}}
+{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Right, then."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
+{"id":14,"ts":"2026-09-07T12:00:03.500Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q5","reason":"entry"}}
