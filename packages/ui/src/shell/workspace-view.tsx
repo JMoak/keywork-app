@@ -20,13 +20,14 @@ import { Dynamic } from "solid-js/web";
 import { FirstRun } from "../chrome/first-run.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
 import { createWardrobe } from "../flavor/wardrobe.ts";
+import { followActivations } from "../host/activation.ts";
 import type { HostPort } from "../host/port.ts";
 import { usageLine } from "../instruments/cost.ts";
 import {
   type ActionTarget,
   appActions,
   bindingHelp,
-  chordOfKey,
+  chordsOfKey,
   type Keymap,
   keymapFromConfig,
 } from "../keys/index.ts";
@@ -41,6 +42,7 @@ import {
   type Screen,
   sameSeam,
   seamZoneRect,
+  type Verdict,
 } from "../layout/index.ts";
 import { CommandRegistry } from "../palette/commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
@@ -94,8 +96,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     setNotice(text);
     setTimeout(() => setNotice((current) => (current === text ? undefined : current)), 2400);
   };
-  const act = (verdict: { ok: boolean; refused?: string }): void => {
-    if (!verdict.ok && verdict.refused === "no-room") say("no room for that here");
+  const act = (verdict: Verdict): void => {
+    if (!verdict.ok && verdict.notice !== undefined) say(verdict.notice);
   };
   const focusedSession = (): string | undefined => {
     const spec = tiler.focusedSpec();
@@ -121,9 +123,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.open(parsed, screen()));
     },
-    openInEditor: (path, line) => {
-      void props.host.openExternal(fileUrlOf(props.workspace, path, line));
-    },
+    openInEditor: (path, line) =>
+      props.host.openExternal(fileUrlOf(props.workspace, path, line)).catch((cause: unknown) => {
+        say(cause instanceof Error ? cause.message : String(cause));
+        throw cause;
+      }),
     keys: {
       chord: (action) => keymap.describe(action) ?? "an unbound key",
       leader: () => keymap.leader,
@@ -161,7 +165,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         const sessionId = await props.store.create();
         tiler.bind(paneId, { kind: "conversation", sessionId });
         await props.store.open(sessionId);
-        await props.store.prompt(sessionId, text);
+        await props.store.prompt(sessionId, text, "queue");
       },
     },
   };
@@ -182,10 +186,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   };
 
   const target: ActionTarget = {
-    closePane: () => {
-      const id = tiler.focused();
-      if (id !== undefined) act(tiler.close(id));
-    },
+    closePane: () => act(tiler.closeFocused()),
     zoomPane: () => act(tiler.zoom()),
     rotatePane: () => act(tiler.rotate()),
     focusToward: (direction) => act(tiler.focusToward(direction, screen())),
@@ -208,6 +209,16 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     openPalette: (query) => setOverlay({ kind: "palette", query }),
     trustWorkspace: () => void trust.accept(),
   };
+
+  onCleanup(
+    followActivations(props.host, {
+      workspace: props.workspace,
+      findPane: tiler.findPane,
+      focusPane: (id) => act(tiler.focus(id)),
+      openSession: shell.sessions.openSession,
+      summonMemory: () => void summon(definitionOf("memory")),
+    }),
+  );
 
   for (const [name, action] of Object.entries(appActions)) {
     if (action.command === undefined) continue;
@@ -239,10 +250,10 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (overlay() !== undefined) return;
-    const chord = chordOfKey(event);
-    if (chord === undefined) return;
+    const chords = chordsOfKey(event);
+    if (chords.length === 0) return;
     const scope = scopeWhileTyping(tiler.focusedSpec()?.kind, event.target, keymap);
-    const result = keymap.press(chord, performance.now(), scope);
+    const result = keymap.press(chords, performance.now(), scope);
     setLeaderArmed(result.type === "leader-pending");
     if (result.type === "pass") return;
     event.preventDefault();
@@ -331,6 +342,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           context={adornmentsOf(slot()).context}
           modeWord={adornmentsOf(slot()).modeWord}
           bot={adornmentsOf(slot()).bot}
+          inference={adornmentsOf(slot()).inference}
           hueRank={adornmentsOf(slot()).hueRank}
         >
           <Dynamic
@@ -401,6 +413,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       <StatusLine
         serverLabel={props.serverLabel}
         projection={focusedProjection()}
+        preset={props.store.controls.state.preset}
         trust={trustStatusItem(trust, shell.keys.chord("trust.workspace"))}
         leader={leaderArmed() ? keymap.leader : undefined}
         notice={notice()}
@@ -435,6 +448,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 interface StatusLineProps {
   serverLabel: string;
   projection: SessionProjection;
+  preset: string | undefined;
   trust: string | undefined;
   leader: string | undefined;
   notice: string | undefined;
@@ -448,7 +462,7 @@ function StatusLine(props: StatusLineProps) {
       "keywork",
       props.serverLabel,
       props.trust,
-      props.projection.preset,
+      props.preset,
       props.projection.mode,
       usageLine(props.projection.usage),
     ].filter((item): item is string => item !== undefined && item !== "");

@@ -110,3 +110,22 @@
 .kw-diff-merge .cm-editor {
   height: 100%;
 }
+
+.kw-diff-verbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-mid);
+}
+
+.kw-diff-verb[data-enabled="no"] {
+  color: var(--kw-text-dim);
+  text-decoration: line-through;
+}
+
+.kw-diff-verb-notice {
+  color: var(--kw-text-dim);
+}

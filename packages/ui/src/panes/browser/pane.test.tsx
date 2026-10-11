@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, TreeListing } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
@@ -6,8 +8,9 @@ import treeRoot from "../../../../client/src/fixtures/tree-root.json?raw";
 import treeSrc from "../../../../client/src/fixtures/tree-src.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
+import { holdTypingFocus } from "../overview/rows.test.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { browserPane, describeTreeRefusal, markOf } from "./index.tsx";
+import { browserPane, describeTreeRefusal, filterMissLine, markOf } from "./index.tsx";
 
 const fixture = (raw: string): TreeListing => JSON.parse(raw) as TreeListing;
 
@@ -139,6 +142,24 @@ describe("the files pane", () => {
     expect(names(view.container)).toHaveLength(3);
   });
 
+  it("says a filter matched nothing instead of calling the workspace empty", async () => {
+    const h = harness();
+    const { view, act } = mount(h);
+    await waitFor(() => expect(names(view.container)).toHaveLength(3));
+    act("browser.filter");
+    const field = (await waitFor(() => {
+      const input = view.container.querySelector(".kw-browser-filter");
+      expect(input).not.toBeNull();
+      return input;
+    })) as HTMLInputElement;
+    field.value = "zzz";
+    fireEvent.input(field);
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(names(view.container)).toEqual([]);
+    expect(view.container.textContent).toContain(filterMissLine("zzz"));
+    expect(view.container.textContent).not.toContain("nothing here");
+  });
+
   it("rereads every open folder on r", async () => {
     const h = harness();
     const { view, act } = mount(h);
@@ -190,3 +211,78 @@ describe("the files pane", () => {
     );
   });
 });
+
+describe("the files pane's keyboard home", () => {
+  it("takes DOM focus from a typing field when it is focused, so its single keys reach it", async () => {
+    const typing = holdTypingFocus();
+    const { view } = mount(harness());
+    await waitFor(() =>
+      expect(view.container.firstElementChild?.contains(document.activeElement)).toBe(true),
+    );
+    typing.remove();
+  });
+});
+
+describe("the files pane following a write", () => {
+  it("rereads the folder once a write lands a file it has not listed, then lifts the new row", async () => {
+    const h = harness();
+    const { view, act } = mount(h);
+    await waitFor(() => expect(names(view.container)).toHaveLength(3));
+    act("browser.down");
+    act("browser.down");
+    act("browser.expand");
+    await waitFor(() => expect(names(view.container)).toHaveLength(5));
+    const before = listings.src;
+    try {
+      h.push(toolStarted("w1", "write", "src/fresh.ts"));
+      listings.src = {
+        path: "src",
+        entries: [
+          ...(before?.entries ?? []),
+          { name: "fresh.ts", kind: "file", ignored: false, hidden: false },
+        ],
+      };
+      h.push({
+        id: 5,
+        ts: "t",
+        sessionId: "s1",
+        type: "tool.finished",
+        payload: { callId: "w1", output: "", isError: false },
+      });
+      await waitFor(() =>
+        expect(view.container.querySelector("[data-lit] .kw-browser-name")?.textContent).toBe(
+          "fresh.ts",
+        ),
+      );
+      expect(h.asked).toEqual(["", "src", "src"]);
+    } finally {
+      if (before !== undefined) listings.src = before;
+    }
+  });
+});
+
+function toolStarted(callId: string, name: string, path: string): BusEnvelope {
+  return {
+    id: 4,
+    ts: "t",
+    sessionId: "s1",
+    type: "tool.started",
+    payload: { call: { type: "tool-call", callId, name, arguments: { path } } },
+  };
+}
+
+describe("the files pane's chrome", () => {
+  it("keeps the root path at every width and draws no focus ring of its own", () => {
+    expect(narrowRules(browserCss)).not.toContain(".kw-browser-root");
+    expect(browserCss).toMatch(/\.kw-browser:focus \{\s*outline: none;/);
+  });
+});
+
+function narrowRules(css: string): string {
+  return css.slice(css.indexOf("@container"));
+}
+
+const browserCss = readFileSync(
+  join(process.cwd(), "packages/ui/src/panes/browser/browser.css"),
+  "utf8",
+);

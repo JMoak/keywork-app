@@ -1,12 +1,15 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bundledBinary, keyworkTicketFile, launchableOf, spawnsThroughShell } from "./system.ts";
+import { bundledBinary, keyworkTickets, launchableOf, spawnsThroughShell } from "./system.ts";
 
 describe("system paths", () => {
-  it("names keywork's ticket file under the home directory", () => {
-    expect(keyworkTicketFile("/home/me").split(/[\\/]/).slice(-3)).toEqual([
-      "me",
-      ".keywork",
-      "server.json",
+  it("finds keywork's tickets for a workspace under the home directory, its own first", async () => {
+    const located = await keyworkTickets(process.cwd());
+    expect(located.identity).toMatch(/^[0-9a-f]{12}$/);
+    expect(located.files).toEqual([
+      join(homedir(), ".keywork", "workspaces", located.identity, "server.json"),
+      join(homedir(), ".keywork", "server.json"),
     ]);
   });
 

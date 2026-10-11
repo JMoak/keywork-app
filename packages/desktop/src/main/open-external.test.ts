@@ -13,9 +13,10 @@ describe("openExternal's allowlist", () => {
   });
 
   it("opens a file: link only inside an open workspace root", () => {
-    expect(externalVerdict("file:///C:/work/app/src/index.ts", roots)).toEqual({
+    expect(externalVerdict("file:///C:/work/app/src/index.ts#L12", roots)).toEqual({
       ok: true,
-      url: "file:///C:/work/app/src/index.ts",
+      url: "file:///C:/work/app/src/index.ts#L12",
+      path: expect.stringMatching(/index\.ts$/),
     });
     expect(externalVerdict("file:///C:/work/app", roots)).toMatchObject({ ok: true });
     expect(externalVerdict("file:///C:/work/app-evil/secret.txt", roots)).toMatchObject({

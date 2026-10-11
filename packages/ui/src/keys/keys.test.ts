@@ -6,7 +6,7 @@ import {
   composerHotPath,
   hotPathActions,
 } from "./actions.ts";
-import { chordOfKey, formatChord, parseChord } from "./chord.ts";
+import { chordLabel, chordOfKey, chordsOfKey, formatChord, parseChord } from "./chord.ts";
 import { keybindingsSchema, keymapFromConfig } from "./config.ts";
 import { Keymap, KeymapError } from "./keymap.ts";
 
@@ -52,8 +52,84 @@ describe("chords", () => {
       shift: true,
       alt: false,
     });
-    expect(chordOfKey(key({ key: ">", shiftKey: true }))?.shift).toBe(false);
+    expect(chordOfKey(key({ key: "!", shiftKey: true }))).toEqual(parseChord("shift+1"));
+    expect(chordOfKey(key({ key: "°", shiftKey: true }))?.shift).toBe(false);
     expect(chordOfKey({ ...key({ key: "a" }), isComposing: true })).toBeUndefined();
+  });
+});
+
+describe("shifted punctuation", () => {
+  const keymap = () =>
+    new Keymap({
+      bindings: {
+        "dock.grow": "leader .",
+        "pane.grow": "leader shift+.",
+        "pane.shrink": "leader <",
+        "memory.ask": "?",
+      },
+    });
+  const usKey = (typed: string, code: string, shiftKey = true) =>
+    chordsOfKey({ ...key({ key: typed, shiftKey }), code });
+  const afterLeader = (map: Keymap, chords: ReturnType<typeof chordsOfKey>) => {
+    map.press(parseChord("ctrl+k"), 0);
+    return map.press(chords, 1);
+  };
+
+  it("matches the typed > and < from a US keyboard against both the declared shift+ and typed forms", () => {
+    expect(parseChord(">")).toEqual(parseChord("shift+."));
+    expect(afterLeader(keymap(), usKey(">", "Period"))).toEqual({
+      type: "action",
+      action: "pane.grow",
+    });
+    expect(afterLeader(keymap(), usKey("<", "Comma"))).toEqual({
+      type: "action",
+      action: "pane.shrink",
+    });
+    expect(afterLeader(keymap(), usKey(".", "Period", false))).toEqual({
+      type: "action",
+      action: "dock.grow",
+    });
+    expect(keymap().press(usKey("?", "Slash"), 0)).toEqual({
+      type: "action",
+      action: "memory.ask",
+    });
+  });
+
+  it("falls back to the physical key on a non-US layout", () => {
+    const germanShiftPeriod = usKey(":", "Period");
+    expect(germanShiftPeriod.map(formatChord)).toEqual(["shift+;", "shift+."]);
+    expect(afterLeader(keymap(), germanShiftPeriod)).toEqual({
+      type: "action",
+      action: "pane.grow",
+    });
+    const germanGreaterThan = usKey(">", "IntlBackslash");
+    expect(afterLeader(keymap(), germanGreaterThan)).toEqual({
+      type: "action",
+      action: "pane.grow",
+    });
+    const russianLeader = chordsOfKey({ ...key({ key: "л", ctrlKey: true }), code: "KeyK" });
+    expect(keymap().press(russianLeader, 0)).toEqual({ type: "leader-pending" });
+  });
+
+  it("prefers the typed character over the physical key when both are bound", () => {
+    const map = new Keymap({ bindings: { colon: "leader :", grow: "leader shift+." } });
+    expect(afterLeader(map, usKey(":", "Period"))).toEqual({ type: "action", action: "colon" });
+  });
+
+  it("refuses the declared and typed spellings of one key bound to two actions", () => {
+    expect(() => new Keymap({ bindings: { a: "leader shift+.", b: "leader >" } })).toThrow(
+      '"ctrl+k shift+." is bound to both "a" and "b"',
+    );
+    expect(() => new Keymap({ bindings: { a: "?", b: "shift+/" } })).toThrow(KeymapError);
+    expect(() => new Keymap({ bindings: { a: "leader .", b: "leader >" } })).not.toThrow();
+  });
+
+  it("describes a binding in the spelling it was declared with", () => {
+    const map = keymap();
+    expect(map.describe("pane.grow")).toBe("ctrl+k shift+.");
+    expect(map.describe("pane.shrink")).toBe("ctrl+k <");
+    expect(map.describe("memory.ask")).toBe("?");
+    expect(chordLabel("alt+shift+CTRL+k")).toBe("ctrl+shift+alt+k");
   });
 });
 

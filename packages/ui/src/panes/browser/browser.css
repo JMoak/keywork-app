@@ -6,6 +6,10 @@
   font-family: var(--kw-font-mono);
 }
 
+.kw-browser:focus {
+  outline: none;
+}
+
 .kw-browser-head {
   display: flex;
   align-items: baseline;
@@ -103,8 +107,7 @@
 }
 
 @container browser (max-width: 559.98px) {
-  .kw-browser-fact,
-  .kw-browser-root {
+  .kw-browser-fact {
     display: none;
   }
 }

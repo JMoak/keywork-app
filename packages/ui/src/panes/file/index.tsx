@@ -1,7 +1,14 @@
-import type { FileRange, FileReading, FileSlice, SpillReference } from "@keywork-app/protocol";
-import { createEffect, createSignal, Match, onCleanup, Show, Switch } from "solid-js";
+import type {
+  FileRange,
+  FileReading,
+  FileSlice,
+  SpillReference,
+  SpillRefusal,
+} from "@keywork-app/protocol";
+import { createEffect, createSignal, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { z } from "zod";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import {
   fileUrlOf,
@@ -22,21 +29,26 @@ const fileSpec = z.object({
   from: z.number().int().nonnegative().optional(),
   to: z.number().int().nonnegative().optional(),
   atEnd: z.boolean().optional(),
+  spillOf: z.string().optional(),
 });
 
 export type FileSpec = z.output<typeof fileSpec>;
 
+export type TextSlice = Omit<FileSlice, "path">;
+
+export type TextRefusal = Exclude<FileReading, FileSlice> | SpillRefusal;
+
 export type FileState =
   | { kind: "loading" }
-  | { kind: "loaded"; slice: FileSlice }
-  | { kind: "refused"; reading: Exclude<FileReading, FileSlice>; path: string }
+  | { kind: "loaded"; slice: TextSlice }
+  | { kind: "refused"; reading: TextRefusal; spec: FileSpec }
   | { kind: "failed"; reason: string };
 
 export const filePane = definePane<FileSpec>({
   kind: "file",
   spec: fileSpec,
   home: "main",
-  title: (spec) => spec.path,
+  title: (spec) => (spec.spillOf === undefined ? spec.path : `spill ${spec.path}`),
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {
@@ -85,12 +97,39 @@ export const filePane = definePane<FileSpec>({
   },
 });
 
-export function spillFileSpec(spill: SpillReference): FileSpec {
-  return { kind: "file", path: spill.id, from: spill.elidedFrom, to: spill.elidedTo };
+export function spillFileSpec(spill: SpillReference, sessionId: string): FileSpec {
+  return {
+    kind: "file",
+    path: spill.id,
+    from: spill.elidedFrom,
+    to: spill.elidedTo,
+    spillOf: sessionId,
+  };
 }
 
-export function describeRefusal(reading: Exclude<FileReading, FileSlice>, path: string): string {
+export function describeRefusal(reading: TextRefusal, spec: FileSpec): string {
+  return spec.spillOf === undefined
+    ? describeFileRefusal(reading, spec.path)
+    : describeSpillRefusal(reading, spec.path);
+}
+
+function describeSpillRefusal(reading: TextRefusal, spillId: string): string {
   switch (reading) {
+    case "missing-session":
+      return "no session has that id";
+    case "binary":
+      return "binary spill · nothing to show as text";
+    case "invalid-range":
+      return "from and to must be whole numbers";
+    default:
+      return `no spill ${spillId} in this session`;
+  }
+}
+
+function describeFileRefusal(reading: TextRefusal, path: string): string {
+  switch (reading) {
+    case "invalid-range":
+    case "missing-session":
     case "missing":
       return `no file at ${path}`;
     case "outside-scope":
@@ -103,24 +142,36 @@ export function describeRefusal(reading: Exclude<FileReading, FileSlice>, path: 
 }
 
 function FileSlot(props: PaneProps<FileSpec>) {
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const [state, setState] = createSignal<FileState>({ kind: "loading" });
   const [mount, setMount] = createSignal<TextMount>();
+  const [editorRefusal, setEditorRefusal] = createSignal<string>();
   let holder: HTMLDivElement | undefined;
 
-  const slice = (): FileSlice | undefined => {
+  const slice = (): TextSlice | undefined => {
     const current = state();
     return current.kind === "loaded" ? current.slice : undefined;
   };
 
-  const read = async (range: FileRange | "tail"): Promise<void> => {
+  let landing: Edge = "top";
+
+  const read = async (
+    range: FileRange | "tail",
+    landAt: Edge = landingOf(range),
+  ): Promise<void> => {
+    landing = landAt;
     setState({ kind: "loading" });
     try {
-      const wanted = range === "tail" ? await tailOf(props.shell, props.spec.path) : range;
+      const wanted = range === "tail" ? await tailOf(props.shell, props.spec) : range;
       const reading =
-        wanted === undefined ? "missing" : await props.shell.client.file(props.spec.path, wanted);
+        wanted === undefined ? "missing" : await readSlice(props.shell, props.spec, wanted);
       setState(
         typeof reading === "string"
-          ? { kind: "refused", reading, path: props.spec.path }
+          ? { kind: "refused", reading, spec: props.spec }
           : { kind: "loaded", slice: reading },
       );
     } catch (cause) {
@@ -138,22 +189,28 @@ function FileSlot(props: PaneProps<FileSpec>) {
     const loaded =
       current.kind === "loaded" && current.slice.text !== "" ? current.slice : undefined;
     if (loaded === undefined || holder === undefined) {
-      mount()?.destroy();
+      untrack(mount)?.destroy();
       setMount(undefined);
       return;
     }
     const numbering = { label: (index: number) => lineLabel(loaded, index) };
-    const existing = mount();
-    if (existing === undefined) setMount(mountTextView(holder, loaded.text, numbering));
+    const existing = untrack(mount);
+    const shown = existing ?? mountTextView(holder, loaded.text, numbering);
+    if (existing === undefined) setMount(shown);
     else existing.replace(loaded.text, numbering);
+    if (landing === "end") shown.scrollTo("end");
   });
   onCleanup(() => mount()?.destroy());
 
   const openInEditor = (): void => {
+    if (props.spec.spillOf !== undefined) return;
     const line = mount()?.lineAtTop();
     const path = props.spec.path;
-    if (props.shell.openInEditor !== undefined) props.shell.openInEditor(path, line ?? 1);
-    else void props.shell.host.openExternal(fileUrlOf(props.shell.workspace, path, line));
+    setEditorRefusal(undefined);
+    const opening =
+      props.shell.openInEditor?.(path, line ?? 1) ??
+      props.shell.host.openExternal(fileUrlOf(props.shell.workspace, path, line));
+    opening.catch((cause: unknown) => setEditorRefusal(editorRefusalText(cause)));
   };
 
   props.onAction((action) => {
@@ -169,7 +226,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
       }
       case "file.previous": {
         const previous = loaded === undefined ? undefined : rangeBefore(loaded);
-        return previous === undefined ? undefined : void read(previous);
+        return previous === undefined ? undefined : void read(previous, "end");
       }
       case "file.down":
         return mount()?.scrollBy(1);
@@ -181,7 +238,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
   });
 
   return (
-    <section class="kw-file" aria-label="file">
+    <section class="kw-file" aria-label="file" tabIndex={-1} ref={root}>
       <Show when={slice()}>
         {(loaded) => (
           <div class="kw-file-head">
@@ -194,6 +251,13 @@ function FileSlot(props: PaneProps<FileSpec>) {
           </div>
         )}
       </Show>
+      <Show when={editorRefusal()}>
+        {(refusal) => (
+          <p class="kw-file-note" data-level="error">
+            {refusal()}
+          </p>
+        )}
+      </Show>
       <div class="kw-file-text" ref={holder} hidden={mount() === undefined} />
       <Switch>
         <Match when={state().kind === "loading"}>
@@ -202,7 +266,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
         <Match when={refusalOf(state())}>
           {(refused) => (
             <p class="kw-file-note" data-level="error">
-              {describeRefusal(refused().reading, refused().path)}
+              {describeRefusal(refused().reading, refused().spec)}
             </p>
           )}
         </Match>
@@ -219,11 +283,33 @@ function FileSlot(props: PaneProps<FileSpec>) {
   );
 }
 
-async function tailOf(shell: ShellSeams, path: string): Promise<FileRange | undefined> {
-  const probe = await shell.client.file(path, { from: 0, to: 1 });
+function readSlice(
+  shell: ShellSeams,
+  spec: FileSpec,
+  range: FileRange,
+): Promise<TextSlice | TextRefusal> {
+  return spec.spillOf === undefined
+    ? shell.client.file(spec.path, range)
+    : shell.client.spill(spec.spillOf, spec.path, range);
+}
+
+async function tailOf(shell: ShellSeams, spec: FileSpec): Promise<FileRange | undefined> {
+  const probe = await readSlice(shell, spec, { from: 0, to: 1 });
   return typeof probe === "string" ? undefined : tailRange(probe.bytes);
 }
 
 function refusalOf(state: FileState): Extract<FileState, { kind: "refused" }> | undefined {
   return state.kind === "refused" ? state : undefined;
+}
+
+type Edge = "top" | "end";
+
+function landingOf(range: FileRange | "tail"): Edge {
+  return range === "tail" ? "end" : "top";
+}
+
+export function editorRefusalText(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  const reason = message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+  return `couldn't open in your editor · ${reason}`;
 }

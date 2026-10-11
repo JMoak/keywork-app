@@ -58,6 +58,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -131,6 +132,55 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
+  "streaming": undefined,
+  "turn": undefined,
+  "usage": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "costUsd": 0,
+    "inputTokens": 12,
+    "lastTurnContextTokens": 12,
+    "outputTokens": 5,
+    "turns": 1,
+    "unpricedTurns": 1,
+  },
+}
+`;
+
+exports[`fixtures recorded from keywork serve > every fixture snapshot stays stable > controls 1`] = `
+{
+  "decisions": {},
+  "diagnostics": {},
+  "entries": [
+    {
+      "kind": "user",
+      "replay": false,
+      "text": "turn on the lights",
+    },
+    {
+      "kind": "assistant",
+      "replay": false,
+      "settled": true,
+      "text": "Lights on.",
+    },
+  ],
+  "injections": [],
+  "lastError": undefined,
+  "lastEventId": 13,
+  "mode": undefined,
+  "preset": "open",
+  "queue": [],
+  "running": {},
+  "standing": {
+    "effort": "high",
+    "leafId": "q5",
+    "model": "mock/beta",
+    "redoable": false,
+    "thinking": true,
+    "title": "Lights",
+    "undoable": true,
+  },
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -204,6 +254,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -258,6 +309,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -302,6 +354,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -341,6 +394,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -391,6 +445,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -435,6 +490,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {
@@ -508,6 +564,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "preset": undefined,
   "queue": [],
   "running": {},
+  "standing": undefined,
   "streaming": undefined,
   "turn": undefined,
   "usage": {

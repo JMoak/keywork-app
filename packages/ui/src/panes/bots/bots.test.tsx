@@ -1,6 +1,8 @@
 import { cleanup, fireEvent } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
+import { noWorkingSession } from "../overview/working-session.ts";
 import { botAside, botLabel, botsPane } from "./index.tsx";
 
 afterEach(cleanup);
@@ -65,7 +67,7 @@ describe("the bots pane", () => {
     });
     await harness.surfaces.load();
     const { container, act } = mountPane(botsPane.component, { kind: "bots" }, harness.shell);
-    expect(container.querySelector(".kw-empty")?.textContent).toContain("n defines one");
+    expect(container.querySelector(".kw-empty")?.textContent).toContain("bots.new defines one");
     act("bots.new");
     const input = container.querySelector("input") as HTMLInputElement;
     fireEvent.input(input, { target: { value: "scout" } });
@@ -74,6 +76,34 @@ describe("the bots pane", () => {
     await settle();
     expect(drafts).toEqual(["scout:project"]);
     expect(container.textContent).toContain("◇ scout defined");
+    harness.dispose();
+  });
+});
+
+describe("the bots pane's working session", () => {
+  it("switches the conversation that last held focus, and says so when there has been none", async () => {
+    const calls: string[] = [];
+    const harness = overviewShell({
+      client: {
+        switchSessionBot: async (id, slug) => {
+          calls.push(`${id}:${slug}`);
+          return { sessionId: id, bot: slug };
+        },
+      },
+    });
+    await harness.surfaces.load();
+    const [focused, setFocused] = createSignal<string | undefined>();
+    const shell = { ...harness.shell, currentSession: focused };
+    const { container, act } = mountPane(botsPane.component, { kind: "bots" }, shell);
+    act("bots.switch");
+    await settle();
+    expect(calls).toEqual([]);
+    expect(container.textContent).toContain(noWorkingSession);
+    setFocused("s2");
+    setFocused(undefined);
+    act("bots.switch");
+    await settle();
+    expect(calls).toEqual(["s2:reviewer"]);
     harness.dispose();
   });
 });

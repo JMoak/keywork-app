@@ -1,4 +1,4 @@
-import type { ServerDocument, ServerTicket } from "@keywork-app/client";
+import type { ServerTicket } from "@keywork-app/client";
 import { describe, expect, it } from "vitest";
 import { type FileSeams, recentStore } from "./recents.ts";
 import {
@@ -7,6 +7,7 @@ import {
   type ServeSpec,
   type ServeState,
 } from "./serve-process.ts";
+import type { LiveServer } from "./ticket.ts";
 import {
   chooseBinary,
   readTicket,
@@ -68,34 +69,45 @@ interface Harness {
   fs: ReturnType<typeof memoryFs>;
 }
 
+const workspaceIdentity = "5de0568f6bc0";
+const workspaceTicketFile = `/home/me/.keywork/workspaces/${workspaceIdentity}/server.json`;
+const userTicketFile = "/home/me/.keywork/server.json";
+
+type Answer = "ok" | "dead" | "old" | "foreign" | "unnamed";
+
 function harness(options: {
   ticket?: ServerTicket | "corrupt";
-  ticketAnswers?: "ok" | "dead" | "old";
+  ticketAnswers?: Answer;
+  userTicket?: ServerTicket;
+  answers?: Record<string, Answer>;
   onPath?: string;
   pathVersion?: string;
   outcome?: "ready" | "unresolved";
 }): Harness {
-  const ticketFile = "/home/me/.keywork/server.json";
-  const fs = memoryFs(
-    options.ticket === undefined
-      ? {}
-      : { [ticketFile]: options.ticket === "corrupt" ? "{" : JSON.stringify(options.ticket) },
-  );
+  const fs = memoryFs({
+    ...(options.ticket !== undefined && {
+      [workspaceTicketFile]: options.ticket === "corrupt" ? "{" : JSON.stringify(options.ticket),
+    }),
+    ...(options.userTicket !== undefined && {
+      [userTicketFile]: JSON.stringify(options.userTicket),
+    }),
+  });
   const processes: FakeProcess[] = [];
-  const answers = options.ticketAnswers ?? "ok";
+  const answerFor = (ticket: ServerTicket): Answer =>
+    options.answers?.[ticket.url] ?? options.ticketAnswers ?? "ok";
   return {
     fs,
     processes,
     seams: {
-      ticketFile,
+      locateTickets: async () => ({
+        identity: workspaceIdentity,
+        files: [workspaceTicketFile, userTicketFile],
+      }),
       readText: fs.readText,
       removeFile: async (path) => {
         fs.files.delete(path);
       },
-      fetchDocument: async (): Promise<ServerDocument> => {
-        if (answers === "dead") throw new Error("refused");
-        return { version: answers === "old" ? "0.0.0" : expectedServerVersion, operationIds: [] };
-      },
+      probeTicket: async (ticket) => liveServer(answerFor(ticket)),
       supervise: (spec) => {
         const process = fakeProcess(spec, options.outcome ?? "ready");
         processes.push(process);
@@ -107,6 +119,21 @@ function harness(options: {
       recents: recentStore("/data/recents.json", fs),
     },
   };
+}
+
+function liveServer(answer: Answer): LiveServer | undefined {
+  switch (answer) {
+    case "dead":
+      return undefined;
+    case "old":
+      return { version: "0.0.0", identity: workspaceIdentity };
+    case "foreign":
+      return { version: expectedServerVersion, identity: "0123456789ab" };
+    case "unnamed":
+      return { version: expectedServerVersion, identity: undefined };
+    case "ok":
+      return { version: expectedServerVersion, identity: workspaceIdentity };
+  }
 }
 
 const terminalTicket: ServerTicket = { url: "http://127.0.0.1:4770", token: "terminal" };
@@ -148,7 +175,7 @@ describe("workspaceHost: attach first, spawn second", () => {
       binary: "/app/resources/sidecar/keywork",
       cwd: "/work",
     });
-    expect(h.fs.files.has(h.seams.ticketFile) && _case === "absent").toBe(false);
+    expect(h.fs.files.has(workspaceTicketFile) && _case === "absent").toBe(false);
   });
 
   it("refuses a running server of another version instead of spawning beside it", async () => {
@@ -159,6 +186,54 @@ describe("workspaceHost: attach first, spawn second", () => {
       failure: { kind: "version-mismatch", actual: "0.0.0", ticket: terminalTicket },
     });
     expect(h.processes).toHaveLength(0);
+  });
+
+  it("reads the per-workspace ticket before the user-level one", async () => {
+    const userLevel: ServerTicket = { url: "http://127.0.0.1:4790", token: "user" };
+    const h = harness({ ticket: terminalTicket, userTicket: userLevel });
+    expect(await workspaceHost(h.seams).open("/work")).toMatchObject({
+      ok: true,
+      opened: { server: terminalTicket, attached: true },
+    });
+  });
+
+  it("never lets a stale per-workspace ticket shadow the live user-level one", async () => {
+    const userLevel: ServerTicket = { url: "http://127.0.0.1:4790", token: "user" };
+    const h = harness({
+      ticket: terminalTicket,
+      userTicket: userLevel,
+      answers: { [terminalTicket.url]: "dead" },
+    });
+    expect(await workspaceHost(h.seams).open("/work")).toMatchObject({
+      ok: true,
+      opened: { server: userLevel, attached: true },
+    });
+    expect(h.processes).toHaveLength(0);
+  });
+
+  it("spawns rather than attach when every ticket names a dead port", async () => {
+    const h = harness({
+      ticket: terminalTicket,
+      userTicket: { url: "http://127.0.0.1:4790", token: "user" },
+      ticketAnswers: "dead",
+    });
+    expect(await workspaceHost(h.seams).open("/work")).toMatchObject({
+      ok: true,
+      opened: { attached: false },
+    });
+    expect(h.processes).toHaveLength(1);
+  });
+
+  it("never attaches to a server that names another workspace, and trusts one that names none", async () => {
+    const userLevel: ServerTicket = { url: "http://127.0.0.1:4790", token: "user" };
+    const foreign = harness({ userTicket: userLevel, ticketAnswers: "foreign" });
+    expect(await workspaceHost(foreign.seams).open("/work")).toMatchObject({
+      opened: { attached: false },
+    });
+    const unnamed = harness({ userTicket: userLevel, ticketAnswers: "unnamed" });
+    expect(await workspaceHost(unnamed.seams).open("/work")).toMatchObject({
+      opened: { server: userLevel, attached: true },
+    });
   });
 
   it("returns the serve failure and stops the failed process", async () => {
@@ -210,23 +285,23 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(host.ticketFor("/elsewhere")).toBeUndefined();
   });
 
-  it("clears the ticket a force-killed server of its own left behind, never a foreign one", async () => {
+  it("clears the tickets a force-killed server of its own left behind, never a foreign one", async () => {
     const own = harness({});
     const ownHost = workspaceHost(own.seams);
     await ownHost.open("/work");
-    own.fs.files.set(
-      own.seams.ticketFile,
-      JSON.stringify({ url: "http://127.0.0.1:4771", token: "spawned" }),
-    );
+    const spawned = JSON.stringify({ url: "http://127.0.0.1:4771", token: "spawned" });
+    own.fs.files.set(workspaceTicketFile, spawned);
+    own.fs.files.set(userTicketFile, spawned);
     await ownHost.close("/work");
-    expect(own.fs.files.has(own.seams.ticketFile)).toBe(false);
+    expect(own.fs.files.has(workspaceTicketFile)).toBe(false);
+    expect(own.fs.files.has(userTicketFile)).toBe(false);
 
     const foreign = harness({});
     const foreignHost = workspaceHost(foreign.seams);
     await foreignHost.open("/work");
-    foreign.fs.files.set(foreign.seams.ticketFile, JSON.stringify(terminalTicket));
+    foreign.fs.files.set(workspaceTicketFile, JSON.stringify(terminalTicket));
     await foreignHost.close("/work");
-    expect(foreign.fs.files.has(foreign.seams.ticketFile)).toBe(true);
+    expect(foreign.fs.files.has(workspaceTicketFile)).toBe(true);
   });
 
   it("restarts a server it started by stopping it and spawning afresh, and lists its open roots", async () => {

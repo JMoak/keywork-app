@@ -1,3 +1,4 @@
+import type { SessionState } from "./controls.ts";
 import type { SurfaceKind } from "./workspace.ts";
 
 export const engineEventTypes = [
@@ -19,11 +20,12 @@ export const engineEventTypes = [
   "session.tree",
   "changes.updated",
   "engine.error",
+  "extension.notice",
 ] as const;
 
 export type EngineEventType = (typeof engineEventTypes)[number];
 
-export const serverEventTypes = ["memory.inbox", "surface.changed"] as const;
+export const serverEventTypes = ["memory.inbox", "surface.changed", "session.state"] as const;
 
 export type ServerEventType = (typeof serverEventTypes)[number];
 
@@ -36,6 +38,7 @@ export const processLevelSessionId = "";
 export interface ServerPayloads {
   "memory.inbox": { count: number; kinds: Record<string, number> };
   "surface.changed": { kind: SurfaceKind };
+  "session.state": SessionState;
 }
 
 export type EventPayloads = EnginePayloads & ServerPayloads;
@@ -77,6 +80,16 @@ export interface EnginePayloads {
   "session.tree": TreeChange;
   "changes.updated": { sessionId: string; paths: readonly string[] };
   "engine.error": { error: { name: string; message: string } };
+  "extension.notice": ExtensionNotice;
+}
+
+export type ExtensionNoticeLevel = "info" | "warn" | "error";
+
+export interface ExtensionNotice {
+  extension: string;
+  level: ExtensionNoticeLevel;
+  message: string;
+  detail?: unknown;
 }
 
 export type TreeChangeReason = "fork" | "label" | "leaf" | "entry";

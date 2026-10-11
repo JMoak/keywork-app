@@ -29,7 +29,7 @@ export const terminalPane = definePane<TerminalSpec>({
   keyboard: "owned",
   title: titleOf,
   emptyState: (keys) =>
-    `a shell in the workspace root · ${keys.chord("terminal.summon")} opens one · inside it every key goes to the shell except ${keys.leader()}`,
+    `no shell yet · ${keys.chord("terminal.summon")} opens one where every key but the leader goes to it`,
   component: TerminalSlot,
   summon: {
     action: "terminal.summon",

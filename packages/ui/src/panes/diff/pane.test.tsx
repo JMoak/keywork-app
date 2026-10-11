@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type ChangesState, changesSnapshot, emptyChangesState } from "@keywork-app/client";
-import type { ChangedFileReading, ChangesReading } from "@keywork-app/protocol";
+import {
+  type ChangesState,
+  changesSnapshot,
+  emptyChangesState,
+  type SessionControls,
+  unknownControls,
+} from "@keywork-app/client";
+import type {
+  ChangedFileReading,
+  ChangesReading,
+  RedoReading,
+  UndoReading,
+} from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { browserHost } from "../../host/browser.ts";
@@ -26,12 +37,16 @@ interface Recorded {
   reads: number;
   fileReads: string[];
   editor: Array<[string, number]>;
+  verbs: string[];
 }
 
 interface Seams {
   changes?: ChangesState;
   file?: ChangedFileReading;
   openInEditor?: boolean;
+  controls?: Partial<SessionControls>;
+  undo?: UndoReading;
+  redo?: RedoReading;
 }
 
 function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
@@ -52,6 +67,17 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
       openChanges: async () => {
         recorded.reads += 1;
       },
+      controlsOf: () => ({ ...unknownControls, ...seams.controls }),
+      controls: {
+        undo: async (id: string) => {
+          recorded.verbs.push(`undo ${id}`);
+          return seams.undo ?? { refused: "nothing", detail: "nothing to undo" };
+        },
+        redo: async (id: string) => {
+          recorded.verbs.push(`redo ${id}`);
+          return seams.redo ?? { refused: "nothing", detail: "nothing to redo" };
+        },
+      },
       changedFile: async (_id: string, path: string) => {
         recorded.fileReads.push(path);
         return seams.file ?? recordedFile;
@@ -67,7 +93,7 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
     },
     unseen: () => false,
     ...(seams.openInEditor && {
-      openInEditor: (path: string, line: number) => {
+      openInEditor: async (path: string, line: number) => {
         recorded.editor.push([path, line]);
       },
     }),
@@ -91,7 +117,13 @@ function mount(spec: DiffSpec, recorded: Recorded, shell = shellSeams(recorded))
   return (action: string) => handle(action);
 }
 
-const recording = (): Recorded => ({ rebound: [], reads: 0, fileReads: [], editor: [] });
+const recording = (): Recorded => ({
+  rebound: [],
+  reads: 0,
+  fileReads: [],
+  editor: [],
+  verbs: [],
+});
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -244,6 +276,76 @@ describe("the changes pane, level two", () => {
     await settle();
     fireEvent.click(screen.getByText("open in editor"));
     expect(recorded.editor).toEqual([["notes.txt", 1]]);
+  });
+});
+
+describe("the changes pane's undo and redo", () => {
+  const verbStates = () =>
+    [...document.querySelectorAll<HTMLElement>(".kw-diff-verb")].map((verb) => [
+      verb.textContent,
+      verb.dataset.enabled,
+    ]);
+
+  it("greys the verbs the server says have nothing to act on, without asking it", async () => {
+    const recorded = recording();
+    const act = mount(
+      { kind: "diff", sessionId: "s1" },
+      recorded,
+      shellSeams(recorded, { controls: { undoable: false, redoable: false } }),
+    );
+    expect(verbStates()).toEqual([
+      ["ctrl+k diff.undo undo", "no"],
+      ["ctrl+k diff.redo redo", "no"],
+    ]);
+    act("diff.undo");
+    await settle();
+    expect(screen.getByText("nothing to undo")).toBeTruthy();
+    expect(recorded.verbs).toEqual([]);
+  });
+
+  it("undoes through the server, says what came back and rereads the files", async () => {
+    const recorded = recording();
+    const act = mount(
+      { kind: "diff", sessionId: "s1", path: "notes.txt" },
+      recorded,
+      shellSeams(recorded, {
+        controls: { undoable: true, redoable: false },
+        undo: {
+          prompt: { entryId: "e1", text: "write two lines" },
+          filesNote: "files put back",
+          undoable: false,
+          redoable: true,
+        },
+        redo: { restored: true, undoable: true, redoable: false },
+      }),
+    );
+    expect(verbStates().map(([, enabled]) => enabled)).toEqual(["yes", "no"]);
+    act("diff.undo");
+    await settle();
+    expect(
+      screen.getByText("undone · the prompt is back in the composer · files put back"),
+    ).toBeTruthy();
+    expect(recorded.verbs).toEqual(["undo s1"]);
+    expect(recorded.reads).toBe(1);
+  });
+
+  it("asks the server when it has not yet said, and shows its refusal word for word", async () => {
+    const recorded = recording();
+    const act = mount({ kind: "diff", sessionId: "s1" }, recorded);
+    expect(verbStates().map(([, enabled]) => enabled)).toEqual(["unknown", "unknown"]);
+    act("diff.redo");
+    await settle();
+    expect(recorded.verbs).toEqual(["redo s1"]);
+    expect(screen.getByText("nothing to redo")).toBeTruthy();
+  });
+
+  it("binds u and shift+u, which no other diff chord holds", () => {
+    expect(diffPane.localActions?.["diff.undo"]?.chords).toBe("u");
+    expect(diffPane.localActions?.["diff.redo"]?.chords).toBe("shift+u");
+    const chords = Object.values(diffPane.localActions ?? {}).flatMap((action) =>
+      typeof action.chords === "string" ? [action.chords] : [...action.chords],
+    );
+    expect(new Set(chords).size).toBe(chords.length);
   });
 });
 

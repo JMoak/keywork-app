@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { actionScopes, appActions, coreActions } from "../keys/actions.ts";
 import { keymapFromConfig } from "../keys/config.ts";
 import { Keymap } from "../keys/keymap.ts";
 import { CommandRegistry } from "../palette/commands.ts";
+import { ratchetValue } from "../shell/frame-tick-ratchets.ts";
 import { paneActions, paneDefinitions, paneRegistry, parsePaneSpec } from "./index.ts";
 
 const keymap = keymapFromConfig();
@@ -28,17 +31,37 @@ describe("the pane inventory", () => {
     }
   });
 
-  it("gives every pane a title, a home, and a one-line empty state that names a key", () => {
+  it("gives every pane a home and a one-line empty state", () => {
     for (const definition of paneRegistry.values()) {
       const line = definition.emptyState(keys);
       expect(line, definition.kind).not.toBe("");
       expect(line, definition.kind).not.toContain("\n");
-      expect(line, definition.kind).toMatch(/ctrl\+k \w|type a prompt/);
-      expect(line.match(/ctrl\+k \S+/g), definition.kind).toHaveLength(1);
       expect(line, definition.kind).not.toContain("an unbound key");
       expect(line, definition.kind).not.toMatch(/alt\+enter|steer/);
       expect(["main", "left", "right"]).toContain(definition.home);
     }
+  });
+
+  it("T7: names exactly one next action carrying exactly one bound chord", () => {
+    for (const definition of paneRegistry.values()) {
+      const [state, action, ...extra] = definition.emptyState(markedKeys).split(" · ");
+      expect(extra, definition.kind).toEqual([]);
+      expect(chordsIn(state ?? ""), definition.kind).toEqual([]);
+      const chords = chordsIn(action ?? "");
+      expect(chords, definition.kind).toHaveLength(1);
+      for (const chord of chords) expect(keymap.describe(chord), chord).toBeDefined();
+    }
+  });
+
+  it("T7: fits every empty state into a 320 px pane without overflow", () => {
+    const narrowest = Math.max(
+      ...[...paneRegistry.values()].map((definition) =>
+        emptyStateMinWidthPx(definition.emptyState(keys)),
+      ),
+    );
+    expect(narrowest).toBeLessThanOrEqual(narrowPanePx);
+    expect(narrowest).toBeLessThanOrEqual(ratchetValue("T7.emptyStateMinWidthPx"));
+    expect(emptyStateCss).not.toMatch(/white-space:\s*(nowrap|pre)\b/);
   });
 
   it("parses each pane's own spec and refuses a foreign kind", () => {
@@ -92,6 +115,29 @@ describe("the pane inventory", () => {
     expect(() => new Keymap({ bindings: keymapBindings(), scopes: actionScopes })).not.toThrow();
   });
 });
+
+const narrowPanePx = 320;
+const emptyStatePaddingPx = 2 * 20;
+const widestMonoAdvancePx = 0.6 * 16;
+
+const markedKeys = {
+  chord: (action: string) => `⟦${action}⟧`,
+  leader: () => "⟦leader⟧",
+};
+
+function chordsIn(text: string): string[] {
+  return Array.from(text.matchAll(/⟦([^⟧]+)⟧/g), (match) => match[1] ?? "");
+}
+
+function emptyStateMinWidthPx(line: string): number {
+  const longestRun = Math.max(...line.split(/\s+/).map((run) => [...run].length));
+  return emptyStatePaddingPx + Math.ceil(longestRun * widestMonoAdvancePx);
+}
+
+const emptyStateCss = readFileSync(
+  join(process.cwd(), "packages/ui/src/panes/empty-state.css"),
+  "utf8",
+);
 
 function keymapBindings(): Record<string, string | readonly string[]> {
   return Object.fromEntries(

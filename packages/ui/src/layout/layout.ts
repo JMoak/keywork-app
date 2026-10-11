@@ -42,7 +42,7 @@ import {
   withRatioAt,
 } from "./tree.ts";
 
-export type Verdict = { ok: true } | { ok: false; refused: Refusal };
+export type Verdict = { ok: true } | { ok: false; refused: Refusal; notice?: string | undefined };
 
 export type Refusal = "no-room" | "no-focus" | "unknown-pane" | "already-open" | "nothing-to-do";
 

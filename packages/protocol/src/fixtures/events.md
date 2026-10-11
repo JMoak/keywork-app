@@ -21,7 +21,7 @@ stamps each payload into an envelope before it leaves the process:
 |---|---|
 | `id` | Monotonic per server process, starting at 1. The SSE `id:` line carries the same number. |
 | `ts` | ISO 8601 time the envelope was stamped. |
-| `sessionId` | The session whose bus produced the event; the empty string for a server event, which belongs to the process rather than to a session. |
+| `sessionId` | The session the event concerns. Empty (`""`) for a process-level event, which belongs to the process rather than to one session: `surface.changed`, `memory.inbox`, and `gate.preset` from `POST /preset`. |
 | `type` | One of the event names below. |
 | `payload` | The event's fields, exactly as emitted, with one translation (see `engine.error`). |
 
@@ -175,7 +175,8 @@ ask; the answer is no and `keywork run` flags it).
 
 ### gate.preset
 
-Fires when the active permission preset changes.
+Fires when the active permission preset changes. Over `keywork serve` the switch is
+`POST /preset`, and the envelope is process-level: its `sessionId` is empty.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -215,6 +216,20 @@ Fires after a file save when the language port publishes diagnostics for it.
 
 Fires when the session's shell state was reset. The payload has no fields beyond the
 optional `replay`.
+
+### extension.notice
+
+Fires when the extension host has something to say about one extension: a quarantine (level
+`error`, the message names the extension, the phase and the thrown reason), or a line the
+extension wrote through its own logger. A consumer that toasts shows `error` and `warn`;
+`info` belongs in a log. Not journaled; a resumed session does not replay notices.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `extension` | `string` | The extension's name (its file stem). |
+| `level` | `"info" \| "warn" \| "error"` | How loud the notice is. |
+| `message` | `string` | One readable line. |
+| `detail` | `unknown` | Optional structured context the extension attached. |
 
 ## Tree and files
 
@@ -261,11 +276,13 @@ that throws while handling `engine.error` is dropped silently, so the bus cannot
 
 ## Server events
 
-`keywork serve` adds a second, process-level vocabulary beside the engine's
-(`serverEventTypes` in `packages/server/src/events.ts`; the envelope's `type` is the union of
-both lists, and `/doc` publishes the union). These events belong to no session: their
-envelope carries an empty `sessionId` (`""`), and a client filtering `/events` by session
-keeps them. They never replay. The engine vocabulary above is unchanged by them.
+`keywork serve` adds a second vocabulary beside the engine's (`serverEventTypes` in
+`packages/server/src/events.ts`; the envelope's `type` is the union of both lists, and `/doc`
+publishes the union). These events never appear on the in-process bus and never replay. The
+engine vocabulary above is unchanged by them. `surface.changed` and `memory.inbox` belong to
+the process: their envelope carries an empty `sessionId` (`""`), and a client filtering
+`/events` by session keeps them unless it adds `only=session`. `session.state` carries its
+session's id.
 
 ### surface.changed
 
@@ -301,6 +318,23 @@ The needs-you threshold stays on the client: the TUI notifies on the rising edge
 client applies the same rule to this payload. The server carries the count, never the
 decision.
 
+### session.state
+
+Fires after every session verb that changes the session's standing state: `POST
+/sessions/{id}/model`, `/thinking`, `/effort`, `/compact`, `/undo`, `/redo`, `/rename` and
+`/leaf`. The payload is the whole current state, not a delta, so a client replaces what it
+holds.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `model` | `string`, optional | The model in force as `provider/model`; absent when the provider reports no model id. |
+| `thinking` | `boolean` | Whether the model is asked to show its reasoning. |
+| `effort` | `EffortLevel`, optional | `low`, `medium`, `high`, `xhigh` or `max`; absent when the provider decides. |
+| `title` | `string` | The session title. |
+| `leafId` | `string \| null` | The session entry the next prompt will follow; `null` at the root. |
+| `undoable` | `boolean` | Whether `POST /sessions/{id}/undo` has something to take back. |
+| `redoable` | `boolean` | Whether `POST /sessions/{id}/redo` has something to bring back. |
+
 ## SSE framing
 
 `GET /events` answers `text/event-stream; charset=utf-8` with `cache-control: no-store`. The
@@ -329,6 +363,15 @@ oldest envelope, the replay is preceded by a comment naming the loss:
 ```
 : resumed with a gap, events 12 to 41 are gone
 ```
+
+## Filtering with `?session=`
+
+`GET /events?session=<id>` keeps the envelopes whose `sessionId` equals the id **and** every
+envelope with an empty `sessionId`, so a pane bound to one session still learns about
+process-level state such as a preset switch. `&only=session` drops the process-level
+envelopes too. The filter applies to the `Last-Event-ID` replay as well as to live delivery,
+and ids are never renumbered: a filtered stream still carries the server's ids, so resuming
+with the last id seen works the same way.
 
 ## The one translation: `engine.error`
 

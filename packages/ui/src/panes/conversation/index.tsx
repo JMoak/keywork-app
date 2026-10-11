@@ -1,16 +1,43 @@
 import type { SessionProjection } from "@keywork-app/client";
-import { Show } from "solid-js";
+import {
+  type ActivePreset,
+  type ControlRefusal,
+  isControlRefusal,
+  type PresetName,
+  type PromptBehavior,
+} from "@keywork-app/protocol";
+import { createEffect, createSignal, Show } from "solid-js";
 import { z } from "zod";
 import { FirstRun } from "../../chrome/first-run.tsx";
 import { arcHueRank, botTitle } from "../../chrome/identity.ts";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { sessionName, telemetry } from "../../chrome/telemetry.ts";
 import { Composer } from "../../composer/composer.tsx";
-import { contextLevelOf } from "../../instruments/context.ts";
+import { contextLevelOf, contextLevelOfReport } from "../../instruments/context.ts";
+import { costReadout, reportedUsageLine } from "../../instruments/cost-report.ts";
 import { ConversationPane } from "../../page/pane.tsx";
 import { EmptyState } from "../empty-state.tsx";
 import { spillFileSpec } from "../file/index.tsx";
-import { definePane, type PaneProps } from "../registry.ts";
+import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
+import { type ControlAsk, ControlRow } from "./control-row.tsx";
+import {
+  compactNotice,
+  effortNotice,
+  exportedNotice,
+  inferenceWords,
+  isSettled,
+  leftUnchanged,
+  looseningQuestion,
+  nextEffort,
+  type PresetDirection,
+  presetNotice,
+  presetStep,
+  redoneNotice,
+  refusalNotice,
+  thinkingNotice,
+  undoneNotice,
+  unsteppableNotice,
+} from "./controls.ts";
 
 const conversationSpec = z.object({
   kind: z.literal("conversation"),
@@ -37,13 +64,102 @@ export const conversationPane = definePane<ConversationSpec>({
     command: { name: "split", description: "open a new session pane beside this one" },
     spec: async (shell) => ({ kind: "conversation", sessionId: await shell.store.create() }),
   },
+  localActions: {
+    "conversation.model": {
+      chords: "leader o",
+      help: "switch the model",
+      command: { name: "model", description: "switch this session's model" },
+    },
+    "conversation.thinking": {
+      chords: "leader v",
+      help: "show or hide thinking",
+      command: { name: "thinking", description: "show or hide the model's reasoning" },
+    },
+    "conversation.effort": {
+      chords: "leader e",
+      help: "next effort level",
+      command: {
+        name: "effort",
+        description: "how much work each reply gets: low to max, then the provider's default",
+      },
+    },
+    "conversation.compact": {
+      chords: "leader shift+c",
+      help: "compact the context",
+      command: { name: "compact", description: "fold the older conversation into a summary" },
+    },
+    "conversation.rename": {
+      chords: "leader shift+r",
+      help: "rename the session",
+      command: { name: "rename", description: "give this session a title" },
+    },
+    "conversation.export": {
+      chords: "leader shift+e",
+      help: "export the session",
+      command: { name: "export", description: "copy this session as a self-contained page" },
+    },
+    "conversation.export-file": {
+      chords: "none",
+      help: "export into the workspace",
+      command: {
+        name: "export-file",
+        description: "write this session's page into the workspace folder",
+      },
+    },
+    "conversation.undo": {
+      chords: "none",
+      help: "undo the last prompt",
+      command: { name: "undo", description: "take back the last prompt, its turn and its files" },
+    },
+    "conversation.redo": {
+      chords: "none",
+      help: "redo what undo took",
+      command: { name: "redo", description: "bring back what the last undo took" },
+    },
+    "conversation.cost": {
+      chords: "none",
+      help: "cost per model",
+      command: { name: "cost", description: "tokens and spend for each model this session ran" },
+    },
+    "conversation.preset-tighter": {
+      chords: "leader [",
+      help: "tighter permissions",
+      command: { name: "preset-tighter", description: "move the permission preset toward careful" },
+    },
+    "conversation.preset-looser": {
+      chords: "leader ]",
+      help: "looser permissions",
+      command: { name: "preset-looser", description: "move the permission preset toward open" },
+    },
+    "conversation.preset-careful": {
+      chords: "none",
+      help: "careful preset",
+      command: { name: "preset-careful", description: "ask before each core tool" },
+    },
+    "conversation.preset-standard": {
+      chords: "none",
+      help: "standard preset",
+      command: { name: "preset-standard", description: "follow the configured rules" },
+    },
+    "conversation.preset-open": {
+      chords: "none",
+      help: "open preset",
+      command: { name: "preset-open", description: "allow the core tools without asking" },
+    },
+  },
   adornments: (spec, shell) => {
     const projection = shell.store.projection(spec.sessionId);
     const summary = shell.store.summary(spec.sessionId);
+    const readings = shell.store.controls.readings(spec.sessionId);
     return {
-      telemetry: telemetry(projection),
-      context: contextLevelOf(projection.usage),
+      telemetry:
+        readings.cost === undefined ? telemetry(projection) : reportedUsageLine(readings.cost),
+      context:
+        readings.context === undefined
+          ? contextLevelOf(projection.usage)
+          : contextLevelOfReport(readings.context),
       bot: botTitle(summary, shell.store.surfaces.state.bots),
+      inference: inferenceWords(shell.store.controlsOf(spec.sessionId)),
       hueRank: arcHueRank(summary, shell.store.surfaces.state.ordinals),
       modeWord: shell.trust.untrusted()
         ? "untrusted"
@@ -63,18 +179,46 @@ export const conversationPane = definePane<ConversationSpec>({
   },
 });
 
+interface PendingAsk {
+  readonly ask: ControlAsk;
+  readonly answer: (reply: string | boolean) => Promise<void>;
+}
+
 function ConversationSlot(props: PaneProps<ConversationSpec>) {
   const projection = () => props.shell.store.projection(props.spec.sessionId);
-  const queue = (text: string): void => {
-    const id = props.spec.sessionId;
-    if (id === undefined) void props.shell.sessions.startSession(props.id, text);
-    else void props.shell.store.prompt(id, text);
+  const [pending, setPending] = createSignal<PendingAsk>();
+  const [lines, setLines] = createSignal<readonly string[]>([]);
+  const say = (...said: string[]): void => {
+    setLines(said);
   };
-  const steer = (text: string): void => queue(text);
+
+  createEffect(() => {
+    const id = props.spec.sessionId;
+    if (id !== undefined) void props.shell.store.controls.watchReadings(id);
+  });
+
+  const send =
+    (behavior: PromptBehavior) =>
+    (text: string): void => {
+      setLines([]);
+      const id = props.spec.sessionId;
+      if (id === undefined) void props.shell.sessions.startSession(props.id, text);
+      else void props.shell.store.prompt(id, text, behavior);
+    };
   const interrupt = (): void => {
     const id = props.spec.sessionId;
     if (id !== undefined) void props.shell.store.abort(id);
   };
+
+  const controls = sessionControlsOf(props.shell, () => props.spec.sessionId, say, setPending);
+  props.onAction((action) => controls[action]?.());
+
+  const answerPending = (reply: string | boolean): void => {
+    const asked = pending();
+    setPending(undefined);
+    void asked?.answer(reply);
+  };
+
   return (
     <>
       <div class="kw-page">
@@ -92,20 +236,162 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
           <ConversationPane
             projection={projection()}
             onAnswerAsk={(callId, verdict) => void props.shell.store.answerAsk(callId, verdict)}
-            onOpenSpill={(spill) => props.shell.openPane(spillFileSpec(spill))}
+            onOpenSpill={(spill) =>
+              props.shell.openPane(spillFileSpec(spill, props.spec.sessionId ?? ""))
+            }
           />
         </Show>
       </div>
+      <ControlRow
+        ask={pending()?.ask}
+        lines={lines()}
+        onAnswer={answerPending}
+        onConfirm={answerPending}
+        onDismiss={() => setPending(undefined)}
+      />
       <Composer
         queue={projection().queue}
         busy={projection().turn !== undefined}
-        onSteer={steer}
-        onQueue={queue}
+        seed={props.shell.store.controls.seed(props.spec.sessionId)}
+        onSteer={send("steer")}
+        onQueue={send("queue")}
         onInterrupt={interrupt}
       />
     </>
   );
 }
+
+type Say = (...lines: string[]) => void;
+
+function sessionControlsOf(
+  shell: ShellSeams,
+  sessionId: () => string | undefined,
+  say: Say,
+  ask: (pending: PendingAsk | undefined) => void,
+): Record<string, () => void> {
+  const store = shell.store;
+  const verbs = store.controls;
+  const withSession = (run: (id: string) => Promise<void> | void) => (): void => {
+    const id = sessionId();
+    if (id === undefined) say("no session here yet · send a prompt first");
+    else void run(id);
+  };
+  const report = <Reading,>(
+    reading: Reading,
+    settled: (answer: Exclude<Reading, "missing" | ControlRefusal>) => string,
+  ): void => {
+    if (isSettled(reading)) say(settled(reading));
+    else say(refusalNotice(reading as "missing" | ControlRefusal));
+  };
+
+  const choosePreset = async (name: PresetName): Promise<void> => {
+    const reading = await verbs.setPreset(name);
+    if (!isControlRefusal(reading)) return say(presetNotice(reading.from, reading.to));
+    if (reading.refused !== "needs-confirmation") return say(reading.detail);
+    ask({
+      ask: { kind: "confirm", question: looseningQuestion(verbs.state.preset, name) },
+      answer: async (agreed) => {
+        if (agreed !== true) return say(leftUnchanged);
+        const confirmed = await verbs.setPreset(name, true);
+        say(
+          isControlRefusal(confirmed)
+            ? confirmed.detail
+            : presetNotice(confirmed.from, confirmed.to),
+        );
+      },
+    });
+  };
+  const stepPreset = (direction: PresetDirection) => (): void => {
+    const active: ActivePreset | undefined = verbs.state.preset;
+    const target = presetStep(active, direction);
+    if (target === undefined) say(unsteppableNotice(active, direction));
+    else void choosePreset(target);
+  };
+
+  return {
+    "conversation.model": withSession((id) =>
+      ask({
+        ask: {
+          kind: "text",
+          label: "model · provider/model",
+          initial: "",
+          choices: verbs.models(),
+        },
+        answer: async (reference) => {
+          report(await verbs.setModel(id, String(reference)), (switched) => switched.notice);
+        },
+      }),
+    ),
+    "conversation.thinking": withSession(async (id) => {
+      const on = !store.controlsOf(id).thinking;
+      report(await verbs.setThinking(id, on), (answer) =>
+        thinkingNotice(answer.thinking, shell.keys.chord("conversation.thinking")),
+      );
+    }),
+    "conversation.effort": withSession(async (id) => {
+      const level = nextEffort(store.controlsOf(id).effort);
+      report(await verbs.setEffort(id, level), (answer) => effortNotice(answer.effort));
+    }),
+    "conversation.compact": withSession(async (id) => {
+      say("compacting · folding the older conversation into a summary");
+      report(await verbs.compact(id), compactNotice);
+    }),
+    "conversation.rename": withSession((id) =>
+      ask({
+        ask: { kind: "text", label: "title", initial: currentTitle(shell, id), choices: [] },
+        answer: async (title) => {
+          report(await verbs.rename(id, String(title)), (renamed) => `renamed · ${renamed.title}`);
+        },
+      }),
+    ),
+    "conversation.export": withSession(async (id) => {
+      const reading = await verbs.exportSession(id);
+      if (!isSettled(reading)) return say(refusalNotice(reading));
+      if (!("html" in reading)) return say(`session page written to ${reading.file}`);
+      say(await copiedToClipboard(reading.html));
+    }),
+    "conversation.export-file": withSession(async (id) => {
+      report(await verbs.exportSession(id, { out: "." }), (exported) =>
+        "file" in exported
+          ? `session page written to ${exported.file}`
+          : "the server sent the page inline",
+      );
+    }),
+    "conversation.undo": withSession(async (id) => {
+      report(await verbs.undo(id), undoneNotice);
+    }),
+    "conversation.redo": withSession(async (id) => {
+      report(await verbs.redo(id), () => redoneNotice);
+    }),
+    "conversation.cost": withSession(async (id) => {
+      await verbs.watchReadings(id);
+      const cost = verbs.readings(id).cost;
+      if (cost === undefined) say("this session is gone");
+      else say(...costReadout(cost, store.controlsOf(id).model));
+    }),
+    "conversation.preset-tighter": stepPreset("tighter"),
+    "conversation.preset-looser": stepPreset("looser"),
+    "conversation.preset-careful": () => void choosePreset("careful"),
+    "conversation.preset-standard": () => void choosePreset("standard"),
+    "conversation.preset-open": () => void choosePreset("open"),
+  };
+}
+
+function currentTitle(shell: ShellSeams, id: string): string {
+  const title = shell.store.controlsOf(id).title;
+  return title === undefined || title === untitled ? "" : title;
+}
+
+async function copiedToClipboard(html: string): Promise<string> {
+  try {
+    await navigator.clipboard.writeText(html);
+    return exportedNotice(new TextEncoder().encode(html).length);
+  } catch {
+    return "the clipboard refused the page · export-file writes it into the workspace";
+  }
+}
+
+const untitled = "(untitled session)";
 
 function settledState(projection: SessionProjection): LifecycleState | undefined {
   if (projection.turn !== undefined) return "working";

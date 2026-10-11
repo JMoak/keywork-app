@@ -1,4 +1,4 @@
-import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { KeyworkClient, ServerFeed, StreamNotice } from "@keywork-app/client";
 import type { BusEnvelope, InboxItem, MemoryGarden } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
@@ -61,8 +61,12 @@ export function inboxEnvelope(id: number, count: number, kinds: Record<string, n
   } satisfies BusEnvelope;
 }
 
-export function feedOf(): ServerFeed & { push(envelopes: readonly BusEnvelope[]): void } {
+export function feedOf(): ServerFeed & {
+  push(envelopes: readonly BusEnvelope[]): void;
+  connect(): void;
+} {
   const listeners = new Set<(envelopes: readonly BusEnvelope[]) => void>();
+  const noticeListeners = new Set<(notice: StreamNotice) => void>();
   return {
     open: async () => undefined,
     subscribe: (listener) => {
@@ -70,11 +74,17 @@ export function feedOf(): ServerFeed & { push(envelopes: readonly BusEnvelope[])
       return () => listeners.delete(listener);
     },
     subscribeSession: () => () => undefined,
-    onNotice: () => () => undefined,
+    onNotice: (listener) => {
+      noticeListeners.add(listener);
+      return () => noticeListeners.delete(listener);
+    },
     whenLost: () => () => undefined,
     close: () => undefined,
     push: (envelopes) => {
       for (const listener of [...listeners]) listener(envelopes);
+    },
+    connect: () => {
+      for (const listener of [...noticeListeners]) listener({ kind: "connected" });
     },
   };
 }
@@ -188,5 +198,50 @@ describe("the recorded memory fixture", () => {
     const seeded = { count: 3, kinds: { note: 3 } };
     expect(inboxAfter(seeded, envelopes)).toEqual(inboxTallyOf(garden));
     expect(garden.ledger.map((entry) => entry.op)).toEqual(["approve", "discard", "revert"]);
+  });
+});
+
+describe("the memory store across writes and a reopened server", () => {
+  it("rereads the garden after a successful discard, and not after a refused one", async () => {
+    let reads = 0;
+    let outcome: "discarded" | "missing" = "discarded";
+    const client = {
+      ...inertMemoryClient(),
+      memory: async () => {
+        reads += 1;
+        return trustedGarden([]);
+      },
+      discardStagedItem: async () => outcome,
+    } as unknown as KeyworkClient;
+    const store = createRoot(() => createMemoryStore(client, feedOf()));
+    await store.discard("a");
+    await settle();
+    expect(reads).toBe(1);
+    outcome = "missing";
+    await store.discard("a");
+    await settle();
+    expect(reads).toBe(1);
+    store.dispose();
+  });
+
+  it("rereads the garden when the feed reconnects to a reopened server, not on its first connection", async () => {
+    let reads = 0;
+    const client = {
+      ...inertMemoryClient(),
+      memory: async () => {
+        reads += 1;
+        return trustedGarden([stagedNote("a", "A.md")]);
+      },
+    } as unknown as KeyworkClient;
+    const feed = feedOf();
+    const store = createRoot(() => createMemoryStore(client, feed));
+    feed.connect();
+    await settle();
+    expect(reads).toBe(0);
+    feed.connect();
+    await settle();
+    expect(reads).toBe(1);
+    expect(store.state.inbox.count).toBe(1);
+    store.dispose();
   });
 });

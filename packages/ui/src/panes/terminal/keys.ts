@@ -1,14 +1,14 @@
-import { type Chord, chordOfKey, chordsEqual, parseChord } from "../../keys/chord.ts";
+import { type Chord, chordsEqual, chordsOfKey, parseChord } from "../../keys/chord.ts";
 
 export type KeyEventLike = Pick<
   KeyboardEvent,
   "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "isComposing" | "type"
->;
+> &
+  Partial<Pick<KeyboardEvent, "code">>;
 
 export function terminalKeeps(event: KeyEventLike, leader: string): boolean {
-  const chord = chordOfKey(event);
-  if (chord === undefined) return true;
-  return !chordsEqual(chord, leaderChord(leader));
+  const leaderKey = leaderChord(leader);
+  return !chordsOfKey(event).some((chord) => chordsEqual(chord, leaderKey));
 }
 
 export function leaderChord(leader: string): Chord {

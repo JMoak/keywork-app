@@ -1,0 +1,52 @@
+{
+  "T1.graphemeCorpusSamples": {
+    "value": 17,
+    "better": "higher",
+    "why": "every hard grapheme family the composer has been proven against; a new family only adds"
+  },
+  "T2.floodBytes": {
+    "value": 5242880,
+    "better": "higher",
+    "why": "the multi-megabyte paste the composer must land as one honest draft"
+  },
+  "T2.floodLines": {
+    "value": 10000,
+    "better": "higher",
+    "why": "the many-line paste the composer must land as one honest draft"
+  },
+  "T2.floodDraftChars": {
+    "value": 33,
+    "better": "lower",
+    "why": "characters the textarea lays out after a flood: the placeholder, never the payload"
+  },
+  "T6.minMarginLc.keywork-night": {
+    "value": 3.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.keywork-day": {
+    "value": 13.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T7.emptyStateMinWidthPx": {
+    "value": 127,
+    "better": "lower",
+    "why": "narrowest pane every empty state fits without overflow: padding plus its longest unbreakable run"
+  },
+  "T8.eventsPerFrame": {
+    "value": 800,
+    "better": "higher",
+    "why": "events pushed into one frame before it paints; the prose fixture streamed per character fills it"
+  },
+  "T8.reducerStepsPerFrame": {
+    "value": 14,
+    "better": "lower",
+    "why": "projection steps the reducer takes in the busiest frame of any fixture streamed one character per event"
+  },
+  "T8.firstPaintElements": {
+    "value": 185,
+    "better": "lower",
+    "why": "DOM elements the conversation pane builds on first paint, summed over every recorded fixture"
+  }
+}

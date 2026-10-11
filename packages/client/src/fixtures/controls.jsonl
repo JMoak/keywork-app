@@ -1,0 +1,13 @@
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"turn on the lights"}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Lights on."}}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
+{"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Lights on."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
+{"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"session.tree","payload":{"sessionId":"s1","leafId":"q1","reason":"entry"}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"","type":"memory.inbox","payload":{"count":0,"kinds":{}}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":false,"title":"(untitled session)","leafId":"q2","undoable":true,"redoable":false}}
+{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"title":"(untitled session)","leafId":"q3","undoable":true,"redoable":false}}
+{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"(untitled session)","leafId":"q4","undoable":true,"redoable":false}}
+{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":"q5","undoable":true,"redoable":false}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":null,"undoable":false,"redoable":true}}
+{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":"q5","undoable":true,"redoable":false}}
+{"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"","type":"gate.preset","payload":{"from":"standard","to":"open"}}

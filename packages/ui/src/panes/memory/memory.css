@@ -13,6 +13,10 @@
   line-height: 1.5;
 }
 
+.kw-memory:focus {
+  outline: none;
+}
+
 .kw-memory-ask {
   display: flex;
   gap: 0.5rem;
@@ -143,6 +147,9 @@
   font-weight: 600;
   font-size: 1.25rem;
   line-height: 1.3;
+}
+.kw-memory-daily > .kw-memory-note-title {
+  padding: 0.5rem 1rem 0;
 }
 .kw-memory-note-facts {
   display: flex;

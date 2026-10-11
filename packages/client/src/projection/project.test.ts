@@ -224,3 +224,30 @@ function runOf(state: ReturnType<typeof project>, index: number) {
   if (entry?.kind !== "tool") throw new Error(`entry ${index} is not a tool`);
   return entry.run;
 }
+
+describe("extension notices and session state", () => {
+  it("folds an extension notice into a quiet row whose density mark follows its level", () => {
+    const state = projectAll(emptyProjection, [
+      at("extension.notice", { extension: "counter", level: "info", message: "counted 3" }),
+      at("extension.notice", { extension: "lint", level: "warn", message: "slow" }),
+      at("extension.notice", {
+        extension: "lint",
+        level: "error",
+        message: "quarantined in activate: boom",
+        detail: { phase: "activate" },
+      }),
+      at("extension.notice", {
+        extension: "counter",
+        level: "info",
+        message: "replayed",
+        replay: true,
+      }),
+    ]);
+    expect(state.entries).toEqual([
+      { kind: "notice", level: "info", text: "░ counter · counted 3" },
+      { kind: "notice", level: "info", text: "▒ lint · slow" },
+      { kind: "notice", level: "info", text: "█ lint · quarantined in activate: boom" },
+    ]);
+    expect(state.lastError).toBeUndefined();
+  });
+});

@@ -1,4 +1,5 @@
 import type { UsageLedger } from "@keywork-app/client";
+import type { ContextReport } from "@keywork-app/protocol";
 import type { DensityLevel } from "../flavor/schema.ts";
 import { formatTokens } from "./format.ts";
 
@@ -10,6 +11,7 @@ export interface ContextLevel {
   readonly flushAt: number;
   readonly compactAt: number;
   readonly basis: ContextBasis;
+  readonly declared?: boolean | undefined;
 }
 
 export type GaugeStyle = "steps" | "bar";
@@ -25,6 +27,18 @@ export const barCells = 10;
 export function contextLevelOf(ledger: UsageLedger): ContextLevel | undefined {
   if (ledger.turns === 0) return undefined;
   return assumedContextLevel(ledger.lastTurnContextTokens);
+}
+
+export function contextLevelOfReport(report: ContextReport): ContextLevel | undefined {
+  if (report.used === 0) return undefined;
+  return {
+    used: report.used,
+    window: report.window,
+    flushAt: report.flushAt,
+    compactAt: report.compactAt,
+    basis: "reported",
+    declared: report.declared,
+  };
 }
 
 export function assumedContextLevel(used: number): ContextLevel {
@@ -52,19 +66,30 @@ export function gaugeCells(level: ContextLevel, style: GaugeStyle): GaugeCell[] 
 export function gaugeCount(level: ContextLevel, style: GaugeStyle): string {
   const used = formatTokens(level.used);
   if (style === "steps") return used;
-  return `${used}/${level.basis === "assumed" ? "~" : ""}${formatTokens(level.window)}`;
+  return `${used}/${windowIsAssumed(level) ? "~" : ""}${formatTokens(level.window)}`;
 }
 
 export function gaugeReadout(level: ContextLevel): string {
-  const window =
-    level.basis === "assumed"
-      ? `window assumed at ${formatTokens(level.window)} until the server reports one`
-      : `window reported at ${formatTokens(level.window)}`;
   return [
     `context ${formatTokens(level.used)} of ${formatTokens(level.window)} tokens`,
     `memory flush at ${formatTokens(level.flushAt)} · compaction at ${formatTokens(level.compactAt)}`,
-    window,
+    windowBasis(level),
   ].join(" · ");
+}
+
+function windowBasis(level: ContextLevel): string {
+  const window = formatTokens(level.window);
+  if (level.basis === "assumed") return `window assumed at ${window} until the server reports one`;
+  if (level.declared === false) {
+    return `window reported at ${window}, assumed by the server · estimated from the conversation text · declare models[…].contextWindow in keywork.json for an honest limit`;
+  }
+  return level.declared === true
+    ? `window reported at ${window}, declared in keywork.json · estimated from the conversation text`
+    : `window reported at ${window}`;
+}
+
+function windowIsAssumed(level: ContextLevel): boolean {
+  return level.basis === "assumed" || level.declared === false;
 }
 
 const densityRamp: readonly { glyph: string; level: DensityLevel }[] = [

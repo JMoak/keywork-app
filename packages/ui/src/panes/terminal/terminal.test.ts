@@ -161,6 +161,7 @@ describe("keys inside a terminal", () => {
     expect(terminalKeeps(key({ key: "k", ctrlKey: true }), "ctrl+k")).toBe(false);
     expect(terminalKeeps(key({ key: "k", ctrlKey: true }), "ctrl+space")).toBe(true);
     expect(terminalKeeps(key({ key: "Control" }), "ctrl+k")).toBe(true);
+    expect(terminalKeeps(key({ key: "л", ctrlKey: true, code: "KeyK" }), "ctrl+k")).toBe(false);
   });
 });
 

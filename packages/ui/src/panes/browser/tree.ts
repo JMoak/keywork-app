@@ -31,6 +31,8 @@ export const followHoldMs = 4000;
 
 export const followedTools: readonly string[] = ["read", "write", "edit"];
 
+export const writingTools: readonly string[] = ["write", "edit"];
+
 export const emptyTree: TreeState = {
   directories: {},
   expanded: [rootPath],
@@ -88,7 +90,7 @@ export function directoriesToLoad(state: TreeState): string[] {
 export function lift(state: TreeState, path: string, nowMs: number): TreeState {
   let next: TreeState = { ...state, lit: { ...state.lit, [path]: nowMs + followHoldMs } };
   for (const ancestor of ancestorsOf(path)) {
-    if (state.directories[ancestor]?.kind === "loaded") next = expand(next, ancestor);
+    if (isLoaded(state, ancestor)) next = expand(next, ancestor);
   }
   return next;
 }
@@ -105,11 +107,12 @@ export function nextExpiry(state: TreeState): number | undefined {
 }
 
 export function rows(state: TreeState, nowMs = 0): BrowserRow[] {
-  const collected: BrowserRow[] = [];
-  collect(state, rootPath, 0, collected, nowMs);
-  if (state.filter === "") return collected;
+  if (state.filter === "") return walk(state, (path) => isExpanded(state, path), nowMs);
+  const everythingLoaded = walk(state, (path) => isLoaded(state, path), nowMs);
   const needle = state.filter.toLowerCase();
-  return collected.filter((row) => row.name.toLowerCase().includes(needle));
+  const matches = everythingLoaded.filter((row) => row.name.toLowerCase().includes(needle));
+  const shown = new Set(matches.flatMap((row) => [row.path, ...ancestorsOf(row.path)]));
+  return everythingLoaded.filter((row) => shown.has(row.path));
 }
 
 export function agentPathOf(envelope: BusEnvelope, workspaceRoot: string): string | undefined {
@@ -118,6 +121,31 @@ export function agentPathOf(envelope: BusEnvelope, workspaceRoot: string): strin
   if (!followedTools.includes(call.name)) return undefined;
   const path = call.arguments.path;
   return typeof path === "string" ? relativeToRoot(path, workspaceRoot) : undefined;
+}
+
+export interface AgentWrite {
+  readonly callId: string;
+  readonly path: string;
+}
+
+export function agentWriteOf(envelope: BusEnvelope, workspaceRoot: string): AgentWrite | undefined {
+  if (envelope.type !== "tool.started") return undefined;
+  const { call } = envelope.payload;
+  if (!writingTools.includes(call.name)) return undefined;
+  const path = agentPathOf(envelope, workspaceRoot);
+  return path === undefined ? undefined : { callId: call.callId, path };
+}
+
+export function finishedCallOf(envelope: BusEnvelope): string | undefined {
+  return envelope.type === "tool.finished" ? envelope.payload.callId : undefined;
+}
+
+export function rereadWhereMissing(state: TreeState, path: string): TreeState {
+  const stale = ancestorsOf(path).find(
+    (directory) =>
+      isLoaded(state, directory) && !lists(state, directory, nextSegment(directory, path)),
+  );
+  return stale === undefined ? state : forgetListing(state, stale);
 }
 
 export function relativeToRoot(path: string, workspaceRoot: string): string | undefined {
@@ -144,8 +172,34 @@ export function joinPath(directory: string, name: string): string {
   return directory === rootPath ? name : `${directory}/${name}`;
 }
 
+function walk(state: TreeState, opens: (path: string) => boolean, nowMs: number): BrowserRow[] {
+  const collected: BrowserRow[] = [];
+  collect(state, opens, rootPath, 0, collected, nowMs);
+  return collected;
+}
+
+function isLoaded(state: TreeState, path: string): boolean {
+  return state.directories[path]?.kind === "loaded";
+}
+
+function lists(state: TreeState, directory: string, name: string): boolean {
+  const listing = state.directories[directory];
+  return listing?.kind === "loaded" && listing.entries.some((entry) => entry.name === name);
+}
+
+function nextSegment(directory: string, path: string): string {
+  const below = directory === rootPath ? path : path.slice(directory.length + 1);
+  return below.split("/")[0] ?? below;
+}
+
+function forgetListing(state: TreeState, path: string): TreeState {
+  const { [path]: _forgotten, ...kept } = state.directories;
+  return { ...state, directories: kept };
+}
+
 function collect(
   state: TreeState,
+  opens: (path: string) => boolean,
   directory: string,
   depth: number,
   into: BrowserRow[],
@@ -156,7 +210,7 @@ function collect(
   for (const entry of listing.entries) {
     if (entry.hidden && !state.showHidden) continue;
     const path = joinPath(directory, entry.name);
-    const expanded = entry.kind === "dir" && isExpanded(state, path);
+    const expanded = entry.kind === "dir" && opens(path);
     into.push({
       path,
       name: entry.name,
@@ -168,7 +222,7 @@ function collect(
       load: entry.kind === "dir" ? state.directories[path]?.kind : undefined,
       lit: (state.lit[path] ?? 0) > nowMs,
     });
-    if (expanded) collect(state, path, depth + 1, into, nowMs);
+    if (expanded) collect(state, opens, path, depth + 1, into, nowMs);
   }
 }
 

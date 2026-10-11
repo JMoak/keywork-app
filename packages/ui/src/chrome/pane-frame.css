@@ -57,7 +57,7 @@
 .kw-frame[data-focused] .kw-frame-name {
   color: var(--kw-pane-border);
 }
-.kw-frame-name[data-state="needs-you"] {
+.kw-frame .kw-frame-name[data-state="needs-you"] {
   color: var(--kw-background);
   background: var(--kw-pane-hue);
 }
@@ -70,6 +70,7 @@
 
 .kw-frame-telemetry,
 .kw-frame-bot,
+.kw-frame-inference,
 .kw-frame-mode {
   color: var(--kw-text-dim);
   white-space: nowrap;
@@ -93,7 +94,8 @@
   }
 }
 @container frame (max-width: 559.98px) {
-  .kw-frame-telemetry {
+  .kw-frame-telemetry,
+  .kw-frame-inference {
     display: none;
   }
 }

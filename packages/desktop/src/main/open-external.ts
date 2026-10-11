@@ -1,7 +1,9 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type ExternalVerdict = { ok: true; url: string } | { ok: false; reason: string };
+export type ExternalVerdict =
+  | { ok: true; url: string; path?: string }
+  | { ok: false; reason: string };
 
 export function externalVerdict(url: string, workspaceRoots: readonly string[]): ExternalVerdict {
   let parsed: URL;
@@ -20,7 +22,7 @@ function fileVerdict(parsed: URL, workspaceRoots: readonly string[]): ExternalVe
   const inside = workspaceRoots.some((root) => contains(resolve(root), target));
   if (!inside)
     return { ok: false, reason: `refusing to open ${target}: outside the open workspaces` };
-  return { ok: true, url: parsed.href };
+  return { ok: true, url: parsed.href, path: target };
 }
 
 function contains(root: string, target: string): boolean {

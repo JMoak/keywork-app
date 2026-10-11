@@ -77,7 +77,7 @@ export function surfacesOfKind(kind: SurfaceKind): readonly SurfaceName[] {
 
 export function createSurfacesStore(
   client: SurfacesClient,
-  feed: Pick<ServerFeed, "subscribe">,
+  feed: Pick<ServerFeed, "subscribe" | "onNotice">,
   seams: SurfacesSeams = {},
 ): SurfacesStore {
   const [state, setState] = createStore<MutableSurfacesState>({
@@ -161,21 +161,39 @@ export function createSurfacesStore(
     if (kind === "arcs" || kind === "bots") seams.sessionsChanged?.();
   };
 
-  const stop = feed.subscribe((envelopes) => {
+  const load = async (): Promise<void> => {
+    await Promise.all(surfaceNames.map(fetchOne));
+  };
+
+  const stopFollowing = feed.subscribe((envelopes) => {
     for (const kind of changedKinds(envelopes)) void refetch(kind);
   });
+  const stopReloading = onReconnected(feed, () => void load());
 
   return {
     state,
     verbs: client,
-    load: async () => {
-      await Promise.all(surfaceNames.map(fetchOne));
-    },
+    load,
     refetch,
     arcOrdinal: (slug) => (slug === undefined ? undefined : state.ordinals[slug]),
     bot: (name) => (name === undefined ? undefined : state.bots.find((bot) => bot.name === name)),
-    dispose: stop,
+    dispose: () => {
+      stopFollowing();
+      stopReloading();
+    },
   };
+}
+
+export function onReconnected(
+  feed: Pick<ServerFeed, "onNotice">,
+  listener: () => void,
+): () => void {
+  let connections = 0;
+  return feed.onNotice((notice) => {
+    if (notice.kind !== "connected") return;
+    connections += 1;
+    if (connections > 1) listener();
+  });
 }
 
 interface MutableSurfacesState {

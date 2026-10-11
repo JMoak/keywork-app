@@ -57,22 +57,34 @@ interface ServerModule {
 }
 
 interface ServeModule {
-  fileSessionHost(options: {
-    cwd: string;
-    sessionDir: string;
-    userRoot: string;
-    projectTrusted: boolean;
-    provider: Provider;
-    permissions: (call: unknown) => "allow" | "ask" | "deny" | undefined;
-    askTimeoutMs?: number;
-    checkpointsGitDir?: string;
-    log: EventLogLike;
-  }): unknown;
+  fileSessionHost(
+    options: HostSeams & {
+      cwd: string;
+      sessionDir: string;
+      userRoot: string;
+      projectTrusted: boolean;
+      provider: Provider;
+      permissions: (call: unknown) => "allow" | "ask" | "deny" | undefined;
+      askTimeoutMs?: number;
+      checkpointsGitDir?: string;
+      log: EventLogLike;
+    },
+  ): unknown;
+}
+
+interface ServerTestingModule {
+  inferenceOver(models: Readonly<Record<string, Provider>>): unknown;
+}
+
+interface HostSeams {
+  inference?: unknown;
+  presets?: { active(): string; apply(name: string): Promise<void> };
 }
 
 interface Scenario {
   name: string;
   provider(engine: EngineModule): Provider;
+  seams?(engine: EngineModule, testing: ServerTestingModule): HostSeams;
   permissions: "allow" | "default";
   drive(stage: Stage): Promise<void>;
   capacity?: number;
@@ -107,6 +119,68 @@ const writeCall = {
   name: "write",
   arguments: { path: "notes.txt", content: "one\ntwo\n" },
 } as const;
+
+async function post(stage: Stage, path: string, body?: unknown): Promise<unknown> {
+  const response = await stage.call(path, {
+    method: "POST",
+    ...(body !== undefined && { body: JSON.stringify(body) }),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text.startsWith("<") ? "<html>" : JSON.parse(text) };
+}
+
+async function get(stage: Stage, path: string): Promise<unknown> {
+  const response = await stage.call(path);
+  return { status: response.status, body: await response.json() };
+}
+
+const controlAnswers = new Map<string, unknown>();
+
+function controlProviders(engine: EngineModule): Record<string, Provider> {
+  return {
+    "mock/alpha": new engine.MockProvider([engine.textTurn("Lights on.", usage)], "alpha"),
+    "mock/beta": new engine.MockProvider([], "beta"),
+  };
+}
+
+let controlModels: Record<string, Provider> = {};
+
+function presetSwitch(): NonNullable<HostSeams["presets"]> {
+  let active = "standard";
+  return {
+    active: () => active,
+    apply: async (name) => {
+      active = name;
+    },
+  };
+}
+
+async function driveControls(stage: Stage): Promise<void> {
+  const session = `/sessions/${stage.sessionId}`;
+  const answer = async (name: string, reading: Promise<unknown>) => {
+    controlAnswers.set(name, await reading);
+  };
+  await stage.prompt("turn on the lights");
+  await stage.until("turn.completed");
+  await answer("model", post(stage, `${session}/model`, { reference: "mock/beta" }));
+  await answer("modelUnknown", post(stage, `${session}/model`, { reference: "mock/gamma" }));
+  await answer("thinking", post(stage, `${session}/thinking`, { on: true }));
+  await answer("effort", post(stage, `${session}/effort`, { level: "high" }));
+  await answer("effortUnknown", post(stage, `${session}/effort`, { level: "extreme" }));
+  await answer("rename", post(stage, `${session}/rename`, { title: "Lights" }));
+  await answer("context", get(stage, `${session}/context`));
+  await answer("cost", get(stage, `${session}/cost`));
+  await answer("undo", post(stage, `${session}/undo`));
+  await answer("undoAgain", post(stage, `${session}/undo`));
+  await answer("redo", post(stage, `${session}/redo`));
+  await answer("redoAgain", post(stage, `${session}/redo`));
+  await answer("presetLoosening", post(stage, "/preset", { name: "open" }));
+  await answer("preset", post(stage, "/preset", { name: "open", confirmed: true }));
+  await answer("export", post(stage, `${session}/export`, {}));
+  await answer("sessions", get(stage, "/sessions"));
+  await stage.until("session.state", 6);
+  await stage.until("gate.preset");
+}
 
 async function entryIdsOf(stage: Stage): Promise<string[]> {
   const tree = (await (await stage.call(`/sessions/${stage.sessionId}/entries`)).json()) as {
@@ -296,6 +370,20 @@ export const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "controls",
+    provider: (engine) => {
+      controlModels = controlProviders(engine);
+      return controlModels["mock/alpha"] as Provider;
+    },
+    seams: (_engine, testing) => ({
+      inference: testing.inferenceOver(controlModels),
+      presets: presetSwitch(),
+    }),
+    permissions: "allow",
+    trusted: true,
+    drive: driveControls,
+  },
+  {
     name: "memory",
     provider: (engine) => new engine.MockProvider([], "mock-model"),
     permissions: "allow",
@@ -378,12 +466,15 @@ export async function recordAll(only?: string): Promise<string[]> {
   const engine = (await import(keyworkModuleUrl("packages/engine/src/index.ts"))) as EngineModule;
   const server = (await import(keyworkModuleUrl("packages/server/src/index.ts"))) as ServerModule;
   const serve = (await import(keyworkModuleUrl("packages/cli/src/serve.ts"))) as ServeModule;
+  const testing = (await import(
+    keyworkModuleUrl("packages/server/src/testing.ts")
+  )) as ServerTestingModule;
   await mkdir(fixturesDir, { recursive: true });
   const written: string[] = [];
   const chosen = scenarios.filter((scenario) => only === undefined || scenario.name === only);
   if (chosen.length === 0) throw new Error(`no scenario named "${only}"`);
   for (const scenario of chosen) {
-    const recorded = await record(scenario, { engine, server, serve });
+    const recorded = await record(scenario, { engine, server, serve, testing });
     await writeFile(join(fixturesDir, `${scenario.name}.jsonl`), recorded.jsonl);
     written.push(`${scenario.name}.jsonl`);
     for (const [name, text] of Object.entries(recorded.extras)) {
@@ -398,6 +489,7 @@ interface Modules {
   engine: EngineModule;
   server: ServerModule;
   serve: ServeModule;
+  testing: ServerTestingModule;
 }
 
 interface Recorded {
@@ -426,6 +518,7 @@ async function record(scenario: Scenario, modules: Modules): Promise<Recorded> {
     userRoot,
     projectTrusted: scenario.trusted === true,
     provider: scenario.provider(modules.engine),
+    ...scenario.seams?.(modules.engine, modules.testing),
     permissions: () => (scenario.permissions === "allow" ? "allow" : undefined),
     ...(scenario.askTimeoutMs !== undefined && { askTimeoutMs: scenario.askTimeoutMs }),
     ...(scenario.trusted === true && { checkpointsGitDir: join(root, "checkpoints") }),
@@ -524,6 +617,16 @@ async function extrasFor(
     const replayed = await call("/events", { headers: { "last-event-id": "0" } });
     const raw = await readUntil(replayed, `\nid: ${lastId}\n`);
     return { "doc.json": await mergedIntoDocFixture(doc), "plain.sse": raw };
+  }
+  if (scenario.name === "controls") {
+    const doc = await (await call("/doc")).text();
+    const lastId = stage.seen.at(-1)?.id ?? 0;
+    const replayed = await call("/events", { headers: { "last-event-id": "0" } });
+    return {
+      "doc.json": await mergedIntoDocFixture(doc),
+      "controls.sse": await readUntil(replayed, `\nid: ${lastId}\n`),
+      "controls.json": `${JSON.stringify(Object.fromEntries(controlAnswers), null, 2)}\n`,
+    };
   }
   if (scenario.name === "tool") {
     const detail = await (await call(`/sessions/${stage.sessionId}`)).text();

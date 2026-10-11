@@ -2,16 +2,19 @@ import type { BusEnvelope, TreeListing } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import {
   agentPathOf,
+  agentWriteOf,
   ancestorsOf,
   collapse,
   directoriesToLoad,
   emptyTree,
   expand,
   expireLit,
+  finishedCallOf,
   followHoldMs,
   lift,
   nextExpiry,
   parentOf,
+  rereadWhereMissing,
   rows,
   toggleHidden,
   withFailure,
@@ -92,10 +95,23 @@ describe("the browser tree", () => {
     ]);
   });
 
-  it("filters loaded rows by name without touching what is loaded", () => {
+  it("filters loaded rows by name, keeping each match's folders, without touching what is loaded", () => {
     const filtered = withFilter(expand(loaded, "src"), "IND");
-    expect(rows(filtered).map((row) => row.path)).toEqual(["src/index.ts"]);
+    expect(rows(filtered).map((row) => [row.path, row.depth])).toEqual([
+      ["src", 0],
+      ["src/index.ts", 1],
+    ]);
     expect(rows(withFilter(filtered, "")).length).toBe(5);
+  });
+
+  it("finds a match inside a folder that was loaded and then folded", () => {
+    const folded = collapse(expand(loaded, "src"), "src");
+    expect(rows(withFilter(folded, "ind")).map((row) => row.path)).toEqual(["src", "src/index.ts"]);
+    expect(rows(withFilter(folded, "")).map((row) => row.path)).toEqual([
+      "dist",
+      "src",
+      "README.md",
+    ]);
   });
 
   it("remembers a failed directory with its reason", () => {
@@ -143,5 +159,35 @@ describe("the browser tree", () => {
     expect(ancestorsOf("README.md")).toEqual([""]);
     expect(parentOf("src/util")).toBe("src");
     expect(parentOf("src")).toBe("");
+  });
+});
+
+describe("following the agent's writes", () => {
+  it("pairs a write or edit with its call id and ignores reads", () => {
+    const write = {
+      ...started("write", "src/new.ts"),
+      payload: {
+        call: { type: "tool-call", callId: "w9", name: "write", arguments: { path: "src/new.ts" } },
+      },
+    } as BusEnvelope;
+    expect(agentWriteOf(write, "C:/work")).toEqual({ callId: "w9", path: "src/new.ts" });
+    expect(agentWriteOf(started("read", "src/index.ts"), "C:/work")).toBeUndefined();
+    expect(
+      finishedCallOf({
+        id: 2,
+        ts: "t",
+        sessionId: "s1",
+        type: "tool.finished",
+        payload: { callId: "w9", output: "", isError: false },
+      }),
+    ).toBe("w9");
+  });
+
+  it("forgets the shallowest loaded listing that is missing the written path, and nothing when all is listed", () => {
+    const open = expand(loaded, "src");
+    expect(directoriesToLoad(rereadWhereMissing(open, "src/new.ts"))).toEqual(["src"]);
+    expect(directoriesToLoad(rereadWhereMissing(open, "lib/deep/new.ts"))).toEqual([""]);
+    expect(rereadWhereMissing(open, "src/index.ts")).toBe(open);
+    expect(rereadWhereMissing(open, "src/util/new.ts")).toBe(open);
   });
 });

@@ -5,6 +5,7 @@ import {
   serverFeed,
 } from "@keywork-app/client";
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
+import { reportPendingAsks } from "./host/pending-asks.ts";
 import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
 import { hostFetch } from "./host/transport.ts";
 import { frameTick } from "./shell/frame-tick.ts";
@@ -48,7 +49,18 @@ export function App(props: AppProps) {
     const client = connect(props.host, result.opened.workspace);
     const feed = serverFeed(client, { tick: frameTick() });
     const store = createSessionStore(client, feed);
-    const stopNotifying = notifyOnInbox(store.memory, props.host, result.opened.workspace);
+    const stopInbox = notifyOnInbox(store.memory, props.host, result.opened.workspace);
+    const stopAsks = reportPendingAsks({
+      feed,
+      asks: () => client.asks(),
+      host: props.host,
+      workspace: result.opened.workspace,
+      titleOf: (sessionId) => store.summary(sessionId)?.title,
+    });
+    const stopNotifying = (): void => {
+      stopInbox();
+      stopAsks();
+    };
     await store.refresh();
     void store.surfaces.load();
     setConnected({ opened: result.opened, client, feed, store, stopNotifying });
@@ -71,12 +83,23 @@ export function App(props: AppProps) {
     live?.feed.close();
   });
 
+  const host: HostPort = {
+    ...props.host,
+    restartServer: async (path) => {
+      const reopened = await props.host.restartServer(path);
+      if (reopened.ok) {
+        setConnected((live) => live && { ...live, opened: reopened.opened });
+      }
+      return reopened;
+    },
+  };
+
   return (
     <Switch>
       <Match when={connected()}>
         {(live) => (
           <WorkspaceView
-            host={props.host}
+            host={host}
             workspace={live().opened.workspace}
             serverLabel={serverLabel(live().opened)}
             store={live().store}

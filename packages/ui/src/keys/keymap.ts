@@ -1,6 +1,15 @@
-import { type Chord, ChordError, chordsEqual, formatChord, parseChord } from "./chord.ts";
+import {
+  type Chord,
+  ChordError,
+  chordLabel,
+  chordsEqual,
+  formatChord,
+  parseChord,
+} from "./chord.ts";
 
-export type Binding = { kind: "chord"; chord: Chord } | { kind: "leader"; key: string };
+export type Binding =
+  | { kind: "chord"; chord: Chord; label: string }
+  | { kind: "leader"; key: string; label: string };
 
 export type KeymapResult =
   | { type: "action"; action: string }
@@ -46,17 +55,20 @@ export class Keymap {
     this.disarm();
   }
 
-  press(chord: Chord, nowMs: number, activeScope?: string): KeymapResult {
+  press(pressed: Chord | readonly Chord[], nowMs: number, activeScope?: string): KeymapResult {
+    const chords = isChordList(pressed) ? pressed : [pressed];
+    const isLeader = chords.some((chord) => chordsEqual(chord, this.table.leader));
     if (this.isPending(nowMs)) {
-      if (!chordsEqual(chord, this.table.leader)) return this.resolveLeaderKey(chord, activeScope);
+      if (!isLeader) return this.resolveLeaderKey(chords, activeScope);
       this.disarm();
       return cancelled;
     }
-    if (chordsEqual(chord, this.table.leader)) {
+    if (isLeader) {
       this.pendingSince = nowMs;
       return { type: "leader-pending" };
     }
-    const action = this.findByChord(chord, activeScope, this.ownsKeyboard(activeScope));
+    const scopedOnly = this.ownsKeyboard(activeScope);
+    const action = firstOf(chords, (chord) => this.findByChord(chord, activeScope, scopedOnly));
     return action === undefined ? { type: "pass" } : { type: "action", action };
   }
 
@@ -73,14 +85,12 @@ export class Keymap {
   }
 
   describe(action: string): string | undefined {
-    const binding = this.table.bindings.get(action)?.[0];
-    if (binding === undefined) return undefined;
-    return binding.kind === "chord" ? formatChord(binding.chord) : `${this.leader} ${binding.key}`;
+    return this.describeAll(action)[0];
   }
 
   describeAll(action: string): string[] {
     return (this.table.bindings.get(action) ?? []).map((binding) =>
-      binding.kind === "chord" ? formatChord(binding.chord) : `${this.leader} ${binding.key}`,
+      binding.kind === "chord" ? binding.label : `${this.leader} ${binding.label}`,
     );
   }
 
@@ -103,10 +113,14 @@ export class Keymap {
     return false;
   }
 
-  private resolveLeaderKey(chord: Chord, activeScope: string | undefined): KeymapResult {
+  private resolveLeaderKey(
+    chords: readonly Chord[],
+    activeScope: string | undefined,
+  ): KeymapResult {
     this.disarm();
-    if (chord.name === "escape" || chord.ctrl || chord.alt) return cancelled;
-    const action = this.findByLeaderKey(chord, activeScope);
+    const [typed] = chords;
+    if (typed === undefined || typed.name === "escape" || typed.ctrl || typed.alt) return cancelled;
+    const action = firstOf(chords, (chord) => this.findByLeaderKey(chord, activeScope));
     return action === undefined ? cancelled : { type: "action", action };
   }
 
@@ -214,20 +228,36 @@ function parseBinding(spec: string): Binding {
   const leaderMatch = spec.match(/^leader\s+(\S+)$/i);
   if (leaderMatch === null) {
     try {
-      return { kind: "chord", chord: parseChord(spec) };
+      return { kind: "chord", chord: parseChord(spec), label: chordLabel(spec) };
     } catch (cause) {
       throw new KeymapError(cause instanceof ChordError ? cause.message : String(cause));
     }
   }
-  const key = parseChord(leaderMatch[1] as string);
+  const keySpec = leaderMatch[1] as string;
+  const key = parseChord(keySpec);
   if (key.ctrl || key.alt) {
     throw new KeymapError(
       `"${spec}" can never fire: leader keys take at most shift, since ctrl and alt end the leader`,
     );
   }
-  return { kind: "leader", key: leaderKeyOf(key) };
+  return { kind: "leader", key: leaderKeyOf(key), label: chordLabel(keySpec) };
 }
 
 function leaderKeyOf(chord: Chord): string {
   return chord.shift ? `shift+${chord.name}` : chord.name;
+}
+
+function isChordList(pressed: Chord | readonly Chord[]): pressed is readonly Chord[] {
+  return Array.isArray(pressed);
+}
+
+function firstOf(
+  chords: readonly Chord[],
+  find: (chord: Chord) => string | undefined,
+): string | undefined {
+  for (const chord of chords) {
+    const found = find(chord);
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }

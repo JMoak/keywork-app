@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
 import type { LedgerEntry, MemoryGarden, MemoryNote } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
@@ -12,6 +14,7 @@ import {
   stagedNote,
 } from "../../shell/memory-store.test.ts";
 import { createMemoryStore, inertGarden, type MemoryStore } from "../../shell/memory-store.ts";
+import { holdTypingFocus } from "../overview/rows.test.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { inertLine, lifecycleOf, memoryPane, titleOf } from "./index.tsx";
 
@@ -178,6 +181,7 @@ describe("the garden lens", () => {
     act("memory.approve");
     await settle();
     expect(calls).toEqual([`approve ${first?.id}`]);
+    expect(document.querySelector(".kw-memory")?.textContent).toContain("approved");
     setGarden({ ...garden(), inbox: garden().inbox.slice(1) });
     feed.push([inboxEnvelope(9, 1, { note: 1 })]);
     await settle();
@@ -187,6 +191,8 @@ describe("the garden lens", () => {
     act("memory.discard");
     await settle();
     expect(calls.at(-1)).toBe(`discard ${garden().inbox[0]?.id}`);
+    expect(document.querySelector(".kw-memory")?.textContent).toContain("discarded");
+    expect(document.querySelector(".kw-memory")?.textContent).not.toContain("that item is gone");
   });
 
   it("asks the garden inline and lists the hits as note rows", async () => {
@@ -283,3 +289,31 @@ describe("the staged helper", () => {
     expect(stagedNote("x", "X.md").kind).toBe("note");
   });
 });
+
+describe("the memory pane's keyboard home", () => {
+  it("takes DOM focus from a typing field when it is focused", async () => {
+    const typing = holdTypingFocus();
+    const { store } = harness(fixture);
+    mount(store);
+    await settle();
+    expect(document.querySelector(".kw-memory")?.contains(document.activeElement)).toBe(true);
+    typing.remove();
+  });
+});
+
+describe("the memory pane's chrome", () => {
+  it("draws no focus ring of its own, since the frame already marks focus", () => {
+    expect(memoryCss).toMatch(/\.kw-memory:focus \{\s*outline: none;/);
+  });
+
+  it("insets the daily lens title like the note lens title, never flush to the frame", () => {
+    expect(memoryCss).toMatch(
+      /\.kw-memory-daily > \.kw-memory-note-title \{\s*padding: 0\.5rem 1rem 0;/,
+    );
+  });
+});
+
+const memoryCss = readFileSync(
+  join(process.cwd(), "packages/ui/src/panes/memory/memory.css"),
+  "utf8",
+);

@@ -4,6 +4,7 @@ import type {
   PermissionDecision,
   PromptOrigin,
   QueuedPrompt,
+  SessionState,
   SpillReference,
 } from "@keywork-app/protocol";
 
@@ -16,6 +17,7 @@ export interface SessionProjection {
   readonly decisions: Readonly<Record<string, PermissionDecision>>;
   readonly preset: string | undefined;
   readonly mode: string | undefined;
+  readonly standing: SessionState | undefined;
   readonly usage: UsageLedger;
   readonly injections: readonly ContextInjection[];
   readonly diagnostics: Readonly<Record<string, number>>;
@@ -114,6 +116,7 @@ export const emptyProjection: SessionProjection = {
   decisions: {},
   preset: undefined,
   mode: undefined,
+  standing: undefined,
   usage: emptyUsage,
   injections: [],
   diagnostics: {},

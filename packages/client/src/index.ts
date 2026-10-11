@@ -36,6 +36,11 @@ export {
   type FrameBatcher,
   type TickScheduler,
 } from "./projection/coalesce.ts";
+export {
+  type SessionControls,
+  sessionControls,
+  unknownControls,
+} from "./projection/controls.ts";
 export { historyEnvelopes } from "./projection/history.ts";
 export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {

@@ -60,7 +60,10 @@ describe("keyworkClient routes", () => {
         return json(200, { sessions: [] });
       if (call.url.endsWith("/sessions")) return json(201, { id: "s1" });
       if (call.url.endsWith("/sessions/s1")) return json(200, { id: "s1", messages: [] });
-      if (call.url.endsWith("/prompt")) return json(202, { sessionId: "s1", accepted: true });
+      if (call.url.endsWith("/prompt")) {
+        const queued = call.body?.includes("queue") === true;
+        return json(202, { sessionId: "s1", accepted: true, queued, behavior: "queue" });
+      }
       if (call.url.endsWith("/inject")) {
         const queued = call.body?.includes("and then") === true;
         return json(202, { sessionId: "s1", accepted: true, queued });
@@ -73,12 +76,16 @@ describe("keyworkClient routes", () => {
     expect(await client.sessions()).toEqual([]);
     expect((await client.createSession()).id).toBe("s1");
     expect((await client.session("s1"))?.id).toBe("s1");
-    expect(await client.prompt("s1", "hi")).toBe("accepted");
+    expect(await client.prompt("s1", "hi", "steer")).toBe("started");
+    expect(await client.prompt("s1", "later", "queue")).toBe("queued");
     expect(await client.inject("s1", { text: "from voice", client: "wispr-flow" })).toBe("started");
     expect(await client.inject("s1", { text: "and then", client: "wispr-flow" })).toBe("queued");
     expect(await client.abort("s1")).toBe("aborted");
     for (const call of calls) expect(call.headers.authorization).toBe("Bearer t0k3n");
-    expect(calls.find((call) => call.url.endsWith("/prompt"))?.body).toBe('{"text":"hi"}');
+    expect(calls.filter((call) => call.url.endsWith("/prompt")).map((call) => call.body)).toEqual([
+      '{"text":"hi","behavior":"steer"}',
+      '{"text":"later","behavior":"queue"}',
+    ]);
     expect(calls.find((call) => call.url.endsWith("/inject"))?.body).toBe(
       '{"text":"from voice","client":"wispr-flow"}',
     );
@@ -88,7 +95,7 @@ describe("keyworkClient routes", () => {
     const { fetch } = recordingFetch(() => json(404, { error: "no session has that id" }));
     const client = keyworkClient(ticket, { fetch });
     expect(await client.session("nope")).toBeUndefined();
-    expect(await client.prompt("nope", "hi")).toBe("missing");
+    expect(await client.prompt("nope", "hi", "queue")).toBe("missing");
     expect(await client.inject("nope", { text: "hi", client: "cli" })).toBe("missing");
     expect(await client.abort("nope")).toBe("missing");
     expect(await client.entries("nope")).toBeUndefined();
@@ -157,8 +164,8 @@ describe("keyworkClient routes", () => {
       status: 401,
       message: "the server refused the token",
     });
-    await expect(client.prompt("s1", "")).rejects.toThrow(ServerRefusal);
-    await expect(client.prompt("s1", "")).rejects.toThrow("the body is not { text }");
+    await expect(client.prompt("s1", "", "queue")).rejects.toThrow(ServerRefusal);
+    await expect(client.prompt("s1", "", "queue")).rejects.toThrow("the body is not { text }");
   });
 
   it("reads the server document and summarizes it", async () => {
@@ -413,6 +420,39 @@ describe("keyworkClient workspace routes", () => {
     expect(await answer(413).file("huge.bin")).toBe("too-large");
     expect(await answer(415).file("photo.png")).toBe("binary");
     await expect(answer(500).file("a.txt")).rejects.toThrow(ServerRefusal);
+  });
+
+  it("reads a spill's elided range by session and spill id, and the whole spill by default", async () => {
+    const slice = {
+      spillId: "q1",
+      bytes: 68,
+      from: 34,
+      to: 60,
+      text: "the elided middle",
+      truncated: false,
+      eof: false,
+      encoding: "utf-8",
+    };
+    const { calls, fetch } = recordingFetch(() => json(200, slice));
+    const client = keyworkClient(ticket, { fetch });
+    expect(await client.spill("s 1", "q1", { from: 34, to: 60 })).toEqual(slice);
+    await client.spill("s1", "q1");
+    expect(calls.map((call) => call.url.replace(ticket.url, "/"))).toEqual([
+      "/sessions/s%201/spills/q1?from=34&to=60",
+      "/sessions/s1/spills/q1",
+    ]);
+  });
+
+  it("names each refusal of a spill read, telling a missing session from a missing spill", async () => {
+    const answer = (status: number, error: string) =>
+      keyworkClient(ticket, { fetch: recordingFetch(() => json(status, { error })).fetch });
+    expect(await answer(400, "from and to must be whole numbers").spill("s1", "q1")).toBe(
+      "invalid-range",
+    );
+    expect(await answer(404, "no session has that id").spill("gone", "q1")).toBe("missing-session");
+    expect(await answer(404, "no spill q9 in this session").spill("s1", "q9")).toBe("missing");
+    expect(await answer(415, "binary spill").spill("s1", "q1")).toBe("binary");
+    await expect(answer(500, "boom").spill("s1", "q1")).rejects.toThrow(ServerRefusal);
   });
 
   it("posts an empty body to trust the root and types both refusals with the server's words", async () => {

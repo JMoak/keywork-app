@@ -1,0 +1,69 @@
+.kw-controls:empty {
+  display: none;
+}
+
+.kw-controls {
+  border-top: 1px solid var(--kw-border);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-controls-ask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.35rem 0.75rem;
+}
+
+.kw-controls-mark {
+  color: var(--kw-accent);
+}
+
+.kw-controls-input {
+  flex: 1;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  border: 1px solid var(--kw-border);
+  border-radius: 2px;
+  padding: 0.15rem 0.4rem;
+}
+
+.kw-controls-input:focus {
+  outline: none;
+  border-color: var(--kw-border-focus);
+}
+
+.kw-controls-choices {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  list-style: none;
+  color: var(--kw-text-dim);
+}
+
+.kw-controls-choice[data-picked] {
+  color: var(--kw-text);
+}
+
+.kw-controls-confirm {
+  padding: 0.35rem 0.75rem;
+  color: var(--kw-text);
+}
+
+.kw-controls-confirm:focus {
+  outline: none;
+  background: var(--kw-panel-lift);
+}
+
+.kw-controls-lines {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0.75rem;
+  color: var(--kw-text-dim);
+  white-space: pre;
+  overflow-x: auto;
+}

@@ -12,22 +12,43 @@ export function parseFlavor(candidate: unknown): Flavor {
 }
 
 export function contrastFailures(flavor: Flavor): string[] {
+  return contrastMeasurements(flavor)
+    .filter((measurement) => measurement.lc < measurement.floor)
+    .map(({ pair, lc, floor }) => `${pair} measures Lc ${lc.toFixed(1)}, needs at least ${floor}`);
+}
+
+export interface ContrastMeasurement {
+  readonly pair: string;
+  readonly ink: string;
+  readonly ground: string;
+  readonly floor: number;
+  readonly lc: number;
+}
+
+export function contrastMeasurements(flavor: Flavor): ContrastMeasurement[] {
   const measured = (
+    pair: string,
     ink: FlavorReadableToken,
     ground: FlavorGroundToken,
     floor: number,
-  ): string[] => {
-    const value = apcaLc(flavor.tokens[ink], flavor.tokens[ground]);
-    if (value >= floor) return [];
-    return [`${ink} on ${ground} measures Lc ${value.toFixed(1)}, needs at least ${floor}`];
+  ): ContrastMeasurement => {
+    const inkHex = flavor.tokens[ink];
+    const groundHex = flavor.tokens[ground];
+    return { pair, ink: inkHex, ground: groundHex, floor, lc: apcaLc(inkHex, groundHex) };
   };
   return [
-    ...readabilityFloors.flatMap(({ ink, ground, floor }) => measured(ink, ground, floor)),
-    ...densityLevels.flatMap((level) =>
-      measured(flavor.density[level], "background", densityFloors[level]).map(
-        (failure) => `density ${level}: ${failure}`,
-      ),
+    ...readabilityFloors.map(({ ink, ground, floor }) =>
+      measured(`${ink} on ${ground}`, ink, ground, floor),
     ),
+    ...densityLevels.map((level) => {
+      const ink = flavor.density[level];
+      return measured(
+        `density ${level}: ${ink} on background`,
+        ink,
+        "background",
+        densityFloors[level],
+      );
+    }),
   ];
 }
 

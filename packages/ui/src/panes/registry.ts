@@ -67,6 +67,7 @@ export interface PaneAdornments {
   readonly context?: ContextLevel | undefined;
   readonly modeWord?: string | undefined;
   readonly bot?: string | undefined;
+  readonly inference?: string | undefined;
   readonly hueRank?: number | undefined;
 }
 
@@ -101,12 +102,11 @@ export interface ShellSeams {
   currentSession(): string | undefined;
   rebind<Spec extends PaneSpecBase>(paneId: PaneId, spec: Spec): void;
   unseen(view: PaneView<PaneSpecBase>, completed: number): boolean;
-  openInEditor?(path: string, line: number): void;
-  onUndoTurn?(sessionId: string, turn: number): Promise<void>;
   readonly client: KeyworkClient;
   readonly feed: ServerFeed;
   readonly trust: TrustFlow;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
+  openInEditor?(path: string, line: number): Promise<void>;
 }
 
 export function definePane<Spec extends PaneSpecBase>(

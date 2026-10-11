@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
+import { idleControlsClient } from "./controls-store.test.ts";
 import { inertMemoryClient } from "./memory-store.test.ts";
 import { emptySurfacesClient } from "./surfaces-store.test.ts";
 import { inertWorkspaceClient } from "./trust.test.ts";
@@ -45,7 +46,7 @@ function quietClient(): KeyworkClient {
     },
     prompt: async (id, text) => {
       prompts.push([id, text]);
-      return "accepted";
+      return "started";
     },
     abort: async () => "idle",
     events: async function* (): AsyncIterable<BusEnvelope> {
@@ -58,9 +59,11 @@ function quietClient(): KeyworkClient {
     moveLeaf: async () => "missing",
     changes: async () => "missing",
     ...inertMemoryClient(),
+    ...idleControlsClient(),
     ...emptySurfacesClient(),
     ...inertWorkspaceClient(),
     changedFile: async () => "missing",
+    spill: async () => "missing",
     asks: async () => [],
     answerAsk: async () => "settled" as const,
   };

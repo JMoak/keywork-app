@@ -1,3 +1,4 @@
+import type { EffortLevel } from "./controls.ts";
 import type { Message, MessagePart, Usage } from "./events.ts";
 
 export interface SessionSummary {
@@ -6,6 +7,9 @@ export interface SessionSummary {
   createdAt: string;
   lastActivityAt: string;
   messageCount: number;
+  model?: string;
+  thinking?: boolean;
+  effort?: EffortLevel;
   costNanos?: number;
   arc?: string;
   bot?: string;
@@ -18,7 +22,7 @@ export interface SessionDetail extends SessionSummary {
   messages: readonly Message[];
 }
 
-export type PromptOutcome = "accepted" | "missing";
+export type PromptOutcome = "started" | "queued" | "missing";
 
 export interface PromptInjection {
   text: string;

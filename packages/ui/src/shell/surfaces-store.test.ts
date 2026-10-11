@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { ServerFeed, StreamNotice } from "@keywork-app/client";
 import type { BusEnvelope, SurfaceKind } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
@@ -77,11 +78,13 @@ export function emptySurfacesClient(): SurfacesClient {
 }
 
 export function fakeFeed(): {
-  feed: { subscribe: (listener: (envelopes: readonly BusEnvelope[]) => void) => () => void };
+  feed: Pick<ServerFeed, "subscribe" | "onNotice">;
   emit: (kind: SurfaceKind) => void;
+  connect: () => void;
   listeners: number;
 } {
   const listeners = new Set<(envelopes: readonly BusEnvelope[]) => void>();
+  const noticeListeners = new Set<(notice: StreamNotice) => void>();
   let id = 0;
   return {
     feed: {
@@ -89,6 +92,13 @@ export function fakeFeed(): {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
+      onNotice: (listener) => {
+        noticeListeners.add(listener);
+        return () => noticeListeners.delete(listener);
+      },
+    },
+    connect: () => {
+      for (const listener of noticeListeners) listener({ kind: "connected" });
     },
     emit: (kind) => {
       id += 1;
@@ -207,5 +217,22 @@ describe("the surfaces store", () => {
     expect(store.state.notices).toEqual({ bots: "the server answered 500" });
     expect(store.state.loaded.bots).toBeUndefined();
     expect(store.state.mcp).toHaveLength(4);
+  });
+});
+
+describe("the surfaces store across a reopened server", () => {
+  it("reloads every surface when the feed reconnects, but not on its first connection", async () => {
+    const client = fixtureSurfacesClient();
+    const feed = fakeFeed();
+    const store = inRoot(() => createSurfacesStore(client, feed.feed));
+    feed.connect();
+    await settle();
+    expect(client.calls).toEqual([]);
+    feed.connect();
+    await settle();
+    expect([...client.calls].sort()).toEqual(
+      ["arcs", "bots", "flavors", "mcpServers", "workspaces"].sort(),
+    );
+    store.dispose();
   });
 });

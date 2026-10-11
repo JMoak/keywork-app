@@ -1,3 +1,5 @@
+import { spillRoutes } from "./spills.ts";
+
 export const protocolVersion = "0.1.1";
 
 export type HttpMethod = "GET" | "POST";
@@ -23,6 +25,17 @@ export const routes = [
   { method: "POST", path: "/sessions/{id}/leaf", operationId: "moveLeaf" },
   { method: "GET", path: "/sessions/{id}/changes", operationId: "readChanges" },
   { method: "GET", path: "/sessions/{id}/changes/file", operationId: "readChangedFile" },
+  { method: "POST", path: "/sessions/{id}/model", operationId: "setSessionModel" },
+  { method: "POST", path: "/sessions/{id}/thinking", operationId: "setSessionThinking" },
+  { method: "POST", path: "/sessions/{id}/effort", operationId: "setSessionEffort" },
+  { method: "POST", path: "/sessions/{id}/compact", operationId: "compactSession" },
+  { method: "POST", path: "/sessions/{id}/undo", operationId: "undoSessionPrompt" },
+  { method: "POST", path: "/sessions/{id}/redo", operationId: "redoSessionPrompt" },
+  { method: "GET", path: "/sessions/{id}/context", operationId: "readSessionContext" },
+  { method: "GET", path: "/sessions/{id}/cost", operationId: "readSessionCost" },
+  { method: "POST", path: "/sessions/{id}/export", operationId: "exportSession" },
+  { method: "POST", path: "/sessions/{id}/rename", operationId: "renameSession" },
+  { method: "POST", path: "/preset", operationId: "setPreset" },
   { method: "GET", path: "/asks", operationId: "listAsks" },
   { method: "POST", path: "/asks/{callId}", operationId: "answerAsk" },
   { method: "GET", path: "/memory", operationId: "readMemory" },
@@ -67,6 +80,7 @@ export const routes = [
   { method: "POST", path: "/workspaces/{slug}/focus", operationId: "focusWorkspaceDir" },
   { method: "POST", path: "/workspaces/{slug}/unfocus", operationId: "unfocusWorkspaceDir" },
   { method: "GET", path: "/flavors", operationId: "listFlavors" },
+  ...spillRoutes,
 ] as const satisfies readonly RouteShape[];
 
 export type OperationId = (typeof routes)[number]["operationId"];

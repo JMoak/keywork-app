@@ -16,9 +16,10 @@ import {
   bundledBinary,
   fileSeams,
   keyworkOnPath,
-  keyworkTicketFile,
+  keyworkTickets,
   keyworkVersion,
 } from "./system.ts";
+import { probeTicket } from "./ticket.ts";
 import {
   chooseBinary,
   type OpenedWorkspace,
@@ -38,10 +39,10 @@ export function aboutInfo(): HostAbout {
 
 export function createWorkspaces(): WorkspaceHost {
   return workspaceHost({
-    ticketFile: keyworkTicketFile(),
+    locateTickets: keyworkTickets,
     readText: fileSeams.readText,
     removeFile: (path) => rm(path, { force: true }),
-    fetchDocument: (ticket) => keyworkClient(ticket).document(),
+    probeTicket: (ticket) => probeTicket(ticket, fetch),
     supervise: (spec) =>
       superviseServer(spec, {
         spawn: spawnChild,
@@ -155,7 +156,13 @@ function publicView(opened: OpenedWorkspace) {
 
 function openExternal(url: string, workspaceRoots: readonly string[]): Promise<void> {
   const verdict = externalVerdict(url, workspaceRoots);
-  return verdict.ok ? shell.openExternal(verdict.url) : Promise.reject(new Error(verdict.reason));
+  if (!verdict.ok) return Promise.reject(new Error(verdict.reason));
+  return verdict.path === undefined ? shell.openExternal(verdict.url) : openFile(verdict.path);
+}
+
+async function openFile(path: string): Promise<void> {
+  const problem = await shell.openPath(path);
+  if (problem !== "") throw new Error(`could not open ${path}: ${problem}`);
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

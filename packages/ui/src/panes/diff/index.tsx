@@ -7,6 +7,7 @@ import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 import { type MergeMount, mergeLayoutFor, mountMergeView } from "./merge-view.ts";
+import { createTurnVerbs, TurnVerbRow, type TurnVerbs } from "./turn-verbs.tsx";
 import "./diff.css";
 
 const diffSpec = z.object({
@@ -72,6 +73,19 @@ export const diffPane = definePane<DiffSpec>({
       help: "refresh",
       command: { name: "diff-refresh", description: "reread the changed files" },
     },
+    "diff.undo": {
+      chords: "u",
+      help: "undo the last prompt",
+      command: {
+        name: "undo-turn",
+        description: "take back the last prompt, its turn and the files it changed",
+      },
+    },
+    "diff.redo": {
+      chords: "shift+u",
+      help: "redo what undo took",
+      command: { name: "redo-turn", description: "bring back the turn and files the undo took" },
+    },
   },
   onRestore: (spec, shell) => {
     if (spec.sessionId !== undefined) void shell.store.openChanges(spec.sessionId);
@@ -107,20 +121,28 @@ function DiffSlot(props: PaneProps<DiffSpec>) {
       when={props.spec.sessionId}
       fallback={<EmptyState line={diffPane.emptyState(props.shell.keys)} />}
     >
-      {(sessionId) => (
-        <Show
-          keyed
-          when={props.spec.path}
-          fallback={<FilesLevel {...props} sessionId={sessionId} />}
-        >
-          {(path) => <FileLevel {...props} sessionId={sessionId} path={path} />}
-        </Show>
-      )}
+      {(sessionId) => <SessionDiff {...props} sessionId={sessionId} />}
     </Show>
   );
 }
 
-function FilesLevel(props: PaneProps<DiffSpec> & { sessionId: string }) {
+function SessionDiff(props: PaneProps<DiffSpec> & { sessionId: string }) {
+  const verbs = createTurnVerbs(props.shell, () => props.sessionId);
+  return (
+    <Show keyed when={props.spec.path} fallback={<FilesLevel {...props} verbs={verbs} />}>
+      {(path) => <FileLevel {...props} path={path} verbs={verbs} />}
+    </Show>
+  );
+}
+
+type LevelProps = PaneProps<DiffSpec> & { sessionId: string; verbs: TurnVerbs };
+
+function turnVerb(action: string, verbs: TurnVerbs): void {
+  if (action === "diff.undo") void verbs.undo();
+  if (action === "diff.redo") void verbs.redo();
+}
+
+function FilesLevel(props: LevelProps) {
   const [cursor, setCursor] = createSignal(0);
   const changes = () => props.shell.store.changes(props.sessionId);
   const groups = createMemo((): TurnGroup[] => changesByTurn(changes().files));
@@ -154,11 +176,14 @@ function FilesLevel(props: PaneProps<DiffSpec> & { sessionId: string }) {
       case "diff.refresh":
         void props.shell.store.openChanges(props.sessionId, { force: true });
         break;
+      default:
+        turnVerb(action, props.verbs);
     }
   });
 
   return (
     <section class="kw-diff" aria-label="changed files" tabIndex={-1} ref={root}>
+      <TurnVerbRow verbs={props.verbs} keys={props.shell.keys} />
       <Show when={availabilityLine(changes())}>
         {(line) => <p class="kw-diff-unavailable">{line()}</p>}
       </Show>
@@ -202,7 +227,7 @@ function FilesLevel(props: PaneProps<DiffSpec> & { sessionId: string }) {
   );
 }
 
-function FileLevel(props: PaneProps<DiffSpec> & { sessionId: string; path: string }) {
+function FileLevel(props: LevelProps & { path: string }) {
   const [reading, setReading] = createSignal<ChangedFileReading>();
   const [tier, setTier] = createSignal<WidthTier>("column");
   const [hunks, setHunks] = createSignal(0);
@@ -270,11 +295,14 @@ function FileLevel(props: PaneProps<DiffSpec> & { sessionId: string; path: strin
       case "diff.refresh":
         void props.shell.store.changedFile(props.sessionId, props.path).then(setReading);
         break;
+      default:
+        turnVerb(action, props.verbs);
     }
   });
 
   return (
     <section class="kw-diff" aria-label="file diff" tabIndex={-1} ref={root}>
+      <TurnVerbRow verbs={props.verbs} keys={props.shell.keys} />
       <div class="kw-diff-head">
         <button type="button" class="kw-diff-back" onClick={back}>
           ‹ changes
@@ -286,7 +314,7 @@ function FileLevel(props: PaneProps<DiffSpec> & { sessionId: string; path: strin
             <button
               type="button"
               class="kw-diff-editor"
-              onClick={() => openInEditor()(props.path, 1)}
+              onClick={() => void openInEditor()(props.path, 1).catch(() => undefined)}
             >
               open in editor
             </button>

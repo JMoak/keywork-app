@@ -1,13 +1,13 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import { bundledSidecar } from "../shared/sidecar.ts";
 import { commandOutput } from "./child.ts";
 import type { FileSeams } from "./recents.ts";
 import { versionOfLine } from "./workspace.ts";
+import { locateTickets, type TicketLocation } from "./workspace-identity.ts";
 
-export function keyworkTicketFile(home: string = homedir()): string {
-  return join(home, ".keywork", "server.json");
+export function keyworkTickets(workspace: string): Promise<TicketLocation> {
+  return locateTickets(workspace, { home: homedir(), platform: process.platform, exists });
 }
 
 export const fileSeams: FileSeams = {
@@ -67,4 +67,13 @@ export function bundledBinary(
   platform: NodeJS.Platform = process.platform,
 ): string {
   return bundledSidecar(resourcesPath, platform);
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

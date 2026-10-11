@@ -27,12 +27,12 @@ describe("check:contract", () => {
       const method = route.operationId === "injectPrompt" ? "put" : route.method.toLowerCase();
       paths[route.path] = { ...paths[route.path], [method]: { operationId: route.operationId } };
     }
-    paths["/sessions/{id}/rename"] = { post: { operationId: "renameSession" } };
+    paths["/sessions/{id}/mode"] = { post: { operationId: "setSessionMode" } };
     const document = documentOfOpenApi({ info: { version: "9.9.9" }, paths }, "drifted");
     expect(contractViolations(document)).toEqual([
       `the server reports version 9.9.9; the app pins ${protocolVersion}`,
       "the server no longer serves abortSession",
-      "the server added renameSession; the protocol does not know it yet",
+      "the server added setSessionMode; the protocol does not know it yet",
       "injectPrompt moved: the protocol has POST /sessions/{id}/inject, the server PUT /sessions/{id}/inject",
     ]);
   });

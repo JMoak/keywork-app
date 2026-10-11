@@ -10,6 +10,7 @@ assume the earlier ones.
 | [`stack.md`](stack.md) | Every component with its exact pin and why it won, the alternatives considered, the repository layout |
 | [`plan.md`](plan.md) | Milestones M0–M5 with sized tasks and acceptance criteria, the server lane that lives in the keywork repo, and the assumptions to confirm before building |
 | [`release.md`](release.md) | Cutting a release: the tag ritual, what `release.yml` produces on three runners, the sidecar pin fetched by checksum, the signing secrets, and how the updater behaves unsigned |
+| [`textures.md`](textures.md) | The M5.4 textures (grapheme corpus, paste flood, first-class light, empty states, latency): each ratchet, its number, where it lives and how to move it |
 
 The keywork docs this plan derives from, in the keywork repo: `docs/vision.md` (D1–D10),
 `docs/events.md` (the wire), `docs/headless.md` (exit classes), `docs/design-language.md`,

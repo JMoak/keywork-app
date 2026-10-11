@@ -1,5 +1,5 @@
 import { Match, Show, Switch } from "solid-js";
-import { reopeningNotice, type TrustFlow, trustEnables, trustPrompt } from "./trust.ts";
+import { reopeningNotice, type TrustFlow, trustPrompt, trustStaysOff } from "./trust.ts";
 import "./trust.css";
 
 export interface TrustCardProps {
@@ -15,9 +15,7 @@ export function TrustCard(props: TrustCardProps) {
         <Switch>
           <Match when={state().kind === "undecided" || state().kind === "failed"}>
             <p class="kw-trust-ask">{trustPrompt(rootOf(state()))}</p>
-            <p class="kw-trust-enables">
-              trusting turns on {trustEnables} · until then this folder is read-only to the agent
-            </p>
+            <p class="kw-trust-enables">{trustStaysOff}</p>
             <Show when={messageOf(state())}>
               {(message) => <p class="kw-trust-refusal">{message()}</p>}
             </Show>

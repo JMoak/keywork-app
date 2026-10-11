@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { emptyProjection } from "@keywork-app/client";
 import type { SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render } from "@solidjs/testing-library";
@@ -15,7 +17,11 @@ import {
   type SurfacesStore,
 } from "../../shell/surfaces-store.ts";
 import { inertShellExtras } from "../../shell/trust.test.ts";
+import { arcsPane } from "../arcs/index.tsx";
+import { botsPane } from "../bots/index.tsx";
+import { mcpPane } from "../mcp/index.tsx";
 import type { PaneProps, PaneSpecBase, ShellSeams } from "../registry.ts";
+import { workspacesPane } from "../workspaces/index.tsx";
 import { ChoiceLine, ConfirmLine, createCursor, DraftLine } from "./rows.tsx";
 
 export interface OverviewHarness {
@@ -182,3 +188,49 @@ describe("the overview lines", () => {
     expect(chosen).toEqual(["u", "cancel"]);
   });
 });
+
+describe("the overview panes' keyboard home", () => {
+  const panes = [
+    ["mcp", mcpPane],
+    ["arcs", arcsPane],
+    ["bots", botsPane],
+    ["workspaces", workspacesPane],
+  ] as const;
+
+  it.each(panes)(
+    "%s takes DOM focus from a typing field when it is focused",
+    async (kind, pane) => {
+      const typing = holdTypingFocus();
+      const harness = overviewShell();
+      await harness.surfaces.load();
+      const { container } = mountPane(
+        pane.component as (props: PaneProps<PaneSpecBase>) => JSX.Element,
+        { kind },
+        harness.shell,
+      );
+      await settle();
+      expect(container.firstElementChild?.contains(document.activeElement)).toBe(true);
+      typing.remove();
+      harness.dispose();
+    },
+  );
+});
+
+export function holdTypingFocus(): HTMLTextAreaElement {
+  const typing = document.createElement("textarea");
+  document.body.append(typing);
+  typing.focus();
+  expect(document.activeElement).toBe(typing);
+  return typing;
+}
+
+describe("the overview chrome", () => {
+  it("draws no focus ring of its own, since the frame already marks focus", () => {
+    expect(overviewCss).toMatch(/\.kw-ov:focus \{\s*outline: none;/);
+  });
+});
+
+const overviewCss = readFileSync(
+  join(process.cwd(), "packages/ui/src/panes/overview/overview.css"),
+  "utf8",
+);

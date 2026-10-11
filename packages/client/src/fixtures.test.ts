@@ -1,7 +1,14 @@
 import { readFile } from "node:fs/promises";
-import type { BusEnvelope, SessionDetail } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  CostReport,
+  SessionDetail,
+  SessionSummary,
+  Undone,
+} from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { coalesceEnvelopes } from "./projection/coalesce.ts";
+import { sessionControls } from "./projection/controls.ts";
 import { historyEnvelopes } from "./projection/history.ts";
 import { projectAll } from "./projection/project.ts";
 import { toolRowText } from "./projection/tool-row.ts";
@@ -178,6 +185,7 @@ describe("fixtures recorded from keywork serve", () => {
       "interrupt",
       "queued",
       "injected",
+      "controls",
     ]) {
       const stream = await envelopes(name);
       expect(projectAll(emptyProjection, coalesceEnvelopes(stream)), name).toEqual(
@@ -197,31 +205,130 @@ describe("fixtures recorded from keywork serve", () => {
       "interrupt",
       "queued",
       "injected",
+      "controls",
     ]) {
       expect(await projected(name)).toMatchSnapshot(name);
     }
   });
 });
 
-describe("the raw SSE capture", () => {
-  it("parses byte for byte into the same envelopes the jsonl fixture holds", async () => {
-    const raw = await readFile(fixture("plain.sse"));
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        for (let at = 0; at < raw.length; at += 13) controller.enqueue(raw.subarray(at, at + 13));
-        controller.close();
-      },
+describe("controls recorded from K1's session verbs", () => {
+  interface Answer<Body> {
+    status: number;
+    body: Body;
+  }
+
+  async function answers(): Promise<Record<string, Answer<unknown>>> {
+    return JSON.parse(await readFile(fixture("controls.json"), "utf8"));
+  }
+
+  it("folds each session.state into the projection's standing, whole rather than merged", async () => {
+    const stream = await envelopes("controls");
+    const states = stream.filter((envelope) => envelope.type === "session.state");
+    expect(states).toHaveLength(6);
+    const afterThinking = projectAll(emptyProjection, stream.slice(0, 8));
+    expect(afterThinking.standing).toMatchObject({ model: "mock/beta", thinking: true });
+    expect(afterThinking.standing?.effort).toBeUndefined();
+    const undone = projectAll(emptyProjection, stream.slice(0, 11));
+    expect(undone.standing).toMatchObject({ leafId: null, undoable: false, redoable: true });
+    const state = await projected("controls");
+    expect(state.standing).toEqual({
+      model: "mock/beta",
+      thinking: true,
+      effort: "high",
+      title: "Lights",
+      leafId: "q5",
+      undoable: true,
+      redoable: false,
     });
-    const parsed: BusEnvelope[] = [];
-    let connected = false;
-    for await (const frame of sseFrames(body)) {
-      if (frame.comments.includes("connected")) connected = true;
-      const envelope = envelopeOf(frame);
-      if (envelope !== undefined) parsed.push(envelope);
-    }
-    expect(connected).toBe(true);
-    expect(parsed).toEqual(await envelopes("plain"));
   });
+
+  it("carries the preset switch as a process-level envelope", async () => {
+    const preset = (await envelopes("controls")).find(
+      (envelope) => envelope.type === "gate.preset",
+    );
+    expect(preset).toMatchObject({ sessionId: "", payload: { from: "standard", to: "open" } });
+  });
+
+  it("seeds the same controls from the session summary before any event arrives", async () => {
+    const recorded = await answers();
+    const listed = recorded.sessions as Answer<{ sessions: SessionSummary[] }>;
+    const summary = listed.body.sessions[0];
+    expect(sessionControls(summary, emptyProjection)).toEqual({
+      model: "mock/beta",
+      thinking: true,
+      effort: "high",
+      title: "Lights",
+      leafId: undefined,
+      undoable: undefined,
+      redoable: undefined,
+      basis: "summary",
+    });
+    expect(sessionControls(summary, await projected("controls"))).toMatchObject({
+      basis: "reported",
+      undoable: true,
+    });
+  });
+
+  it("answers undo with the prompt text, refuses a second undo, and redo brings it back", async () => {
+    const recorded = await answers();
+    expect((recorded.undo as Answer<Undone>).body.prompt?.text).toBe("turn on the lights");
+    expect(recorded.undoAgain).toEqual({
+      status: 409,
+      body: { error: "already undone · send a prompt to keep it, or redo to bring it back" },
+    });
+    expect(recorded.redo).toMatchObject({ status: 200, body: { restored: true, redoable: false } });
+    expect(recorded.redoAgain).toEqual({ status: 404, body: { error: "nothing to redo" } });
+  });
+
+  it("refuses unknown words with 400 and loosening without confirmation with 409", async () => {
+    const recorded = await answers();
+    expect(recorded.modelUnknown).toMatchObject({
+      status: 400,
+      body: { failure: { code: "unknown-model", known: ["mock/alpha", "mock/beta"] } },
+    });
+    expect(recorded.effortUnknown?.status).toBe(400);
+    expect(recorded.presetLoosening).toEqual({
+      status: 409,
+      body: { error: "loosening needs confirmed: true" },
+    });
+    expect(recorded.preset).toEqual({ status: 200, body: { from: "standard", to: "open" } });
+  });
+
+  it("reports cost per model and a context reading with its basis", async () => {
+    const recorded = await answers();
+    const cost = (recorded.cost as Answer<CostReport>).body;
+    expect(cost.models.map((row) => [row.reference, row.turns])).toEqual([["mock/alpha", 1]]);
+    expect(cost.rollup.unpricedTurns).toBe(1);
+    expect(recorded.context).toMatchObject({
+      status: 200,
+      body: { window: 200_000, declared: false, basis: "estimated" },
+    });
+  });
+});
+
+describe("the raw SSE capture", () => {
+  it.each(["plain", "controls"])(
+    "%s.sse parses byte for byte into the jsonl envelopes",
+    async (name) => {
+      const raw = await readFile(fixture(`${name}.sse`));
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let at = 0; at < raw.length; at += 13) controller.enqueue(raw.subarray(at, at + 13));
+          controller.close();
+        },
+      });
+      const parsed: BusEnvelope[] = [];
+      let connected = false;
+      for await (const frame of sseFrames(body)) {
+        if (frame.comments.includes("connected")) connected = true;
+        const envelope = envelopeOf(frame);
+        if (envelope !== undefined) parsed.push(envelope);
+      }
+      expect(connected).toBe(true);
+      expect(parsed).toEqual(await envelopes(name));
+    },
+  );
 });
 
 describe("stored history", () => {

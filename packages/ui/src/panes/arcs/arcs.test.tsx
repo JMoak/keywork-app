@@ -2,7 +2,8 @@ import type { SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
-import { arcHueStyle, arcRows, arcsPane, closeOutcomeLine } from "./index.tsx";
+import { noWorkingSession } from "../overview/working-session.ts";
+import { type ArcsSpec, arcHueStyle, arcRows, arcsPane, closeOutcomeLine } from "./index.tsx";
 
 afterEach(cleanup);
 
@@ -122,6 +123,30 @@ describe("the arcs pane", () => {
     await harness.surfaces.load();
     const { container } = mountPane(arcsPane.component, { kind: "arcs" }, harness.shell);
     expect(container.querySelector(".kw-empty")?.textContent).toBe(notice);
+    harness.dispose();
+  });
+});
+
+describe("the arcs pane's working session", () => {
+  it("binds the session it was summoned from, though the arcs pane now holds focus", async () => {
+    const calls: string[] = [];
+    const harness = overviewShell({
+      client: {
+        bindSessionArc: async (id, slug) => {
+          calls.push(`bind:${id}:${slug}`);
+          return { sessionId: id, arc: slug };
+        },
+      },
+    });
+    await harness.surfaces.load();
+    const fromConversation = { ...harness.shell, currentSession: () => "s7" };
+    const spec = (await arcsPane.summon?.spec(fromConversation)) as ArcsSpec;
+    expect(spec).toEqual({ kind: "arcs", sessionId: "s7" });
+    const { container, act } = mountPane(arcsPane.component, spec, harness.shell);
+    act("arcs.bind");
+    await settle();
+    expect(calls).toEqual(["bind:s7:arc-1"]);
+    expect(container.textContent).not.toContain(noWorkingSession);
     harness.dispose();
   });
 });

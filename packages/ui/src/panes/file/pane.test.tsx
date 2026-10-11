@@ -1,11 +1,14 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
-import type { FileRange, FileReading, FileSlice } from "@keywork-app/protocol";
+import type { FileRange, FileReading, FileSlice, SpillReading } from "@keywork-app/protocol";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fileWhole from "../../../../client/src/fixtures/file.json?raw";
 import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
+import { holdTypingFocus } from "../overview/rows.test.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { describeRefusal, type FileSpec, filePane, spillFileSpec } from "./index.tsx";
 
@@ -45,15 +48,24 @@ interface Harness {
   external: string[];
 }
 
-function harness(answer: (path: string, range?: FileRange) => FileReading): Harness {
+function harness(
+  answer: (path: string, range?: FileRange) => FileReading,
+  spillAnswer: SpillReading = "missing",
+): Harness {
   const requests: Array<[string, FileRange | undefined]> = [];
   const external: string[] = [];
-  const client = inertWorkspaceClient({
-    file: async (path, range) => {
-      requests.push([path, range]);
-      return answer(path, range);
+  const client = {
+    ...inertWorkspaceClient({
+      file: async (path, range) => {
+        requests.push([path, range]);
+        return answer(path, range);
+      },
+    }),
+    spill: async (sessionId: string, spillId: string, range?: FileRange) => {
+      requests.push([`spill ${sessionId}/${spillId}`, range]);
+      return spillAnswer;
     },
-  }) as unknown as KeyworkClient;
+  } as unknown as KeyworkClient;
   const host = browserHost();
   host.openExternal = async (url) => void external.push(url);
   const shell: ShellSeams = {
@@ -106,13 +118,17 @@ describe("the file pane", () => {
     expect(mounts[0]?.scrolled).toEqual(["top", "by 1"]);
   });
 
-  it("opens a spill at its range and says which bytes it holds", async () => {
-    const h = harness(() => range);
-    const spec = spillFileSpec({ id: "q1", bytes: 68, elidedFrom: 34, elidedTo: 60 });
-    expect(spec).toEqual({ kind: "file", path: "q1", from: 34, to: 60 });
-    const { view } = mount(h, { ...spec, path: "src/index.ts" });
+  it("opens a spill at its elided range through the session's spill route and says which bytes it holds", async () => {
+    const { path: _path, ...slice } = range;
+    const h = harness(() => "missing", { ...slice, spillId: "q1" });
+    const spec = spillFileSpec({ id: "q1", bytes: 68, elidedFrom: 34, elidedTo: 60 }, "s1");
+    expect(spec).toEqual({ kind: "file", path: "q1", from: 34, to: 60, spillOf: "s1" });
+    expect(filePane.title(spec, h.shell)).toBe("spill q1");
+    const { view, act } = mount(h, spec);
     await waitFor(() => expect(mounts[0]?.text).toBe(range.text));
-    expect(h.requests).toEqual([["src/index.ts", { from: 34, to: 60 }]]);
+    expect(h.requests).toEqual([["spill s1/q1", { from: 34, to: 60 }]]);
+    act("file.editor");
+    expect(h.external).toEqual([]);
     expect(view.container.querySelector(".kw-file-facts")?.textContent).toBe(
       "bytes 34..60 of 68 B",
     );
@@ -131,16 +147,18 @@ describe("the file pane", () => {
     }));
     const { act } = mount(h, { kind: "file", path: "log.txt", atEnd: true });
     await waitFor(() => expect(mounts[0]?.text).toBe(`slice ${big - 1024 * 1024}`));
+    expect(mounts[0]?.scrolled).toEqual(["end"]);
     expect(h.requests).toEqual([
       ["log.txt", { from: 0, to: 1 }],
       ["log.txt", { from: big - 1024 * 1024, to: big }],
     ]);
     act("file.previous");
     await waitFor(() => expect(mounts[0]?.text).toBe(`slice ${big - 2 * 1024 * 1024}`));
+    expect(mounts[0]?.scrolled).toEqual(["end", "end"]);
     act("file.next");
     await waitFor(() => expect(mounts[0]?.text).toBe(`slice ${big - 1024 * 1024}`));
     act("file.end");
-    expect(mounts[0]?.scrolled).toEqual(["end"]);
+    expect(mounts[0]?.scrolled).toEqual(["end", "end", "end"]);
   });
 
   it("states a binary, oversized, missing or confined file honestly", async () => {
@@ -167,8 +185,26 @@ describe("the file pane", () => {
       );
       cleanup();
     }
-    expect(describeRefusal("binary", "a")).toContain("binary");
+    expect(describeRefusal("binary", { kind: "file", path: "a" })).toContain("binary");
     expect(mounts).toHaveLength(0);
+  });
+
+  it("names each refusal of a spill in the server's words", async () => {
+    for (const [reading, expected] of [
+      ["missing", "no spill q9 in this session"],
+      ["missing-session", "no session has that id"],
+      ["binary", "binary spill"],
+      ["invalid-range", "from and to must be whole numbers"],
+    ] as const) {
+      const h = harness(() => "missing", reading);
+      const { view } = mount(h, { kind: "file", path: "q9", spillOf: "s1" });
+      await waitFor(() =>
+        expect(
+          view.container.querySelector(".kw-file-note[data-level='error']")?.textContent,
+        ).toContain(expected),
+      );
+      cleanup();
+    }
   });
 
   it("shows the empty state for an empty file and titles itself with the path", async () => {
@@ -176,5 +212,47 @@ describe("the file pane", () => {
     const { view } = mount(h, { kind: "file", path: "empty.txt" });
     await waitFor(() => expect(view.container.textContent).toContain("an empty file"));
     expect(filePane.title({ kind: "file", path: "src/a.ts" }, h.shell)).toBe("src/a.ts");
+  });
+});
+
+describe("the file pane's keyboard home", () => {
+  it("takes DOM focus from a typing field when it is focused", async () => {
+    const typing = holdTypingFocus();
+    const h = harness(() => whole);
+    const { view } = mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() =>
+      expect(view.container.firstElementChild?.contains(document.activeElement)).toBe(true),
+    );
+    typing.remove();
+  });
+});
+
+describe("the file pane's chrome", () => {
+  it("keeps the slice facts at every width, shedding only the hint, and draws no focus ring of its own", () => {
+    const narrow = fileCss.slice(fileCss.indexOf("@container"));
+    expect(narrow).not.toContain(".kw-file-facts");
+    expect(narrow).toContain(".kw-file-more");
+    expect(fileCss).toMatch(/\.kw-file:focus \{\s*outline: none;/);
+  });
+});
+
+const fileCss = readFileSync(join(process.cwd(), "packages/ui/src/panes/file/file.css"), "utf8");
+
+describe("the file pane's editor link", () => {
+  it("says so in the pane when the host refuses to open the file, in the host's own words", async () => {
+    const h = harness(() => whole);
+    h.shell.host.openExternal = async () => {
+      throw new Error(
+        "Error invoking remote method 'host:open-external': Error: Failed to open: The system cannot find the file specified. (0x2)",
+      );
+    };
+    const { view, act } = mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    act("file.editor");
+    await waitFor(() =>
+      expect(view.container.querySelector(".kw-file-note[data-level='error']")?.textContent).toBe(
+        "couldn't open in your editor · Failed to open: The system cannot find the file specified. (0x2)",
+      ),
+    );
   });
 });

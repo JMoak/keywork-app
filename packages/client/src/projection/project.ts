@@ -1,6 +1,8 @@
 import type {
   BusEnvelope,
   EnginePayloads,
+  ExtensionNotice,
+  ExtensionNoticeLevel,
   PermissionAsk,
   PermissionDecision,
   ToolCallPart,
@@ -61,6 +63,8 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       return { ...state, preset: envelope.payload.to };
     case "session.mode":
       return { ...state, mode: envelope.payload.mode };
+    case "session.state":
+      return { ...state, standing: envelope.payload };
     case "context.injected":
       return { ...state, injections: [...state.injections, envelope.payload.injection] };
     case "diagnostics.published":
@@ -75,6 +79,8 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "memory.inbox":
     case "surface.changed":
       return state;
+    case "extension.notice":
+      return replay ? state : notice(state, "info", extensionLine(envelope.payload));
     case "engine.error":
       return notice(
         endTurn({ ...state, lastError: envelope.payload.error.message }),
@@ -290,6 +296,16 @@ function addUsage(ledger: UsageLedger, usage: Usage): UsageLedger {
     costUsd: ledger.costUsd + (usage.costUsd ?? 0),
   };
 }
+
+function extensionLine(payload: ExtensionNotice): string {
+  return `${extensionMarks[payload.level]} ${payload.extension} · ${payload.message}`;
+}
+
+const extensionMarks: Readonly<Record<ExtensionNoticeLevel, string>> = {
+  info: "░",
+  warn: "▒",
+  error: "█",
+};
 
 function notice(
   state: SessionProjection,

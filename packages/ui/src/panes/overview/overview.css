@@ -5,6 +5,10 @@
   font-family: var(--kw-font-mono);
 }
 
+.kw-ov:focus {
+  outline: none;
+}
+
 .kw-ov-head {
   display: flex;
   align-items: baseline;

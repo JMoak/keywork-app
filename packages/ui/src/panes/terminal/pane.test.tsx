@@ -152,7 +152,7 @@ describe("the terminal pane", () => {
       "keywork connect",
     );
     expect(terminalPane.title({ kind: "terminal", mode: "mirror" }, shell)).toBe("mirror");
-    expect(terminalPane.emptyState(shell.keys)).toContain("except ctrl+k");
+    expect(terminalPane.emptyState(shell.keys)).toContain("every key but the leader");
     expect(terminalPane.adornments?.({ kind: "terminal", mode: "bridge" }, shell)).toEqual({
       modeWord: "bridge",
     });

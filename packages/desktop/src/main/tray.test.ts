@@ -1,6 +1,7 @@
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { decodePngHeader, encodePng, trayMarkPng, trayModel } from "./tray.ts";
+import { windowRegistry } from "./windows.ts";
 
 describe("trayModel", () => {
   it("names the pending ask count in the tooltip and badge, and lists every open workspace", () => {
@@ -42,6 +43,16 @@ describe("trayModel", () => {
     expect(trayModel([{ workspace: "C:/w", windows: 1, pendingAsks: 1 }]).badge).toBe(
       "1 ask waiting",
     );
+  });
+
+  it("follows the count a window reports as an ask arrives and its gate.permission settles it", () => {
+    const registry = windowRegistry();
+    registry.add(7, "C:/work/app");
+    const badges: Array<string | undefined> = [];
+    registry.onChange(() => badges.push(trayModel(registry.list()).badge));
+    registry.setPendingAsks(7, 1);
+    registry.setPendingAsks(7, 0);
+    expect(badges).toEqual(["1 ask waiting", undefined]);
   });
 });
 

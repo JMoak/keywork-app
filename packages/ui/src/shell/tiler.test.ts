@@ -128,3 +128,47 @@ describe("createTiler", () => {
     });
   });
 });
+
+describe("refusals in keywork's words", () => {
+  const full = (tiler: ReturnType<typeof createTiler>): void => {
+    tiler.summon(sessions, screen);
+    while (tiler.open(conversation(), screen).ok);
+  };
+
+  it("names the full layout when a pane cannot be placed, and still closes on it", () => {
+    withTiler((tiler) => {
+      full(tiler);
+      const crowded = tiler.panes().length;
+      expect(tiler.open(conversation("one more"), screen)).toEqual({
+        ok: false,
+        refused: "no-room",
+        notice: "no room for another pane · close or resize one",
+      });
+      expect(tiler.closeFocused()).toEqual({ ok: true });
+      expect(tiler.panes()).toHaveLength(crowded - 1);
+      expect(tiler.open(conversation("fits again"), screen).ok).toBe(true);
+    });
+  });
+
+  it("says which home has no room when a pane cannot move there", () => {
+    withTiler((tiler) => {
+      const narrow = { width: 1000, height: 600 };
+      tiler.summon(sessions, narrow);
+      while (tiler.open(conversation(), narrow).ok);
+      const refusal = tiler.dock("right", narrow);
+      expect(refusal.ok || refusal.notice).toBe(
+        "no room in the right dock · close or resize a pane",
+      );
+    });
+  });
+
+  it("says nothing is focused instead of refusing a close silently", () => {
+    withTiler((tiler) => {
+      expect(tiler.closeFocused()).toEqual({
+        ok: false,
+        refused: "no-focus",
+        notice: "no pane is focused · nothing to close",
+      });
+    });
+  });
+});

@@ -632,6 +632,154 @@ loosening over HTTP, rename pinning and `effort: null`, cost lineage, the events
 one `surface.changed` or four, context-dir linking, the `system` flavor placeholder); the
 deb executable name; installing Bun 1.3.14 locally; whether to persist injection origin.
 
+### Wave 5 ledger (2026-10-10): K1 consumed, the panes verified live, the leftovers closed
+
+Five lanes ran at once, one in keywork. The precondition found at the start: keywork's `main`
+had merged agentbox (bc33378) after wave 4 was cut, carrying the wave-0 route split but also
+~120 other engine, TUI and CLI files, so the wave-4 lane worktrees were stale against it and a
+merge of `app-surface/*` as-is would have conflicted. The keywork lane therefore re-based the
+integration rather than merging stale branches.
+
+**Lane K5, keywork (landed on branch `app-surface/next`, worktree `C:\src\keywork-lanes\next`,
+staged, uncommitted).** K2+K3+K4 re-applied onto bc33378 (five conflicts, all agentbox's
+`extension.notice` beside k2's events), then K1 folded (fourteen conflicts, each recorded in the
+118 ledger and in `C:\src\keywork-lanes\INTEGRATION-NEXT.md`): one `serverEventTypes` of
+`surface.changed`, `memory.inbox`, `session.state`; `routeFamilies` ending `memory,
+sessionVerbs, presets`; the test host's undo and redo move the store's leaf so the store and
+agent never disagree; `serve.ts` composes `arcService`, `botMemory` and citations once with
+K1's per-session provider and one `AgentBuild` seam that keeps the session's bot across
+rebuilds. Served sessions now spill large tool output like the TUI (they never had), the guard
+calls `checkpoints.beginTurn()` as agentbox's `chat.ts` does, and a leaf move announces
+`session.state`. The spill route: `GET /sessions/{id}/spills/{spillId}?from=&to=` → `{ spillId,
+bytes, from, to, text, truncated, eof, encoding }`, the `/files` slice keyed by the engine's
+existing `SpillReference.id`; 400 on a bad range, 404 unknown session or spill, 415 on NUL;
+stored sessions answer too. `/doc` has 62 paths. Gate: types, lint, prose, pins, guardrails
+green; 325 files, 4533 tests passed, 1 pre-existing skip. The only wire change agentbox made:
+the engine event `extension.notice { extension, level, message, detail? }`.
+
+**Lane A5, the app consumes K1 (M3.6 preset half, M4.2 undo and redo, M4.8 finished).**
+`protocol/src/controls.ts` mirrors K1's shapes verbatim, eleven routes, `session.state` beside
+the server events, `extension.notice` beside the engine's (nineteen), `SessionSummary` with
+`model`, `thinking`, `effort`, `PromptOutcome` as `started | queued | missing`; one client
+method per route with every refusal typed (`invalid`, `unresolved`, `busy`, `staged`,
+`nothing`, `outside-scope`, `needs-confirmation`, `unavailable`), `prompt` always sending
+`behavior` (**finding: Alt+Enter steer had sent exactly what Enter sent**), `events` taking
+`session` and `onlySession`. Fixture `controls` recorded from `next` (model switch and an
+unknown model, thinking, effort and an unknown word, rename, context, cost, undo returning the
+prompt, a second undo as `staged`, redo, a second redo as `nothing`, preset loosening refused
+then confirmed with the process-level `gate.preset`, export); `doc.json` at 62 paths. The
+projection keeps `standing` (the latest `session.state`) and renders `extension.notice` as a
+quiet notice row by level. `shell/controls-store.ts` reads context and cost on watch and on
+`turn.completed`/`session.state`, learns the preset from `gate.preset`, builds the model list
+from summaries, states and the server's refusal lists, reloads the transcript after undo, redo
+and compact, and seeds the composer after undo. Conversation pane chords, all pane-local:
+`leader o` model picker, `leader v` thinking, `leader e` effort cycle to provider default,
+`leader shift+c` compact, `leader shift+r` rename inline, `leader shift+e` export to the
+clipboard (`export-file` writes into the workspace through the server), `leader [` / `leader ]`
+preset tighter and looser with keywork's confirm line before any loosening; palette commands for
+each plus `undo`, `redo`, `cost`, and the three presets by name. The title row shows
+`model · thinking · effort` typographically through a new `inference` adornment. Diff pane: `u`
+undo, `shift+u` redo, verbs struck through when the server says there is nothing to act on; the
+`onUndoTurn?` seam is gone. Instruments: the gauge labelled `reported` from `GET /context` with
+the server's thresholds, `~` when the window is undeclared; `cost-report.ts` lists every model
+and never hides unpriced turns. Deferred, as briefed: mode cycling (keywork PD12).
+
+**Lane A6, the wave-2 panes verified live (M4.3, M4.5, M4.6, M4.7).** A `keywork.cmd` shim
+let the app's own supervisor spawn keywork's real `serve()` with a scripted model and two MCP
+servers (one broken on purpose), tickets and trust in temp dirs, the renderer driven over CDP
+with request logging on the server. Every surface verified: lazy tree walk, gitignored density,
+the four-second lift after a real read, 1 MiB slices with honest facts, trust card to
+`/workspace/trust` to `reopens` to a restarted sidecar, the four memory lenses with approve and
+discard dropping the count 3→2→1 over `memory.inbox` and `needs-rebase` after a hand edit, MCP
+restart and toggle refetching only `/mcp`, arcs new and bind with the hue chip and the arc's
+memory layer, bots create and switch and the mid-turn 409 in the server's words, workspace
+`use` reopening on a new sidecar and back, keywork-day re-theming. Twelve defects fixed with
+tests: the browser filter missed folded folders and dropped parents; a no-match filter said
+"nothing here"; written files never appeared (the folder is reread on `tool.finished`); the
+root path and the byte range were hidden under 560 px; `G` needed two presses and the view was
+built twice per load; a refused editor link was silent; the trust card claimed the folder was
+read-only to the agent (false: keywork keeps the root in the tool scope, the agent wrote
+`proof.txt` live); every discard reported failure (`"discarded"` was read as a refusal, in the
+pane and the store); memory and surfaces went stale after a restart (they reload on
+reconnect); the daily title sat flush; `b` in arcs and `enter`/`u` in bots could never fire
+from the keyboard (they now use the summoning or last-focused conversation,
+`overview/working-session.ts`); single-key verbs died after summoning from the composer (all
+seven panes take keyboard home). Screenshots `02`–`23` in the session scratchpad.
+
+**Lane A7, the desktop and keyboard leftovers (M5.1 closed, M2.7 ticket, M3.1 refusals).**
+`host/pending-asks.ts` tallies live asks minus their `gate.permission`, seeded from `GET /asks`,
+and calls `setPendingAsks` once per frame batch on change, so the tray badge and the Windows
+overlay are real; the ask toast reads `<title> · needs you · ask`. `desktop/main/
+workspace-identity.ts` re-expresses keywork's identity rule (declaration above, else `.git`
+root, else the folder; sha256 of `workspace:<root>` or the lowercased path, twelve hex) pinned
+against identities computed by running keywork itself; `ticket.ts` calls a ticket live only
+when `/doc` answers as keywork with the matching identity and `/asks` accepts the token; the
+per-workspace ticket is tried first, a dead or foreign ticket never shadows a spawn, and
+stopping the app's own server clears every ticket pointing at it (verified live with a killed
+server). Tiler refusals carry keywork's wording ("no room for another pane · close or resize
+one"), `closeFocused` says "no pane is focused · nothing to close". `chord.ts` resolves `>`
+`<` and the US shifted-punctuation table to `shift+.` `shift+,` with `event.code` as the
+physical fallback, so a German `:` or a Russian ctrl+л reach their chords (`chordsOfKey`).
+`host/activation.ts` focuses the pane showing the toast's session, opens it if none does, and
+summons memory for an inbox toast. Spill consumer: `protocol/src/spills.ts`, `client.spill`
+mapping 400/404/415 to typed readings, the file pane opening `spill <id>` at
+`elidedFrom..elidedTo`.
+
+**Lane A8, M5.4 textures (landed).** `scripts/textures/ratchets.json` holds every number
+with a direction and a written `why`; `scripts/check-textures.ts` (in the `check` chain) fails
+on a missing, dropped or loosened ratchet (a loosening needs a rewritten `why`, the pins rule)
+and measures T1 and T6 itself. T1: seventeen grapheme families through the real composer, the
+caret walking one cluster, Backspace and Delete erasing one cluster, submit byte-identical
+(`composer/graphemes.ts` over `Intl.Segmenter`); **finding: the browser could split a
+decomposed cluster on delete**. T2: `composer/paste-vault.ts` mirrors keywork's vault, a paste
+over six lines or 4096 characters lands as `[pasted #n, N lines, 5.0 MB]` and expands on
+submit; **finding: the composer had no paste handling at all**. T6: `flavor/contrast-audit.ts`
+applies keywork's APCA floors to every pair plus a measured polarity check so a tinted dark
+flavor fails as light; keywork-night's smallest headroom is 3.1 Lc. T7: every pane's zero state
+is `state · chord action`, one chord, ≤ 320 px at a worst-case mono advance (eight empty
+states rewritten). T8: every fixture streamed one character per event at 800 events per frame,
+batched equal to unbatched, the busiest frame under the reducer budget, first paint under the
+element budget. `docs/textures.md` records each ratchet.
+
+**Consolidation.** The lead fixed what the lanes left for each other: a focused needs-you
+title was unreadable (specificity in `pane-frame.css`); the terminal's leader check used the
+typed chord only (`chordsOfKey`); the shell's `openInEditor` dropped the refusal (it now says
+it in the status line and the file pane shows it); the status line kept the old port after a
+restart (`App` wraps `restartServer` to refresh the opened workspace); a `file:` link with a
+line fragment fails under Windows ShellExecute, so main opens file links through
+`shell.openPath` (the line is lost, honestly). **Evidence:** 89 files, 981 tests (wave 4: 633);
+`bun run check` green with `KEYWORK_REPO=C:\src\keywork-lanes\next` (66 routes, 0.1.1) and in
+fixture mode; no process or ticket left behind.
+
+**Findings for keywork, from the app's side (also appended to the 118 ledger in `next`).**
+- `keywork serve` refuses to start for a second workspace: it writes the user-level
+  `~/.keywork/server.json` for every workspace and treats any live ticket there as this
+  workspace's server (`runningServerAmong` should check `/doc`'s identity, or stop writing the
+  user-level ticket). `keywork attach` has the same mix-up.
+- No way to read the active preset (`GET /preset`) and no route listing models (`GET /models`);
+  the app learns the preset from the first `gate.preset` and builds the model list from
+  summaries and refusal lists.
+- Refusals told apart only by text: `/preset` 409 for both "needs confirmed" and "no preset
+  switch", `/undo` 404 for both a missing session and "nothing to undo". A `code` field would
+  make the client's mapping robust.
+- `costBasis` says "metered by the provider" when no turn was priced (0 === 0).
+- `GET /flavors` serves only `keywork-night` plus the `system` placeholder: no keywork-day, no
+  user flavors, so "server flavors beside the gallery" has nothing to show yet.
+- `/memory/ledger` discard entries carry only the staging path, not the note's name.
+- The identity derivation is not on the wire before connecting; `/doc` is unauthenticated, so
+  checking a token needs an authenticated route (a ping would do).
+- `/prompt` and `/inject` are text-only although agentbox's `promptMessage(text, images)` exists.
+- File-host undo sends `session.state` but not `session.tree`; `docs/events.md` still lists
+  `engine.error` under "Tree and files".
+
+**Left after wave 5.** Merging `app-surface/next` into keywork `main` (Jordan); mode cycling
+(keywork PD12); a real save dialog for export (a `HostPort` call); a posix identity fixture;
+launching the built Electron app for A5's and A7's paths (A6 drove the real renderer, A7 drove
+main's modules from bun); the T8 load rising with a longer fixture; Ctrl+Z after a vaulted paste;
+the conversation pane's typed text before the composer has DOM focus and one empty transcript
+after a reopen (observed by A6, not reproduced); the duplicate `/mcp` and `/memory` loads at
+startup; `docs/README.md` now indexes `textures.md`.
+
 ## M4: The panes (20pt)
 
 Each pane earns its place with daily use. Order is by how often Jordan reaches for it.

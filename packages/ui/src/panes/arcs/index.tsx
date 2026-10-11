@@ -9,6 +9,7 @@ import { z } from "zod";
 import { hueStop } from "../../chrome/pane-frame.tsx";
 import { relativeAge, sessionName } from "../../chrome/telemetry.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import {
   ConfirmLine,
   createCursor,
@@ -16,9 +17,13 @@ import {
   NoticeLine,
   OverviewRow,
 } from "../overview/rows.tsx";
+import { noWorkingSession, summonedFrom, workingSession } from "../overview/working-session.ts";
 import { definePane, type KeyHints, type PaneProps, type ShellSeams } from "../registry.ts";
 
-const arcsSpec = z.object({ kind: z.literal("arcs") });
+const arcsSpec = z.object({
+  kind: z.literal("arcs"),
+  sessionId: z.string().optional(),
+});
 
 export type ArcsSpec = z.output<typeof arcsSpec>;
 
@@ -29,14 +34,14 @@ export const arcsPane = definePane<ArcsSpec>({
   spec: arcsSpec,
   home: "left",
   title: () => "arcs",
-  emptyState: (keys) => `no arcs yet · n opens one · ${keys.chord("arcs.summon")} is this pane`,
+  emptyState: (keys) => `no arcs yet · ${keys.chord("arcs.new")} opens one`,
   component: ArcsList,
   summon: {
     action: "arcs.summon",
     chords: "leader a",
     help: "arcs pane",
     command: { name: "arcs", description: "open the arcs pane" },
-    spec: () => ({ kind: "arcs" }),
+    spec: (shell) => ({ kind: "arcs", ...summonedFrom(shell) }),
   },
   localActions: {
     "arcs.down": {
@@ -133,6 +138,12 @@ export function arcHueStyle(ordinal: number | undefined): Record<string, string>
 type Prompt = { kind: "name" } | { kind: "abandon"; slug: string };
 
 function ArcsList(props: PaneProps<ArcsSpec>) {
+  const session = workingSession(props.shell, props.spec.sessionId);
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const surfaces = () => props.shell.store.surfaces;
   const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set());
   const [prompt, setPrompt] = createSignal<Prompt>();
@@ -198,9 +209,9 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
   };
 
   const bind = async (slug: string | null): Promise<void> => {
-    const sessionId = props.shell.currentSession();
+    const sessionId = session();
     if (sessionId === undefined) {
-      setNotice("no session is focused · focus a conversation pane first");
+      setNotice(noWorkingSession);
       return;
     }
     const outcome = await surfaces().verbs.bindSessionArc(sessionId, slug);
@@ -245,7 +256,7 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
   });
 
   return (
-    <section class="kw-ov kw-arcs" aria-label="arcs">
+    <section class="kw-ov kw-arcs" aria-label="arcs" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
         <button type="button" class="kw-ov-new" onClick={() => setPrompt({ kind: "name" })}>
           + new arc

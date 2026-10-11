@@ -13,8 +13,10 @@ export {
 export {
   type Chord,
   ChordError,
+  chordLabel,
   chordOfKey,
   chordsEqual,
+  chordsOfKey,
   formatChord,
   isPlainText,
   parseChord,

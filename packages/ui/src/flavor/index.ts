@@ -1,7 +1,10 @@
-export { apcaLc } from "./contrast.ts";
+export { apcaLc, type ContrastPolarity, contrastPolarity } from "./contrast.ts";
+export { auditFlavor, type FlavorAudit } from "./contrast-audit.ts";
 export { flavorNamed, gallery, keyworkDay, keyworkNight } from "./flavors.ts";
 export {
+  type ContrastMeasurement,
   contrastFailures,
+  contrastMeasurements,
   type DensityLevel,
   type Flavor,
   type FlavorTokens,

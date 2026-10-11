@@ -9,7 +9,9 @@ import {
   type KeyworkClient,
   projectAll,
   type ServerFeed,
+  type SessionControls,
   type SessionProjection,
+  sessionControls,
   type TreeState,
   treeSnapshot,
   treeState,
@@ -23,10 +25,13 @@ import type {
   LabelOutcome,
   LeafOutcome,
   PendingAsk,
+  PromptBehavior,
   SessionDetail,
+  SessionState as SessionStanding,
   SessionSummary,
 } from "@keywork-app/protocol";
 import { createStore, produce, reconcile } from "solid-js/store";
+import { type ControlsStore, createControlsStore } from "./controls-store.ts";
 import { createMemoryStore, type MemoryStore } from "./memory-store.ts";
 import { createSurfacesStore, type SurfacesStore } from "./surfaces-store.ts";
 
@@ -34,10 +39,12 @@ export interface SessionStore {
   readonly state: SessionState;
   projection(id: string | undefined): SessionProjection;
   summary(id: string | undefined): SessionSummary | undefined;
+  controlsOf(id: string | undefined): SessionControls;
   refresh(): Promise<void>;
   open(id: string): Promise<void>;
+  reload(id: string): Promise<void>;
   create(): Promise<string>;
-  prompt(id: string, text: string): Promise<void>;
+  prompt(id: string, text: string, behavior: PromptBehavior): Promise<void>;
   abort(id: string): Promise<void>;
   answerAsk(callId: string, verdict: AskVerdict): Promise<AnswerOutcome>;
   tree(id: string | undefined): TreeState;
@@ -50,6 +57,7 @@ export interface SessionStore {
   changedFile(id: string, path: string): Promise<ChangedFileReading>;
   readonly memory: MemoryStore;
   readonly surfaces: SurfacesStore;
+  readonly controls: ControlsStore;
   dispose(): void;
 }
 
@@ -92,6 +100,13 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const changeFetches = new Map<string, Promise<void>>();
   const memory = createMemoryStore(client, feed);
   const surfaces = createSurfacesStore(client, feed, { sessionsChanged: () => void refresh() });
+  const controls = createControlsStore(client, feed, {
+    reload: (id) => reload(id),
+    knownModels: () => [
+      ...Object.values(state.projections).map((projection) => projection.standing?.model),
+      ...state.summaries.map((summary) => summary.model),
+    ],
+  });
 
   const apply = (batches: Map<string, BusEnvelope[]>): void => {
     setState(
@@ -124,6 +139,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   };
 
   const absorb = (envelopes: readonly BusEnvelope[]): void => {
+    const rewritten = sessionsRewrittenBy(envelopes, (id) => state.projections[id]?.standing);
     const batches = bySession(envelopes);
     for (const [sessionId, batch] of batches) {
       const waiting = arrivedWhileLoading.get(sessionId);
@@ -135,7 +151,30 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     apply(batches);
     follow(envelopes);
     if (envelopes.some(changesSummaries)) void refresh();
+    for (const id of rewritten) void reload(id);
   };
+
+  const load = async (id: string): Promise<void> => {
+    arrivedWhileLoading.set(id, []);
+    setState("loading", id, true);
+    const [detail, pendingAsks] = await Promise.all([client.session(id), client.asks()]);
+    const history = detail === undefined ? [] : historyEnvelopes(detail);
+    const asOf = detail?.asOf ?? -1;
+    const asks = detail === undefined ? [] : askEnvelopes(detail, pendingAsks);
+    const live = (arrivedWhileLoading.get(id) ?? []).filter((envelope) => envelope.id > asOf);
+    arrivedWhileLoading.delete(id);
+    setState(
+      produce((draft) => {
+        const standing = draft.projections[id]?.standing;
+        const loaded = projectAll(emptyProjection, [...history, ...asks, ...live]);
+        draft.projections[id] = loaded.standing === undefined ? { ...loaded, standing } : loaded;
+        draft.loading[id] = false;
+      }),
+    );
+  };
+
+  const reload = (id: string): Promise<void> =>
+    arrivedWhileLoading.has(id) ? Promise.resolve() : load(id);
 
   const refresh = async (): Promise<void> => {
     const summaries = await client.sessions();
@@ -176,31 +215,25 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     projection: (id) =>
       id === undefined ? emptyProjection : (state.projections[id] ?? emptyProjection),
     summary: (id) => state.summaries.find((item) => item.id === id),
+    controlsOf: (id) =>
+      sessionControls(
+        state.summaries.find((item) => item.id === id),
+        id === undefined ? undefined : state.projections[id],
+      ),
     refresh,
     open: async (id) => {
       if (state.projections[id] !== undefined || arrivedWhileLoading.has(id)) return;
-      arrivedWhileLoading.set(id, []);
-      setState("loading", id, true);
-      const [detail, pendingAsks] = await Promise.all([client.session(id), client.asks()]);
-      const history = detail === undefined ? [] : historyEnvelopes(detail);
-      const asOf = detail?.asOf ?? -1;
-      const asks = detail === undefined ? [] : askEnvelopes(detail, pendingAsks);
-      const live = (arrivedWhileLoading.get(id) ?? []).filter((envelope) => envelope.id > asOf);
-      arrivedWhileLoading.delete(id);
-      setState(
-        produce((draft) => {
-          draft.projections[id] = projectAll(emptyProjection, [...history, ...asks, ...live]);
-          draft.loading[id] = false;
-        }),
-      );
+      await load(id);
     },
+    reload,
     create: async () => {
       const summary = await client.createSession();
       await refresh();
       return summary.id;
     },
-    prompt: async (id, text) => {
-      await client.prompt(id, text);
+    prompt: async (id, text, behavior) => {
+      controls.forgetSeed(id);
+      await client.prompt(id, text, behavior);
     },
     abort: async (id) => {
       await client.abort(id);
@@ -221,9 +254,11 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     changedFile: (id, path) => client.changedFile(id, path),
     memory,
     surfaces,
+    controls,
     dispose: () => {
       memory.dispose();
       surfaces.dispose();
+      controls.dispose();
       for (const stop of stops) stop();
     },
   };
@@ -259,7 +294,29 @@ function bySession(envelopes: readonly BusEnvelope[]): Map<string, BusEnvelope[]
 }
 
 function changesSummaries(envelope: BusEnvelope): boolean {
-  return envelope.type === "turn.started" || envelope.type === "turn.completed";
+  return (
+    envelope.type === "turn.started" ||
+    envelope.type === "turn.completed" ||
+    envelope.type === "session.state"
+  );
+}
+
+export function sessionsRewrittenBy(
+  envelopes: readonly BusEnvelope[],
+  standingOf: (id: string) => SessionStanding | undefined,
+): Set<string> {
+  const rewritten = new Set<string>();
+  const latest = new Map<string, SessionStanding | undefined>();
+  for (const envelope of envelopes) {
+    if (envelope.type !== "session.state") continue;
+    const id = envelope.sessionId;
+    const previous = latest.has(id) ? latest.get(id) : standingOf(id);
+    if (previous !== undefined && previous.redoable !== envelope.payload.redoable) {
+      rewritten.add(id);
+    }
+    latest.set(id, envelope.payload);
+  }
+  return rewritten;
 }
 
 function dedupe(

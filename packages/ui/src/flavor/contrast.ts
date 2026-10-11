@@ -9,6 +9,12 @@ export function apcaLc(inkHex: string, groundHex: string): number {
   return magnitude < lowContrastClip ? 0 : (magnitude - lowContrastOffset) * 100;
 }
 
+export type ContrastPolarity = "dark-on-light" | "light-on-dark";
+
+export function contrastPolarity(inkHex: string, groundHex: string): ContrastPolarity {
+  return screenLuminance(inkHex) < screenLuminance(groundHex) ? "dark-on-light" : "light-on-dark";
+}
+
 export function hexChannels(hex: string): [number, number, number] {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) throw new Error(`Expected a #rrggbb color, got "${hex}"`);
   const value = Number.parseInt(hex.slice(1), 16);

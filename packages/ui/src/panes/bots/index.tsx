@@ -4,6 +4,7 @@ import { z } from "zod";
 import { relativeAge } from "../../chrome/telemetry.ts";
 import { formatCost } from "../../instruments/format.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import {
   ChoiceLine,
   createCursor,
@@ -12,9 +13,13 @@ import {
   OverviewRow,
   SubLine,
 } from "../overview/rows.tsx";
+import { noWorkingSession, summonedFrom, workingSession } from "../overview/working-session.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 
-const botsSpec = z.object({ kind: z.literal("bots") });
+const botsSpec = z.object({
+  kind: z.literal("bots"),
+  sessionId: z.string().optional(),
+});
 
 export type BotsSpec = z.output<typeof botsSpec>;
 
@@ -23,15 +28,14 @@ export const botsPane = definePane<BotsSpec>({
   spec: botsSpec,
   home: "left",
   title: () => "bots",
-  emptyState: (keys) =>
-    `no bots yet · n defines one · ${keys.chord("palette.commands")} /bots reopens this pane`,
+  emptyState: (keys) => `no bots yet · ${keys.chord("bots.new")} defines one`,
   component: BotsList,
   summon: {
     action: "bots.summon",
     chords: "none",
     help: "bots pane",
     command: { name: "bots", description: "open the bots pane", aliases: ["bot"] },
-    spec: () => ({ kind: "bots" }),
+    spec: (shell) => ({ kind: "bots", ...summonedFrom(shell) }),
   },
   localActions: {
     "bots.down": {
@@ -83,6 +87,12 @@ const scopeChoices: Readonly<Record<string, string>> = { p: "project", u: "user"
 type Prompt = { kind: "slug" } | { kind: "scope"; slug: string };
 
 function BotsList(props: PaneProps<BotsSpec>) {
+  const session = workingSession(props.shell, props.spec.sessionId);
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const surfaces = () => props.shell.store.surfaces;
   const bots = () => surfaces().state.bots;
   const cursor = createCursor(() => bots().length);
@@ -95,9 +105,9 @@ function BotsList(props: PaneProps<BotsSpec>) {
   };
 
   const switchTo = async (name: string | null): Promise<void> => {
-    const sessionId = props.shell.currentSession();
+    const sessionId = session();
     if (sessionId === undefined) {
-      setNotice("no session is focused · focus a conversation pane first");
+      setNotice(noWorkingSession);
       return;
     }
     const outcome = await surfaces().verbs.switchSessionBot(sessionId, name);
@@ -141,7 +151,7 @@ function BotsList(props: PaneProps<BotsSpec>) {
   });
 
   return (
-    <section class="kw-ov kw-bots" aria-label="bots">
+    <section class="kw-ov kw-bots" aria-label="bots" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
         <button type="button" class="kw-ov-new" onClick={() => setPrompt({ kind: "slug" })}>
           + new bot

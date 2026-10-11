@@ -1,13 +1,14 @@
-import type { ServerDocument, ServerTicket } from "@keywork-app/client";
+import type { ServerTicket } from "@keywork-app/client";
 import type { RecentStore, RecentWorkspace } from "./recents.ts";
 import {
   expectedServerVersion,
-  healthCheck,
   type ServeFailure,
   type ServerProcess,
   type ServeSpec,
   type ServeState,
 } from "./serve-process.ts";
+import type { LiveServer } from "./ticket.ts";
+import type { TicketLocation } from "./workspace-identity.ts";
 
 export interface OpenedWorkspace {
   workspace: string;
@@ -22,10 +23,10 @@ export type WorkspaceOpen =
   | { ok: false; failure: ServeFailure };
 
 export interface WorkspaceSeams {
-  ticketFile: string;
+  locateTickets(workspace: string): Promise<TicketLocation>;
   readText(path: string): Promise<string | undefined>;
   removeFile(path: string): Promise<void>;
-  fetchDocument(ticket: ServerTicket): Promise<ServerDocument>;
+  probeTicket(ticket: ServerTicket): Promise<LiveServer | undefined>;
   supervise(spec: ServeSpec): ServerProcess;
   keyworkOnPath(): Promise<string | undefined>;
   binaryVersion(binary: string): Promise<string | undefined>;
@@ -64,20 +65,15 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
   };
 
   const attach = async (path: string): Promise<WorkspaceOpen | undefined> => {
-    const ticket = await readTicket(seams.ticketFile, seams.readText);
-    if (ticket === undefined) return undefined;
-    const checked = await healthCheck(ticket, seams.fetchDocument);
-    if (!checked.ok) return checked.failure.kind === "version-mismatch" ? checked : undefined;
-    return {
-      ok: true,
-      opened: {
-        workspace: path,
-        server: ticket,
-        attached: true,
-        version: checked.version,
-        binary: undefined,
-      },
-    };
+    const location = await seams.locateTickets(path);
+    for (const file of location.files) {
+      const ticket = await readTicket(file, seams.readText);
+      const server = ticket === undefined ? undefined : await seams.probeTicket(ticket);
+      if (ticket === undefined || server === undefined) continue;
+      if (!servesIdentity(server, location.identity)) continue;
+      return attachedTo(path, ticket, server.version);
+    }
+    return undefined;
   };
 
   const spawn = async (
@@ -106,7 +102,7 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     entry.unwatch();
     if (entry.process === undefined) return;
     await entry.process.stop();
-    await clearStaleTicket(entry.opened.server.url);
+    await clearStaleTickets(entry.opened.workspace, entry.opened.server.url);
   };
 
   const releasing = new Set<Promise<void>>();
@@ -116,9 +112,11 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     return done;
   };
 
-  const clearStaleTicket = async (url: string): Promise<void> => {
-    const ticket = await readTicket(seams.ticketFile, seams.readText);
-    if (ticket?.url === url) await seams.removeFile(seams.ticketFile);
+  const clearStaleTickets = async (workspace: string, url: string): Promise<void> => {
+    for (const file of (await seams.locateTickets(workspace)).files) {
+      const ticket = await readTicket(file, seams.readText);
+      if (ticket?.url === url) await seams.removeFile(file);
+    }
   };
 
   const hold = (
@@ -218,6 +216,28 @@ export async function chooseBinary(
 
 export function versionOfLine(line: string): string | undefined {
   return line.trim().match(/^keywork (\S+)$/)?.[1];
+}
+
+function servesIdentity(server: LiveServer, identity: string): boolean {
+  return server.identity === undefined || server.identity === identity;
+}
+
+function attachedTo(workspace: string, ticket: ServerTicket, version: string): WorkspaceOpen {
+  if (version !== expectedServerVersion) {
+    return {
+      ok: false,
+      failure: {
+        kind: "version-mismatch",
+        expected: expectedServerVersion,
+        actual: version,
+        ticket,
+      },
+    };
+  }
+  return {
+    ok: true,
+    opened: { workspace, server: ticket, attached: true, version, binary: undefined },
+  };
 }
 
 function lossOf(state: ServeState): ServeFailure | undefined {

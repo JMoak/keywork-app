@@ -1,22 +1,27 @@
+import type { BusEnvelope } from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { z } from "zod";
 import { EmptyState } from "../empty-state.tsx";
 import { rememberAgentFile } from "../file/recent.ts";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 import {
   agentPathOf,
+  agentWriteOf,
   type BrowserRow,
   collapse,
   directoriesToLoad,
   emptyTree,
   expand,
   expireLit,
+  finishedCallOf,
   forgetListings,
   isExpanded,
   lift,
   loading,
   nextExpiry,
   parentOf,
+  rereadWhereMissing,
   rootPath,
   rows,
   type TreeState,
@@ -36,8 +41,7 @@ export const browserPane = definePane<BrowserSpec>({
   spec: browserSpec,
   home: "left",
   title: () => "files",
-  emptyState: (keys) =>
-    `nothing here · . shows dotfiles · ${keys.chord("browser.summon")} summons this tree`,
+  emptyState: (keys) => `nothing here · ${keys.chord("browser.hidden")} shows dotfiles`,
   component: BrowserSlot,
   summon: {
     action: "browser.summon",
@@ -91,6 +95,11 @@ export const browserPane = definePane<BrowserSpec>({
 });
 
 function BrowserSlot(props: PaneProps<BrowserSpec>) {
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const [tree, setTree] = createSignal<TreeState>(emptyTree);
   const [cursor, setCursor] = createSignal<string>();
   const [now, setNow] = createSignal(Date.now());
@@ -133,15 +142,26 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
     onCleanup(() => clearTimeout(timer));
   });
 
+  const writesInFlight = new Map<string, string>();
+  const followAgent = (envelope: BusEnvelope): void => {
+    const write = agentWriteOf(envelope, props.shell.workspace);
+    if (write !== undefined) writesInFlight.set(write.callId, write.path);
+    const finished = finishedCallOf(envelope);
+    const written = finished === undefined ? undefined : writesInFlight.get(finished);
+    if (finished !== undefined && written !== undefined) {
+      writesInFlight.delete(finished);
+      setTree((state) => rereadWhereMissing(state, written));
+    }
+    const path = agentPathOf(envelope, props.shell.workspace);
+    if (path === undefined) return;
+    rememberAgentFile(path);
+    setNow(Date.now());
+    setTree((state) => lift(state, path, Date.now()));
+  };
+
   onCleanup(
     props.shell.feed.subscribe((envelopes) => {
-      for (const envelope of envelopes) {
-        const path = agentPathOf(envelope, props.shell.workspace);
-        if (path === undefined) continue;
-        rememberAgentFile(path);
-        setNow(Date.now());
-        setTree((state) => lift(state, path, Date.now()));
-      }
+      for (const envelope of envelopes) followAgent(envelope);
     }),
   );
 
@@ -201,7 +221,7 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
   });
 
   return (
-    <section class="kw-browser" aria-label="files">
+    <section class="kw-browser" aria-label="files" tabIndex={-1} ref={root}>
       <div class="kw-browser-head">
         <span class="kw-browser-root">{props.shell.workspace}</span>
         <Show when={filtering() || tree().filter !== ""}>
@@ -228,7 +248,13 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
         when={visible().length > 0}
         fallback={
           <Show when={rootState()?.kind === "loaded"}>
-            <EmptyState line={browserPane.emptyState(props.shell.keys)} />
+            <EmptyState
+              line={
+                tree().filter === ""
+                  ? browserPane.emptyState(props.shell.keys)
+                  : filterMissLine(tree().filter)
+              }
+            />
           </Show>
         }
       >
@@ -277,6 +303,10 @@ export function markOf(row: Pick<BrowserRow, "kind" | "expanded" | "load">): str
   if (row.kind === "file") return "·";
   if (row.load === "loading") return "░";
   return row.expanded ? "▾" : "▸";
+}
+
+export function filterMissLine(filter: string): string {
+  return `nothing loaded matches ${filter} · / then esc clears the filter`;
 }
 
 export function describeTreeRefusal(reading: "outside-scope" | "missing", path: string): string {

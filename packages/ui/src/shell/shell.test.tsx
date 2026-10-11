@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
+import { idleControlsClient } from "./controls-store.test.ts";
 import { inertMemoryClient } from "./memory-store.test.ts";
 import { emptySurfacesClient } from "./surfaces-store.test.ts";
 import { inertWorkspaceClient } from "./trust.test.ts";
@@ -64,7 +65,7 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
     },
     prompt: async (_id, text) => {
       prompts.push(text);
-      return "accepted";
+      return "started";
     },
     abort: async (id) => {
       aborts.push(id);
@@ -77,9 +78,11 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
     moveLeaf: async () => "missing",
     changes: async () => "missing",
     ...inertMemoryClient(),
+    ...idleControlsClient(),
     ...inertWorkspaceClient(),
     ...emptySurfacesClient(),
     changedFile: async () => "missing",
+    spill: async () => "missing",
     asks: async () =>
       options.pendingAsk
         ? [

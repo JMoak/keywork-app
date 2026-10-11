@@ -14,6 +14,7 @@ export interface PaneFrameProps {
   context?: ContextLevel | undefined;
   modeWord?: string | undefined;
   bot?: string | undefined;
+  inference?: string | undefined;
   hueRank?: number | undefined;
   onFocus?: (() => void) | undefined;
   children: JSX.Element;
@@ -82,6 +83,9 @@ export function PaneFrame(props: PaneFrameProps) {
           {props.name}
         </span>
         <Show when={props.bot}>{(label) => <span class="kw-frame-bot">{label()}</span>}</Show>
+        <Show when={props.inference}>
+          {(words) => <span class="kw-frame-inference">{words()}</span>}
+        </Show>
         <Show when={props.context !== undefined || props.telemetry}>
           <span class="kw-frame-telemetry">
             <Show when={props.context}>{(level) => <ContextGauge level={level()} />}</Show>

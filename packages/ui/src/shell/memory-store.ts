@@ -16,6 +16,7 @@ import type {
   RevertReply,
 } from "@keywork-app/protocol";
 import { createStore, reconcile } from "solid-js/store";
+import { onReconnected } from "./surfaces-store.ts";
 
 export interface MemoryStore {
   readonly state: MemoryState;
@@ -112,14 +113,15 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
     if (settled(outcome)) void refresh();
     return outcome;
   };
-  const notRefused = (outcome: unknown): boolean => typeof outcome !== "string";
+  const notRefused = (outcome: unknown): boolean => outcome !== "inert" && outcome !== "missing";
 
-  const stop = feed.subscribe((envelopes) => {
+  const stopFollowing = feed.subscribe((envelopes) => {
     const tally = inboxAfter(state.inbox, envelopes);
     if (tally === state.inbox) return;
     announce(tally);
     void refresh();
   });
+  const stopReloading = onReconnected(feed, () => void refresh());
 
   return {
     state,
@@ -146,7 +148,8 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
       return () => listeners.delete(listener);
     },
     dispose: () => {
-      stop();
+      stopFollowing();
+      stopReloading();
       listeners.clear();
     },
   };

@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { z } from "zod";
 import { describeFailure } from "../../host/port.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import {
   ConfirmLine,
   createCursor,
@@ -22,7 +23,7 @@ export const workspacesPane = definePane<WorkspacesSpec>({
   home: "left",
   title: () => "workspaces",
   emptyState: (keys) =>
-    `only the root so far · n declares a named workspace · ${keys.chord("palette.commands")} /workspaces reopens this pane`,
+    `only the root so far · ${keys.chord("workspaces.new")} declares a named workspace`,
   component: WorkspacesList,
   summon: {
     action: "workspaces.summon",
@@ -101,6 +102,11 @@ type Prompt =
   | { kind: "unfocus"; choice: WorkspaceChoice; dir: string | undefined };
 
 function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const surfaces = () => props.shell.store.surfaces;
   const rows = createMemo(() => workspaceRows(surfaces().state.workspaces));
   const cursor = createCursor(() => rows().length);
@@ -193,7 +199,7 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
   });
 
   return (
-    <section class="kw-ov kw-workspaces" aria-label="workspaces">
+    <section class="kw-ov kw-workspaces" aria-label="workspaces" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
         <button type="button" class="kw-ov-new" onClick={() => setPrompt({ kind: "name" })}>
           + new workspace

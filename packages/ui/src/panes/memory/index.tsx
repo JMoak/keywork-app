@@ -1,4 +1,9 @@
-import type { DailyEntry, MemoryAnswer, MemoryNote } from "@keywork-app/protocol";
+import type {
+  DailyEntry,
+  MemoryAnswer,
+  MemoryNote,
+  MemoryWriteRefusal,
+} from "@keywork-app/protocol";
 import {
   createEffect,
   createMemo,
@@ -14,6 +19,7 @@ import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import type { MemoryStore } from "../../shell/memory-store.ts";
 import { inboxNeedsYouAt } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
 import { Garden } from "./garden.tsx";
 import { DailyLens, LedgerLens } from "./ledger.tsx";
@@ -44,7 +50,7 @@ export const memoryPane = definePane<MemorySpec>({
   home: "right",
   title: (_spec, shell) => titleOf(shell.store.memory.state.inbox.count),
   emptyState: (keys) =>
-    `nothing in the garden yet · notes land as sessions run · ${keys.chord("pane.split")} starts one`,
+    `nothing in the garden yet · ${keys.chord("pane.split")} starts a session that grows it`,
   component: MemorySlot,
   summon: {
     action: "memory.summon",
@@ -132,6 +138,11 @@ export function lifecycleOf(inboxCount: number): LifecycleState {
 }
 
 function MemorySlot(props: PaneProps<MemorySpec>) {
+  let root: HTMLDivElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const memory = (): MemoryStore => props.shell.store.memory;
   const state = () => memory().state;
   const [lens, setLens] = createSignal<MemoryLens>({ kind: "garden" });
@@ -325,7 +336,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const report =
     (word: string) =>
     (outcome: unknown): void => {
-      if (typeof outcome === "string") say(describeRefusal(outcome));
+      if (isWriteRefusal(outcome)) say(describeRefusal(outcome));
       else if (isRefusal(outcome)) say(outcome.detail);
       else say(word);
     };
@@ -362,7 +373,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   });
 
   return (
-    <div class="kw-memory" data-lens={lens().kind}>
+    <div class="kw-memory" data-lens={lens().kind} tabIndex={-1} ref={root}>
       <Show when={asking()}>
         <div class="kw-memory-ask">
           <span class="kw-memory-ask-mark">?</span>
@@ -478,6 +489,10 @@ function lastEntryFor(
 
 function isRefusal(outcome: unknown): outcome is { detail: string } {
   return typeof outcome === "object" && outcome !== null && "detail" in outcome;
+}
+
+function isWriteRefusal(outcome: unknown): outcome is MemoryWriteRefusal {
+  return outcome === "inert" || outcome === "missing";
 }
 
 function describeRefusal(refusal: string): string {

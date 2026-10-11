@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { z } from "zod";
 import { tileFill, tileFillStepMs } from "../../chrome/pane-frame.tsx";
 import { EmptyState } from "../empty-state.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import {
   createCursor,
   NoticeLine,
@@ -22,7 +23,7 @@ export const mcpPane = definePane<McpSpec>({
   home: "right",
   title: () => "mcp",
   emptyState: (keys) =>
-    `no mcp servers · name one in keywork's config · ${keys.chord("palette.commands")} /mcp reopens this pane`,
+    `no mcp servers · name one in keywork's config and ${keys.chord("palette.commands")} /mcp lists it`,
   component: McpList,
   summon: {
     action: "mcp.summon",
@@ -101,6 +102,11 @@ export function stateTally(servers: readonly McpServerStatus[]): string {
 type ToolsReading = { tools: readonly string[] } | { error: string } | "loading";
 
 function McpList(props: PaneProps<McpSpec>) {
+  let root: HTMLElement | undefined;
+  keepKeyboardHome(
+    () => root,
+    () => props.focused,
+  );
   const surfaces = () => props.shell.store.surfaces;
   const servers = () => surfaces().state.mcp;
   const cursor = createCursor(() => servers().length);
@@ -175,7 +181,7 @@ function McpList(props: PaneProps<McpSpec>) {
   });
 
   return (
-    <section class="kw-ov kw-mcp" aria-label="mcp servers">
+    <section class="kw-ov kw-mcp" aria-label="mcp servers" tabIndex={-1} ref={root}>
       <Show
         when={servers().length > 0}
         fallback={<EmptyState line={mcpPane.emptyState(props.shell.keys)} />}

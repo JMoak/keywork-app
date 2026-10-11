@@ -5,6 +5,13 @@ export interface Chord {
   readonly alt: boolean;
 }
 
+export type KeyEvent = Pick<
+  KeyboardEvent,
+  "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "isComposing"
+>;
+
+export type PhysicalKeyEvent = KeyEvent & Partial<Pick<KeyboardEvent, "code">>;
+
 export class ChordError extends Error {
   override readonly name = "ChordError";
 }
@@ -19,10 +26,12 @@ export function parseChord(spec: string): Chord {
       throw new ChordError(`unknown modifier "${modifier}" in chord "${spec}"`);
     }
   }
+  const canonical = canonicalName(name);
+  const unshifted = usShiftedPunctuation[canonical];
   return {
-    name: canonicalName(name),
+    name: unshifted ?? canonical,
     ctrl: modifiers.has("ctrl"),
-    shift: modifiers.has("shift"),
+    shift: unshifted !== undefined || modifiers.has("shift"),
     alt: modifiers.has("alt") || modifiers.has("meta"),
   };
 }
@@ -36,6 +45,14 @@ export function formatChord(chord: Chord): string {
   ].join("+");
 }
 
+export function chordLabel(spec: string): string {
+  const chord = parseChord(spec);
+  const typed = spec.split("+").at(-1) ?? "";
+  return usShiftedPunctuation[typed] === undefined
+    ? formatChord(chord)
+    : formatChord({ ...chord, name: typed, shift: false });
+}
+
 export function chordsEqual(left: Chord, right: Chord): boolean {
   return (
     left.name === right.name &&
@@ -45,19 +62,27 @@ export function chordsEqual(left: Chord, right: Chord): boolean {
   );
 }
 
-export function chordOfKey(
-  event: Pick<KeyboardEvent, "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "isComposing">,
-): Chord | undefined {
+export function chordOfKey(event: KeyEvent): Chord | undefined {
   if (event.isComposing) return undefined;
   const name = keyName(event.key);
   if (name === undefined) return undefined;
-  const chorded = event.ctrlKey || event.metaKey || event.altKey;
+  const ctrl = event.ctrlKey || event.metaKey;
+  const unshifted = event.shiftKey ? usShiftedPunctuation[name] : undefined;
+  if (unshifted !== undefined) return { name: unshifted, ctrl, shift: true, alt: event.altKey };
   return {
     name,
-    ctrl: event.ctrlKey || event.metaKey,
-    shift: event.shiftKey && (chorded || !isPrintable(event.key) || isLetter(event.key)),
+    ctrl,
+    shift:
+      event.shiftKey && (ctrl || event.altKey || !isPrintable(event.key) || isLetter(event.key)),
     alt: event.altKey,
   };
+}
+
+export function chordsOfKey(event: PhysicalKeyEvent): readonly Chord[] {
+  const typed = chordOfKey(event);
+  if (typed === undefined) return [];
+  const physical = physicalChordOf(event);
+  return physical === undefined || chordsEqual(physical, typed) ? [typed] : [typed, physical];
 }
 
 export function isPlainText(chord: Chord): boolean {
@@ -77,12 +102,60 @@ const keyNames: Record<string, string> = {
   del: "delete",
 };
 
+const usShiftedPunctuation: Readonly<Record<string, string>> = {
+  "~": "`",
+  "!": "1",
+  "@": "2",
+  "#": "3",
+  $: "4",
+  "%": "5",
+  "^": "6",
+  "&": "7",
+  "*": "8",
+  "(": "9",
+  ")": "0",
+  _: "-",
+  "{": "[",
+  "}": "]",
+  "|": "\\",
+  ":": ";",
+  '"': "'",
+  "<": ",",
+  ">": ".",
+  "?": "/",
+};
+
+const punctuationCodes: Readonly<Record<string, string>> = {
+  Backquote: "`",
+  Minus: "-",
+  Equal: "=",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Semicolon: ";",
+  Quote: "'",
+  Comma: ",",
+  Period: ".",
+  Slash: "/",
+};
+
 const modifierKeys = new Set(["control", "shift", "alt", "meta", "capslock", "numlock", "os"]);
 
 function keyName(key: string): string | undefined {
   const lower = key.toLowerCase();
   if (modifierKeys.has(lower) || lower === "dead" || lower === "unidentified") return undefined;
   return canonicalName(keyNames[lower] ?? lower);
+}
+
+function physicalChordOf(event: PhysicalKeyEvent): Chord | undefined {
+  const name = event.code === undefined ? undefined : nameOfCode(event.code);
+  if (name === undefined) return undefined;
+  return { name, ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey, alt: event.altKey };
+}
+
+function nameOfCode(code: string): string | undefined {
+  const [, letter, digit] = code.match(/^(?:Key([A-Z])|Digit([0-9]))$/) ?? [];
+  return letter?.toLowerCase() ?? digit ?? punctuationCodes[code];
 }
 
 function canonicalName(name: string): string {

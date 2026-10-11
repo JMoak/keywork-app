@@ -8,6 +8,10 @@
   background: var(--kw-panel);
 }
 
+.kw-file:focus {
+  outline: none;
+}
+
 .kw-file-head {
   display: flex;
   gap: 0.75rem;
@@ -48,7 +52,6 @@
 }
 
 @container file (max-width: 559.98px) {
-  .kw-file-facts,
   .kw-file-more {
     display: none;
   }

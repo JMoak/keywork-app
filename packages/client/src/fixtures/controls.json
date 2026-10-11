@@ -1,0 +1,164 @@
+{
+  "model": {
+    "status": 200,
+    "body": {
+      "model": {
+        "provider": "mock",
+        "model": "beta"
+      },
+      "notice": "model → mock/beta"
+    }
+  },
+  "modelUnknown": {
+    "status": 400,
+    "body": {
+      "error": "no model matches mock/gamma",
+      "failure": {
+        "code": "unknown-model",
+        "message": "no model matches mock/gamma",
+        "reference": "mock/gamma",
+        "provider": "mock",
+        "known": [
+          "mock/alpha",
+          "mock/beta"
+        ]
+      }
+    }
+  },
+  "thinking": {
+    "status": 200,
+    "body": {
+      "thinking": true
+    }
+  },
+  "effort": {
+    "status": 200,
+    "body": {
+      "effort": "high"
+    }
+  },
+  "effortUnknown": {
+    "status": 400,
+    "body": {
+      "error": "the body must be { level: \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\" | null }"
+    }
+  },
+  "rename": {
+    "status": 200,
+    "body": {
+      "title": "Lights"
+    }
+  },
+  "context": {
+    "status": 200,
+    "body": {
+      "used": 13,
+      "window": 200000,
+      "flushAt": 175424,
+      "compactAt": 183616,
+      "declared": false,
+      "fullness": 0.00007079993028929941,
+      "flushDue": false,
+      "compactionDue": false,
+      "basis": "estimated"
+    }
+  },
+  "cost": {
+    "status": 200,
+    "body": {
+      "rollup": {
+        "nanos": 0,
+        "pricedTurns": 0,
+        "meteredTurns": 0,
+        "unpricedTurns": 1
+      },
+      "usage": {
+        "inputTokens": 12,
+        "outputTokens": 5
+      },
+      "basis": "metered by the provider",
+      "models": [
+        {
+          "reference": "mock/alpha",
+          "turns": 1,
+          "usage": {
+            "inputTokens": 12,
+            "outputTokens": 5
+          },
+          "rollup": {
+            "nanos": 0,
+            "pricedTurns": 0,
+            "meteredTurns": 0,
+            "unpricedTurns": 1
+          }
+        }
+      ]
+    }
+  },
+  "undo": {
+    "status": 200,
+    "body": {
+      "prompt": {
+        "entryId": "q6",
+        "text": "turn on the lights"
+      },
+      "filesNote": "files untouched",
+      "undoable": false,
+      "redoable": true
+    }
+  },
+  "undoAgain": {
+    "status": 409,
+    "body": {
+      "error": "already undone · send a prompt to keep it, or redo to bring it back"
+    }
+  },
+  "redo": {
+    "status": 200,
+    "body": {
+      "restored": true,
+      "undoable": true,
+      "redoable": false
+    }
+  },
+  "redoAgain": {
+    "status": 404,
+    "body": {
+      "error": "nothing to redo"
+    }
+  },
+  "presetLoosening": {
+    "status": 409,
+    "body": {
+      "error": "loosening needs confirmed: true"
+    }
+  },
+  "preset": {
+    "status": 200,
+    "body": {
+      "from": "standard",
+      "to": "open"
+    }
+  },
+  "export": {
+    "status": 200,
+    "body": "<html>"
+  },
+  "sessions": {
+    "status": 200,
+    "body": {
+      "sessions": [
+        {
+          "id": "s1",
+          "title": "Lights",
+          "createdAt": "2026-09-07T12:00:00.000Z",
+          "lastActivityAt": "2026-09-07T12:00:00.000Z",
+          "messageCount": 2,
+          "model": "mock/beta",
+          "thinking": true,
+          "effort": "high"
+        }
+      ]
+    }
+  }
+}

@@ -19,7 +19,16 @@ import type {
   CandidateChoice,
   ChangedFileReading,
   ChangesReading,
+  CompactReading,
+  ContextReading,
+  ControlRefusal,
+  ControlRefusalKind,
+  CostReading,
   DiscardOutcome,
+  EffortLevel,
+  EffortReading,
+  ExportReading,
+  ExportRequest,
   FileRange,
   FileReading,
   FlavorsView,
@@ -38,17 +47,27 @@ import type {
   MemoryNoteReading,
   MemoryNotes,
   MemoryQuestion,
+  ModelReading,
   PendingAsk,
+  PresetName,
+  PresetReading,
+  PromptBehavior,
   PromptInjection,
   PromptOutcome,
   QuestionChoice,
+  RedoReading,
+  RenameReading,
+  ResolutionFailure,
   RevertReply,
   SessionDetail,
   SessionEntries,
   SessionSummary,
+  SpillReading,
   SurfaceRefusal,
+  ThinkingReading,
   TreeReading,
   TrustOutcome,
+  UndoReading,
   WorkspaceChoice,
   WorkspaceUse,
   WorkspaceView,
@@ -69,7 +88,7 @@ export interface KeyworkClient {
   sessions(): Promise<readonly SessionSummary[]>;
   session(id: string): Promise<SessionDetail | undefined>;
   createSession(): Promise<SessionSummary>;
-  prompt(id: string, text: string): Promise<PromptOutcome>;
+  prompt(id: string, text: string, behavior: PromptBehavior): Promise<PromptOutcome>;
   inject(id: string, injection: PromptInjection): Promise<InjectOutcome>;
   abort(id: string): Promise<AbortOutcome>;
   entries(id: string): Promise<SessionEntries | undefined>;
@@ -78,6 +97,18 @@ export interface KeyworkClient {
   moveLeaf(id: string, entryId: string | null): Promise<LeafOutcome>;
   changes(id: string): Promise<ChangesReading>;
   changedFile(id: string, path: string): Promise<ChangedFileReading>;
+  spill(sessionId: string, spillId: string, range?: FileRange): Promise<SpillReading>;
+  setModel(id: string, reference: string): Promise<ModelReading>;
+  setThinking(id: string, on: boolean): Promise<ThinkingReading>;
+  setEffort(id: string, level: EffortLevel | null): Promise<EffortReading>;
+  compact(id: string, focus?: string): Promise<CompactReading>;
+  undo(id: string): Promise<UndoReading>;
+  redo(id: string): Promise<RedoReading>;
+  context(id: string): Promise<ContextReading>;
+  cost(id: string): Promise<CostReading>;
+  exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
+  rename(id: string, title: string): Promise<RenameReading>;
+  setPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
   asks(): Promise<readonly PendingAsk[]>;
   answerAsk(callId: string, verdict: AskVerdict): Promise<AnswerOutcome>;
   events(options?: EventStreamOptions): AsyncIterable<BusEnvelope>;
@@ -141,6 +172,8 @@ export interface ServerTicket {
 
 export interface EventStreamOptions {
   since?: number | undefined;
+  session?: string | undefined;
+  onlySession?: boolean | undefined;
   signal?: AbortSignal | undefined;
   onOpen?: (() => void) | undefined;
   onNotice?: ((notice: StreamNotice) => void) | undefined;
@@ -217,13 +250,14 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       return response.status === 404 ? undefined : json<SessionDetail>(response);
     },
     createSession: () => request("POST", "/sessions").then(json<SessionSummary>),
-    prompt: async (id, text) => {
+    prompt: async (id, text, behavior) => {
       const response = await request("POST", `/sessions/${encodeURIComponent(id)}/prompt`, {
         text,
+        behavior,
       });
       if (response.status === 404) return "missing";
-      await json(response);
-      return "accepted";
+      const outcome = await json<{ queued: boolean }>(response);
+      return outcome.queued ? "queued" : "started";
     },
     inject: async (id, injection) => {
       const response = await request(
@@ -285,6 +319,14 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       if (response.status === 409) return "no-baseline";
       return json<ChangedFileReading>(response);
     },
+    spill: async (sessionId, spillId, range = {}) => {
+      const path = `/sessions/${encodeURIComponent(sessionId)}/spills/${encodeURIComponent(spillId)}`;
+      const response = await request("GET", `${path}${rangeQuery(range)}`);
+      if (response.status === 400) return "invalid-range";
+      if (response.status === 404) return missingSpillOf(response);
+      if (response.status === 415) return "binary";
+      return json<SpillReading>(response);
+    },
     asks: async () => {
       const listed = await json<{ asks: PendingAsk[] }>(await request("GET", "/asks"));
       return listed.asks;
@@ -296,6 +338,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       await json(response);
       return "settled";
     },
+    ...sessionVerbRoutes(request),
     ...memoryRoutes(request),
     ...workspaceRoutes(request),
     ...surfaceRoutes(request),
@@ -303,7 +346,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       resumingEvents(
         options,
         (lastId) =>
-          request("GET", "/events", undefined, {
+          request("GET", eventsPath(options), undefined, {
             ...(options.signal !== undefined && { signal: options.signal }),
             headers: lastId === undefined ? {} : { "last-event-id": String(lastId) },
           }),
@@ -314,6 +357,114 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
 }
 
 type Request = (method: string, path: string, body?: unknown) => Promise<Response>;
+
+type SessionVerbRoutes = Pick<
+  KeyworkClient,
+  | "setModel"
+  | "setThinking"
+  | "setEffort"
+  | "compact"
+  | "undo"
+  | "redo"
+  | "context"
+  | "cost"
+  | "exportSession"
+  | "rename"
+  | "setPreset"
+>;
+
+function sessionVerbRoutes(request: Request): SessionVerbRoutes {
+  const verb = (id: string, name: string, body?: unknown): Promise<Response> =>
+    request("POST", `/sessions/${encodeURIComponent(id)}/${name}`, body);
+  const reading = (id: string, name: string): Promise<Response> =>
+    request("GET", `/sessions/${encodeURIComponent(id)}/${name}`);
+  return {
+    setModel: async (id, reference) => {
+      const response = await verb(id, "model", { reference });
+      return response.status === 400 ? unresolvedModel(response) : answered(response);
+    },
+    setThinking: async (id, on) => answered(await verb(id, "thinking", { on })),
+    setEffort: async (id, level) => answered(await verb(id, "effort", { level })),
+    compact: async (id, focus) =>
+      answered(await verb(id, "compact", focus === undefined ? {} : { focus })),
+    undo: async (id) => answered(await verb(id, "undo"), undoConflict),
+    redo: async (id) => answered(await verb(id, "redo")),
+    context: async (id) => {
+      const response = await reading(id, "context");
+      return response.status === 404 ? "missing" : json(response);
+    },
+    cost: async (id) => {
+      const response = await reading(id, "cost");
+      return response.status === 404 ? "missing" : json(response);
+    },
+    exportSession: async (id, exportRequest = {}) => {
+      const response = await verb(id, "export", exportRequest);
+      return response.status === 200 ? { html: await response.text() } : answered(response);
+    },
+    rename: async (id, title) => answered(await verb(id, "rename", { title })),
+    setPreset: async (name, confirmed = false) => {
+      const response = await request("POST", "/preset", {
+        name,
+        ...(confirmed && { confirmed: true }),
+      });
+      return (await controlRefusalOf(response, presetConflict)) ?? json(response);
+    },
+  };
+}
+
+type ConflictMeaningOf = (detail: string) => ControlRefusalKind;
+
+const busyConflict: ConflictMeaningOf = () => "busy";
+
+const undoConflict: ConflictMeaningOf = (detail) =>
+  detail.startsWith("already undone") ? "staged" : "busy";
+
+const presetConflict: ConflictMeaningOf = (detail) =>
+  detail.includes("confirmed") ? "needs-confirmation" : "unavailable";
+
+const missingSessionDetail = "no session has that id";
+
+async function answered<T>(
+  response: Response,
+  conflict: ConflictMeaningOf = busyConflict,
+): Promise<T | ControlRefusal | "missing"> {
+  if (response.status === 404) {
+    const detail = await refusalDetail(response);
+    return detail === missingSessionDetail ? "missing" : { refused: "nothing", detail };
+  }
+  return (await controlRefusalOf(response, conflict)) ?? json<T>(response);
+}
+
+async function controlRefusalOf(
+  response: Response,
+  conflict: ConflictMeaningOf,
+): Promise<ControlRefusal | undefined> {
+  if (response.status !== 400 && response.status !== 403 && response.status !== 409) {
+    return undefined;
+  }
+  const detail = await refusalDetail(response);
+  if (response.status === 400) return { refused: "invalid", detail };
+  if (response.status === 403) return { refused: "outside-scope", detail };
+  return { refused: conflict(detail), detail };
+}
+
+async function unresolvedModel(response: Response): Promise<ControlRefusal> {
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    failure?: ResolutionFailure;
+  };
+  const detail = body.error ?? `the server answered ${response.status}`;
+  return body.failure === undefined
+    ? { refused: "invalid", detail }
+    : { refused: "unresolved", detail, failure: body.failure };
+}
+
+function eventsPath(options: EventStreamOptions): string {
+  if (options.session === undefined) return "/events";
+  const query = new URLSearchParams({ session: options.session });
+  if (options.onlySession === true) query.set("only", "session");
+  return `/events?${query}`;
+}
 
 type MemoryRoutes = Pick<
   KeyworkClient,
@@ -495,6 +646,19 @@ async function json<T = unknown>(response: Response): Promise<T> {
 async function missingOf(response: Response): Promise<"missing" | "unknown-entry"> {
   const detail = await refusalDetail(response);
   return detail.includes("entryId") ? "unknown-entry" : "missing";
+}
+
+async function missingSpillOf(response: Response): Promise<"missing-session" | "missing"> {
+  const detail = await refusalDetail(response);
+  return detail === "no session has that id" ? "missing-session" : "missing";
+}
+
+function rangeQuery(range: FileRange): string {
+  const query = new URLSearchParams();
+  if (range.from !== undefined) query.set("from", String(range.from));
+  if (range.to !== undefined) query.set("to", String(range.to));
+  const encoded = query.toString();
+  return encoded === "" ? "" : `?${encoded}`;
 }
 
 async function refusalDetail(response: Response): Promise<string> {

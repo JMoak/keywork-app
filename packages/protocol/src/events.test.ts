@@ -28,8 +28,8 @@ describe("the event vocabulary", () => {
     expect([...serverEventTypes].sort()).toEqual([...server].sort());
   });
 
-  it("has eighteen engine types with no duplicates and one server type beside them", () => {
-    expect(new Set(engineEventTypes).size).toBe(18);
+  it("has nineteen engine types with no duplicates and the server types beside them", () => {
+    expect(new Set(engineEventTypes).size).toBe(19);
     expect(new Set(eventTypes).size).toBe(engineEventTypes.length + serverEventTypes.length);
   });
 

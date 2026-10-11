@@ -27,6 +27,7 @@ export interface Tiler {
   readonly layout: Layout;
   panes(): readonly PaneId[];
   spec(id: PaneId): PaneSpec | undefined;
+  findPane(matches: (spec: PaneSpec) => boolean): PaneId | undefined;
   slots(screen: Screen): PaneSlot[];
   scene(screen: Screen): Scene;
   emptyMain(screen: Screen): Rect | undefined;
@@ -36,6 +37,7 @@ export interface Tiler {
   summon(spec: PaneSpec, screen: Screen): Verdict;
   bind(id: PaneId, spec: PaneSpec): void;
   close(id: PaneId): Verdict;
+  closeFocused(): Verdict;
   focus(id: PaneId): Verdict;
   focusOrdinal(ordinal: number): Verdict;
   focusToward(direction: Direction, screen: Screen): Verdict;
@@ -64,9 +66,9 @@ export function createTiler(restored?: TilerState): Tiler {
   if (restored !== undefined) revive(layout, specs, restored);
   for (const id of specs.keys()) ids.adopt(id);
 
-  const touched = (verdict: Verdict): Verdict => {
+  const touched = (verdict: Verdict, noRoom = refusalNotices.noRoomHere): Verdict => {
     if (verdict.ok) setVersion((at) => at + 1);
-    return verdict;
+    return explained(verdict, noRoom);
   };
 
   const place = (id: PaneId, spec: PaneSpec, screen: Screen): Verdict => {
@@ -79,9 +81,15 @@ export function createTiler(restored?: TilerState): Tiler {
   const open = (spec: PaneSpec, screen: Screen): Verdict => {
     const id = ids.mint(spec.kind);
     const verdict = place(id, spec, screen);
-    if (!verdict.ok) return verdict;
+    if (!verdict.ok) return explained(verdict, refusalNotices.noRoomForPane);
     ids.adopt(id);
     specs.set(id, spec);
+    return touched(verdict);
+  };
+
+  const close = (id: PaneId): Verdict => {
+    const verdict = layout.close(id);
+    if (verdict.ok) specs.delete(id);
     return touched(verdict);
   };
 
@@ -90,6 +98,11 @@ export function createTiler(restored?: TilerState): Tiler {
     layout,
     panes: () => layout.panes(),
     spec: (id) => specs.get(id),
+    findPane: (matches) =>
+      layout.panes().find((id) => {
+        const spec = specs.get(id);
+        return spec !== undefined && matches(spec);
+      }),
     slots: (screen) => {
       version();
       const focused = layout.focused();
@@ -127,10 +140,12 @@ export function createTiler(restored?: TilerState): Tiler {
       specs.set(id, spec);
       setVersion((at) => at + 1);
     },
-    close: (id) => {
-      const verdict = layout.close(id);
-      if (verdict.ok) specs.delete(id);
-      return touched(verdict);
+    close,
+    closeFocused: () => {
+      const id = layout.focused();
+      if (id === undefined)
+        return { ok: false, refused: "no-focus", notice: refusalNotices.nothingToClose };
+      return close(id);
     },
     focus: (id) => touched(layout.focus(id)),
     focusOrdinal: (ordinal) => touched(layout.focusOrdinal(ordinal)),
@@ -138,8 +153,10 @@ export function createTiler(restored?: TilerState): Tiler {
     move: (direction, screen) => touched(layout.move(direction, screen)),
     zoom: () => touched(layout.zoomToggle()),
     rotate: () => touched(layout.rotate()),
-    cycle: (screen) => touched(layout.cycleFocused(screen)),
-    dock: (side, screen) => touched(layout.dockFocused(side, screen)),
+    cycle: (screen) =>
+      touched(layout.cycleFocused(screen), refusalNotices.noRoomIn("this pane's next home")),
+    dock: (side, screen) =>
+      touched(layout.dockFocused(side, screen), refusalNotices.noRoomIn(`the ${side} dock`)),
     resizeDock: (delta, screen) => {
       const id = layout.focused();
       const side = id === undefined ? undefined : layout.dockSideOf(id);
@@ -148,7 +165,8 @@ export function createTiler(restored?: TilerState): Tiler {
     },
     resizePane: (delta, screen) => touched(layout.resizeFocused(delta, screen)),
     resizeSeam: (handle, ratio, screen) => touched(layout.resizeSeam(handle, ratio, screen)),
-    send: (id, zone, screen) => touched(layout.send(id, zone, screen)),
+    send: (id, zone, screen) =>
+      touched(layout.send(id, zone, screen), refusalNotices.noRoomIn(placeName(zone))),
     snapshot: () => ({ layout: layout.toJSON(), specs: Object.fromEntries(specs) }),
   };
 }
@@ -172,6 +190,13 @@ export function parseTilerState(value: unknown): TilerState | undefined {
   }
   return { layout: layoutState, specs };
 }
+
+export const refusalNotices = {
+  noRoomForPane: "no room for another pane · close or resize one",
+  noRoomIn: (where: string) => `no room in ${where} · close or resize a pane`,
+  noRoomHere: "no room for that here",
+  nothingToClose: "no pane is focused · nothing to close",
+};
 
 export function paneIdOf(kind: PaneKind, ordinal: number): PaneId {
   return `${kind}-${ordinal}`;
@@ -200,6 +225,15 @@ function revive(layout: Layout, specs: Map<PaneId, PaneSpec>, state: TilerState)
     if (spec !== undefined) specs.set(id, spec);
     else layout.close(id);
   }
+}
+
+function explained(verdict: Verdict, noRoom: string): Verdict {
+  if (verdict.ok || verdict.refused !== "no-room" || verdict.notice !== undefined) return verdict;
+  return { ...verdict, notice: noRoom };
+}
+
+function placeName(zone: DropZone): string {
+  return zone === "main" ? "the main area" : `the ${zone} dock`;
 }
 
 function mainAnchor(layout: Layout): PaneId | undefined {

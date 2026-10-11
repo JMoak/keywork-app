@@ -31,6 +31,8 @@ export function trustPrompt(root: string): string {
   return `trust ${root}? keywork keeps workspace files and memory in .keywork`;
 }
 
+export const trustStaysOff = `${trustEnables} stay off until you trust it`;
+
 export function untrustedNotice(root: string, chord: string): string {
   return `${root} isn't trusted yet · ${trustEnables} stay off until it is · ${chord} trusts it`;
 }
