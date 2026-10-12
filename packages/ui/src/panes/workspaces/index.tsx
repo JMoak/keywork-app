@@ -21,6 +21,7 @@ export const workspacesPane = definePane<WorkspacesSpec>({
   kind: "workspaces",
   spec: workspacesSpec,
   home: "left",
+  attire: "house",
   title: () => "workspaces",
   emptyState: (keys) =>
     `only the root so far · ${keys.chord("workspaces.new")} declares a named workspace`,

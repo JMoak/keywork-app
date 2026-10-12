@@ -88,6 +88,25 @@ describe("createTiler", () => {
     });
   });
 
+  it("retargets an open pane with summon variants and leaves the others' specs alone", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.summon({ kind: "themes" }, screen);
+      tiler.summon({ kind: "tree", sessionId: "s1" }, screen);
+      tiler.focus("conversation-1");
+      const dressPane: PaneSpec = {
+        kind: "themes",
+        target: { kind: "pane", id: "conversation-1" },
+      };
+      expect(tiler.summon(dressPane, screen).ok).toBe(true);
+      expect(tiler.summon(sessions, screen).ok).toBe(true);
+      expect(tiler.spec("themes-1")).toEqual(dressPane);
+      expect(tiler.spec(sessionsPaneId)).toEqual({ kind: "tree", sessionId: "s1" });
+      expect(tiler.panes().filter((id) => id.startsWith("themes"))).toHaveLength(1);
+      expect(tiler.focused()).toBe(sessionsPaneId);
+    });
+  });
+
   it("round-trips its snapshot and drops panes whose spec is missing", () => {
     const snapshot = withTiler((tiler) => {
       tiler.summon(sessions, screen);

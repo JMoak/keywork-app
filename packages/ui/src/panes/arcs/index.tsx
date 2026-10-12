@@ -35,6 +35,7 @@ export const arcsPane = definePane<ArcsSpec>({
   kind: "arcs",
   spec: arcsSpec,
   home: "left",
+  attire: "house",
   title: () => "arcs",
   emptyState: (keys) => `no arcs yet · ${keys.chord("arcs.new")} opens one`,
   component: ArcsList,

@@ -20,6 +20,12 @@
   overflow: hidden;
 }
 
+.kw-ov-head-lead {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .kw-ov-new {
   font: inherit;
   color: var(--kw-accent);

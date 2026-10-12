@@ -15,10 +15,12 @@ import {
 import { gallery, keyworkDay, keyworkNight } from "./themes.ts";
 import {
   applyTheme,
+  dressElement,
   fontVariables,
   themeAttributes,
   themeStylesheet,
   themeVariables,
+  undressElement,
   variablesOfStylesheet,
 } from "./variables.ts";
 
@@ -270,5 +272,34 @@ describe("themeVariables", () => {
     );
     expect(variablesOfStylesheet(css)).toEqual(themeVariables(keyworkNight));
     expect(css).toBe(themeStylesheet(keyworkNight));
+  });
+});
+
+describe("dressing a single element", () => {
+  it("dresses an element in everything but the house's gap", () => {
+    const element = document.createElement("section");
+    dressElement(element, keyworkDay);
+    expect({ ...element.dataset }).toEqual({
+      theme: keyworkDay.name,
+      appearance: "light",
+      chrome: keyworkDay.chromeWeight,
+      instruments: keyworkDay.instruments,
+    });
+    expect(element.style.colorScheme).toBe("light");
+    expect(element.style.getPropertyValue("--kw-panel")).toBe(keyworkDay.tokens.panel);
+    expect(element.style.getPropertyValue("--kw-syntax-keyword")).toBe(keyworkDay.syntax.keyword);
+    expect(element.style.getPropertyValue("--kw-gap")).toBe("");
+  });
+
+  it("undresses exactly what dressing set and leaves the element's own styles alone", () => {
+    const element = document.createElement("section");
+    element.dataset.state = "working";
+    element.style.setProperty("--kw-pane-hue", "var(--kw-ramp-2)");
+    dressElement(element, keyworkDay);
+    undressElement(element);
+    expect({ ...element.dataset }).toEqual({ state: "working" });
+    expect(element.style.colorScheme).toBe("");
+    expect(element.style.getPropertyValue("--kw-panel")).toBe("");
+    expect(element.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
   });
 });

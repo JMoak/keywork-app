@@ -57,6 +57,7 @@ export const conversationPane = definePane<ConversationSpec>({
   kind: "conversation",
   spec: conversationSpec,
   home: "main",
+  attire: "work",
   title: (spec, shell) =>
     spec.sessionId === undefined
       ? "new session"

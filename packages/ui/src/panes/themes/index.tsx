@@ -1,17 +1,42 @@
 import { systemThemeName } from "@keywork-app/protocol";
-import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { z } from "zod";
+import type { PaneId } from "../../layout/index.ts";
 import { frameTick } from "../../shell/frame-tick.ts";
+import { type AttireTarget, sameTarget } from "../../theme/attire.ts";
 import type { Theme } from "../../theme/schema.ts";
 import type { Fitting, Wardrobe } from "../../theme/wardrobe.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { createCursor, keepInView, NoticeLine } from "../overview/rows.tsx";
-import { definePane, type PaneProps } from "../registry.ts";
+import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
+import { type Dresser, dresserFor } from "./dresser.ts";
+import {
+  attireTargetSpec,
+  nextTarget,
+  reachableTargets,
+  summonedTarget,
+  summonNotices,
+  windowTarget,
+} from "./targets.ts";
 import "../overview/overview.css";
 import "./themes.css";
 
-const themesSpec = z.object({ kind: z.literal("themes") });
+const themesSpec = z.object({
+  kind: z.literal("themes"),
+  target: attireTargetSpec.optional(),
+  summonedFrom: z.string().optional(),
+  notice: z.string().optional(),
+});
 
 export type ThemesSpec = z.output<typeof themesSpec>;
 
@@ -19,6 +44,7 @@ export const themesPane = definePane<ThemesSpec>({
   kind: "themes",
   spec: themesSpec,
   home: "right",
+  attire: "house",
   title: () => "themes",
   emptyState: (keys) =>
     `no wardrobe in this window · ${keys.chord("palette.commands")} lists the theme commands`,
@@ -28,7 +54,23 @@ export const themesPane = definePane<ThemesSpec>({
     chords: "leader shift+f",
     help: "themes pane",
     command: { name: "theme", description: "open the themes pane and try one on" },
-    spec: () => ({ kind: "themes" }),
+    variants: {
+      pane: {
+        chords: "leader w",
+        help: "themes pane for the focused pane",
+        command: { name: "theme-pane", description: "wear a theme on this pane" },
+      },
+      arc: {
+        chords: "leader shift+w",
+        help: "themes pane for the focused pane's arc",
+        command: { name: "theme-arc", description: "wear a theme on this pane's arc" },
+      },
+      marked: {
+        help: "themes pane for the marked panes",
+        command: { name: "theme-marked", description: "wear a theme on the marked panes" },
+      },
+    },
+    spec: (shell, variant) => themesSpecFor(shell, variant),
   },
   localActions: {
     "themes.down": {
@@ -50,6 +92,22 @@ export const themesPane = definePane<ThemesSpec>({
       chords: "escape",
       help: "put the worn theme back",
       command: { name: "theme-restore", description: "drop the preview, keep the worn theme" },
+    },
+    "themes.target": {
+      chords: "t",
+      help: "dress the window, this pane, its arc or the marked panes",
+      command: {
+        name: "theme-target",
+        description: "cycle what the themes pane dresses: window, pane, arc, marked panes",
+      },
+    },
+    "themes.undress": {
+      chords: ["x", "backspace"],
+      help: "drop this target's own theme so it inherits",
+      command: {
+        name: "theme-inherit",
+        description: "drop the target's own theme so it inherits again",
+      },
     },
     "themes.system": {
       chords: "s",
@@ -83,11 +141,19 @@ export function swatchesOf(theme: Theme): readonly string[] {
   ];
 }
 
-export const rememberedNotice = "remembered for the next launch";
+export {
+  onlyWindowFollowsNotice,
+  rememberedNotice,
+  targetRememberedNotice,
+  themeOnShow,
+  windowAlwaysDressedNotice,
+} from "./dresser.ts";
+export { summonNotices };
 
-export function themeOnShow(wardrobe: Wardrobe): string {
-  const worn = wardrobe.worn();
-  return worn === systemThemeName ? (wardrobe.wearing()?.name ?? worn) : worn;
+export function themesSpecFor(shell: ShellSeams, variant?: string): ThemesSpec {
+  const from = shell.focusedPane?.();
+  const { target, notice } = summonedTarget(shell, from, variant);
+  return specOf(target, from, notice);
 }
 
 export function pairLine(fitting: Fitting, wardrobe: Wardrobe): string | undefined {
@@ -118,39 +184,89 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
     () => root,
     () => props.focused,
   );
-  const fittings = () => props.wardrobe.fittings();
-  const cursor = createCursor(() => fittings().length);
-  const [notice, setNotice] = createSignal<string>();
-  const atCursor = (): Fitting | undefined => fittings()[cursor.index()];
-  const previewOnNextFrame = framePreview(props.wardrobe, setNotice);
-
-  cursor.set(
-    Math.max(
-      0,
-      fittings().findIndex((fitting) => fitting.name === themeOnShow(props.wardrobe)),
-    ),
+  const [target, setTarget] = createSignal<AttireTarget>(props.spec.target ?? windowTarget);
+  const dresser = createMemo(() => dresserFor(target(), props.wardrobe, props.shell.attire));
+  const fittings = createMemo(() =>
+    props.wardrobe.fittings().filter((fitting) => dresser().lists(fitting)),
   );
+  const cursor = createCursor(() => fittings().length);
+  const [notice, setNotice] = createSignal<string | undefined>(props.spec.notice);
+  const atCursor = (): Fitting | undefined => fittings()[cursor.index()];
+  const previews = framePreview(setNotice);
 
+  const landOnWorn = (): void => {
+    const landing = dresser().landing();
+    cursor.set(
+      Math.max(
+        0,
+        fittings().findIndex((fitting) => fitting.name === landing),
+      ),
+    );
+  };
+  const dropPreview = (): void => {
+    previews.cancel();
+    dresser().preview(undefined);
+  };
+  const remember = (next: AttireTarget): void =>
+    props.shell.rebind(props.id, specOf(next, props.spec.summonedFrom));
+
+  const switchTo = (next: AttireTarget): void => {
+    dropPreview();
+    setTarget(next);
+    landOnWorn();
+  };
+  const followSummons = (spec: ThemesSpec): void => {
+    const summoned = spec.target ?? windowTarget;
+    if (!sameTarget(summoned, target())) {
+      switchTo(summoned);
+      setNotice(undefined);
+    }
+    if (spec.notice === undefined) return;
+    setNotice(spec.notice);
+    remember(summoned);
+  };
+
+  landOnWorn();
+  onMount(() => {
+    if (props.spec.notice !== undefined) remember(target());
+  });
+  createEffect(on(() => props.spec, followSummons, { defer: true }));
   createEffect(
     on(
       () => props.focused,
       (focused) => {
-        if (!focused) props.wardrobe.preview(undefined);
+        if (!focused) dropPreview();
       },
       { defer: true },
     ),
   );
-  onCleanup(() => props.wardrobe.preview(undefined));
+  onCleanup(dropPreview);
 
   const move = (delta: number): void => {
     cursor.move(delta);
     const fitting = atCursor();
-    if (fitting !== undefined) previewOnNextFrame(fitting.name);
+    if (fitting !== undefined) previews.schedule(dresser(), fitting.name);
   };
   const wear = (fitting: Fitting | undefined): void => {
     if (fitting === undefined) return;
-    const refusal = props.wardrobe.wear(fitting.name);
-    setNotice(refusal ?? rememberedNotice);
+    previews.cancel();
+    setNotice(dresser().wear(fitting.name));
+  };
+  const retarget = (): void => {
+    const reachable = reachableTargets(
+      props.shell.attire,
+      props.spec.summonedFrom,
+      props.shell.marks?.all() ?? [],
+    );
+    const next = nextTarget(dresser().target, reachable);
+    switchTo(next);
+    remember(next);
+    setNotice(reachable.length === 1 ? summonNotices.windowOnly : undefined);
+  };
+  const undress = (): void => {
+    dropPreview();
+    setNotice(dresser().undress());
+    landOnWorn();
   };
 
   props.onAction((action) => {
@@ -162,18 +278,22 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
       case "themes.wear":
         return wear(atCursor());
       case "themes.restore":
-        props.wardrobe.preview(undefined);
-        return setNotice(`kept ${props.wardrobe.worn()}`);
+        dropPreview();
+        return setNotice(dresser().kept());
+      case "themes.target":
+        return retarget();
+      case "themes.undress":
+        return undress();
       case "themes.system":
-        return setNotice(props.wardrobe.toggleSystem() ?? rememberedNotice);
+        return setNotice(dresser().followSystem());
     }
   });
 
   return (
     <section class="kw-ov kw-themes" aria-label="themes" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
-        <span>wearing {props.wardrobe.worn()}</span>
-        <span class="kw-ov-head-detail">enter wears · esc keeps · s system</span>
+        <span class="kw-ov-head-lead">{dresser().head()}</span>
+        <span class="kw-ov-head-detail">{dresser().hints()}</span>
       </div>
       <ol class="kw-ov-list kw-themes-list">
         <For each={fittings()}>
@@ -181,7 +301,7 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
             <ThemeRow
               fitting={fitting}
               cursor={index() === cursor.index()}
-              worn={fitting.name === props.wardrobe.worn()}
+              dressing={dressingOf(dresser(), fitting.name)}
               pair={pairLine(fitting, props.wardrobe)}
               onClick={() => {
                 cursor.set(index());
@@ -196,10 +316,22 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
   );
 }
 
+export const onlyTheWindowNotice =
+  "only the window can be dressed now · focus a work pane or mark some, then summon again";
+
+type Dressing = "own" | "inherited" | undefined;
+
+const dressingMarks: Record<NonNullable<Dressing>, string> = { own: "█", inherited: "·" };
+
+function dressingOf(dresser: Dresser, name: string): Dressing {
+  if (dresser.own() === name) return "own";
+  return dresser.echoes().includes(name) ? "inherited" : undefined;
+}
+
 interface ThemeRowProps {
   fitting: Fitting;
   cursor: boolean;
-  worn: boolean;
+  dressing: Dressing;
   pair: string | undefined;
   onClick(): void;
 }
@@ -217,12 +349,13 @@ function ThemeRow(props: ThemeRowProps) {
       class="kw-themes-row"
       data-theme-name={props.fitting.name}
       data-cursor={props.cursor ? "" : undefined}
-      data-worn={props.worn ? "" : undefined}
+      data-worn={props.dressing === "own" ? "" : undefined}
+      data-inherited={props.dressing === "inherited" ? "" : undefined}
       data-refused={refusal() === undefined ? undefined : ""}
     >
       <button type="button" class="kw-themes-button" onClick={() => props.onClick()}>
         <span class="kw-themes-mark" aria-hidden="true">
-          {props.worn ? "█" : " "}
+          {props.dressing === undefined ? " " : dressingMarks[props.dressing]}
         </span>
         <span class="kw-themes-name">{props.fitting.name}</span>
         <span class="kw-themes-source">{props.fitting.source}</span>
@@ -245,20 +378,42 @@ function ThemeRow(props: ThemeRowProps) {
   );
 }
 
-function framePreview(
-  wardrobe: Wardrobe,
-  say: (text: string | undefined) => void,
-): (name: string) => void {
+function specOf(target: AttireTarget, from: PaneId | undefined, notice?: string): ThemesSpec {
+  return {
+    kind: "themes",
+    ...(target.kind !== "window" && { target: wireTarget(target) }),
+    ...(from !== undefined && { summonedFrom: from }),
+    ...(notice !== undefined && { notice }),
+  };
+}
+
+function wireTarget(target: AttireTarget): NonNullable<ThemesSpec["target"]> {
+  return target.kind === "panes" ? { kind: "panes", ids: [...target.ids] } : { ...target };
+}
+
+interface FramePreview {
+  schedule(dresser: Dresser, name: string): void;
+  cancel(): void;
+}
+
+function framePreview(say: (text: string | undefined) => void): FramePreview {
   const tick = frameTick();
-  let pending: string | undefined;
-  return (name) => {
-    const scheduled = pending !== undefined;
-    pending = name;
-    if (scheduled) return;
-    tick(() => {
-      const next = pending;
+  let pending: { dresser: Dresser; name: string } | undefined;
+  let scheduled = false;
+  return {
+    schedule: (dresser, name) => {
+      pending = { dresser, name };
+      if (scheduled) return;
+      scheduled = true;
+      tick(() => {
+        scheduled = false;
+        const next = pending;
+        pending = undefined;
+        if (next !== undefined) say(next.dresser.preview(next.name));
+      });
+    },
+    cancel: () => {
       pending = undefined;
-      if (next !== undefined) say(wardrobe.preview(next));
-    });
+    },
   };
 }

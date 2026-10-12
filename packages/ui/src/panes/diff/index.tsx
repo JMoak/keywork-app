@@ -24,6 +24,7 @@ export const diffPane = definePane<DiffSpec>({
   kind: "diff",
   spec: diffSpec,
   home: "right",
+  attire: "work",
   title: (spec) => (spec.path === undefined ? "changes" : `changes · ${spec.path}`),
   emptyState: (keys) =>
     `nothing changed yet · ${keys.chord("diff.summon")} follows the session's files`,

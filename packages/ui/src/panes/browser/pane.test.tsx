@@ -49,6 +49,7 @@ function harness(): Harness {
     host: browserHost(),
     workspace: "C:/work",
     currentSession: () => undefined,
+    focusedPane: () => undefined,
     rebind: () => {},
     unseen: () => false,
     ...extras,

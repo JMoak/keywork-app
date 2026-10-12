@@ -37,6 +37,7 @@ export const treePane = definePane<TreeSpec>({
   kind: "tree",
   spec: treeSpec,
   home: "left",
+  attire: "house",
   title: (spec, shell) =>
     spec.sessionId === undefined
       ? "sessions"

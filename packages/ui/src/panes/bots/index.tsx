@@ -27,6 +27,7 @@ export const botsPane = definePane<BotsSpec>({
   kind: "bots",
   spec: botsSpec,
   home: "left",
+  attire: "house",
   title: () => "bots",
   emptyState: (keys) => `no bots yet · ${keys.chord("bots.new")} defines one`,
   component: BotsList,

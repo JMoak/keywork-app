@@ -167,7 +167,7 @@
 .kw-prose {
   font-family: var(--kw-font-prose);
   font-size: 1.0625rem;
-  font-weight: 400;
+  font-weight: var(--kw-prose-weight, 400);
   line-height: var(--kw-line);
   font-kerning: normal;
   font-optical-sizing: auto;
@@ -176,8 +176,11 @@
 .kw-prose > :is(.kw-paragraph, .kw-heading, .kw-list, .kw-quote) {
   max-width: var(--kw-measure);
 }
-:root[data-appearance="dark"] .kw-prose {
-  font-weight: 370;
+[data-appearance="light"] {
+  --kw-prose-weight: 400;
+}
+[data-appearance="dark"] {
+  --kw-prose-weight: 370;
 }
 
 .kw-prose > :first-child {

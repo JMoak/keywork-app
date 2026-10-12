@@ -94,7 +94,7 @@ function summonAction(definition: PaneDefinition<PaneSpec>): Array<[string, AppA
     ...Object.entries(summon.variants ?? {}).map(([variant, detail]): [string, AppAction] => [
       `${summon.action}.${variant}`,
       {
-        chords: "none",
+        chords: detail.chords ?? "none",
         help: detail.help,
         command: detail.command,
         invoke: (target) => target.summon(definition.kind, variant),

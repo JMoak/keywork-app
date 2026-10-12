@@ -46,6 +46,7 @@ export const filePane = definePane<FileSpec>({
   kind: "file",
   spec: fileSpec,
   home: "main",
+  attire: "work",
   title: (spec) => spec.path,
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,

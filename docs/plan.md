@@ -1006,6 +1006,74 @@ destructive variant (`git push *` no longer matches `git push --force`). **Evide
 fix re-verified in the rebuilt app; app rail 105 files, 1214 tests, `check:themes` 21;
 keywork 346 files, 4828 tests. The outline of waves 7 to 11 follows M5.
 
+### Wave 6.5 ledger (2026-10-12): outfits, themes per arc and per pane
+
+Jordan's brief: themes per arc, shared by every pane in the arc that is not an admin pane, a
+quick command to put a theme on a set of work panes, several themes on screen at once moving
+freely with the panes, "the thing that is eye-catching". Five lanes on Opus: the engine (T1)
+and the themes pane (T2) in parallel against a contract the lead wrote first, then the shell
+integration (T3) and docs plus the gallery stage (T4) in parallel, then one polish lane (T5)
+from the live round. The vocabulary stays: the word is **theme**, the verb is **wear**; the
+window wears the **house** theme; "attire" and "outfit" are code names a person never reads.
+
+**The model (`theme/attire.ts`).** A pane's outfit resolves in one order: its own choice, else
+its arc's choice, else the house. `PaneDefinition.attire` is `"house"` for the admin panes
+(tree, arcs, bots, mcp, memory, workspaces, themes, permissions) and `"work"` for conversation,
+diff, terminal, file and browser; a house pane can never be dressed and says so. A dressed
+pane takes its theme whole (tokens, ramp, density, terminal, syntax, diff, selection, cursor,
+appearance, chrome weight, instruments); `gap` stays the house's because it lies between
+panes. Choices persist per workspace under `keywork.attire:<workspace>` as
+`{ version: 1, arcs, panes }`, never in the keywork config and never on the server: a theme
+per arc is presentation state of one window, like the layout. A stored name that no longer
+resolves falls through to the next rung silently while the themes pane still shows it with its
+refusal. One preview at a time, honoured at its own rung, so a pane's own choice still wins
+over an arc preview. `system` is a window-only choice (`system is a choice for the window ·
+pick a theme by name`).
+
+**Dressing (`theme/variables.ts`, `chrome/`).** `dressElement` sets the variables and
+`data-theme`, `data-appearance`, `data-chrome`, `data-instruments` and `color-scheme` on a
+pane's frame; `undressElement` removes exactly that. `PaneFrame` takes `outfit` and `marked`,
+carries `data-attire="pane"|"arc"` when dressed, and the title row shows the worn theme's
+name (`kw-frame-theme`, broadsheet and column tiers) and a mark glyph for marked panes. The
+prose weight moved to a `--kw-prose-weight` variable set per `data-appearance` so the nearest
+dressed ancestor wins without a specificity race; xterm's `watchTheme` watches the nearest
+`.kw-frame` as well as the root, so a dressed terminal retints; CodeMirror and `::selection`
+inherit through `var()`. The gauge in a dressed title row follows the outfit's instruments.
+
+**The themes pane dresses a target (`panes/themes/targets.ts`, `dresser.ts`).** The spec
+carries the target: the window (`leader shift+f`, `theme`), the pane it was summoned from
+(`leader w`, `theme-pane`), that pane's arc (`leader shift+w`, `theme-arc`), or the marked
+panes (`theme-marked`). `t` cycles window → this pane → its arc → marked, skipping what does
+not apply, rebinding the spec so it survives a restart; `j`/`k` preview on the target per frame
+tick; `enter` wears (`remembered`; the window keeps `remembered for the next launch`); `x` or
+`backspace` makes the target inherit again (`theme-inherit`); `s` follows the OS on the window
+only. Rows mark a target's own theme `█` and its inherited theme `·`. A variant with nothing to
+dress opens on the window with a one-time notice (`this pane is in no arc · the arcs pane binds
+one`). `PaneSummonVariant` can now carry chords, and `tiler.summon` rebinds an open docked
+pane whose kind has variants, so `leader w` retargets a themes pane that is already open
+instead of only focusing it.
+
+**Marks (`shell/marks.ts`, `keys/actions.ts`).** `leader b` marks or unmarks the focused pane
+(`mark`; `unmark-all` from the palette); a mark drops when its pane closes; marking a house
+pane is refused with `pane "x" always wears the window's theme`. The notice counts the set:
+`marked · 2 panes carry the mark · theme-marked dresses them`.
+
+**Docs and the gallery.** AD6 gained "The house and the outfits"; `docs/README.md` names the
+house and the per-arc and per-pane themes; `stage--outfits` in the screenshot rail shows
+whiplash, rose-pine-dawn and the house keywork-night in one window
+(`artifacts/shots/windows/themes/stage--outfits.png`). A server-held arc theme, so other
+clients could share it, is a later server-lane task (S15 below), not this wave.
+
+**Live round and polish (T5).** Driven over CDP in the built app: `leader w` retargeted an
+open themes pane and dressed one conversation everforest-dark inside a gruvbox window; the
+window moved to catppuccin-mocha with the pane keeping its own; two marked panes took
+whiplash from `theme-marked`. Found and fixed: the themes head clipped without an ellipsis, a
+mixed marked set read as wearing nothing, the cursor row at the list's bottom sat half under
+the edge, and the mark glyph collided with a bot sigil. The mark is now `▣` (no stamp, voice glyph, fold glyph, focus mark or sigil uses it; JetBrains Mono carries no box glyphs, so it draws from Cascadia Code like `█` does), the themes head ends in an ellipsis and drops its hint under 560px, `markedChoices` sorts a marked set into shared, mixed or none (`esc` on a mixed set says `kept what each pane wears`), and `keepInView` re-scrolls when the list resizes under a notice.
+
+Gate: app 107 files, 1271 tests; `bun run check` green at 21 themes and 72 routes. Left for later: no palette entries derived from marks; `theme-<name>` stays
+window-scoped by design; a server-held arc theme (S15).
+
 ## M4: The panes (20pt)
 
 Each pane earns its place with daily use. Order is by how often Jordan reaches for it.
@@ -1206,6 +1274,7 @@ every terminal, and Zed's review UI stays observed behaviour only.
 | **S13 search** | 2 | `GET /search?q=&in=transcripts,notes,changes,spills` with ranges and provenance | W10.3 |
 | **S14 the open findings** | 2 | `POST /redo` after an undo that announced `redoable`; context from reported usage; cost that survives a restart; compaction summaries marked; `surface.changed` on grants; `?layer` on notes; zero-turn cost rows dropped | W7.3 |
 | **PD12 mode cycling** | 1 | The one decision the app has waited on since M3.6 | W7.2 |
+| **S15 arc theme on the record** | 1 | An optional `theme` on an arc, set by `POST /arcs/{slug}/theme`, so a second client (the TUI, another window) can wear what the app chose; the app keeps its local choice as the fallback | W8.2 |
 
 ## What is deliberately not in this plan
 

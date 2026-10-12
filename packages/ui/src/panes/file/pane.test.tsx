@@ -66,6 +66,7 @@ function harness(answer: (path: string, range?: FileRange) => FileReading): Harn
     host,
     workspace: "C:/work",
     currentSession: () => undefined,
+    focusedPane: () => undefined,
     rebind: () => {},
     unseen: () => false,
     ...inertShellExtras({ client }),

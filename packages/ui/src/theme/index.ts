@@ -1,3 +1,15 @@
+export {
+  type Attire,
+  type AttireOptions,
+  type AttireSource,
+  type AttireState,
+  type AttireTarget,
+  attireStorageKey,
+  createAttire,
+  describeTarget,
+  type Outfit,
+  systemRefusal,
+} from "./attire.ts";
 export { completeTheme } from "./complete.ts";
 export { apcaLc, type ContrastPolarity, contrastPolarity } from "./contrast.ts";
 export { auditTheme, type ThemeAudit } from "./contrast-audit.ts";
@@ -25,11 +37,13 @@ export {
 export { gallery, keyworkDay, keyworkNight, themeNamed } from "./themes.ts";
 export {
   applyTheme,
+  dressElement,
   fontVariables,
   type ThemeVariables,
   themeAttributes,
   themeStylesheet,
   themeVariables,
+  undressElement,
   variablesOfStylesheet,
 } from "./variables.ts";
 export {

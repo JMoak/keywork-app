@@ -31,6 +31,10 @@
   color: var(--kw-density-full);
 }
 
+.kw-themes-row[data-inherited] .kw-themes-mark {
+  color: var(--kw-text-dim);
+}
+
 .kw-themes-name {
   grid-area: name;
   overflow: hidden;
@@ -79,4 +83,10 @@
   color: var(--kw-error);
   font-size: 0.9em;
   white-space: normal;
+}
+
+@container frame (max-width: 559.98px) {
+  .kw-themes .kw-ov-head-detail {
+    display: none;
+  }
 }

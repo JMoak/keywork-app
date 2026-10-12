@@ -58,11 +58,19 @@ export function monoFontOf(element: Element): { family: string; size: number } {
   };
 }
 
-export function watchTheme(root: HTMLElement, onChange: () => void): () => void {
+export function watchTheme(holder: Element, onChange: () => void): () => void {
   if (typeof MutationObserver !== "function") return () => {};
   const observer = new MutationObserver(onChange);
-  observer.observe(root, { attributes: true, attributeFilter: ["style", "data-theme"] });
+  for (const wearer of themeWearers(holder)) {
+    observer.observe(wearer, { attributes: true, attributeFilter: ["style", "data-theme"] });
+  }
   return () => observer.disconnect();
+}
+
+export function themeWearers(holder: Element): Element[] {
+  const frame = holder.closest(".kw-frame");
+  const root = holder.ownerDocument.documentElement;
+  return frame === null ? [root] : [root, frame];
 }
 
 export type FontFaces = Pick<FontFaceSet, "addEventListener" | "removeEventListener"> & {

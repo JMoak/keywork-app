@@ -59,6 +59,7 @@ function shellSeams(rebound: PaneSpecBase[] = []): ShellSeams {
     host: browserHost(),
     workspace: "C:/work",
     currentSession: () => "s1",
+    focusedPane: () => undefined,
     rebind: (_paneId, spec) => {
       rebound.push(spec);
     },

@@ -21,6 +21,7 @@ export const mcpPane = definePane<McpSpec>({
   kind: "mcp",
   spec: mcpSpec,
   home: "right",
+  attire: "house",
   title: () => "mcp",
   emptyState: (keys) =>
     `no mcp servers · name one in keywork's config and ${keys.chord("palette.commands")} /mcp lists it`,

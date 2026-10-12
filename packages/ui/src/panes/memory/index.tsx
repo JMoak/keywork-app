@@ -48,6 +48,7 @@ export const memoryPane = definePane<MemorySpec>({
   kind: "memory",
   spec: memorySpec,
   home: "right",
+  attire: "house",
   title: (_spec, shell) => titleOf(shell.store.memory.state.inbox.count),
   emptyState: (keys) =>
     `nothing in the garden yet · ${keys.chord("pane.split")} starts a session that grows it`,

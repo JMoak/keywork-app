@@ -1,11 +1,17 @@
 import { For, Show } from "solid-js";
 import type { ContextLevel } from "../instruments/context.ts";
 import { ContextGauge } from "../instruments/gauge.tsx";
+import { gaugeStyleFor, type InstrumentTier } from "../instruments/tier.ts";
 import type { WidthTier } from "../page/tiers.ts";
 import type { ChromeWeight } from "./root-attributes.ts";
 import { type LifecycleState, stampGlyph } from "./stamp.ts";
 
-export type TitleZone = "stamp" | "name" | "bot" | "inference" | "mode" | "telemetry";
+export type TitleZone = "stamp" | "name" | "bot" | "inference" | "mode" | "theme" | "telemetry";
+
+export interface ThemeMark {
+  readonly name: string;
+  readonly source: "pane" | "arc";
+}
 
 export interface TitleRowProps {
   name: string;
@@ -19,16 +25,20 @@ export interface TitleRowProps {
   modeWord?: string | undefined;
   telemetry?: string | undefined;
   context?: ContextLevel | undefined;
+  marked?: boolean | undefined;
+  themeMark?: ThemeMark | undefined;
+  instruments?: InstrumentTier | undefined;
 }
 
 export const focusMark = "▎";
+export const paneMark = "▣";
 
 export function titleZones(tier: WidthTier, focused: boolean): ReadonlySet<TitleZone> {
   switch (tier) {
     case "broadsheet":
-      return new Set(["stamp", "name", "bot", "inference", "mode", "telemetry"]);
+      return new Set(["stamp", "name", "bot", "inference", "mode", "theme", "telemetry"]);
     case "column":
-      return new Set(["stamp", "name", "bot", "mode", "telemetry"]);
+      return new Set(["stamp", "name", "bot", "mode", "theme", "telemetry"]);
     case "clipping":
       return new Set(focused ? ["stamp", "name", "mode", "telemetry"] : ["stamp", "name", "mode"]);
     case "masthead":
@@ -42,6 +52,9 @@ export function TitleRow(props: TitleRowProps) {
     zone === "bot" ? props.bot : zone === "inference" ? props.inference : props.modeWord;
   const details = () =>
     detailZones.filter((zone) => zones().has(zone) && present(detailText(zone)));
+  const themeMark = () => (zones().has("theme") ? props.themeMark : undefined);
+  const gaugeStyle = () =>
+    props.instruments === undefined ? undefined : gaugeStyleFor(props.instruments);
   const telemetryShown = () =>
     zones().has("telemetry") && (props.context !== undefined || present(props.telemetry));
   return (
@@ -54,6 +67,11 @@ export function TitleRow(props: TitleRowProps) {
       <span class="kw-frame-stamp" aria-hidden="true" data-state={props.state}>
         {stampGlyph(props.state, props.step)}
       </span>
+      <Show when={props.marked}>
+        <span class="kw-frame-mark" role="img" aria-label="marked">
+          {paneMark}
+        </span>
+      </Show>
       <span class="kw-frame-name" data-state={props.state}>
         {props.name}
       </span>
@@ -61,10 +79,19 @@ export function TitleRow(props: TitleRowProps) {
         <For each={details()}>
           {(zone) => <span class={`kw-frame-${zone}`}>{detailText(zone)}</span>}
         </For>
+        <Show when={themeMark()}>
+          {(mark) => (
+            <span class="kw-frame-theme" data-source={mark().source}>
+              {mark().name}
+            </span>
+          )}
+        </Show>
       </span>
       <Show when={telemetryShown()}>
         <span class="kw-frame-telemetry">
-          <Show when={props.context}>{(level) => <ContextGauge level={level()} />}</Show>
+          <Show when={props.context}>
+            {(level) => <ContextGauge level={level()} style={gaugeStyle()} />}
+          </Show>
           <Show when={props.telemetry}>
             {(text) => <span class="kw-frame-usage">{text()}</span>}
           </Show>

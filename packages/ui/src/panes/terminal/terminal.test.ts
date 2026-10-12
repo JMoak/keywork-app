@@ -14,7 +14,14 @@ import { terminalKeeps } from "./keys.ts";
 import { bashCommand, mirrorDelta, mirrorText } from "./mirror.ts";
 import { chooseRenderer, probeWebgl2 } from "./renderer.ts";
 import { bridgeArgs } from "./session.ts";
-import { type FontFaces, terminalTheme, themeVariables, watchFonts } from "./theme.ts";
+import {
+  type FontFaces,
+  terminalTheme,
+  themeVariables,
+  themeWearers,
+  watchFonts,
+  watchTheme,
+} from "./theme.ts";
 
 const fixtures = join(import.meta.dirname, "..", "..", "..", "..", "client", "src", "fixtures");
 
@@ -120,6 +127,30 @@ describe("the xterm theme", () => {
     for (const variable of Object.values(themeVariables)) {
       expect(variable === "" || variable.startsWith("--kw-")).toBe(true);
     }
+  });
+});
+
+describe("the theme watch", () => {
+  it("watches the window and the frame a terminal sits in, so a dressed pane retints", async () => {
+    const frame = document.createElement("section");
+    frame.className = "kw-frame";
+    const holder = frame.appendChild(document.createElement("div"));
+    document.body.append(frame);
+    expect(themeWearers(holder)).toEqual([document.documentElement, frame]);
+    let retints = 0;
+    const stop = watchTheme(holder, () => {
+      retints += 1;
+    });
+    frame.dataset.theme = "keywork-day";
+    await Promise.resolve();
+    expect(retints).toBe(1);
+    stop();
+    frame.remove();
+  });
+
+  it("watches only the window for a terminal outside any frame", () => {
+    const holder = document.createElement("div");
+    expect(themeWearers(holder)).toEqual([document.documentElement]);
   });
 });
 

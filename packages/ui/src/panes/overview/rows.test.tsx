@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { emptyProjection } from "@keywork-app/client";
 import type { SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render } from "@solidjs/testing-library";
-import { createRoot, type JSX } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { createRoot, createSignal, type JSX } from "solid-js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import {
   emptySurfacesClient,
@@ -22,7 +22,7 @@ import { botsPane } from "../bots/index.tsx";
 import { mcpPane } from "../mcp/index.tsx";
 import type { PaneProps, PaneSpecBase, ShellSeams } from "../registry.ts";
 import { workspacesPane } from "../workspaces/index.tsx";
-import { ChoiceLine, ConfirmLine, createCursor, DraftLine } from "./rows.tsx";
+import { ChoiceLine, ConfirmLine, createCursor, DraftLine, keepInView } from "./rows.tsx";
 
 export interface OverviewHarness {
   shell: ShellSeams;
@@ -74,6 +74,7 @@ export function overviewShell(options: OverviewOptions = {}): OverviewHarness {
     host: browserHost({ server: { url: "http://127.0.0.1:4770", token: "t" } }),
     workspace: "C:/work",
     currentSession: () => options.currentSession,
+    focusedPane: () => undefined,
     rebind: () => {},
     unseen: () => false,
     ...inertShellExtras(),
@@ -135,6 +136,56 @@ describe("createCursor", () => {
     expect(cursor.index()).toBe(0);
   });
 });
+
+describe("keepInView", () => {
+  it("reveals the cursor row again whenever its list is resized, until it loses the cursor", () => {
+    const resized = fakeResizeObservers();
+    const list = document.createElement("ol");
+    const row = list.appendChild(document.createElement("li"));
+    const reveals = vi.fn();
+    row.scrollIntoView = reveals;
+    const [cursor, setCursor] = createSignal(true);
+    const dispose = createRoot((dispose) => {
+      keepInView(row, cursor);
+      return dispose;
+    });
+    expect(reveals).toHaveBeenLastCalledWith({ block: "nearest" });
+    expect(resized.watching()).toEqual([list]);
+    resized.fire();
+    expect(reveals).toHaveBeenCalledTimes(2);
+    setCursor(false);
+    expect(resized.watching()).toEqual([]);
+    resized.fire();
+    expect(reveals).toHaveBeenCalledTimes(2);
+    dispose();
+    vi.unstubAllGlobals();
+  });
+});
+
+function fakeResizeObservers(): { watching(): Element[]; fire(): void } {
+  const live = new Map<object, { target: Element; react: () => void }>();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      readonly react: () => void;
+      constructor(react: () => void) {
+        this.react = react;
+      }
+      observe(target: Element) {
+        live.set(this, { target, react: this.react });
+      }
+      disconnect() {
+        live.delete(this);
+      }
+    },
+  );
+  return {
+    watching: () => [...live.values()].map((watch) => watch.target),
+    fire: () => {
+      for (const watch of [...live.values()]) watch.react();
+    },
+  };
+}
 
 describe("the overview lines", () => {
   it("submits a trimmed draft on enter and cancels on escape", () => {

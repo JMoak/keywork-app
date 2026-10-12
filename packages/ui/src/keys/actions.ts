@@ -25,6 +25,8 @@ export interface ActionTarget {
   toggleHelp(): void;
   openPalette(initialQuery?: string): void;
   trustWorkspace(): void;
+  toggleMark(): void;
+  clearMarks(): void;
 }
 
 export interface AppAction {
@@ -218,6 +220,18 @@ export const coreActions: Record<string, AppAction> = {
     hotPath: true,
     invoke: (target) => target.openPalette("/"),
     command: { name: "palette", description: "open the command palette", aliases: ["commands"] },
+  },
+  "pane.mark": {
+    chords: "leader b",
+    help: "mark this pane for a shared theme",
+    invoke: (target) => target.toggleMark(),
+    command: { name: "mark", description: "mark or unmark this pane" },
+  },
+  "pane.unmark-all": {
+    chords: "none",
+    help: "unmark every marked pane",
+    invoke: (target) => target.clearMarks(),
+    command: { name: "unmark-all", description: "unmark every marked pane" },
   },
   "trust.workspace": {
     chords: "leader u",

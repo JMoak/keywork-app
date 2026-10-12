@@ -40,6 +40,7 @@ export const browserPane = definePane<BrowserSpec>({
   kind: "browser",
   spec: browserSpec,
   home: "left",
+  attire: "work",
   title: () => "files",
   emptyState: (keys) => `nothing here · ${keys.chord("browser.hidden")} shows dotfiles`,
   component: BrowserSlot,

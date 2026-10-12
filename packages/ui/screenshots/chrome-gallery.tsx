@@ -11,47 +11,77 @@ import { usageLine } from "../src/instruments/cost.ts";
 import { Layout, type Rect } from "../src/layout/index.ts";
 import { ConversationPane } from "../src/page/pane.tsx";
 import { OpenScreen } from "../src/shell/open-screen.tsx";
-import { applyTheme, gallery } from "../src/theme/index.ts";
+import type { Outfit } from "../src/theme/attire.ts";
+import { applyTheme, gallery, keyworkNight, type Theme, themeNamed } from "../src/theme/index.ts";
 import "../src/app.css";
 import "../src/shell/shell.css";
 
-type ChromeScene = "workspace" | "transcript" | "open";
+type ChromeScene = "workspace" | "transcript" | "outfits" | "open";
+
+interface Dressing {
+  readonly outfit?: Outfit | undefined;
+  readonly marked?: boolean | undefined;
+}
+
+type StagedPane = () => JSX.Element;
 
 function Gallery() {
   const query = new URLSearchParams(window.location.search);
-  const themes = gallery;
-  const theme = themes.find((candidate) => candidate.name === query.get("theme")) ?? themes[0];
-  if (theme !== undefined) applyTheme(theme);
-  document.body.dataset.themes = themes.map((candidate) => candidate.name).join(" ");
   const scene = (query.get("scene") ?? "workspace") as ChromeScene;
+  const theme = houseOf(scene, query.get("theme"));
+  if (theme !== undefined) applyTheme(theme);
+  document.body.dataset.themes = gallery.map((candidate) => candidate.name).join(" ");
   return (
-    <Show when={scene === "open"} fallback={<WorkspaceScene single={scene === "transcript"} />}>
+    <Show when={scene === "open"} fallback={<WorkspaceScene panes={scenePanes(scene)} />}>
       <OpenScene />
     </Show>
   );
 }
 
-function WorkspaceScene(props: { single: boolean }) {
+function houseOf(scene: ChromeScene, asked: string | null): Theme | undefined {
+  if (scene === "outfits") return keyworkNight;
+  return gallery.find((candidate) => candidate.name === asked) ?? gallery[0];
+}
+
+function scenePanes(scene: ChromeScene): readonly StagedPane[] {
+  switch (scene) {
+    case "transcript":
+      return [() => transcriptPane({})];
+    case "outfits":
+      return [
+        () => transcriptPane({ outfit: wearing("whiplash", "pane") }),
+        () => askingPane({ outfit: wearing("rose-pine-dawn", "arc", "pricing"), marked: true }),
+        () => unseenPane({ outfit: { theme: keyworkNight, source: "window" } }),
+      ];
+    default:
+      return [() => transcriptPane({}), () => askingPane({}), () => unseenPane({})];
+  }
+}
+
+function wearing(name: string, source: Outfit["source"], arc?: string): Outfit {
+  return { theme: themeNamed(name) ?? keyworkNight, source, arc };
+}
+
+function WorkspaceScene(props: { panes: readonly StagedPane[] }) {
   const [rects, setRects] = createSignal<Rect[]>([]);
   let stage: HTMLDivElement | undefined;
   onMount(() => {
     if (stage === undefined) return;
     const measure = (): void => {
-      if (stage !== undefined) setRects(paneRects(stage, props.single ? 1 : 3));
+      if (stage !== undefined) setRects(paneRects(stage, props.panes.length));
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(stage);
     onCleanup(() => observer.disconnect());
   });
-  const panes = props.single ? [transcriptPane] : [transcriptPane, askingPane, unseenPane];
   return (
     <div class="kw-workspace">
       <div class="kw-stage" ref={stage}>
         <For each={rects()}>
           {(rect, index) => (
             <div class="kw-slot" style={rectStyle(rect)}>
-              {panes[index()]?.()}
+              {props.panes[index()]?.()}
             </div>
           )}
         </For>
@@ -71,7 +101,7 @@ function WorkspaceScene(props: { single: boolean }) {
   );
 }
 
-function transcriptPane(): JSX.Element {
+function transcriptPane(dressing: Dressing): JSX.Element {
   const projection = projected("prose");
   return (
     <PaneFrame
@@ -83,6 +113,8 @@ function transcriptPane(): JSX.Element {
       inference="opus · high"
       telemetry={usageLine(projection.usage)}
       context={assumedContextLevel(90_000)}
+      outfit={dressing.outfit}
+      marked={dressing.marked}
     >
       <ConversationPane projection={projection} />
       <Composer queue={[]} onSteer={() => {}} onQueue={() => {}} onInterrupt={() => {}} />
@@ -90,15 +122,22 @@ function transcriptPane(): JSX.Element {
   );
 }
 
-function askingPane(): JSX.Element {
+function askingPane(dressing: Dressing): JSX.Element {
   return (
-    <PaneFrame name="rename the tiler verbs" state="needs-you" focused={false} spawnRank={1}>
+    <PaneFrame
+      name="rename the tiler verbs"
+      state="needs-you"
+      focused={false}
+      spawnRank={1}
+      outfit={dressing.outfit}
+      marked={dressing.marked}
+    >
       <ConversationPane projection={projected("tool")} onAnswerAsk={() => undefined} />
     </PaneFrame>
   );
 }
 
-function unseenPane(): JSX.Element {
+function unseenPane(dressing: Dressing): JSX.Element {
   return (
     <PaneFrame
       name="why is the seam drag sticky"
@@ -106,6 +145,8 @@ function unseenPane(): JSX.Element {
       focused={false}
       spawnRank={2}
       modeWord="plan"
+      outfit={dressing.outfit}
+      marked={dressing.marked}
     >
       <ConversationPane projection={projected("thinking")} />
     </PaneFrame>

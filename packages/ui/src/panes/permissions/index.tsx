@@ -18,6 +18,7 @@ export const permissionsPane = definePane<PermissionsSpec>({
   kind: "permissions",
   spec: permissionsSpec,
   home: "right",
+  attire: "house",
   title: () => "permissions",
   emptyState: (keys) =>
     `no grants yet · ${keys.chord("ask.workspace")} answers an ask and remembers it for the workspace`,

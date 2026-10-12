@@ -4,7 +4,9 @@ import { chromeGalleryUrl } from "../playwright.config.ts";
 
 const platformNames: Record<string, string> = { win32: "windows", darwin: "macos", linux: "linux" };
 const platform = platformNames[process.platform] ?? process.platform;
-const shotsDirectory = resolve(import.meta.dirname, "../../../artifacts/shots", platform, "chrome");
+const platformShots = resolve(import.meta.dirname, "../../../artifacts/shots", platform);
+const shotsDirectory = resolve(platformShots, "chrome");
+const stagesDirectory = resolve(platformShots, "themes");
 const scenes = ["workspace", "transcript", "open"] as const;
 const themes = ["keywork-night", "keywork-day", "gruvbox-light", "matte-black", "catppuccin-mocha"];
 const widths = { wide: { width: 1440, height: 900 }, narrow: { width: 900, height: 720 } };
@@ -25,6 +27,14 @@ for (const [widthName, viewport] of Object.entries(widths)) {
     }
   });
 }
+
+test("the outfits stage: three panes, three themes, one house", async ({ page }) => {
+  await page.setViewportSize(widths.wide);
+  await page.goto(`${chromeGalleryUrl}?scene=outfits`);
+  await settled(page, "keywork-night");
+  await expect(page.locator(".kw-frame[data-attire]")).toHaveCount(2);
+  await page.screenshot({ path: `${stagesDirectory}/stage--outfits.png`, animations: "disabled" });
+});
 
 async function themesOf(page: Page): Promise<string[]> {
   await page.goto(chromeGalleryUrl);

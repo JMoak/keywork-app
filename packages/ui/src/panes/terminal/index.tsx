@@ -26,6 +26,7 @@ export const terminalPane = definePane<TerminalSpec>({
   kind: "terminal",
   spec: terminalSpec,
   home: "main",
+  attire: "work",
   keyboard: "owned",
   title: titleOf,
   emptyState: (keys) =>
@@ -120,7 +121,6 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
 
   onMount(() => {
     if (holder === undefined) return;
-    const root = document.documentElement;
     const font = monoFontOf(holder);
     try {
       const live = xtermSurface(holder, {
@@ -130,7 +130,7 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
         fontSize: font.size,
         windows: /win/i.test(navigator.platform),
       });
-      onCleanup(watchTheme(root, () => live.setTheme(themeOfElement(holder as HTMLElement))));
+      onCleanup(watchTheme(holder, () => live.setTheme(themeOfElement(holder as HTMLElement))));
       onCleanup(watchFonts(() => live.remeasure()));
       onCleanup(() => live.dispose());
       setSurface(live);

@@ -1,8 +1,12 @@
 import { cleanup, render } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { assumedContextLevel } from "../instruments/context.ts";
+import type { Outfit } from "../theme/attire.ts";
+import { keyworkDay, keyworkNight } from "../theme/themes.ts";
 import { hueStop, type LifecycleState, PaneFrame, stampGlyph, tileFill } from "./pane-frame.tsx";
 import { chromeWeights } from "./root-attributes.ts";
+import { paneMark, TitleRow } from "./title-row.tsx";
 
 afterEach(cleanup);
 
@@ -143,6 +147,87 @@ describe("PaneFrame chrome weights", () => {
     await settled();
     expect(frame.dataset.chrome).toBe("borderless");
     expect(frame.querySelector(".kw-frame-lead")?.textContent).toBe("▎");
+  });
+});
+
+describe("PaneFrame outfits", () => {
+  const own: Outfit = { theme: keyworkDay, source: "pane" };
+  const shared: Outfit = { theme: keyworkDay, source: "arc", arc: "pricing" };
+  const house: Outfit = { theme: keyworkNight, source: "window" };
+
+  it("dresses the frame in its own theme and names it in the title row", () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused={false} spawnRank={0} outfit={own}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.dataset.attire).toBe("pane");
+    expect(frame.dataset.theme).toBe(keyworkDay.name);
+    expect(frame.dataset.appearance).toBe("light");
+    expect(frame.dataset.chrome).toBe(keyworkDay.chromeWeight);
+    expect(frame.style.getPropertyValue("--kw-panel")).toBe(keyworkDay.tokens.panel);
+    const mark = container.querySelector(".kw-frame-theme") as HTMLElement;
+    expect(mark.textContent).toBe(keyworkDay.name);
+    expect(mark.dataset.source).toBe("pane");
+  });
+
+  it("wears the house theme from the root and shows no theme mark", () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused={false} spawnRank={0} outfit={house}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.hasAttribute("data-attire")).toBe(false);
+    expect(frame.hasAttribute("data-theme")).toBe(false);
+    expect(frame.style.getPropertyValue("--kw-panel")).toBe("");
+    expect(container.querySelector(".kw-frame-theme")).toBeNull();
+  });
+
+  it("undresses when the pane returns to the house theme and keeps its hue", () => {
+    const [outfit, setOutfit] = createSignal<Outfit>(shared);
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused={false} spawnRank={1} outfit={outfit()}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.dataset.attire).toBe("arc");
+    expect(container.querySelector(".kw-frame-theme")?.getAttribute("data-source")).toBe("arc");
+    setOutfit(house);
+    expect(frame.hasAttribute("data-attire")).toBe(false);
+    expect(frame.hasAttribute("data-theme")).toBe(false);
+    expect(frame.dataset.chrome).toBe("seams");
+    expect(frame.style.getPropertyValue("--kw-panel")).toBe("");
+    expect(frame.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
+  });
+
+  it("hides the theme mark below the column tier", () => {
+    const { container } = render(() => (
+      <TitleRow
+        name="a"
+        state="idle"
+        step={0}
+        focused
+        tier="clipping"
+        weight="seams"
+        themeMark={{ name: "nord", source: "pane" }}
+      />
+    ));
+    expect(container.querySelector(".kw-frame-theme")).toBeNull();
+  });
+
+  it("marks a marked pane before its name", () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused={false} spawnRank={0} marked>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const mark = container.querySelector(".kw-frame-mark") as HTMLElement;
+    expect(mark.getAttribute("aria-label")).toBe("marked");
+    expect(mark.textContent).toBe(paneMark);
+    expect(mark.nextElementSibling?.className).toBe("kw-frame-name");
   });
 });
 

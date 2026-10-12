@@ -12,6 +12,7 @@
   height: 100%;
   container: frame / inline-size;
   background: var(--kw-pane-ground);
+  color: var(--kw-text);
   transition:
     border-color var(--kw-tempo-quick),
     background-color var(--kw-tempo-quick);
@@ -111,6 +112,18 @@
 .kw-frame-inference,
 .kw-frame-mode {
   color: var(--kw-text-dim);
+}
+.kw-frame-theme {
+  color: var(--kw-accent);
+}
+.kw-frame-theme[data-source="arc"] {
+  color: var(--kw-text-mid);
+}
+
+.kw-frame-mark {
+  flex: none;
+  margin-right: 1ch;
+  color: var(--kw-pane-hue);
 }
 
 .kw-frame-telemetry {

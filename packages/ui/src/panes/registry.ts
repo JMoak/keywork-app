@@ -8,9 +8,12 @@ import type { BindingSpec } from "../keys/keymap.ts";
 import type { DockSide, PaneId } from "../layout/index.ts";
 import type { SessionStore } from "../shell/session-store.ts";
 import type { TrustFlow } from "../shell/trust.ts";
+import type { Attire } from "../theme/attire.ts";
 import type { Wardrobe } from "../theme/wardrobe.ts";
 
 export type PaneHome = "main" | DockSide;
+
+export type PaneAttire = "house" | "work";
 
 export interface PaneSpecBase {
   readonly kind: string;
@@ -20,6 +23,7 @@ export interface PaneDefinition<Spec extends PaneSpecBase> {
   readonly kind: Spec["kind"];
   readonly spec: z.ZodType<Spec>;
   readonly home: PaneHome;
+  readonly attire: PaneAttire;
   readonly keyboard?: "shared" | "owned";
   title(spec: Spec, shell: ShellSeams): string;
   emptyState(keys: KeyHints): string;
@@ -45,6 +49,7 @@ export interface PaneSummon<Spec extends PaneSpecBase> {
 }
 
 export interface PaneSummonVariant {
+  readonly chords?: BindingSpec;
   readonly help: string;
   readonly command: {
     readonly name: string;
@@ -88,6 +93,13 @@ export interface KeyHints {
   leader(): string;
 }
 
+export interface PaneMarks {
+  toggle(paneId: PaneId): void;
+  has(paneId: PaneId): boolean;
+  all(): readonly PaneId[];
+  clear(): void;
+}
+
 export interface SessionIntents {
   openSession(sessionId: string): void;
   newSession(): Promise<void>;
@@ -101,12 +113,15 @@ export interface ShellSeams {
   readonly host: HostPort;
   readonly workspace: string;
   currentSession(): string | undefined;
+  focusedPane(): PaneId | undefined;
   rebind<Spec extends PaneSpecBase>(paneId: PaneId, spec: Spec): void;
   unseen(view: PaneView<PaneSpecBase>, completed: number): boolean;
   readonly client: KeyworkClient;
   readonly feed: ServerFeed;
   readonly trust: TrustFlow;
   readonly wardrobe?: Wardrobe;
+  readonly attire?: Attire;
+  readonly marks?: PaneMarks;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
   openInEditor?(path: string, line: number): Promise<void>;
 }

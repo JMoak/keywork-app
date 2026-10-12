@@ -126,6 +126,20 @@ curated gallery ships with the app; any theme file can be imported. `system` app
 is the default. Density still carries state and hue still carries identity: those two
 rules survive the translation intact.
 
+**The house and the outfits.** The window wears one **house** theme; a pane wears an outfit
+resolved in one order: its own choice, else its arc's, else the house. Admin panes (tree,
+arcs, bots, mcp, memory, workspaces, themes, permissions) always wear the house; work panes
+(conversation, diff, terminal, file, browser) can be dressed, and a dressed pane takes its
+theme whole (tokens, sections, chrome weight, instruments) except `gap`, which belongs to
+the house because the gap lies between panes, not inside one. The themes pane wears onto a
+target (the window, the summoning pane, its arc, or the marked panes), and a pane or arc
+that drops its choice inherits again; `system` is a window-only choice. Choices live in the
+app's storage per workspace (`keywork.attire:<workspace>`), never in the keywork config and
+never on the server: a theme per arc is presentation state of one window, like the layout.
+The TUI stays single-theme, and keywork's arc rule is unchanged: hue is identity, the stop
+is the arc's, and the ramp it indexes is now the pane's own theme's. A server-held arc theme,
+so other clients could share it, is a later server-lane task, not this one.
+
 ### AD7. Modern flavor, terminal soul: the design language translated, not imitated
 
 The material of the terminal is ink density on a cell grid. The app translates that

@@ -3,9 +3,12 @@ import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, SessionDetail, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
+import { attireStorageKey, createAttire } from "../theme/attire.ts";
+import { createWardrobe } from "../theme/wardrobe.ts";
 import { idleControlsClient } from "./controls-store.test.ts";
 import { inertMemoryClient } from "./memory-store.test.ts";
 import { emptySurfacesClient } from "./surfaces-store.test.ts";
@@ -33,7 +36,7 @@ const liveAsk = fixture("asked-granted.jsonl")
 
 const storedDetail = JSON.parse(fixture("session-detail.json")) as SessionDetail;
 
-function fakeClient(options: { pendingAsk?: boolean } = {}): {
+function fakeClient(options: { pendingAsk?: boolean; arc?: string } = {}): {
   client: KeyworkClient;
   prompts: string[];
   aborts: string[];
@@ -50,6 +53,7 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
       createdAt: storedDetail.createdAt,
       lastActivityAt: storedDetail.lastActivityAt,
       messageCount: 4,
+      ...(options.arc !== undefined && { arc: options.arc }),
     },
   ];
   let push: ((envelope: BusEnvelope) => void) | undefined;
@@ -150,6 +154,39 @@ async function openTyped(path: string): Promise<void> {
   const input = await screen.findByLabelText("workspace");
   fireEvent.input(input, { target: { value: path } });
   fireEvent.submit(input.closest("form") as HTMLFormElement);
+}
+
+function press(key: string, modifiers: Partial<KeyboardEventInit> = {}): void {
+  fireEvent.keyDown(document.body, { key, bubbles: true, ...modifiers });
+}
+
+function pressLeader(key: string, modifiers: Partial<KeyboardEventInit> = {}): void {
+  press("k", { ctrlKey: true });
+  press(key, modifiers);
+}
+
+function frameNamed(name: string): HTMLElement | undefined {
+  return ([...document.querySelectorAll(".kw-frame")] as HTMLElement[]).find(
+    (frame) => frame.querySelector(".kw-frame-name")?.textContent === name,
+  );
+}
+
+function themesHead(): string {
+  return document.querySelector(".kw-themes .kw-ov-head")?.textContent ?? "";
+}
+
+function wearOnArcBeforeRender(workspace: string, slug: string, theme: string): void {
+  createRoot((dispose) => {
+    createAttire({
+      wardrobe: createWardrobe({ serverThemes: () => [], storage: localStorage }),
+      storage: localStorage,
+      storageKey: attireStorageKey(workspace),
+      arcOf: () => slug,
+      dressable: () => true,
+      titleOf: (paneId) => paneId,
+    }).wear({ kind: "arc", slug }, theme);
+    dispose();
+  });
 }
 
 function hostWithServer() {
@@ -288,6 +325,54 @@ describe("the app shell", () => {
     fireEvent.input(input);
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(fake.prompts).toEqual(["s2: are you there"]));
+  });
+
+  it("dresses a conversation in its arc's theme while the house panes keep the window's", async () => {
+    wearOnArcBeforeRender("C:/work", "pricing", "nord");
+    const fake = fakeClient({ arc: "pricing" });
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    await screen.findByText("It printed served.");
+    await waitFor(() => expect(frameNamed("run echo served")?.dataset.theme).toBe("nord"));
+    expect(frameNamed("run echo served")?.dataset.attire).toBe("arc");
+    expect(frameNamed("sessions")?.dataset.attire).toBeUndefined();
+    expect(frameNamed("sessions")?.dataset.theme).toBeUndefined();
+  });
+
+  it("marks the focused pane with the leader and shows the mark in its title row", async () => {
+    const fake = fakeClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    await screen.findByText("It printed served.");
+    pressLeader("b");
+    const conversation = frameNamed("run echo served");
+    await waitFor(() => expect(conversation?.querySelector(".kw-frame-mark")).toBeTruthy());
+    await screen.findByText("marked · 1 pane carries the mark · theme-marked dresses them");
+    expect(frameNamed("sessions")?.querySelector(".kw-frame-mark")).toBeNull();
+  });
+
+  it("retargets the open themes pane to the focused pane and wears the theme there alone", async () => {
+    const fake = fakeClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    await screen.findByText("It printed served.");
+    pressLeader("F", { shiftKey: true });
+    await waitFor(() => expect(frameNamed("themes")?.dataset.focused).toBe(""));
+    expect(themesHead()).toContain("the window");
+    press("2", { altKey: true });
+    pressLeader("w");
+    await waitFor(() => expect(themesHead()).toContain('pane "run echo served"'));
+    expect(document.querySelectorAll(".kw-themes")).toHaveLength(1);
+    expect(frameNamed("themes")?.dataset.focused).toBe("");
+    press("j");
+    const chosen = document.querySelector(".kw-themes-row[data-cursor]") as HTMLElement;
+    const name = chosen.dataset.themeName;
+    press("Enter");
+    const conversation = frameNamed("run echo served");
+    await waitFor(() => expect(conversation?.dataset.attire).toBe("pane"));
+    expect(conversation?.dataset.theme).toBe(name);
+    expect(frameNamed("themes")?.dataset.attire).toBeUndefined();
+    expect(frameNamed("sessions")?.dataset.attire).toBeUndefined();
   });
 
   it("says why when the server answers the open but its sessions cannot be read", async () => {

@@ -59,7 +59,9 @@ import {
   type ShellSeams,
 } from "../panes/index.ts";
 import { returnKeyboardHome } from "../panes/keyboard-home.ts";
+import { attireStorageKey, createAttire } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
+import { createPaneMarks } from "./marks.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import type { SessionStore } from "./session-store.ts";
 import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
@@ -89,6 +91,26 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     serverThemes: () => props.store.surfaces.state.themes,
     storage,
   });
+  const paneTitle = (spec: PaneSpec): string => definitionOf(spec.kind).title(spec, shell);
+  const sessionOfPane = (paneId: PaneId): string | undefined => {
+    const spec = tiler.spec(paneId);
+    return spec !== undefined && "sessionId" in spec ? spec.sessionId : undefined;
+  };
+  const attire = createAttire({
+    wardrobe,
+    storage,
+    storageKey: attireStorageKey(props.workspace),
+    arcOf: (paneId) => props.store.summary(sessionOfPane(paneId))?.arc,
+    dressable: (paneId) => {
+      const spec = tiler.spec(paneId);
+      return spec !== undefined && definitionOf(spec.kind).attire === "work";
+    },
+    titleOf: (paneId) => {
+      const spec = tiler.spec(paneId);
+      return spec === undefined ? paneId : paneTitle(spec);
+    },
+  });
+  const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
   createEffect(
@@ -131,6 +153,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     feed: props.feed,
     trust,
     wardrobe,
+    attire,
+    marks,
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.open(parsed, screen()));
@@ -147,6 +171,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     host: props.host,
     workspace: props.workspace,
     currentSession: focusedSession,
+    focusedPane: () => tiler.focused(),
     rebind: (paneId, spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) tiler.bind(paneId, parsed);
@@ -200,6 +225,21 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     }
     void props.store.answerAsk(asking.run.callId, verdict, scope);
   };
+  const toggleMark = (paneId: PaneId): string => {
+    if (!marks.has(paneId) && !attire.dressable(paneId))
+      return `${attire.describe({ kind: "pane", id: paneId })} always wears the window's theme`;
+    marks.toggle(paneId);
+    return marks.has(paneId) ? markedNotice(marks.all().length) : "unmarked";
+  };
+  const toggleFocusedMark = (): void => {
+    const focused = tiler.focused();
+    say(focused === undefined ? "no pane is focused · nothing to mark" : toggleMark(focused));
+  };
+  const clearMarks = (): void => {
+    const count = marks.all().length;
+    marks.clear();
+    say(count === 0 ? "no panes are marked" : `unmarked ${paneCount(count)}`);
+  };
 
   const target: ActionTarget = {
     closePane: () => act(tiler.closeFocused()),
@@ -224,6 +264,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
     openPalette: (query) => setOverlay({ kind: "palette", query }),
     trustWorkspace: () => void trust.accept(),
+    toggleMark: toggleFocusedMark,
+    clearMarks,
   };
 
   onCleanup(
@@ -320,7 +362,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     storage?.setItem(storageKey, JSON.stringify(tiler.snapshot()));
   });
 
-  const titleOf = (slot: PaneSlot): string => definitionOf(slot.spec.kind).title(slot.spec, shell);
+  const titleOf = (slot: PaneSlot): string => paneTitle(slot.spec);
   const lifecycleOf = (slot: PaneSlot): LifecycleState =>
     definitionOf(slot.spec.kind).lifecycle?.(slot, shell) ?? "idle";
   const adornmentsOf = (slot: PaneSlot) =>
@@ -365,6 +407,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           bot={adornmentsOf(slot()).bot}
           inference={adornmentsOf(slot()).inference}
           hueRank={adornmentsOf(slot()).hueRank}
+          outfit={attire.outfit(slot().id)}
+          marked={marks.has(slot().id)}
         >
           <Dynamic
             component={definitionOf(slot().spec.kind).component}
@@ -465,6 +509,15 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       </Show>
     </div>
   );
+}
+
+function markedNotice(count: number): string {
+  const carry = count === 1 ? "carries" : "carry";
+  return `marked · ${paneCount(count)} ${carry} the mark · theme-marked dresses them`;
+}
+
+function paneCount(count: number): string {
+  return `${count} ${count === 1 ? "pane" : "panes"}`;
 }
 
 function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {

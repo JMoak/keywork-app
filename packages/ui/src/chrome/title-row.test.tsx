@@ -1,9 +1,11 @@
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { assumedContextLevel } from "../instruments/context.ts";
+import { voiceGlyph } from "../page/pane.tsx";
 import type { WidthTier } from "../page/tiers.ts";
 import type { ChromeWeight } from "./root-attributes.ts";
-import { focusMark, TitleRow, titleZones } from "./title-row.tsx";
+import { tileFill } from "./stamp.ts";
+import { focusMark, paneMark, TitleRow, titleZones } from "./title-row.tsx";
 
 afterEach(cleanup);
 
@@ -27,6 +29,24 @@ function zonesShown(container: HTMLElement): string[] {
   );
 }
 
+describe("paneMark", () => {
+  it("is a glyph no stamp, voice, focus mark or sample bot sigil already wears", () => {
+    const taken = [...tileFill, ...Object.values(voiceGlyph), focusMark, "▛", "◆", "▸", "▾"];
+    expect(taken).not.toContain(paneMark);
+  });
+
+  it("stands apart from the bot sigil in the same title row", () => {
+    const { container } = render(() => (
+      <TitleRow {...busyTitle} tier="broadsheet" focused={false} weight="seams" marked />
+    ));
+    const mark = container.querySelector(".kw-frame-mark")?.textContent;
+    expect(mark).toBe(paneMark);
+    expect(container.querySelector(".kw-frame-bot")?.textContent?.startsWith(mark ?? "")).toBe(
+      false,
+    );
+  });
+});
+
 describe("titleZones", () => {
   it("sheds detail first and keeps the stamp and the name at every width", () => {
     expect([...titleZones("broadsheet", false)]).toEqual([
@@ -35,9 +55,17 @@ describe("titleZones", () => {
       "bot",
       "inference",
       "mode",
+      "theme",
       "telemetry",
     ]);
-    expect([...titleZones("column", false)]).toEqual(["stamp", "name", "bot", "mode", "telemetry"]);
+    expect([...titleZones("column", false)]).toEqual([
+      "stamp",
+      "name",
+      "bot",
+      "mode",
+      "theme",
+      "telemetry",
+    ]);
     expect([...titleZones("masthead", true)]).toEqual(["stamp", "name"]);
   });
 

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, type JSX, Show } from "solid-js";
+import { createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
 import "./overview.css";
 
 export interface Cursor {
@@ -20,8 +20,18 @@ export function createCursor(count: () => number): Cursor {
 
 export function keepInView(row: HTMLElement, isCursor: () => boolean): void {
   createEffect(() => {
-    if (isCursor()) row.scrollIntoView({ block: "nearest" });
+    if (!isCursor()) return;
+    const reveal = (): void => row.scrollIntoView({ block: "nearest" });
+    reveal();
+    onCleanup(whenResized(row.parentElement, reveal));
   });
+}
+
+function whenResized(element: Element | null, react: () => void): () => void {
+  if (element === null || typeof ResizeObserver !== "function") return () => {};
+  const observer = new ResizeObserver(() => react());
+  observer.observe(element);
+  return () => observer.disconnect();
 }
 
 export type RowDensity = "light" | "medium" | "heavy" | "full";

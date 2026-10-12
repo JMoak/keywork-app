@@ -1,9 +1,12 @@
-import { createEffect, createSignal, type JSX, onCleanup, onMount } from "solid-js";
+import { createEffect, createMemo, createSignal, type JSX, onCleanup, onMount } from "solid-js";
 import type { ContextLevel } from "../instruments/context.ts";
 import { tierOf, type WidthTier } from "../page/tiers.ts";
+import type { Outfit } from "../theme/attire.ts";
+import type { Theme } from "../theme/schema.ts";
+import { dressElement, undressElement } from "../theme/variables.ts";
 import { chromeWeight } from "./root-attributes.ts";
 import { createTileFillStep, type LifecycleState } from "./stamp.ts";
-import { TitleRow } from "./title-row.tsx";
+import { type ThemeMark, TitleRow } from "./title-row.tsx";
 import "./pane-frame.css";
 
 export { type LifecycleState, stampGlyph, tileFill, tileFillStepMs } from "./stamp.ts";
@@ -19,6 +22,8 @@ export interface PaneFrameProps {
   bot?: string | undefined;
   inference?: string | undefined;
   hueRank?: number | undefined;
+  outfit?: Outfit | undefined;
+  marked?: boolean | undefined;
   onFocus?: (() => void) | undefined;
   children: JSX.Element;
 }
@@ -36,6 +41,9 @@ export function PaneFrame(props: PaneFrameProps) {
     () => props.focused,
   );
   const [tier, setTier] = createSignal<WidthTier>("broadsheet");
+  const dressed = createMemo(() => ownOutfit(props.outfit));
+  const worn = (): Theme | undefined => dressed()?.theme;
+  const weight = () => worn()?.chromeWeight ?? chromeWeight();
   let frame: HTMLElement | undefined;
   onMount(() => {
     if (frame === undefined) return;
@@ -44,11 +52,14 @@ export function PaneFrame(props: PaneFrameProps) {
     onCleanup(() => frame?.removeEventListener("mousedown", focus));
     onCleanup(followWidthTier(frame, setTier));
   });
+  createEffect(() => {
+    if (frame !== undefined) wearOn(frame, worn());
+  });
   return (
     <section
       ref={frame}
       class="kw-frame"
-      data-chrome={chromeWeight()}
+      data-attire={dressed()?.source}
       data-tier={tier()}
       data-state={shownState()}
       data-focused={props.focused ? "" : undefined}
@@ -60,16 +71,37 @@ export function PaneFrame(props: PaneFrameProps) {
         step={step()}
         focused={props.focused}
         tier={tier()}
-        weight={chromeWeight()}
+        weight={weight()}
         bot={props.bot}
         inference={props.inference}
         modeWord={props.modeWord}
         telemetry={props.telemetry}
         context={props.context}
+        marked={props.marked}
+        themeMark={dressed()}
+        instruments={worn()?.instruments}
       />
       <div class="kw-frame-body">{props.children}</div>
     </section>
   );
+}
+
+interface OwnOutfit extends ThemeMark {
+  readonly theme: Theme;
+}
+
+function ownOutfit(outfit: Outfit | undefined): OwnOutfit | undefined {
+  if (outfit === undefined || outfit.source === "window") return undefined;
+  return { theme: outfit.theme, name: outfit.theme.name, source: outfit.source };
+}
+
+function wearOn(frame: HTMLElement, theme: Theme | undefined): void {
+  if (theme === undefined) {
+    frame.dataset.chrome = chromeWeight();
+    return;
+  }
+  dressElement(frame, theme);
+  onCleanup(() => undressElement(frame));
 }
 
 const drainMs = 240;

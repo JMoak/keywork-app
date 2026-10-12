@@ -1,5 +1,6 @@
 import type { Theme } from "./schema.ts";
 import { densityLevels, diffKeys, syntaxKeys, terminalKeys } from "./sections.ts";
+import { keyworkNight } from "./themes.ts";
 
 export type ThemeVariables = Readonly<Record<string, string>>;
 
@@ -60,6 +61,21 @@ export function applyTheme(theme: Theme, root: HTMLElement = document.documentEl
   Object.assign(root.dataset, themeAttributes(theme));
 }
 
+export function dressElement(element: HTMLElement, theme: Theme): void {
+  for (const [name, value] of Object.entries(paneVariables(theme))) {
+    element.style.setProperty(name, value);
+  }
+  element.style.colorScheme = theme.appearance;
+  Object.assign(element.dataset, paneAttributes(theme));
+}
+
+export function undressElement(element: HTMLElement): void {
+  for (const name of Object.keys(paneVariables(keyworkNight))) element.style.removeProperty(name);
+  element.style.removeProperty("color-scheme");
+  for (const attribute of Object.keys(paneAttributes(keyworkNight)))
+    delete element.dataset[attribute];
+}
+
 export function themeAttributes(theme: Theme): Readonly<Record<string, string>> {
   return {
     theme: theme.name,
@@ -77,6 +93,24 @@ export function variablesOfStylesheet(css: string): ThemeVariables {
       (value ?? "").trim(),
     ]),
   );
+}
+
+const houseVariables: ReadonlySet<string> = new Set(["--kw-gap"]);
+const houseAttributes: ReadonlySet<string> = new Set(["gap"]);
+
+function paneVariables(theme: Theme): ThemeVariables {
+  return withoutKeys(themeVariables(theme), houseVariables);
+}
+
+function paneAttributes(theme: Theme): Readonly<Record<string, string>> {
+  return withoutKeys(themeAttributes(theme), houseAttributes);
+}
+
+function withoutKeys(
+  record: Readonly<Record<string, string>>,
+  dropped: ReadonlySet<string>,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !dropped.has(key)));
 }
 
 const stylesheetWidth = 100;

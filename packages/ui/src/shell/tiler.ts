@@ -87,6 +87,12 @@ export function createTiler(restored?: TilerState): Tiler {
     return touched(verdict);
   };
 
+  const bind = (id: PaneId, spec: PaneSpec): void => {
+    if (specs.get(id)?.kind !== spec.kind) return;
+    specs.set(id, spec);
+    setVersion((at) => at + 1);
+  };
+
   const close = (id: PaneId): Verdict => {
     const verdict = layout.close(id);
     if (verdict.ok) specs.delete(id);
@@ -97,7 +103,10 @@ export function createTiler(restored?: TilerState): Tiler {
     version,
     layout,
     panes: () => layout.panes(),
-    spec: (id) => specs.get(id),
+    spec: (id) => {
+      version();
+      return specs.get(id);
+    },
     findPane: (matches) =>
       layout.panes().find((id) => {
         const spec = specs.get(id);
@@ -133,13 +142,11 @@ export function createTiler(restored?: TilerState): Tiler {
     summon: (spec, screen) => {
       if (definitionOf(spec.kind).home === "main") return open(spec, screen);
       const existing = layout.panes().find((id) => specs.get(id)?.kind === spec.kind);
-      return existing === undefined ? open(spec, screen) : touched(layout.focus(existing));
+      if (existing === undefined) return open(spec, screen);
+      if (summonRetargets(spec)) bind(existing, spec);
+      return touched(layout.focus(existing));
     },
-    bind: (id, spec) => {
-      if (specs.get(id)?.kind !== spec.kind) return;
-      specs.set(id, spec);
-      setVersion((at) => at + 1);
-    },
+    bind,
     close,
     closeFocused: () => {
       const id = layout.focused();
@@ -225,6 +232,10 @@ function revive(layout: Layout, specs: Map<PaneId, PaneSpec>, state: TilerState)
     if (spec !== undefined) specs.set(id, spec);
     else layout.close(id);
   }
+}
+
+function summonRetargets(spec: PaneSpec): boolean {
+  return definitionOf(spec.kind).summon?.variants !== undefined;
 }
 
 function explained(verdict: Verdict, noRoom: string): Verdict {
