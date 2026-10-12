@@ -4,7 +4,7 @@ import {
   type ServerFeed,
   type SessionProjection,
 } from "@keywork-app/client";
-import type { AskScope, AskVerdict } from "@keywork-app/protocol";
+import { type AskScope, type AskVerdict, isSurfaceRefusal } from "@keywork-app/protocol";
 import {
   createEffect,
   createMemo,
@@ -49,6 +49,7 @@ import {
 } from "../layout/index.ts";
 import { rememberableRules } from "../page/ask-card.tsx";
 import { CommandRegistry } from "../palette/commands.ts";
+import { markCommands } from "../palette/mark-commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
 import { fileUrlOf } from "../panes/file/range.ts";
 import {
@@ -109,6 +110,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       const spec = tiler.spec(paneId);
       return spec === undefined ? paneId : paneTitle(spec);
     },
+    arcTheme: (slug) => props.store.surfaces.arcTheme(slug),
+    onArcWorn: (slug, theme) => recordArcTheme(slug, theme),
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
@@ -128,6 +131,10 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const say = (text: string): void => {
     setNotice(text);
     setTimeout(() => setNotice((current) => (current === text ? undefined : current)), 2400);
+  };
+  const recordArcTheme = async (slug: string, theme: string | null): Promise<void> => {
+    const answer = await props.client.setArcTheme(slug, theme);
+    if (isSurfaceRefusal(answer)) say(`${answer.detail} · worn in this window only`);
   };
   const act = (verdict: Verdict): void => {
     if (!verdict.ok && verdict.notice !== undefined) say(verdict.notice);
@@ -157,7 +164,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     marks,
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
-      if (parsed !== undefined) act(tiler.open(parsed, screen()));
+      if (parsed !== undefined) act(tiler.summon(parsed, screen()));
     },
     openInEditor: (path, line) =>
       props.host.openExternal(fileUrlOf(props.workspace, path, line)).catch((cause: unknown) => {
@@ -304,6 +311,16 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       jump: true as const,
       run: () => act(tiler.focus(slot.id)),
     })),
+  );
+  registry.addSource(() =>
+    markCommands(
+      tiler
+        .slots(screen())
+        .flatMap((slot) =>
+          attire.dressable(slot.id) ? [{ id: slot.id, title: titleOf(slot) }] : [],
+        ),
+      { marked: marks.has, toggle: (paneId) => say(toggleMark(paneId)) },
+    ),
   );
 
   const onKeyDown = (event: KeyboardEvent): void => {

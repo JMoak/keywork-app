@@ -24,6 +24,7 @@ export type SurfaceVerbs = Pick<
   | "createArc"
   | "closeArc"
   | "abandonArc"
+  | "setArcTheme"
   | "bindSessionArc"
   | "createBot"
   | "bindSessionBot"
@@ -55,6 +56,7 @@ export interface SurfacesStore {
   load(): Promise<void>;
   refetch(kind: SurfaceKind): Promise<void>;
   arcOrdinal(slug: string | undefined): number | undefined;
+  arcTheme(slug: string): string | undefined;
   bot(name: string | undefined): BotSummary | undefined;
   dispose(): void;
 }
@@ -170,6 +172,7 @@ export function createSurfacesStore(
     load,
     refetch,
     arcOrdinal: (slug) => (slug === undefined ? undefined : state.ordinals[slug]),
+    arcTheme: (slug) => state.arcs.find((arc) => arc.slug === slug)?.theme,
     bot: (name) => (name === undefined ? undefined : state.bots.find((bot) => bot.name === name)),
     dispose: () => {
       stopFollowing();

@@ -36,6 +36,17 @@ test("the outfits stage: three panes, three themes, one house", async ({ page })
   await page.screenshot({ path: `${stagesDirectory}/stage--outfits.png`, animations: "disabled" });
 });
 
+test("the outfit seams stage: three houses, three pane weights", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 760 });
+  await page.goto(`${chromeGalleryUrl}?scene=outfit-seams`);
+  await settled(page, "keywork-night");
+  await expect(page.locator(".kw-frame[data-attire]")).toHaveCount(9);
+  await page.screenshot({
+    path: `${stagesDirectory}/stage--outfit-seams.png`,
+    animations: "disabled",
+  });
+});
+
 async function themesOf(page: Page): Promise<string[]> {
   await page.goto(chromeGalleryUrl);
   await expect(page.locator("body[data-themes]")).toHaveCount(1);

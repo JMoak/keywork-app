@@ -1,5 +1,9 @@
 .kw-frame {
-  --kw-pane-rest: color-mix(in oklch, var(--kw-pane-hue) 30%, var(--kw-border));
+  --kw-pane-rest: color-mix(
+    in oklch,
+    var(--kw-pane-hue) 30%,
+    var(--kw-house-border, var(--kw-border))
+  );
   --kw-pane-lift: color-mix(in oklch, var(--kw-pane-hue) 82%, var(--kw-text));
   --kw-pane-ink: var(--kw-pane-rest);
   --kw-pane-ground: var(--kw-background);
@@ -142,11 +146,11 @@
   flex-direction: column;
 }
 
-.kw-frame[data-chrome="regular"] {
+.kw-frame[data-house="regular"] {
   border: 1px solid var(--kw-pane-ink);
 }
 
-.kw-frame[data-chrome="seams"]::after {
+.kw-frame[data-house="seams"]::after {
   content: "";
   position: absolute;
   inset: 0 -1px -1px 0;
@@ -155,9 +159,10 @@
   border-bottom: 1px solid var(--kw-pane-ink);
   pointer-events: none;
 }
-:root[data-gap]:not([data-gap="0"]) .kw-frame[data-chrome="seams"]::after {
+:root[data-gap]:not([data-gap="0"]) .kw-frame[data-house="seams"]::after {
   display: none;
 }
+
 .kw-frame[data-chrome="seams"] .kw-frame-title {
   box-shadow: inset 0 -1px 0 transparent;
 }

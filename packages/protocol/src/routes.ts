@@ -71,6 +71,7 @@ export const routes = [
   { method: "POST", path: "/arcs", operationId: "createArc" },
   { method: "POST", path: "/arcs/{slug}/close", operationId: "closeArc" },
   { method: "POST", path: "/arcs/{slug}/abandon", operationId: "abandonArc" },
+  { method: "POST", path: "/arcs/{slug}/theme", operationId: "setArcTheme" },
   { method: "POST", path: "/sessions/{id}/arc", operationId: "bindSessionArc" },
   { method: "GET", path: "/bots", operationId: "listBots" },
   { method: "POST", path: "/bots", operationId: "createBot" },

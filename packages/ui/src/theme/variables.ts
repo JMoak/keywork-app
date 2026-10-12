@@ -20,6 +20,7 @@ export function themeVariables(theme: Theme): ThemeVariables {
     "--kw-text-mid": tokens.textMid,
     "--kw-text-dim": tokens.textDim,
     "--kw-border": tokens.border,
+    "--kw-house-border": tokens.border,
     "--kw-border-focus": tokens.borderFocus,
     "--kw-accent": tokens.accent,
     "--kw-accent-soft": tokens.accentSoft,
@@ -95,7 +96,7 @@ export function variablesOfStylesheet(css: string): ThemeVariables {
   );
 }
 
-const houseVariables: ReadonlySet<string> = new Set(["--kw-gap"]);
+const houseVariables: ReadonlySet<string> = new Set(["--kw-gap", "--kw-house-border"]);
 const houseAttributes: ReadonlySet<string> = new Set(["gap"]);
 
 function paneVariables(theme: Theme): ThemeVariables {

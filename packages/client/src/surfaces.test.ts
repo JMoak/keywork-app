@@ -123,6 +123,27 @@ describe("the surface routes", () => {
     ]);
   });
 
+  it("dresses an arc in a theme, undresses it, and reads an unknown theme as invalid", async () => {
+    const pricing = { slug: "pricing", status: "active", created: "t", sessions: 1 };
+    const { calls, fetch } = recordingFetch((call) => {
+      if (call.body?.includes("velvet"))
+        return json(409, { error: 'no theme named "velvet" · GET /themes lists the ones served' });
+      return json(200, call.body?.includes("null") ? pricing : { ...pricing, theme: "nord" });
+    });
+    const client = keyworkClient(ticket, { fetch });
+    expect(await client.setArcTheme("pricing", "nord")).toMatchObject({ theme: "nord" });
+    expect(await client.setArcTheme("pricing", null)).not.toHaveProperty("theme");
+    expect(await client.setArcTheme("pricing", "velvet")).toEqual({
+      refused: "invalid",
+      detail: 'no theme named "velvet" · GET /themes lists the ones served',
+    });
+    expect(calls.map((call) => [call.method, call.path, call.body])).toEqual([
+      ["POST", "/arcs/pricing/theme", '{"theme":"nord"}'],
+      ["POST", "/arcs/pricing/theme", '{"theme":null}'],
+      ["POST", "/arcs/pricing/theme", '{"theme":"velvet"}'],
+    ]);
+  });
+
   it("drives the bot and workspace verbs with the default workspace spelled out", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.path === "/bots") return json(201, { name: "scribe", sigil: "✎", source: "user" });

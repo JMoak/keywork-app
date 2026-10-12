@@ -1547,6 +1547,65 @@
         }
       }
     },
+    "/arcs/{slug}/theme": {
+      "post": {
+        "operationId": "setArcTheme",
+        "summary": "Have an arc wear a theme, or none with `theme: null`. The theme is recorded on the arc itself, so every client dressing the arc's panes wears the same one; `theme` must name a theme `GET /themes` serves. Answers the arc as `GET /arcs` lists it. Fires `surface.changed` with `kind: \"arcs\"`.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "theme"
+                ],
+                "properties": {
+                  "theme": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The arc after the change."
+          },
+          "400": {
+            "description": "The body is not `{ theme: string | null }`."
+          },
+          "403": {
+            "description": "The workspace is untrusted."
+          },
+          "404": {
+            "description": "No arc has that slug."
+          },
+          "409": {
+            "description": "The arc is not active, or no theme has that name."
+          },
+          "503": {
+            "description": "This host serves no arcs."
+          }
+        }
+      }
+    },
     "/sessions/{id}/arc": {
       "post": {
         "operationId": "bindSessionArc",
@@ -2310,9 +2369,75 @@
             "description": "The body is not `{ rule: { action, resource, effect: \"allow\" } }`."
           },
           "404": {
-            "description": "No workspace grant matches that rule."
+            "description": "That session holds no grant matching the rule."
           }
         }
+      }
+    },
+    "/permissions/session/{sessionId}/revoke": {
+      "post": {
+        "operationId": "revokeSessionGrant",
+        "summary": "Remove one grant a `scope: \"session\"` answer recorded for that session, so the call it covered asks again there. Other sessions and the workspace grants are untouched.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rule"
+                ],
+                "properties": {
+                  "rule": {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "resource",
+                      "effect"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "resource": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "effect": {
+                        "type": "string",
+                        "const": "allow"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ revoked: rule }`."
+          },
+          "400": {
+            "description": "The body is not `{ rule: { action, resource, effect: \"allow\" } }`."
+          },
+          "404": {
+            "description": "That session holds no grant matching the rule."
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },

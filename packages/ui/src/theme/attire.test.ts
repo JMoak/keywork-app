@@ -240,3 +240,85 @@ describe("previewing", () => {
     dispose();
   });
 });
+
+describe("the arc's theme on the record", () => {
+  function recorded(initial: Record<string, string> = {}) {
+    const [onServer, setOnServer] = createSignal<Record<string, string>>(initial);
+    const sent: [string, string | null][] = [];
+    const answer = { refuse: false };
+    const harness = dressed({
+      arcTheme: (slug) => onServer()[slug],
+      onArcWorn: async (slug, theme) => {
+        sent.push([slug, theme]);
+        if (answer.refuse) throw new Error("the server refused");
+        setOnServer((current) => withTheme(current, slug, theme));
+      },
+    });
+    return { ...harness, sent, answer, setOnServer };
+  }
+
+  it("wears what the arc's record says before this window's own memory", () => {
+    const local = JSON.stringify({ version: 1, arcs: { pricing: "nord" }, panes: {} });
+    const [onServer, setOnServer] = createSignal<Record<string, string>>({ pricing: "rose-pine" });
+    const { attire, dispose } = dressed({ initial: local, arcTheme: (slug) => onServer()[slug] });
+    expect(named(attire.outfit("a"))).toEqual({
+      theme: "rose-pine",
+      source: "arc",
+      arc: "pricing",
+    });
+    expect(attire.worn({ kind: "arc", slug: "pricing" })).toBe("rose-pine");
+    setOnServer({});
+    expect(attire.outfit("a").theme.name).toBe("nord");
+    setOnServer({ pricing: "velvet" });
+    expect(attire.outfit("a").theme.name).toBe("nord");
+    dispose();
+  });
+
+  it("writes an arc's theme through to the server and takes it off with null", async () => {
+    const { attire, sent, stored, dispose } = recorded();
+    attire.wear({ kind: "arc", slug: "pricing" }, "nord");
+    attire.wear({ kind: "pane", id: "b" }, "keywork-day");
+    attire.undress({ kind: "arc", slug: "pricing" });
+    await Promise.resolve();
+    expect(sent).toEqual([
+      ["pricing", "nord"],
+      ["pricing", null],
+    ]);
+    expect(stored()).toEqual({ version: 1, arcs: {}, panes: { b: "keywork-day" } });
+    expect(attire.outfit("a").source).toBe("window");
+    dispose();
+  });
+
+  it("keeps wearing the local choice when the server refuses it", async () => {
+    const { attire, answer, stored, dispose } = recorded({ pricing: "rose-pine" });
+    answer.refuse = true;
+    expect(attire.wear({ kind: "arc", slug: "pricing" }, "nord")).toBeUndefined();
+    await Promise.resolve();
+    expect(attire.outfit("a").theme.name).toBe("nord");
+    expect(attire.worn({ kind: "arc", slug: "pricing" })).toBe("nord");
+    expect(stored()).toMatchObject({ arcs: { pricing: "nord" } });
+    dispose();
+  });
+
+  it("follows another client that dresses the arc after this window chose", () => {
+    const { attire, answer, setOnServer, dispose } = recorded({ pricing: "rose-pine" });
+    answer.refuse = true;
+    attire.wear({ kind: "arc", slug: "pricing" }, "nord");
+    setOnServer({ pricing: "keywork-day" });
+    expect(named(attire.outfit("b"))).toEqual({
+      theme: "keywork-day",
+      source: "arc",
+      arc: "pricing",
+    });
+    dispose();
+  });
+});
+
+function withTheme(
+  themes: Record<string, string>,
+  slug: string,
+  theme: string | null,
+): Record<string, string> {
+  const { [slug]: _previous, ...rest } = themes;
+  return theme === null ? rest : { ...rest, [slug]: theme };
+}

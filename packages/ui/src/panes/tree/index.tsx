@@ -8,6 +8,7 @@ import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { ConfirmLine, NoticeLine } from "../overview/rows.tsx";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
+import { arcWears } from "../themes/targets.ts";
 import {
   discardNotice,
   emptyTrashLine,
@@ -241,7 +242,12 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
                   <span class="kw-tree-mark" aria-hidden="true">
                     {livenessMark(item.id, props.shell)}
                   </span>
-                  <span class="kw-tree-name">{nameOf(item)}</span>
+                  <span class="kw-tree-title">
+                    <span class="kw-tree-name">{nameOf(item)}</span>
+                    <Show when={arcWears(props.shell.attire, item.arc)}>
+                      {(wears) => <span class="kw-tree-wears">· {wears()}</span>}
+                    </Show>
+                  </span>
                   <span class="kw-tree-cost">{costOf(item)}</span>
                   <span class="kw-tree-age">{relativeAge(item.lastActivityAt)}</span>
                 </button>

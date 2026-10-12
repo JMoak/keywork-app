@@ -47,7 +47,7 @@ function windowDresser(wardrobe: Wardrobe): Dresser {
     inherited: () => undefined,
     echoes: () => [],
     landing: () => themeOnShow(wardrobe),
-    head: () => `wearing ${wardrobe.worn()} · the window`,
+    head: () => `${wardrobe.worn()} · the window`,
     hints: () => "enter wears · esc keeps · s system · t target",
     preview: (name) => wardrobe.preview(name),
     wear: (name) => wardrobe.wear(name) ?? rememberedNotice,

@@ -1,7 +1,8 @@
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
-import { createSignal, For, type JSX, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, type JSX, Match, onCleanup, onMount, Switch } from "solid-js";
 import { render } from "solid-js/web";
-import { PaneFrame } from "../src/chrome/pane-frame.tsx";
+import { type LifecycleState, PaneFrame } from "../src/chrome/pane-frame.tsx";
+import type { ChromeWeight } from "../src/chrome/root-attributes.ts";
 import { StatusLine } from "../src/chrome/status-line.tsx";
 import { Composer } from "../src/composer/composer.tsx";
 import { scenarios } from "../src/dev/scenarios.ts";
@@ -16,7 +17,7 @@ import { applyTheme, gallery, keyworkNight, type Theme, themeNamed } from "../sr
 import "../src/app.css";
 import "../src/shell/shell.css";
 
-type ChromeScene = "workspace" | "transcript" | "outfits" | "open";
+type ChromeScene = "workspace" | "transcript" | "outfits" | "outfit-seams" | "open";
 
 interface Dressing {
   readonly outfit?: Outfit | undefined;
@@ -32,14 +33,19 @@ function Gallery() {
   if (theme !== undefined) applyTheme(theme);
   document.body.dataset.themes = gallery.map((candidate) => candidate.name).join(" ");
   return (
-    <Show when={scene === "open"} fallback={<WorkspaceScene panes={scenePanes(scene)} />}>
-      <OpenScene />
-    </Show>
+    <Switch fallback={<WorkspaceScene panes={scenePanes(scene)} />}>
+      <Match when={scene === "open"}>
+        <OpenScene />
+      </Match>
+      <Match when={scene === "outfit-seams"}>
+        <OutfitSeamsScene />
+      </Match>
+    </Switch>
   );
 }
 
 function houseOf(scene: ChromeScene, asked: string | null): Theme | undefined {
-  if (scene === "outfits") return keyworkNight;
+  if (scene === "outfits" || scene === "outfit-seams") return keyworkNight;
   return gallery.find((candidate) => candidate.name === asked) ?? gallery[0];
 }
 
@@ -149,6 +155,109 @@ function unseenPane(dressing: Dressing): JSX.Element {
       marked={dressing.marked}
     >
       <ConversationPane projection={projected("thinking")} />
+    </PaneFrame>
+  );
+}
+
+interface SeamHouse {
+  readonly weight: ChromeWeight;
+  readonly theme: string;
+}
+
+interface SeamGuest {
+  readonly theme: string;
+  readonly state: LifecycleState;
+  readonly focused: boolean;
+}
+
+const seamHouses: readonly SeamHouse[] = [
+  { weight: "regular", theme: "nord" },
+  { weight: "seams", theme: "keywork-night" },
+  { weight: "borderless", theme: "osaka-jade" },
+];
+
+const seamGuests: readonly SeamGuest[] = [
+  { theme: "gruvbox-dark", state: "idle", focused: false },
+  { theme: "rose-pine", state: "needs-you", focused: false },
+  { theme: "whiplash", state: "finished-unseen", focused: true },
+];
+
+function OutfitSeamsScene() {
+  return (
+    <div style={{ display: "grid", gap: "1.5rem", padding: "1.5rem" }}>
+      <For each={seamHouses}>{(house) => <SeamRow house={house} />}</For>
+    </div>
+  );
+}
+
+function SeamRow(props: { house: SeamHouse }) {
+  const houseTheme = (): Theme => themeNamed(props.house.theme) ?? keyworkNight;
+  let row: HTMLDivElement | undefined;
+  onMount(() => {
+    if (row === undefined) return;
+    applyTheme(houseTheme(), row);
+    for (const frame of row.querySelectorAll<HTMLElement>(".kw-frame")) {
+      frame.dataset.house = props.house.weight;
+      if (frame.dataset.attire === undefined) frame.dataset.chrome = props.house.weight;
+    }
+  });
+  return (
+    <section>
+      <p
+        style={{
+          margin: "0 0 0.5rem",
+          color: "var(--kw-text-dim)",
+          "font-family": "var(--kw-font-mono)",
+        }}
+      >
+        house {props.house.weight} · {props.house.theme}
+      </p>
+      <div
+        ref={row}
+        style={{
+          display: "grid",
+          "grid-template-columns": "repeat(4, minmax(0, 1fr))",
+          height: "11rem",
+          background: "var(--kw-background)",
+        }}
+      >
+        <SeamFrame name={`house · ${props.house.theme}`} state="idle" focused={false} rank={0} />
+        <For each={seamGuests}>
+          {(guest, at) => (
+            <SeamFrame
+              name={`${themeNamed(guest.theme)?.chromeWeight ?? ""} pane`}
+              state={guest.state}
+              focused={guest.focused}
+              rank={at() + 1}
+              outfit={wearing(guest.theme, "pane")}
+            />
+          )}
+        </For>
+      </div>
+    </section>
+  );
+}
+
+interface SeamFrameProps {
+  name: string;
+  state: LifecycleState;
+  focused: boolean;
+  rank: number;
+  outfit?: Outfit | undefined;
+}
+
+function SeamFrame(props: SeamFrameProps) {
+  return (
+    <PaneFrame
+      name={props.name}
+      state={props.state}
+      focused={props.focused}
+      spawnRank={props.rank}
+      outfit={props.outfit}
+    >
+      <p style={{ margin: "0.5rem 0.75rem", color: "var(--kw-text-mid)" }}>
+        {props.focused ? "focused" : props.state}
+      </p>
     </PaneFrame>
   );
 }

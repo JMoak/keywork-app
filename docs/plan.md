@@ -1163,6 +1163,81 @@ five stamp states, the palette, the status line, and the first-run screen. The s
 decided (AD7); the canvas picks the two faces and the measure by showing the same fixture
 transcript in both themes. Nothing decorative that is not also informative.
 
+## Next up (2026-10-12): the series after the outfits
+
+The order the next items should land in, written after wave 6.5. Each is small enough for
+one lane; the rungs are the dependency order, not a calendar. Points as elsewhere.
+
+**Rung 1: close the loop, ship once.**
+
+- **N1 (1pt) The lane worktrees retire.** Corrected 2026-10-12: PR #7 is already merged
+  into keywork `main` (8952a27) and `main` carries whiplash (K8). Only K9, the bounded
+  derived rules, still sits unstaged in the `next` worktree; the patch is extracted at the
+  session scratchpad as `k9.patch` (trust/*, `server.test.ts`, `docs/events.md`, the 118
+  ledger) and applying it to `main` is Jordan's call, after which the `keywork-lanes` and
+  `.claude/worktrees` checkouts can go. keywork's last release is `v0.1.1` (2026-09-09),
+  before the themes route, so the sidecar pin needs a `v0.2.0` cut from `main`.
+- **N2 (3pt) First release of the app (W7.1).** Pin the keywork release as the sidecar, tag
+  `v0.1.0`, prove the three-platform rail and the updater with `v0.1.1`. The outfits stage
+  joins the committed screenshot baselines.
+- **N3 (2pt) Outfits follow-through.** The arcs pane and the tree show an arc's theme beside
+  its hue chip; `arcs` rows get a `w` key that opens the themes pane on that arc; palette
+  entries `mark-<pane>` and `theme-marked` from marks; a dressed pane's seam against the gap
+  audited in every chrome weight; the themes head keeps its key word at the narrowest tier.
+- **N4 (1pt) S15 arc theme on the record (keywork).** Optional `theme` on an arc with
+  `POST /arcs/{slug}/theme` and `surface.changed: arcs`; the app reads it as the arc rung
+  when present and keeps its local choice as the fallback. The TUI may colour arc chips by it.
+
+**N3 and N4 ledger (2026-10-12).** Landed uncommitted, two lanes in parallel. N3: arc rows
+read `1 session · wears rose-pine · now`, `w` (`arc-theme`) opens the themes pane on that arc
+and `shift+w` (`arc-inherit`) drops it; tree rows add `· wears x` above 560px; palette
+`mark-<slug>` per dressable open pane with mark/unmark wording; the seam rule is the pane's own
+weight inside, the house's weight at the edge, through a root-only `--kw-house-border` and a
+`data-house` attribute, shown in `stage--outfit-seams`; the themes head puts the theme first
+(`whiplash · 2 marked`); `shell.openPane` summons so an open themes pane is rebound. N4 (S15):
+keywork `main` gained `theme?` on `ArcRecord`/`ArcSummary`, `ArcsPort.setTheme`, and
+`POST /arcs/{slug}/theme` (`setArcTheme`, `{ theme: string | null }`; 400 malformed, 404 no
+arc, 409 archived or `no theme named "x" · GET /themes lists the ones served`), firing
+`surface.changed: arcs`, contract 1.1, the TUI arc row ending `· wears nord`; the app's protocol
+and client know it, `surfaces-store` exposes `arcTheme`, and the attire's arc rung reads the
+server first with this window's choice as the fallback, writing through on wear and undress
+(`<refusal> · worn in this window only`). The app also mirrored keywork's new
+`POST /permissions/session/{sessionId}/revoke` (`revokeSessionGrant`) in the protocol, client
+and doc fixture; its pane surface is W7.2. N2 was held: the permission layer refused version
+bumps and packing as a shared-resource change, so the release order is written up for Jordan
+in the report instead. Gate: app 108 files, 1295 tests, every check green except
+`check:contract` against keywork `main`'s working tree, which is mid-edit by another session
+adding `child.started`/`child.finished`; keywork 355 files, 4913 tests, its own types failing
+on that same in-flight work.
+
+**Rung 2: the daily driver.**
+
+- **N5 (2pt) Open loops (W7.2).** `purgeTrash` in the tree's trash section; mode cycling
+  (needs PD12); the arc slug and bot sigil in the title row at broadsheet; the `textFaint`
+  token; `/open` with a README fallback; a posix identity fixture.
+- **N6 (2pt) S14 findings (keywork).** `POST /redo` after an undo that announced `redoable`;
+  context from reported usage; cost that survives a restart; compaction summaries marked;
+  `surface.changed` on grants; zero-turn cost rows dropped.
+- **N7 (3pt) Dogfood week (W7.3).** `docs/dogfood.md` kept daily; each reach for the TUI
+  recorded with its reason and triaged into N5 or the waves below. Acceptance is the list
+  getting shorter.
+- **N8 (2pt) Second workspace (W7.4 + S10).** Two windows on two servers; the user-level
+  ticket stops blocking the second `serve`; asks pending across both in the tray.
+
+**Rung 3: many sessions, one head (the start of wave 8).**
+
+- **N9 (3pt) The needs-you queue (W8.1).** One ordered list across sessions and workspaces;
+  a chord that jumps to the next waiting item and back; tray badge and toasts from the same
+  queue.
+- **N10 (3pt) Session groups (W8.2).** Arcs as the grouping in the tree with collapse and
+  per-group waiting counts; a session started inside an arc with its bot bound in one step;
+  the arc's theme worn by the new session's pane from its first paint.
+- **N11 (2pt) Quiet mode (W8.4).** A per-session "let it run" posture on the K7 session
+  scope, marked in the title row, one key back.
+
+What is deliberately after these: fan-out and compare (W8.3), performance at scale (W8.5),
+and review as a surface (wave 9), each needing the daily-driver week's evidence first.
+
 ## Waves 7 to 11: after the merge (outline, 2026-10-12)
 
 M0 through M5 have landed across waves 4 to 6, PR #7 carries the themes and the trusted

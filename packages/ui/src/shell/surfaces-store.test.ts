@@ -67,6 +67,7 @@ export function emptySurfacesClient(): SurfacesClient {
     createArc: async () => missing,
     closeArc: async () => missing,
     abandonArc: async () => missing,
+    setArcTheme: async () => missing,
     bindSessionArc: async () => missing,
     createBot: async () => missing,
     bindSessionBot: async () => missing,
@@ -165,6 +166,27 @@ describe("the surfaces store", () => {
     await settle();
     expect(client.calls.sort()).toEqual(["arcs", "bots", "workspaces"]);
     expect(surfacesOfKind("arcs")).toEqual(["arcs"]);
+  });
+
+  it("reads the theme an arc wears off its summary, and follows another client's change", async () => {
+    let worn: string | undefined;
+    const client = fixtureSurfacesClient({
+      arcs: async () => ({
+        ...surfaceFixtures.arcs,
+        arcs: surfaceFixtures.arcs.arcs.map((arc) =>
+          arc.slug === "pricing" && worn !== undefined ? { ...arc, theme: worn } : arc,
+        ),
+      }),
+    });
+    const feed = fakeFeed();
+    const store = inRoot(() => createSurfacesStore(client, feed.feed));
+    await store.load();
+    expect(store.arcTheme("pricing")).toBeUndefined();
+    worn = "nord";
+    feed.emit("arcs");
+    await settle();
+    expect(store.arcTheme("pricing")).toBe("nord");
+    expect(store.arcTheme("arc-0")).toBeUndefined();
   });
 
   it("tells the session store when arc or bot bindings moved, since summaries carry both", async () => {

@@ -13,6 +13,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createStore } from "solid-js/store";
 import { afterEach, describe, expect, it } from "vitest";
 import { browserHost } from "../../host/browser.ts";
+import type { AttireTarget } from "../../theme/attire.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { costOf, sessionsNewestFirst, type TreeSpec, treePane } from "./index.tsx";
 
@@ -186,6 +187,21 @@ describe("the tree pane, level one", () => {
     expect(recorded.opened).toEqual(["s1"]);
     fireEvent.click(screen.getByLabelText("tree of which way?"));
     expect(recorded.rebound).toEqual([{ kind: "tree", sessionId: "s1" }]);
+  });
+
+  it("names the theme a session's pane would wear from its arc", () => {
+    const recorded = recording();
+    const inArc = summaries.map((item) => (item.id === "s1" ? { ...item, arc: "pricing" } : item));
+    const shell = {
+      ...shellSeams(recorded, undefined, inArc),
+      attire: { worn: (target: AttireTarget) => (target.kind === "arc" ? "whiplash" : undefined) },
+    } as ShellSeams;
+    mount({ kind: "tree" }, recorded, shell);
+    const wears = [...document.querySelectorAll(".kw-tree-session")].map(
+      (row) => row.querySelector(".kw-tree-wears")?.textContent ?? "",
+    );
+    expect(wears).toEqual(["", "· wears whiplash"]);
+    expect(document.querySelectorAll(".kw-tree-name")).toHaveLength(2);
   });
 
   it("teaches one key when there are no sessions", () => {

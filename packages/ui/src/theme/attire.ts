@@ -39,6 +39,8 @@ export interface AttireOptions {
   readonly titleOf: (paneId: PaneId) => string;
   readonly storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
   readonly storageKey: string;
+  readonly arcTheme?: ((slug: string) => string | undefined) | undefined;
+  readonly onArcWorn?: ((slug: string, theme: string | null) => Promise<void>) | undefined;
 }
 
 export interface AttireState {
@@ -55,6 +57,7 @@ export function createAttire(options: AttireOptions): Attire {
   const { wardrobe } = options;
   const [choices, setChoices] = createStore<Choices>(rememberedChoices(options));
   const [previewing, setPreviewing] = createSignal<Preview>();
+  const [chosenOver, setChosenOver] = createStore<Record<string, string | null>>({});
   const fittings = createMemo(() => new Map(wardrobe.fittings().map((fit) => [fit.name, fit])));
 
   const fit = (name: string): Theme | string =>
@@ -67,6 +70,16 @@ export function createAttire(options: AttireOptions): Attire {
     const shown = previewing();
     return shown !== undefined && covers(shown.target, rung, key) ? shown.name : undefined;
   };
+  const arcChoice = (slug: string): string | undefined => {
+    const recorded = options.arcTheme?.(slug);
+    const superseded =
+      recorded === undefined || chosenOver[slug] === recorded || fitted(recorded) === undefined;
+    return superseded ? choices.arcs[slug] : recorded;
+  };
+  const recordOnServer = (slug: string, name: string | undefined): void => {
+    setChosenOver(slug, options.arcTheme?.(slug) ?? null);
+    options.onArcWorn?.(slug, name ?? null).catch(() => undefined);
+  };
 
   const outfit = memoizedPerPane((paneId): Outfit => {
     const house: Outfit = { theme: wardrobe.wearing() ?? keyworkNight, source: "window" };
@@ -75,7 +88,7 @@ export function createAttire(options: AttireOptions): Attire {
     if (own !== undefined) return { theme: own, source: "pane" };
     const arc = options.arcOf(paneId);
     if (arc === undefined) return house;
-    const shared = fitted(previewed("arc", arc) ?? choices.arcs[arc]);
+    const shared = fitted(previewed("arc", arc) ?? arcChoice(arc));
     return shared === undefined ? house : { theme: shared, source: "arc", arc };
   });
 
@@ -93,6 +106,7 @@ export function createAttire(options: AttireOptions): Attire {
   const choose = (target: Dressing, name: string | undefined): void => {
     setChoices(produce((draft) => assign(draft, target, name)));
     persist(options, choices);
+    if (target.kind === "arc") recordOnServer(target.slug, name);
   };
   const dropPreviewOn = (target: AttireTarget): void => {
     const shown = previewing();
@@ -110,7 +124,7 @@ export function createAttire(options: AttireOptions): Attire {
         case "window":
           return wardrobe.worn();
         case "arc":
-          return choices.arcs[target.slug];
+          return arcChoice(target.slug);
         case "pane":
           return choices.panes[target.id];
         case "panes":

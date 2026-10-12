@@ -60,6 +60,7 @@ export function PaneFrame(props: PaneFrameProps) {
       ref={frame}
       class="kw-frame"
       data-attire={dressed()?.source}
+      data-house={chromeWeight()}
       data-tier={tier()}
       data-state={shownState()}
       data-focused={props.focused ? "" : undefined}

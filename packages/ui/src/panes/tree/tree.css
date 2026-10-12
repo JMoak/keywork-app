@@ -87,6 +87,17 @@
   color: var(--kw-density-medium);
 }
 
+.kw-tree-title {
+  display: flex;
+  gap: 1ch;
+  min-width: 0;
+}
+
+.kw-tree-wears {
+  flex: none;
+  color: var(--kw-text-dim);
+}
+
 .kw-tree-name,
 .kw-tree-text {
   overflow: hidden;
@@ -183,7 +194,8 @@
 
 @container tree (max-width: 559.98px) {
   .kw-tree-age,
-  .kw-tree-cost {
+  .kw-tree-cost,
+  .kw-tree-wears {
     display: none;
   }
 }

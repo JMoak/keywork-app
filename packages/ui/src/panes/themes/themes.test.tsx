@@ -127,7 +127,9 @@ describe("the themes pane", () => {
     act("themes.wear");
     expect(wardrobe.worn()).toBe("keywork-day");
     expect(stored["keywork.theme"]).toBe("keywork-day");
-    expect(container.querySelector(".kw-ov-head")?.textContent).toContain("wearing keywork-day");
+    expect(container.querySelector(".kw-ov-head")?.textContent).toContain(
+      "keywork-day · the window",
+    );
     expect(container.querySelector(".kw-ov-line")?.textContent).toBe(rememberedNotice);
     dispose();
   });
@@ -441,11 +443,11 @@ describe("the themes pane on a target", () => {
       heads.push(head(container));
     }
     expect(heads).toEqual([
-      "wearing keywork-night · the window",
-      'pane "run echo served" wears nothing of its own · inherits keywork-night',
-      "arc pricing wears nothing of its own · inherits keywork-night",
-      "3 marked panes wear nothing of their own · inherit",
-      "wearing keywork-night · the window",
+      "keywork-night · the window",
+      'inherits keywork-night · pane "run echo served"',
+      "inherits keywork-night · arc pricing",
+      "inherits keywork-night · 3 marked",
+      "keywork-night · the window",
     ]);
     expect(rebound.map((spec) => spec.target)).toEqual([
       { kind: "pane", id: "w1" },
@@ -465,11 +467,9 @@ describe("the themes pane on a target", () => {
       shell,
     );
     act("themes.target");
-    expect(head(container)).toBe(
-      'pane "scratch" wears nothing of its own · inherits keywork-night',
-    );
+    expect(head(container)).toBe('inherits keywork-night · pane "scratch"');
     act("themes.target");
-    expect(head(container)).toBe("wearing keywork-night · the window");
+    expect(head(container)).toBe("keywork-night · the window");
     dispose();
   });
 
@@ -477,7 +477,7 @@ describe("the themes pane on a target", () => {
     const { container, act } = mount(fitted().wardrobe);
     act("themes.target");
     expect(notice(container)).toBe(summonNotices.windowOnly);
-    expect(head(container)).toBe("wearing keywork-night · the window");
+    expect(head(container)).toBe("keywork-night · the window");
   });
 
   it("previews, wears and undresses on the target, never on the window", async () => {
@@ -494,7 +494,7 @@ describe("the themes pane on a target", () => {
     expect(attire.closet.panes.w1).toBe("keywork-day");
     expect(wardrobe.worn()).toBe("keywork-night");
     expect(notice(container)).toBe(targetRememberedNotice);
-    expect(head(container)).toBe('pane "run echo served" wears keywork-day');
+    expect(head(container)).toBe('keywork-day · pane "run echo served"');
     act("themes.undress");
     expect(attire.closet.panes.w1).toBeUndefined();
     expect(notice(container)).toBe('pane "run echo served" inherits again');
@@ -513,7 +513,7 @@ describe("the themes pane on a target", () => {
     act("themes.wear");
     expect(markOf(container, "keywork-night")).toBe("█");
     expect(markOf(container, "keywork-day")).toBe("·");
-    expect(head(container)).toBe('pane "run echo served" wears keywork-night');
+    expect(head(container)).toBe('keywork-night · pane "run echo served"');
     dispose();
   });
 
@@ -543,7 +543,7 @@ describe("the themes pane on a target", () => {
       { kind: "themes", target: { kind: "panes", ids: ["w1", "w2", "w3"] } },
       shell,
     );
-    expect(head(container)).toBe("3 marked panes wear keywork-day");
+    expect(head(container)).toBe("keywork-day · 3 marked");
     dispose();
   });
 
@@ -555,7 +555,7 @@ describe("the themes pane on a target", () => {
       { kind: "themes", target: { kind: "panes", ids: ["w1", "w3"] } },
       shell,
     );
-    expect(head(container)).toBe("2 marked panes wear different themes");
+    expect(head(container)).toBe("different themes · 2 marked");
     expect(markOf(container, "keywork-day")).toBe("·");
     expect(markOf(container, "keywork-night")).toBe("·");
     expect(markOf(container, "washed-out")).toBe(" ");

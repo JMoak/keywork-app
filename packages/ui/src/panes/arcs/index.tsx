@@ -19,6 +19,8 @@ import {
 } from "../overview/rows.tsx";
 import { noWorkingSession, summonedFrom, workingSession } from "../overview/working-session.ts";
 import { definePane, type KeyHints, type PaneProps, type ShellSeams } from "../registry.ts";
+import type { ThemesSpec } from "../themes/index.tsx";
+import { arcWears } from "../themes/targets.ts";
 
 const arcsSpec = z.object({
   kind: z.literal("arcs"),
@@ -90,6 +92,16 @@ export const arcsPane = definePane<ArcsSpec>({
       help: "release the current session from its arc",
       command: { name: "arc-release", description: "release the focused session from its arc" },
     },
+    "arcs.wear": {
+      chords: "w",
+      help: "wear a theme on this arc",
+      command: { name: "arc-theme", description: "open the themes pane on this arc" },
+    },
+    "arcs.undress": {
+      chords: "shift+w",
+      help: "let this arc inherit the house theme again",
+      command: { name: "arc-inherit", description: "drop this arc's theme so it inherits again" },
+    },
   },
 });
 
@@ -132,6 +144,10 @@ export function closeOutcomeLine(slug: string, outcome: ArcCloseOutcome, keys: K
     ...(outcome.wedged > 0 ? [`${outcome.wedged} wedged`] : []),
   ].join(", ");
   return `${slug} pending · ${waiting} wait for review · ${keys.chord("memory.summon")} opens the memory pane${notice}`;
+}
+
+export function arcInheritsLine(slug: string): string {
+  return `arc ${slug} inherits the house again`;
 }
 
 export function arcHueStyle(ordinal: number | undefined): Record<string, string> {
@@ -233,6 +249,14 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
     await surfaces().refetch("arcs");
   };
 
+  const wearOn = (slug: string): void =>
+    props.shell.openPane<ThemesSpec>({ kind: "themes", target: { kind: "arc", slug } });
+
+  const undress = (slug: string): void => {
+    props.shell.attire?.undress({ kind: "arc", slug });
+    setNotice(arcInheritsLine(slug));
+  };
+
   props.onAction((action) => {
     if (prompt() !== undefined) {
       setPrompt(undefined);
@@ -259,6 +283,12 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
         return;
       case "arcs.release":
         return void bind(null);
+      case "arcs.wear":
+        if (arc !== undefined) wearOn(arc.slug);
+        return;
+      case "arcs.undress":
+        if (arc !== undefined) undress(arc.slug);
+        return;
     }
   });
 
@@ -332,7 +362,7 @@ function ArcRowView(props: ArcRowViewProps) {
             muted={row().arc.status === "archived"}
             mark={row().open ? "▾" : "▸"}
             density="light"
-            aside={arcAside(row().arc)}
+            aside={arcAside(row().arc, arcWears(props.shell.attire, row().arc.slug))}
             onClick={() => props.onClick()}
           >
             <span class="kw-ov-chip" aria-hidden="true" style={arcHueStyle(row().ordinal)} />
@@ -371,11 +401,13 @@ function ArcRowView(props: ArcRowViewProps) {
   );
 }
 
-function arcAside(arc: ArcSummary): string {
+function arcAside(arc: ArcSummary, wears: string | undefined): string {
   const sessions = `${arc.sessions} ${arc.sessions === 1 ? "session" : "sessions"}`;
-  return arc.status === "archived"
-    ? `archived · ${sessions}`
-    : `${sessions} · ${relativeAge(arc.created)}`;
+  const parts =
+    arc.status === "archived"
+      ? ["archived", sessions, wears]
+      : [sessions, wears, relativeAge(arc.created)];
+  return parts.filter((part) => part !== undefined && part !== "").join(" · ");
 }
 
 function activeCount(arcs: readonly ArcSummary[]): string {

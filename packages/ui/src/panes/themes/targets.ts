@@ -103,24 +103,25 @@ export function echoedThemes(
 }
 
 export function targetHead(attire: Attire, target: AttireTarget, windowTheme: string): string {
-  const named = attire.describe(target);
-  if (target.kind === "panes" && target.ids.length > 1)
-    return `${named} ${pluralHead(choicesOf(attire, target.ids))}`;
-  const own = attire.worn(target);
-  if (own !== undefined) return `${named} wears ${own}`;
-  const inherited = inheritedTheme(attire, target, windowTheme);
-  return `${named} wears nothing of its own · inherits${inherited === undefined ? "" : ` ${inherited}`}`;
+  return `${wornPhrase(attire, target, windowTheme)} · ${headName(attire, target)}`;
 }
 
-function pluralHead(choices: MarkedChoices): string {
-  switch (choices.kind) {
-    case "shared":
-      return `wear ${choices.name}`;
-    case "mixed":
-      return "wear different themes";
-    case "bare":
-      return "wear nothing of their own · inherit";
-  }
+export function arcWears(attire: Attire | undefined, slug: string | undefined): string | undefined {
+  const worn = slug === undefined ? undefined : attire?.worn({ kind: "arc", slug });
+  return worn === undefined ? undefined : `wears ${worn}`;
+}
+
+function wornPhrase(attire: Attire, target: AttireTarget, windowTheme: string): string {
+  if (target.kind === "panes" && choicesOf(attire, target.ids).kind === "mixed")
+    return "different themes";
+  const own = attire.worn(target);
+  if (own !== undefined) return own;
+  const inherited = inheritedTheme(attire, target, windowTheme);
+  return inherited === undefined ? "inherits" : `inherits ${inherited}`;
+}
+
+function headName(attire: Attire, target: AttireTarget): string {
+  return target.kind === "panes" ? `${target.ids.length} marked` : attire.describe(target);
 }
 
 function choicesOf(attire: Attire, ids: readonly PaneId[]): MarkedChoices {

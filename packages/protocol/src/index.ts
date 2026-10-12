@@ -209,6 +209,8 @@ export {
   type ArcStatus,
   type ArcSummary,
   type ArcsView,
+  type ArcThemeAnswer,
+  type ArcThemeRequest,
   type BotDraft,
   type BotEntry,
   type BotScope,

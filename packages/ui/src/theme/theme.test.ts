@@ -289,6 +289,7 @@ describe("dressing a single element", () => {
     expect(element.style.getPropertyValue("--kw-panel")).toBe(keyworkDay.tokens.panel);
     expect(element.style.getPropertyValue("--kw-syntax-keyword")).toBe(keyworkDay.syntax.keyword);
     expect(element.style.getPropertyValue("--kw-gap")).toBe("");
+    expect(element.style.getPropertyValue("--kw-house-border")).toBe("");
   });
 
   it("undresses exactly what dressing set and leaves the element's own styles alone", () => {

@@ -18,7 +18,14 @@ export interface ArcSummary {
   status: ArcStatus;
   created: string;
   sessions: number;
+  theme?: string;
 }
+
+export interface ArcThemeRequest {
+  theme: string | null;
+}
+
+export type ArcThemeAnswer = ArcSummary;
 
 export interface ArcsView {
   arcs: readonly ArcSummary[];

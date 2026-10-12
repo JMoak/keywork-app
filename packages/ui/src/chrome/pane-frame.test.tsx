@@ -203,6 +203,27 @@ describe("PaneFrame outfits", () => {
     expect(frame.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
   });
 
+  it("draws its inside in its own weight and its edge in the house's", async () => {
+    document.documentElement.setAttribute("data-chrome", "regular");
+    await settled();
+    const borderless: Outfit = {
+      theme: { ...keyworkDay, chromeWeight: "borderless" },
+      source: "pane",
+    };
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused spawnRank={0} outfit={borderless}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.dataset.chrome).toBe("borderless");
+    expect(frame.dataset.house).toBe("regular");
+    expect(frame.querySelector(".kw-frame-lead")?.textContent).toBe("▎");
+    expect(frame.style.getPropertyValue("--kw-house-border")).toBe("");
+    document.documentElement.removeAttribute("data-chrome");
+    await settled();
+  });
+
   it("hides the theme mark below the column tier", () => {
     const { container } = render(() => (
       <TitleRow

@@ -1,9 +1,20 @@
 import type { SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent } from "@solidjs/testing-library";
+import { createStore, produce } from "solid-js/store";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Attire, AttireTarget } from "../../theme/attire.ts";
+import { keyworkNight } from "../../theme/themes.ts";
 import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
-import { type ArcsSpec, arcHueStyle, arcRows, arcsPane, closeOutcomeLine } from "./index.tsx";
+import type { PaneSpecBase } from "../registry.ts";
+import {
+  type ArcsSpec,
+  arcHueStyle,
+  arcInheritsLine,
+  arcRows,
+  arcsPane,
+  closeOutcomeLine,
+} from "./index.tsx";
 
 afterEach(cleanup);
 
@@ -126,6 +137,57 @@ describe("the arcs pane", () => {
     harness.dispose();
   });
 });
+
+describe("the arcs pane's themes", () => {
+  it("names the theme an arc wears, opens the themes pane on it, and lets it inherit", async () => {
+    const closet: Record<string, string> = { pricing: "whiplash" };
+    const opened: PaneSpecBase[] = [];
+    const harness = overviewShell();
+    const shell = {
+      ...harness.shell,
+      attire: arcCloset(closet),
+      openPane: (spec: PaneSpecBase) => void opened.push(spec),
+    };
+    await harness.surfaces.load();
+    const { container, act } = mountPane(arcsPane.component, { kind: "arcs" }, shell);
+    expect(rowTexts(container)).toEqual([
+      "▸ arc-1 2 sessions",
+      "▸ pricing 0 sessions · wears whiplash",
+      "▸ arc-0 archived · 1 session",
+    ]);
+    act("arcs.down");
+    act("arcs.wear");
+    expect(opened).toEqual([{ kind: "themes", target: { kind: "arc", slug: "pricing" } }]);
+    act("arcs.undress");
+    expect(closet).toEqual({});
+    expect(container.querySelector(".kw-ov-line")?.textContent).toBe(arcInheritsLine("pricing"));
+    expect(arcInheritsLine("pricing")).toBe("arc pricing inherits the house again");
+    harness.dispose();
+  });
+});
+
+function arcCloset(closet: Record<string, string>): Attire {
+  const [arcs, setArcs] = createStore(closet);
+  const slugOf = (target: AttireTarget): string | undefined =>
+    target.kind === "arc" ? target.slug : undefined;
+  return {
+    outfit: () => ({ theme: keyworkNight, source: "window" }),
+    worn: (target) => {
+      const slug = slugOf(target);
+      return slug === undefined ? undefined : arcs[slug];
+    },
+    wear: () => undefined,
+    undress: (target) => {
+      const slug = slugOf(target);
+      if (slug === undefined) return;
+      setArcs(produce((draft) => delete draft[slug]));
+    },
+    preview: () => undefined,
+    arcOf: () => undefined,
+    dressable: () => true,
+    describe: (target) => target.kind,
+  };
+}
 
 describe("the arcs pane's working session", () => {
   it("binds the session it was summoned from, though the arcs pane now holds focus", async () => {

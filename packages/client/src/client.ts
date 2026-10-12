@@ -127,6 +127,7 @@ export interface KeyworkClient {
   answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
   permissions(): Promise<PermissionsView>;
   revokeWorkspaceGrant(rule: PermissionRule): Promise<RevokeOutcome>;
+  revokeSessionGrant(sessionId: string, rule: PermissionRule): Promise<RevokeOutcome>;
   events(options?: EventStreamOptions): AsyncIterable<BusEnvelope>;
   memory(): Promise<MemoryGarden>;
   memoryInbox(): Promise<MemoryInbox>;
@@ -164,6 +165,7 @@ export interface KeyworkClient {
   createArc(slug: string): Promise<ArcSummary | SurfaceRefusal>;
   closeArc(slug: string, direction?: string): Promise<ArcCloseOutcome | SurfaceRefusal>;
   abandonArc(slug: string): Promise<"abandoned" | SurfaceRefusal>;
+  setArcTheme(slug: string, theme: string | null): Promise<ArcSummary | SurfaceRefusal>;
   bindSessionArc(id: string, slug: string | null): Promise<SessionBinding | SurfaceRefusal>;
   bots(): Promise<readonly BotSummary[]>;
   createBot(draft: BotDraft): Promise<BotEntry | SurfaceRefusal>;
@@ -353,6 +355,18 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
     permissions: () => request("GET", "/permissions").then(json<PermissionsView>),
     revokeWorkspaceGrant: async (rule) => {
       const response = await request("POST", "/permissions/workspace/revoke", { rule });
+      if (response.status === 400)
+        return { refused: "invalid", detail: await refusalDetail(response) };
+      if (response.status === 404)
+        return { refused: "missing", detail: await refusalDetail(response) };
+      return json<RevokeOutcome>(response);
+    },
+    revokeSessionGrant: async (sessionId, rule) => {
+      const response = await request(
+        "POST",
+        `/permissions/session/${encodeURIComponent(sessionId)}/revoke`,
+        { rule },
+      );
       if (response.status === 400)
         return { refused: "invalid", detail: await refusalDetail(response) };
       if (response.status === 404)
@@ -784,6 +798,7 @@ type SurfaceRoutes = Pick<
   | "createArc"
   | "closeArc"
   | "abandonArc"
+  | "setArcTheme"
   | "bindSessionArc"
   | "bots"
   | "createBot"
@@ -837,6 +852,8 @@ function surfaceRoutes(request: Request): SurfaceRoutes {
       await json(response);
       return "abandoned";
     },
+    setArcTheme: async (slug, theme) =>
+      answered<ArcSummary>(await request("POST", arc(slug, "/theme"), { theme }), "invalid"),
     bindSessionArc: async (id, slug) =>
       answered<SessionBinding>(await request("POST", session(id, "/arc"), { slug }), "archived"),
     bots: async () => (await json<{ bots: BotSummary[] }>(await request("GET", "/bots"))).bots,

@@ -52,4 +52,9 @@ export const permissionRoutes = [
     path: "/permissions/workspace/revoke",
     operationId: "revokeWorkspaceGrant",
   },
+  {
+    method: "POST",
+    path: "/permissions/session/{sessionId}/revoke",
+    operationId: "revokeSessionGrant",
+  },
 ] as const;

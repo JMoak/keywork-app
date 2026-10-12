@@ -118,6 +118,7 @@ function fakeClient(options: { pendingAsk?: boolean; arc?: string } = {}): {
     },
     permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
     revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
+    revokeSessionGrant: async (_sessionId, rule) => ({ revoked: rule }),
     events: async function* (options) {
       options?.onOpen?.();
       for (;;) {
