@@ -1,3 +1,4 @@
 {"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"wait forever"}}
-{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Working on it"}}}
-{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.interrupted","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Working on it"}]}}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+{"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Working on it"}}}
+{"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.interrupted","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Working on it"}]}}}

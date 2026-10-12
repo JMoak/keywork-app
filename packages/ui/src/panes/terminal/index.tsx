@@ -6,7 +6,7 @@ import { EmptyState } from "../empty-state.tsx";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { bridgeArgs, connectPty, mirrorPainter, type TerminalSurface } from "./session.ts";
 import { xtermSurface } from "./surface.ts";
-import { monoFontOf, themeOfElement, watchFlavor } from "./theme.ts";
+import { monoFontOf, themeOfElement, watchFonts, watchTheme } from "./theme.ts";
 import "@xterm/xterm/css/xterm.css";
 import "./terminal.css";
 
@@ -130,7 +130,8 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
         fontSize: font.size,
         windows: /win/i.test(navigator.platform),
       });
-      onCleanup(watchFlavor(root, () => live.setTheme(themeOfElement(holder as HTMLElement))));
+      onCleanup(watchTheme(root, () => live.setTheme(themeOfElement(holder as HTMLElement))));
+      onCleanup(watchFonts(() => live.remeasure()));
       onCleanup(() => live.dispose());
       setSurface(live);
     } catch (error) {

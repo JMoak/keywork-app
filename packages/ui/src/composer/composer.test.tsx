@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { Composer, intentOf } from "./composer.tsx";
 
@@ -104,5 +105,38 @@ describe("Composer", () => {
       />
     ));
     expect(container.querySelector(".kw-queue-origin")?.textContent).toBe("via wispr-flow");
+  });
+});
+
+describe("the composer's seed", () => {
+  function seeded() {
+    const [seed, setSeed] = createSignal<{ text: string } | undefined>();
+    const { container } = render(() => (
+      <Composer
+        queue={[]}
+        seed={seed()}
+        onSteer={() => {}}
+        onQueue={() => {}}
+        onInterrupt={() => {}}
+      />
+    ));
+    return { input: container.querySelector("textarea") as HTMLTextAreaElement, setSeed };
+  }
+
+  it("takes back an untouched seed when it is withdrawn, so a redo never leaves a duplicate", () => {
+    const { input, setSeed } = seeded();
+    setSeed({ text: "write hello.txt" });
+    expect(input.value).toBe("write hello.txt");
+    setSeed(undefined);
+    expect(input.value).toBe("");
+  });
+
+  it("keeps whatever the user wrote over a seed", () => {
+    const { input, setSeed } = seeded();
+    setSeed({ text: "write hello.txt" });
+    input.value = "write hello.txt twice";
+    fireEvent.input(input);
+    setSeed(undefined);
+    expect(input.value).toBe("write hello.txt twice");
   });
 });

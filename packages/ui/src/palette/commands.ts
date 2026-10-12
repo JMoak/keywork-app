@@ -71,6 +71,19 @@ export function fuzzyScore(query: string, candidate: string): number | undefined
   return score - candidate.length / 100;
 }
 
+export function fuzzyMatches(query: string, candidate: string): number[] | undefined {
+  const wanted = query.trim().toLowerCase();
+  const text = candidate.toLowerCase();
+  if (text.startsWith(wanted)) return Array.from(wanted, (_, index) => index);
+  const hits: number[] = [];
+  for (const character of wanted) {
+    const found = text.indexOf(character, (hits.at(-1) ?? -1) + 1);
+    if (found === -1) return undefined;
+    hits.push(found);
+  }
+  return hits;
+}
+
 function namesOf(command: CommandSpec): string[] {
   return [command.name, ...(command.aliases ?? [])];
 }

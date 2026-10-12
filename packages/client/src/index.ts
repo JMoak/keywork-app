@@ -20,6 +20,7 @@ export {
   type ServerFeed,
   serverFeed,
 } from "./feed.ts";
+export { type ClientMethod, operationOfMethod } from "./operations.ts";
 export {
   type ChangesAvailability,
   type ChangesState,
@@ -45,6 +46,7 @@ export { historyEnvelopes } from "./projection/history.ts";
 export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {
   compactJson,
+  grantWord,
   type RowSpan,
   type SpanPart,
   type SpanTone,

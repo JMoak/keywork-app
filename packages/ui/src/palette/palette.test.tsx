@@ -1,8 +1,15 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { Keymap } from "../keys/keymap.ts";
-import { CommandRegistry, fuzzyScore } from "./commands.ts";
-import { helpRows, Palette, paletteEntries, paletteModeOf } from "./palette.tsx";
+import { CommandRegistry, fuzzyMatches, fuzzyScore } from "./commands.ts";
+import {
+  helpRows,
+  matchRuns,
+  Palette,
+  paletteEntries,
+  paletteModeOf,
+  searchTextOf,
+} from "./palette.tsx";
 
 afterEach(cleanup);
 
@@ -64,6 +71,30 @@ describe("CommandRegistry", () => {
   });
 });
 
+describe("the fuzzy match as density", () => {
+  it("finds the characters the score counted, a prefix first", () => {
+    expect(fuzzyMatches("zo", "zoom")).toEqual([0, 1]);
+    expect(fuzzyMatches("dy", "dock-cycle")).toEqual([0, 6]);
+    expect(fuzzyMatches("DY", "Dock-Cycle")).toEqual([0, 6]);
+    expect(fuzzyMatches("zz", "zoom")).toBeUndefined();
+  });
+
+  it("splits a label into matched and unmatched runs", () => {
+    expect(matchRuns("dock-cycle", "dy")).toEqual([
+      { text: "d", matched: true },
+      { text: "ock-c", matched: false },
+      { text: "y", matched: true },
+      { text: "cle", matched: false },
+    ]);
+    expect(matchRuns("zoom", "")).toEqual([{ text: "zoom", matched: false }]);
+  });
+
+  it("searches commands without their leading slash", () => {
+    expect(searchTextOf("/spl")).toBe("spl");
+    expect(searchTextOf("alpha")).toBe("alpha");
+  });
+});
+
 describe("palette entries", () => {
   it("shows jump targets by default and commands behind a slash", () => {
     const commands = registry([]);
@@ -90,6 +121,8 @@ describe("Palette", () => {
     input.value = "/sp";
     fireEvent.input(input);
     expect(screen.getAllByRole("option")).toHaveLength(1);
+    const lit = [...document.querySelectorAll(".kw-palette-run[data-match]")];
+    expect(lit.map((run) => run.textContent)).toEqual(["sp"]);
     fireEvent.keyDown(input, { key: "Enter" });
     expect(ran).toEqual(["split"]);
     expect(dismissed).toBe(1);

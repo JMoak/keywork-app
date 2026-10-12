@@ -1,0 +1,109 @@
+{
+  "removed": {
+    "status": 200,
+    "body": {
+      "id": "s1",
+      "title": "say hello",
+      "createdAt": "2026-09-07T12:00:00.000Z",
+      "lastActivityAt": "2026-09-07T12:00:00.000Z",
+      "messageCount": 2
+    }
+  },
+  "sessionsAfterRemove": {
+    "status": 200,
+    "body": {
+      "sessions": []
+    }
+  },
+  "readRemoved": {
+    "status": 404,
+    "body": {
+      "error": "no session has that id"
+    }
+  },
+  "trash": {
+    "status": 200,
+    "body": {
+      "sessions": [
+        {
+          "id": "s1",
+          "title": "say hello",
+          "createdAt": "2026-09-07T12:00:00.000Z",
+          "lastActivityAt": "2026-09-07T12:00:00.000Z",
+          "messageCount": 2
+        }
+      ]
+    }
+  },
+  "restored": {
+    "status": 201,
+    "body": {
+      "id": "s1",
+      "title": "say hello",
+      "createdAt": "2026-09-07T12:00:00.000Z",
+      "lastActivityAt": "2026-09-07T12:00:00.000Z",
+      "messageCount": 2
+    }
+  },
+  "sessionsAfterRestore": {
+    "status": 200,
+    "body": {
+      "sessions": [
+        {
+          "id": "s1",
+          "title": "say hello",
+          "createdAt": "2026-09-07T12:00:00.000Z",
+          "lastActivityAt": "2026-09-07T12:00:00.000Z",
+          "messageCount": 2
+        }
+      ]
+    }
+  },
+  "removedAgain": {
+    "status": 200,
+    "body": {
+      "id": "s1",
+      "title": "say hello",
+      "createdAt": "2026-09-07T12:00:00.000Z",
+      "lastActivityAt": "2026-09-07T12:00:00.000Z",
+      "messageCount": 2
+    }
+  },
+  "discarded": {
+    "status": 200,
+    "body": {
+      "sessionId": "s1",
+      "discarded": true
+    }
+  },
+  "discardedAgain": {
+    "status": 404,
+    "body": {
+      "error": "nothing in the trash has that id"
+    }
+  },
+  "restoreDiscarded": {
+    "status": 404,
+    "body": {
+      "error": "nothing in the trash has that id"
+    }
+  },
+  "removeMissing": {
+    "status": 404,
+    "body": {
+      "error": "no session has that id"
+    }
+  },
+  "trashAfterDiscard": {
+    "status": 200,
+    "body": {
+      "sessions": []
+    }
+  },
+  "purged": {
+    "status": 200,
+    "body": {
+      "purged": 0
+    }
+  }
+}

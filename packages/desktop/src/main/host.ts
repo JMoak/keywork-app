@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { keyworkClient } from "@keywork-app/client";
 import { app, BrowserWindow, dialog, ipcMain, shell, type WebContents } from "electron";
@@ -9,6 +9,7 @@ import { isNotice, shouldNotify } from "./notify.ts";
 import { externalVerdict } from "./open-external.ts";
 import { registerPtyHandlers } from "./pty-ipc.ts";
 import { recentStore } from "./recents.ts";
+import { saveAs } from "./save-as.ts";
 import { superviseServer } from "./serve-process.ts";
 import { serverRelay } from "./server-relay.ts";
 import type { DesktopShell } from "./shell.ts";
@@ -116,6 +117,14 @@ export function registerHostHandlers(
       window.webContents.send(hostChannels.notificationActivated, notice.trigger);
     });
   });
+  ipcMain.handle(hostChannels.saveAs, (event, request: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return saveAs(request, {
+      folder: window === null ? undefined : desktop.windows.workspaceOf(window.id),
+      choosePath: (defaultPath) => chooseSavePath(window, defaultPath),
+      writeText: (path, text) => writeFile(path, text, "utf8"),
+    });
+  });
   ipcMain.handle(hostChannels.serverFetch, (event, request: RelayRequest) =>
     relay.start(request, {
       chunk: (requestId, bytes) =>
@@ -138,6 +147,18 @@ export function registerHostHandlers(
     secretsFor: (workspace) => [workspaces.ticketFor(workspace)?.token ?? ""],
   });
   return { abortRelays: () => relay.abortAll() };
+}
+
+async function chooseSavePath(
+  window: BrowserWindow | null,
+  defaultPath: string,
+): Promise<string | undefined> {
+  const options = { defaultPath, filters: [{ name: "Web page", extensions: ["html"] }] };
+  const chosen =
+    window === null
+      ? await dialog.showSaveDialog(options)
+      : await dialog.showSaveDialog(window, options);
+  return chosen.canceled ? undefined : chosen.filePath;
 }
 
 function sendUnlessGone(target: WebContents, channel: string, ...payload: unknown[]): void {

@@ -1,7 +1,7 @@
 import { emptyUsage, type UsageLedger } from "@keywork-app/client";
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
-import { densityLevels } from "../flavor/schema.ts";
+import { densityLevels } from "../theme/sections.ts";
 import {
   assumedContextLevel,
   assumedContextWindow,
@@ -144,7 +144,7 @@ describe("the context level", () => {
 });
 
 describe("the instrument tier", () => {
-  it("defaults to calm and reads cockpit from the flavor's mark on the root", () => {
+  it("defaults to calm and reads cockpit from the theme's mark on the root", () => {
     expect(instrumentTierOf(undefined)).toBe("calm");
     expect(instrumentTierOf({ dataset: {} as DOMStringMap })).toBe("calm");
     expect(instrumentTierOf({ dataset: { instruments: "cockpit" } as DOMStringMap })).toBe(

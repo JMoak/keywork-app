@@ -100,25 +100,25 @@ describe("keyworkClient routes", () => {
     expect(await client.abort("nope")).toBe("missing");
     expect(await client.entries("nope")).toBeUndefined();
     expect(await client.fork("nope", "e1")).toBe("missing");
-    expect(await client.label("nope", "e1", "x")).toBe("missing");
+    expect(await client.labelEntry("nope", "e1", "x")).toBe("missing");
     expect(await client.moveLeaf("nope", "e1")).toBe("missing");
     expect(await client.changes("nope")).toBe("missing");
     expect(await client.changedFile("nope", "a.txt")).toBe("missing");
   });
 
   it("walks the tree routes: entries, fork, label, and leaf with their bodies", async () => {
-    const summary = { id: "s2", title: "forked", messageCount: 2 };
+    const forked = { sessionId: "s2" };
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/entries")) return json(200, { sessionId: "s1", entries: [] });
-      if (call.url.endsWith("/fork")) return json(201, summary);
+      if (call.url.endsWith("/fork")) return json(201, forked);
       if (call.url.endsWith("/label")) return json(200, { entryId: "e1", label: null });
       if (call.url.endsWith("/leaf")) return json(200, { leafId: "e1" });
       return json(404, { error: "no such route" });
     });
     const client = keyworkClient(ticket, { fetch });
     expect((await client.entries("s1"))?.sessionId).toBe("s1");
-    expect(await client.fork("s1", "e1")).toEqual(summary);
-    expect(await client.label("s1", "e1", null)).toBe("labelled");
+    expect(await client.fork("s1", "e1")).toEqual(forked);
+    expect(await client.labelEntry("s1", "e1", null)).toEqual({ entryId: "e1", label: null });
     expect(await client.moveLeaf("s1", "e1")).toEqual({ leafId: "e1" });
     expect(calls.map((call) => call.body)).toEqual([
       undefined,
@@ -132,25 +132,28 @@ describe("keyworkClient routes", () => {
     const { fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/leaf")) return json(409, { error: "a turn is running" });
       if (call.url.includes("/changes")) return json(409, { error: "no baseline" });
-      return json(404, { error: "no entry has that entryId" });
+      return json(404, { error: "no entry has that id" });
     });
     const client = keyworkClient(ticket, { fetch });
     expect(await client.fork("s1", "e9")).toBe("unknown-entry");
-    expect(await client.label("s1", "e9", "x")).toBe("unknown-entry");
+    expect(await client.labelEntry("s1", "e9", "x")).toBe("unknown-entry");
     expect(await client.moveLeaf("s1", "e9")).toBe("busy");
     expect(await client.changes("s1")).toBe("no-baseline");
     expect(await client.changedFile("s1", "a.txt")).toBe("no-baseline");
   });
 
   it("reads changes and one changed file by its query path", async () => {
+    const changes = { baseline: "session start", files: [] };
     const { calls, fetch } = recordingFetch((call) => {
-      if (call.url.endsWith("/changes")) return json(200, { trusted: false, files: [] });
-      return json(200, { trusted: true, path: "src/a b.ts", before: "x", after: "y" });
+      if (call.url.endsWith("/changes")) return json(200, changes);
+      if (call.url.includes("escape")) return json(403, { error: "escapes the workspace scope" });
+      return json(200, { path: "src/a b.ts", before: "x", after: "y", truncated: false });
     });
     const client = keyworkClient(ticket, { fetch });
-    expect(await client.changes("s1")).toEqual({ trusted: false, files: [] });
+    expect(await client.changes("s1")).toEqual(changes);
+    expect(await client.changedFile("s1", "../escape")).toBe("outside-scope");
     expect(await client.changedFile("s1", "src/a b.ts")).toMatchObject({ before: "x", after: "y" });
-    expect(calls[1]?.url).toBe("http://127.0.0.1:4770/sessions/s1/changes/file?path=src%2Fa+b.ts");
+    expect(calls[2]?.url).toBe("http://127.0.0.1:4770/sessions/s1/changes/file?path=src%2Fa+b.ts");
   });
 
   it("raises a ServerRefusal carrying the server's detail", async () => {
@@ -258,15 +261,21 @@ describe("keyworkClient memory routes", () => {
     gardener: { state: "idle" },
     airlocks: [],
   };
-  const digest = { arc: "launch", candidates: [], questions: [] };
+  const digest = {
+    arc: "launch",
+    candidates: [],
+    questions: [],
+    decisions: { candidates: {}, questions: {} },
+  };
 
   it("reads the garden, the inbox, notes, daily logs and the ledger with their layers encoded", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/memory")) return json(200, garden);
       if (call.url.endsWith("/memory/inbox"))
         return json(200, { trusted: true, items: [], count: 0 });
-      if (call.url.includes("/memory/notes/Stray%20Claim?layer=arc%3Alaunch"))
-        return json(200, { trusted: true, note: { name: "Stray Claim" } });
+      if (call.url.endsWith("/memory/notes/Stray%20Claim"))
+        return json(200, { trusted: true, name: "Stray Claim", relations: [], curing: 0 });
+      if (call.url.endsWith("/memory/notes/Inert%20Claim")) return json(200, { trusted: false });
       if (call.url.endsWith("/memory/notes?layer=workspace"))
         return json(200, { trusted: true, notes: [] });
       if (call.url.endsWith("/memory/notes")) return json(404, { error: "no layer" });
@@ -282,7 +291,8 @@ describe("keyworkClient memory routes", () => {
     expect((await client.memoryInbox()).count).toBe(0);
     expect((await client.memoryNotes("workspace"))?.notes).toEqual([]);
     expect(await client.memoryNotes()).toBeUndefined();
-    expect((await client.memoryNote("Stray Claim", "arc:launch"))?.note?.name).toBe("Stray Claim");
+    expect((await client.memoryNote("Stray Claim"))?.name).toBe("Stray Claim");
+    expect(await client.memoryNote("Inert Claim")).toBeUndefined();
     expect((await client.memoryDailyDates()).dates).toEqual(["2026-09-07"]);
     expect((await client.memoryDaily("2026-09-07")).entries).toEqual([]);
     expect((await client.memoryLedger()).entries).toEqual([]);
@@ -292,14 +302,13 @@ describe("keyworkClient memory routes", () => {
   it("maps approve, discard and revert through inert and missing", async () => {
     const { fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/inbox/a/approve"))
-        return json(200, { id: "a", result: { path: "A.md", staged: false, ledgerId: "l1" } });
-      if (call.url.endsWith("/inbox/b/discard")) return json(200, { id: "b", discarded: true });
+        return json(200, { path: "A.md", staged: false, ledgerId: "l1" });
+      if (call.url.endsWith("/inbox/bot/approve")) return json(200, {});
+      if (call.url.endsWith("/inbox/b/discard")) return json(200, {});
       if (call.url.endsWith("/inbox/gone/approve")) return json(404, { error: "no staged item" });
       if (call.url.endsWith("/inbox/gone/discard")) return json(404, { error: "no staged item" });
-      if (call.url.endsWith("/ledger/l1/revert"))
-        return json(200, { id: "l1", outcome: "reverted" });
-      if (call.url.endsWith("/ledger/l2/revert"))
-        return json(200, { id: "l2", outcome: "needs-rebase" });
+      if (call.url.endsWith("/ledger/l1/revert")) return json(200, { outcome: "reverted" });
+      if (call.url.endsWith("/ledger/l2/revert")) return json(200, { outcome: "needs-rebase" });
       return json(403, { error: "memory is inert: this workspace is untrusted" });
     });
     const client = keyworkClient(ticket, { fetch });
@@ -307,6 +316,7 @@ describe("keyworkClient memory routes", () => {
       kind: "approved",
       result: { path: "A.md", staged: false, ledgerId: "l1" },
     });
+    expect(await client.approveStagedItem("bot")).toEqual({ kind: "approved", result: null });
     expect(await client.discardStagedItem("b")).toBe("discarded");
     expect(await client.approveStagedItem("gone")).toBe("missing");
     expect(await client.discardStagedItem("gone")).toBe("missing");
@@ -332,7 +342,7 @@ describe("keyworkClient memory routes", () => {
   it("walks the airlock verbs with their typed refusals", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/arcs/launch/airlock") && call.method === "GET")
-        return json(200, { trusted: true, digest });
+        return json(200, { trusted: true, ...digest });
       if (call.url.endsWith("/arcs/none/airlock")) return json(404, { error: "no review" });
       if (call.url.endsWith("/candidates/Weak%20Note"))
         return json(409, { error: "below the bar" });
@@ -346,8 +356,8 @@ describe("keyworkClient memory routes", () => {
       return json(403, { error: "memory is inert" });
     });
     const client = keyworkClient(ticket, { fetch });
-    expect((await client.arcAirlock("launch"))?.digest).toEqual(digest);
-    expect(await client.arcAirlock("none")).toBeUndefined();
+    expect(await client.airlock("launch")).toEqual({ trusted: true, ...digest });
+    expect(await client.airlock("none")).toBeUndefined();
     expect(await client.triageAirlockCandidate("launch", "Strong Note", "deliver")).toEqual({
       kind: "digest",
       digest,
@@ -364,15 +374,15 @@ describe("keyworkClient memory routes", () => {
       kind: "digest",
       digest,
     });
-    expect(await client.deliverAirlockEligible("launch")).toEqual({
+    expect(await client.deliverAirlock("launch")).toEqual({
       kind: "delivered",
       delivered: 2,
     });
-    expect(await client.finishArcAirlock("launch", true)).toEqual({
+    expect(await client.finishAirlock("launch", true)).toEqual({
       kind: "finished",
       outcome: { kind: "undecided", items: ["q"] },
     });
-    expect(await client.finishArcAirlock("inert")).toBe("inert");
+    expect(await client.finishAirlock("inert")).toBe("inert");
     expect(calls.at(-2)?.body).toBe('{"force":true}');
   });
 });
@@ -389,7 +399,6 @@ describe("keyworkClient workspace routes", () => {
     to: 12,
     text: "hello world\n",
     truncated: false,
-    eof: true,
     encoding: "utf-8",
   };
 
@@ -405,7 +414,7 @@ describe("keyworkClient workspace routes", () => {
     expect(await client.file("src/a.ts", { from: 3, to: 9 })).toEqual(slice);
     expect(calls.map((call) => call.url.replace(ticket.url, "/"))).toEqual([
       "/workspace",
-      "/tree?path=src",
+      "/tree?path=src&hidden=true",
       "/files?path=src%2Fa.ts&from=3&to=9",
     ]);
   });
@@ -420,39 +429,6 @@ describe("keyworkClient workspace routes", () => {
     expect(await answer(413).file("huge.bin")).toBe("too-large");
     expect(await answer(415).file("photo.png")).toBe("binary");
     await expect(answer(500).file("a.txt")).rejects.toThrow(ServerRefusal);
-  });
-
-  it("reads a spill's elided range by session and spill id, and the whole spill by default", async () => {
-    const slice = {
-      spillId: "q1",
-      bytes: 68,
-      from: 34,
-      to: 60,
-      text: "the elided middle",
-      truncated: false,
-      eof: false,
-      encoding: "utf-8",
-    };
-    const { calls, fetch } = recordingFetch(() => json(200, slice));
-    const client = keyworkClient(ticket, { fetch });
-    expect(await client.spill("s 1", "q1", { from: 34, to: 60 })).toEqual(slice);
-    await client.spill("s1", "q1");
-    expect(calls.map((call) => call.url.replace(ticket.url, "/"))).toEqual([
-      "/sessions/s%201/spills/q1?from=34&to=60",
-      "/sessions/s1/spills/q1",
-    ]);
-  });
-
-  it("names each refusal of a spill read, telling a missing session from a missing spill", async () => {
-    const answer = (status: number, error: string) =>
-      keyworkClient(ticket, { fetch: recordingFetch(() => json(status, { error })).fetch });
-    expect(await answer(400, "from and to must be whole numbers").spill("s1", "q1")).toBe(
-      "invalid-range",
-    );
-    expect(await answer(404, "no session has that id").spill("gone", "q1")).toBe("missing-session");
-    expect(await answer(404, "no spill q9 in this session").spill("s1", "q9")).toBe("missing");
-    expect(await answer(415, "binary spill").spill("s1", "q1")).toBe("binary");
-    await expect(answer(500, "boom").spill("s1", "q1")).rejects.toThrow(ServerRefusal);
   });
 
   it("posts an empty body to trust the root and types both refusals with the server's words", async () => {
@@ -476,5 +452,43 @@ describe("keyworkClient workspace routes", () => {
       refused: "home",
       message: "refusing to blanket-trust a home",
     });
+  });
+});
+
+describe("keyworkClient trash routes", () => {
+  it("moves a session to the trash, lists it, restores it and discards it with typed refusals", async () => {
+    const summary = { id: "s1", title: "Lights", messageCount: 2 };
+    const { calls, fetch } = recordingFetch((call) => {
+      if (call.url.endsWith("/sessions/busy")) return json(409, { error: "a turn is running" });
+      if (call.url.endsWith("/sessions/gone") || call.url.includes("/trash/gone"))
+        return json(404, { error: "nothing in the trash has that id" });
+      if (call.url.endsWith("/trash") && call.method === "GET")
+        return json(200, { sessions: [summary] });
+      if (call.url.endsWith("/trash")) return json(200, { purged: 3 });
+      if (call.url.endsWith("/restore")) return json(201, summary);
+      if (call.url.includes("/trash/")) return json(200, { sessionId: "s1", discarded: true });
+      return json(200, summary);
+    });
+    const client = keyworkClient(ticket, { fetch });
+    expect(await client.removeSession("s1")).toEqual(summary);
+    expect(await client.removeSession("busy")).toBe("busy");
+    expect(await client.removeSession("gone")).toBe("missing");
+    expect(await client.listTrash()).toEqual([summary]);
+    expect(await client.restoreSession("s1")).toEqual(summary);
+    expect(await client.restoreSession("gone")).toBe("missing");
+    expect(await client.discardTrashedSession("s1")).toBe("discarded");
+    expect(await client.discardTrashedSession("gone")).toBe("missing");
+    expect(await client.purgeTrash()).toEqual({ purged: 3 });
+    expect(calls.map((call) => `${call.method} ${call.url.replace(ticket.url, "/")}`)).toEqual([
+      "DELETE /sessions/s1",
+      "DELETE /sessions/busy",
+      "DELETE /sessions/gone",
+      "GET /trash",
+      "POST /trash/s1/restore",
+      "POST /trash/gone/restore",
+      "DELETE /trash/s1",
+      "DELETE /trash/gone",
+      "DELETE /trash",
+    ]);
   });
 });

@@ -5,6 +5,7 @@ import type {
   ExtensionNoticeLevel,
   PermissionAsk,
   PermissionDecision,
+  SessionSettlement,
   ToolCallPart,
   TurnDelta,
   Usage,
@@ -58,7 +59,7 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "gate.ask":
       return replay ? state : askFor(state, envelope.payload.ask, envelope.ts);
     case "gate.permission":
-      return decide(state, envelope.payload.decision);
+      return decide(state, envelope.payload.decision, envelope.ts);
     case "gate.preset":
       return { ...state, preset: envelope.payload.to };
     case "session.mode":
@@ -74,10 +75,14 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       };
     case "shell.reset":
       return replay ? state : notice(state, "info", "· shell reset");
+    case "session.settled":
+      return replay ? state : settled(state, envelope.payload);
     case "session.tree":
     case "changes.updated":
     case "memory.inbox":
     case "surface.changed":
+    case "session.removed":
+    case "session.restored":
       return state;
     case "extension.notice":
       return replay ? state : notice(state, "info", extensionLine(envelope.payload));
@@ -230,7 +235,7 @@ function settleTool(
     durationMs:
       run.replay || run.phase === "refused" || run.startedAt === undefined
         ? undefined
-        : elapsed(run.startedAt, ts),
+        : Math.max(0, elapsed(run.startedAt, ts) - (run.waitedMs ?? 0)),
     outputChars: payload.spill?.bytes ?? payload.output.length,
     detail: detailLines(payload.output),
     spill: payload.spill,
@@ -241,7 +246,7 @@ function settleTool(
 function askFor(state: SessionProjection, ask: PermissionAsk, ts: string): SessionProjection {
   const index = state.running[ask.callId];
   if (index !== undefined) {
-    return updateRun(state, index, (run) => ({ ...run, phase: "asking", ask }));
+    return updateRun(state, index, (run) => ({ ...run, phase: "asking", ask, askedAt: ts }));
   }
   const call: ToolCallPart = {
     type: "tool-call",
@@ -253,10 +258,15 @@ function askFor(state: SessionProjection, ask: PermissionAsk, ts: string): Sessi
     ...newRun(call, false, "proposed", ts),
     phase: "asking",
     ask,
+    askedAt: ts,
   });
 }
 
-function decide(state: SessionProjection, decision: PermissionDecision): SessionProjection {
+function decide(
+  state: SessionProjection,
+  decision: PermissionDecision,
+  ts: string,
+): SessionProjection {
   const decisions = { ...state.decisions, [decision.callId]: decision };
   const index = state.running[decision.callId];
   if (index === undefined) return { ...state, decisions };
@@ -266,11 +276,17 @@ function decide(state: SessionProjection, decision: PermissionDecision): Session
       ...run,
       decision,
       ask: undefined,
+      ...answeredAt(run, ts),
       phase: refused ? "refused" : run.phase === "asking" ? "running" : run.phase,
       reason: refused ? refusalReason(decision) : run.reason,
     })),
     decisions,
   };
+}
+
+function answeredAt(run: ToolRun, ts: string): Pick<ToolRun, "askedAt" | "waitedMs"> {
+  if (run.askedAt === undefined) return { askedAt: undefined, waitedMs: run.waitedMs };
+  return { askedAt: undefined, waitedMs: (run.waitedMs ?? 0) + elapsed(run.askedAt, ts) };
 }
 
 function argumentsOf(value: unknown): Record<string, unknown> {
@@ -295,6 +311,11 @@ function addUsage(ledger: UsageLedger, usage: Usage): UsageLedger {
     unpricedTurns: ledger.unpricedTurns + (usage.costUsd === undefined ? 1 : 0),
     costUsd: ledger.costUsd + (usage.costUsd ?? 0),
   };
+}
+
+function settled(state: SessionProjection, settlement: SessionSettlement): SessionProjection {
+  if (settlement.phase === "requested") return state;
+  return settlement.notices.reduce((current, text) => notice(current, "info", text), state);
 }
 
 function extensionLine(payload: ExtensionNotice): string {
@@ -332,6 +353,8 @@ function newRun(
     live: undefined,
     reason: undefined,
     durationMs: undefined,
+    askedAt: undefined,
+    waitedMs: undefined,
     outputChars: undefined,
     detail: undefined,
     spill: undefined,

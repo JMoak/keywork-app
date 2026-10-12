@@ -1,3 +1,4 @@
+import type { AskScope } from "@keywork-app/protocol";
 import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
@@ -19,7 +20,7 @@ export interface ActionTarget {
   summon(kind: PaneKind, variant?: string): void;
   paneAction(action: string): void;
   cycleMode(): void;
-  approveAsk(): void;
+  approveAsk(scope?: AskScope): void;
   denyAsk(): void;
   toggleHelp(): void;
   openPalette(initialQuery?: string): void;
@@ -169,6 +170,26 @@ export const coreActions: Record<string, AppAction> = {
     hotPath: true,
     invoke: (target) => target.approveAsk(),
     command: { name: "approve", description: "approve the pending tool call" },
+  },
+  "ask.session": {
+    chords: "alt+s",
+    help: "approve the pending ask for this session",
+    hotPath: true,
+    invoke: (target) => target.approveAsk("session"),
+    command: {
+      name: "approve-session",
+      description: "approve the pending tool call and its rules for this session",
+    },
+  },
+  "ask.workspace": {
+    chords: "alt+w",
+    help: "approve the pending ask for this workspace",
+    hotPath: true,
+    invoke: (target) => target.approveAsk("workspace"),
+    command: {
+      name: "approve-workspace",
+      description: "approve the pending tool call and its rules for this workspace",
+    },
   },
   "ask.deny": {
     chords: "ctrl+n",

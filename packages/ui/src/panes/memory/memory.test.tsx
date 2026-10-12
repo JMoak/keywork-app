@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
-import type { LedgerEntry, MemoryGarden, MemoryNote } from "@keywork-app/protocol";
+import type {
+  LedgerEntry,
+  MemoryGarden,
+  MemoryNoteDetail,
+  MemoryNotes,
+} from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createRoot } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import gardenFixture from "../../../../client/src/fixtures/memory-garden.json";
 import { browserHost } from "../../host/browser.ts";
 import {
@@ -20,7 +25,7 @@ import { inertLine, lifecycleOf, memoryPane, titleOf } from "./index.tsx";
 
 const fixture = gardenFixture as MemoryGarden;
 
-function note(name: string, body: string): MemoryNote {
+function note(name: string, body: string): MemoryNoteDetail {
   return {
     name,
     path: `${name}.md`,
@@ -33,6 +38,7 @@ function note(name: string, body: string): MemoryNote {
     tokens: 12,
     frontmatter: {},
     layer: "workspace",
+    file: `C:/vault/${name}.md`,
     curing: 3,
     injected: true,
     recalls: 2,
@@ -60,11 +66,11 @@ function harness(initial: MemoryGarden): Harness {
   const client = {
     ...inertMemoryClient(),
     memory: async () => garden,
-    memoryNotes: async () => ({ trusted: garden.trusted, notes: garden.trusted ? notes : [] }),
-    memoryNote: async (name: string) => ({
-      trusted: true,
-      note: notes.find((item) => item.name === name) ?? null,
+    memoryNotes: async (): Promise<MemoryNotes> => ({
+      trusted: garden.trusted,
+      notes: garden.trusted && garden.layers.length > 0 ? notes : [],
     }),
+    memoryNote: async (name: string) => notes.find((item) => item.name === name),
     memoryDailyDates: async () => ({ trusted: true, dates: ["2026-09-07"] }),
     memoryDaily: async (date: string) => ({
       trusted: true,
@@ -157,12 +163,16 @@ describe("the memory pane definition", () => {
 
 describe("the garden lens", () => {
   it("renders the recorded garden: layers with their ramp, notes, the inbox by kind, the gardener", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-10T12:00:00Z") });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const { store } = harness(fixture);
     mount(store);
     await settle();
     const text = document.body.textContent ?? "";
     expect(text).toContain("2 notes");
-    expect(screen.getByLabelText("curing · 1 curing · 1 settled")).toBeTruthy();
+    expect(screen.getByLabelText("curing · 2 settled")).toBeTruthy();
     expect(screen.getByLabelText("prompt 0 of 4096 tokens")).toBeTruthy();
     expect(text).toContain("inbox · staged");
     expect(document.querySelectorAll('[data-kind="inbox"]')).toHaveLength(2);
@@ -183,7 +193,7 @@ describe("the garden lens", () => {
     expect(calls).toEqual([`approve ${first?.id}`]);
     expect(document.querySelector(".kw-memory")?.textContent).toContain("approved");
     setGarden({ ...garden(), inbox: garden().inbox.slice(1) });
-    feed.push([inboxEnvelope(9, 1, { note: 1 })]);
+    feed.push([inboxEnvelope(9, 1)]);
     await settle();
     expect(store.state.inbox.count).toBe(1);
     expect(document.querySelectorAll('[data-kind="inbox"]')).toHaveLength(1);

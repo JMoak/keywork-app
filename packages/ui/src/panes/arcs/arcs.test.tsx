@@ -71,7 +71,7 @@ describe("the arcs pane", () => {
       client: {
         createArc: async (slug) => {
           calls.push(`create:${slug}`);
-          return { slug: slug ?? "arc-3", status: "active", created: "t", sessions: 0 };
+          return { slug, status: "active", created: "t", sessions: 0 };
         },
         closeArc: async (slug) => {
           calls.push(`close:${slug}`);
@@ -79,7 +79,7 @@ describe("the arcs pane", () => {
         },
         bindSessionArc: async (id, slug) => {
           calls.push(`bind:${id}:${slug}`);
-          return { sessionId: id, arc: slug };
+          return slug === null ? {} : { arc: slug };
         },
         abandonArc: async (slug) => {
           calls.push(`abandon:${slug}`);
@@ -134,7 +134,7 @@ describe("the arcs pane's working session", () => {
       client: {
         bindSessionArc: async (id, slug) => {
           calls.push(`bind:${id}:${slug}`);
-          return { sessionId: id, arc: slug };
+          return slug === null ? {} : { arc: slug };
         },
       },
     });

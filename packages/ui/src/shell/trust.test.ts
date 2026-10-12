@@ -31,7 +31,12 @@ export function inertWorkspaceClient(overrides: Partial<WorkspaceClient> = {}): 
     workspace: async () => undecidedWorkspace,
     tree: async () => ({ path: "", entries: [] }),
     file: async () => "missing",
-    trustWorkspace: async () => ({ trusted: true, root: "C:/work", reopens: false }),
+    trustWorkspace: async () => ({
+      trusted: true,
+      root: "C:/work",
+      vault: "C:/work/.keywork/memory",
+      reopens: false,
+    }),
     ...overrides,
   };
 }
@@ -132,7 +137,12 @@ describe("the trust flow", () => {
   });
 
   it("accepts, restarts the sidecar when the server asks to reopen, and re-reads trust", async () => {
-    const h = harness(undecidedWorkspace, { trusted: true, root: "C:/work", reopens: true });
+    const h = harness(undecidedWorkspace, {
+      trusted: true,
+      root: "C:/work",
+      vault: "C:/work/.keywork/memory",
+      reopens: true,
+    });
     await settle();
     const accepted = h.flow.accept();
     await settle();
@@ -146,7 +156,7 @@ describe("the trust flow", () => {
   it("skips the restart when trust was already on record", async () => {
     const h = harness(
       { ...undecidedWorkspace, trust: "trusted" },
-      { trusted: true, root: "C:/work", reopens: false },
+      { trusted: true, root: "C:/work", vault: "C:/work/.keywork/memory", reopens: false },
     );
     await settle();
     expect(h.flow.state().kind).toBe("trusted");
@@ -190,7 +200,7 @@ describe("the trust flow", () => {
       ts: "t",
       sessionId: "",
       type: "surface.changed",
-      payload: { kind: "workspace" },
+      payload: { kind: "workspaces" },
     });
     await settle();
     expect(h.flow.state().kind).toBe("trusted");

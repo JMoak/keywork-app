@@ -2,11 +2,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type PathPredicate, repoRoot, reportViolations, walkRepo } from "./lib/repo-files.ts";
 
-export const flavorHome = "packages/ui/src/flavor/";
+export const themeHome = "packages/ui/src/theme/";
 
 export const styledPath: PathPredicate = (path) =>
   /^packages\/ui\/src\/.*\.(tsx?|css)$/.test(path) &&
-  !path.startsWith(flavorHome) &&
+  !path.startsWith(themeHome) &&
   !path.endsWith(".test.ts") &&
   !path.endsWith(".test.tsx");
 
@@ -32,7 +32,7 @@ if (import.meta.main) {
   process.exitCode = reportViolations(
     {
       check: "check:colors",
-      heading: `Color literals outside ${flavorHome} (every color is a flavor token, AD6):`,
+      heading: `Color literals outside ${themeHome} (every color is a theme token, AD6):`,
       scanned: `${paths.length} styled files`,
     },
     violations,

@@ -9,21 +9,19 @@ import type { BusEnvelope } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
 import { telemetry } from "../chrome/telemetry.ts";
 import { Composer } from "../composer/composer.tsx";
-import { applyFlavor, type Flavor, gallery, keyworkDay, keyworkNight } from "../flavor/index.ts";
 import { ConversationPane } from "../page/pane.tsx";
 import { tierPresetPx, type WidthTier } from "../page/tiers.ts";
 import { frameTick } from "../shell/frame-tick.ts";
+import { applyTheme, gallery, keyworkDay, keyworkNight, type Theme } from "../theme/index.ts";
 import { type Replay, replayEnvelopes } from "./replay.ts";
 import { scenarios } from "./scenarios.ts";
 import "./dev.css";
-
-export type FlavorChoice = "system" | (typeof gallery)[number]["name"];
 
 const widths = Object.keys(tierPresetPx) as WidthTier[];
 
 export function DevPage() {
   const [scenario, setScenario] = createSignal(scenarios[0]?.name ?? "plain");
-  const [flavorChoice, setFlavorChoice] = createSignal<FlavorChoice>("system");
+  const [themeChoice, setThemeChoice] = createSignal("system");
   const [width, setWidth] = createSignal<WidthTier>("column");
   const [projection, setProjection] = createSignal<SessionProjection>(emptyProjection);
   const [take, setTake] = createSignal(0);
@@ -49,7 +47,7 @@ export function DevPage() {
     replay = replayEnvelopes(chosen.envelopes, (envelope) => batcher?.push(envelope));
   });
 
-  createEffect(() => applyFlavor(resolveFlavor(flavorChoice())));
+  createEffect(() => applyTheme(resolveTheme(themeChoice())));
 
   onCleanup(() => replay?.stop());
 
@@ -97,15 +95,13 @@ export function DevPage() {
           </select>
         </label>
         <label class="kw-dev-field">
-          flavor
+          theme
           <select
-            value={flavorChoice()}
-            onChange={(event) => setFlavorChoice(event.currentTarget.value as FlavorChoice)}
+            value={themeChoice()}
+            onChange={(event) => setThemeChoice(event.currentTarget.value)}
           >
             <option value="system">system</option>
-            <For each={gallery}>
-              {(flavor) => <option value={flavor.name}>{flavor.name}</option>}
-            </For>
+            <For each={gallery}>{(theme) => <option value={theme.name}>{theme.name}</option>}</For>
           </select>
         </label>
         <label class="kw-dev-field">
@@ -156,8 +152,8 @@ export function DevPage() {
   );
 }
 
-export function resolveFlavor(choice: FlavorChoice): Flavor {
-  if (choice !== "system") return gallery.find((flavor) => flavor.name === choice) ?? keyworkNight;
+export function resolveTheme(choice: string): Theme {
+  if (choice !== "system") return gallery.find((theme) => theme.name === choice) ?? keyworkNight;
   const prefersDark =
     typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
   return prefersDark ? keyworkNight : keyworkDay;

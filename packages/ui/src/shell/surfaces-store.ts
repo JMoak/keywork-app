@@ -5,7 +5,7 @@ import {
   type BusEnvelope,
   isSurfaceRefusal,
   type McpServerStatus,
-  type ServerFlavor,
+  type ServerTheme,
   type SurfaceKind,
   type WorkspaceChoice,
 } from "@keywork-app/protocol";
@@ -13,7 +13,7 @@ import { createStore, produce } from "solid-js/store";
 
 export type SurfaceListings = Pick<
   KeyworkClient,
-  "mcpServers" | "arcs" | "bots" | "workspaces" | "flavors"
+  "mcpServers" | "arcs" | "bots" | "workspaces" | "themes"
 >;
 
 export type SurfaceVerbs = Pick<
@@ -26,7 +26,7 @@ export type SurfaceVerbs = Pick<
   | "abandonArc"
   | "bindSessionArc"
   | "createBot"
-  | "switchSessionBot"
+  | "bindSessionBot"
   | "createWorkspace"
   | "useWorkspace"
   | "focusWorkspaceDir"
@@ -35,7 +35,7 @@ export type SurfaceVerbs = Pick<
 
 export type SurfacesClient = SurfaceListings & SurfaceVerbs;
 
-export type SurfaceName = "mcp" | "arcs" | "bots" | "workspaces" | "flavors";
+export type SurfaceName = "mcp" | "arcs" | "bots" | "workspaces" | "themes";
 
 export interface SurfacesState {
   readonly mcp: readonly McpServerStatus[];
@@ -43,8 +43,8 @@ export interface SurfacesState {
   readonly ordinals: Readonly<Record<string, number>>;
   readonly bots: readonly BotSummary[];
   readonly workspaces: readonly WorkspaceChoice[];
-  readonly flavors: readonly ServerFlavor[];
-  readonly activeFlavor: string | undefined;
+  readonly themes: readonly ServerTheme[];
+  readonly activeTheme: string | undefined;
   readonly loaded: Readonly<Partial<Record<SurfaceName, true>>>;
   readonly notices: Readonly<Partial<Record<SurfaceName, string>>>;
 }
@@ -63,16 +63,10 @@ export interface SurfacesSeams {
   sessionsChanged?: (() => void) | undefined;
 }
 
-export const surfaceNames: readonly SurfaceName[] = [
-  "mcp",
-  "arcs",
-  "bots",
-  "workspaces",
-  "flavors",
-];
+export const surfaceNames: readonly SurfaceName[] = ["mcp", "arcs", "bots", "workspaces", "themes"];
 
 export function surfacesOfKind(kind: SurfaceKind): readonly SurfaceName[] {
-  return kind === "workspace" ? ["arcs", "bots"] : [kind];
+  return kind === "workspaces" ? ["workspaces", "arcs", "bots"] : [kind];
 }
 
 export function createSurfacesStore(
@@ -86,8 +80,8 @@ export function createSurfacesStore(
     ordinals: {},
     bots: [],
     workspaces: [],
-    flavors: [],
-    activeFlavor: undefined,
+    themes: [],
+    activeTheme: undefined,
     loaded: {},
     notices: {},
   });
@@ -139,11 +133,11 @@ export function createSurfacesStore(
         draft.workspaces = [...workspaces];
       });
     },
-    flavors: async () => {
-      const listing = await client.flavors();
-      settle("flavors", (draft) => {
-        draft.flavors = [...listing.flavors];
-        draft.activeFlavor = listing.active;
+    themes: async () => {
+      const listing = await client.themes();
+      settle("themes", (draft) => {
+        draft.themes = [...listing.themes];
+        draft.activeTheme = listing.active;
       });
     },
   };
@@ -202,8 +196,8 @@ interface MutableSurfacesState {
   ordinals: Record<string, number>;
   bots: BotSummary[];
   workspaces: WorkspaceChoice[];
-  flavors: ServerFlavor[];
-  activeFlavor: string | undefined;
+  themes: ServerTheme[];
+  activeTheme: string | undefined;
   loaded: Partial<Record<SurfaceName, true>>;
   notices: Partial<Record<SurfaceName, string>>;
 }

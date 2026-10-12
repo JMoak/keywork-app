@@ -35,7 +35,7 @@ export type ControlsClient = Pick<
   | "cost"
   | "exportSession"
   | "rename"
-  | "setPreset"
+  | "applyPreset"
 >;
 
 export interface SessionReadings {
@@ -163,11 +163,15 @@ export function createControlsStore(
         if (undone.prompt !== null) setState("seeds", id, { text: undone.prompt.text });
         await seams.reload(id);
       }),
-    redo: (id) => whenAnswered(client.redo(id), () => seams.reload(id)),
+    redo: (id) =>
+      whenAnswered(client.redo(id), async () => {
+        setState("seeds", id, undefined);
+        await seams.reload(id);
+      }),
     rename: (id, title) => client.rename(id, title),
     exportSession: (id, request) => client.exportSession(id, request),
     setPreset: async (name, confirmed) => {
-      const reading = await client.setPreset(name, confirmed);
+      const reading = await client.applyPreset(name, confirmed);
       if (!isControlRefusal(reading)) setState("preset", reading.to);
       return reading;
     },

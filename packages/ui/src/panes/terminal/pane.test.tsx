@@ -15,6 +15,7 @@ vi.mock("./surface.ts", () => ({
   xtermSurface: () => {
     const surface = Object.assign(fakeSurface(), {
       setTheme: () => {},
+      remeasure: () => {},
       fit: () => {},
       renderer: () => "dom",
     });

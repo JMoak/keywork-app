@@ -67,7 +67,7 @@ queues, so the app never starts a second one.
 Decided 2026-09-07 over Tauri. The two things that make this app world-class rather than
 fine are pixel-identical rendering on all three platforms and a flawless embedded terminal,
 and those are exactly where a system webview is weakest on Linux, keywork's primary
-platform. Electron bundles Chromium, so a flavor renders the same everywhere, and its PTY
+platform. Electron bundles Chromium, so a theme renders the same everywhere, and its PTY
 story (`node-pty` plus xterm's WebGL renderer) is VS Code's own terminal stack. The cost is
 about 80 MB on top of a 125 MB sidecar, which is the honest total.
 
@@ -116,13 +116,13 @@ doubles as documentation, and a leaderless hot path (Enter queues, Alt+Enter ste
 keywork's composer; interrupt, approve, deny, mode cycle, palette, pane jump, zoom, overlay). Bindings share
 action ids with keywork where the action exists in both, so muscle memory transfers.
 
-### AD6. One theme system: keywork flavors (PD15, T6)
+### AD6. One theme system: keywork themes (PD15, T6)
 
-The app does not have its own theme format. It reads keywork **flavor** files (tokens,
+The app does not have its own theme format. It reads keywork **theme** files (tokens,
 ramp, density mapping, appearance) and maps every token to a CSS variable; every color
 in every component is a token; the APCA contrast floor is enforced at load exactly as
-keywork's validator does, and a failing flavor errors helpfully instead of loading. The
-curated gallery ships with the app; any flavor file can be imported. `system` appearance
+keywork's validator does, and a failing theme errors helpfully instead of loading. The
+curated gallery ships with the app; any theme file can be imported. `system` appearance
 is the default. Density still carries state and hue still carries identity: those two
 rules survive the translation intact.
 
@@ -132,7 +132,7 @@ The material of the terminal is ink density on a cell grid. The app translates t
 material rather than drawing a fake terminal:
 
 - **Density** renders as fill and weight (a mark's opacity and stroke), still mapped
-  through the flavor's density tokens, still monochrome-safe.
+  through the theme's density tokens, still monochrome-safe.
 - **The tile-fill progress mark** is the one and only progress element. Never a spinner.
 - **The motion grammar** carries over whole: motion in ink not geometry, four named tempos,
   one mover per region, input outranks motion, reduced-motion is the floor.
@@ -141,7 +141,7 @@ material rather than drawing a fake terminal:
   monospace (rail, stamps, paths, tool rows, diffs, terminal, status), and everything the
   model says to you sets in a **text serif** at the tier's measure, headings the same face
   one step up, never display type. The width-tier grammar (broadsheet / column / clipping /
-  masthead) becomes a container-query grammar with the same tiers. In the light flavor it
+  masthead) becomes a container-query grammar with the same tiers. In the light theme it
   reads like a broadsheet; in keywork-night, like a terminal that learned to typeset.
 - **Needs-you only.** A notification always means a keystroke is wanted, with the same two
   triggers as keywork. Completions stay silent and show as return state in the title
@@ -161,9 +161,9 @@ allowlist of its own. File changes are undoable per turn through the server's ch
 
 ### AD9. Config: one typed surface, zero-config default (D9, P5)
 
-The app has exactly one config file (keybindings, flavor, window preferences), schema
+The app has exactly one config file (keybindings, theme, window preferences), schema
 validated, with every option carrying a written justification in its `.describe()`. The
-first run with no config is the best experience: one flavor, one keymap, one layout
+first run with no config is the best experience: one theme, one keymap, one layout
 algorithm. keywork's own config is keywork's.
 
 ### AD10. Windows-first parity, three platforms (T3)

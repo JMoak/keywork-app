@@ -35,8 +35,10 @@ export const emptyTreeState: TreeState = {
 };
 
 export function treeState(state: TreeState, envelope: BusEnvelope): TreeState {
-  if (envelope.type !== "session.tree" || envelope.payload.replay === true) return state;
-  return { ...state, stale: true, leafId: envelope.payload.leafId, lastChange: envelope.payload };
+  if (envelope.payload.replay === true) return state;
+  if (envelope.type === "session.tree") return changedTree(state, envelope.payload);
+  if (envelope.type === "session.state") return movedLeaf(state, envelope.payload.leafId);
+  return state;
 }
 
 export function treeSnapshot(state: TreeState, snapshot: SessionEntries): TreeState {
@@ -137,4 +139,13 @@ function bindingText(arc: string | null | undefined, bot: string | null | undefi
     .concat(bot === undefined ? [] : [[`bot ${bot ?? "cleared"}`]])
     .flat();
   return bound.length === 0 ? "binding unchanged" : bound.join(" · ");
+}
+
+function changedTree(state: TreeState, change: TreeChange): TreeState {
+  const leafId = change.reason === "leaf" ? change.entryId : state.leafId;
+  return { ...state, stale: true, leafId, lastChange: change };
+}
+
+function movedLeaf(state: TreeState, leafId: string | null): TreeState {
+  return leafId === state.leafId ? state : { ...state, stale: true, leafId };
 }

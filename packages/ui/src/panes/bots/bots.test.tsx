@@ -30,11 +30,13 @@ describe("the bots pane", () => {
     const harness = overviewShell({
       currentSession: "s1",
       client: {
-        switchSessionBot: async (id, slug) => {
-          calls.push(`${id}:${slug}`);
+        bindSessionBot: async (id, name) => {
+          calls.push(`${id}:${name}`);
           return busy
             ? { refused: "busy", detail: "a turn is running" }
-            : { sessionId: id, bot: slug };
+            : name === null
+              ? {}
+              : { bot: name };
         },
       },
     });
@@ -85,9 +87,9 @@ describe("the bots pane's working session", () => {
     const calls: string[] = [];
     const harness = overviewShell({
       client: {
-        switchSessionBot: async (id, slug) => {
-          calls.push(`${id}:${slug}`);
-          return { sessionId: id, bot: slug };
+        bindSessionBot: async (id, name) => {
+          calls.push(`${id}:${name}`);
+          return name === null ? {} : { bot: name };
         },
       },
     });

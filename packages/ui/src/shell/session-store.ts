@@ -18,14 +18,19 @@ import {
 } from "@keywork-app/client";
 import type {
   AnswerOutcome,
+  AskScope,
   AskVerdict,
   BusEnvelope,
   ChangedFileReading,
+  DiscardTrashedOutcome,
   ForkOutcome,
   LabelOutcome,
   LeafOutcome,
   PendingAsk,
   PromptBehavior,
+  PromptOutcome,
+  RemoveOutcome,
+  RestoreOutcome,
   SessionDetail,
   SessionState as SessionStanding,
   SessionSummary,
@@ -42,11 +47,17 @@ export interface SessionStore {
   controlsOf(id: string | undefined): SessionControls;
   refresh(): Promise<void>;
   open(id: string): Promise<void>;
+  gone(id: string): boolean;
+  trashed(id: string): boolean;
+  openTrash(): Promise<void>;
+  remove(id: string): Promise<RemoveOutcome>;
+  restore(id: string): Promise<RestoreOutcome>;
+  discard(id: string): Promise<DiscardTrashedOutcome>;
   reload(id: string): Promise<void>;
   create(): Promise<string>;
-  prompt(id: string, text: string, behavior: PromptBehavior): Promise<void>;
+  prompt(id: string, text: string, behavior: PromptBehavior): Promise<PromptOutcome>;
   abort(id: string): Promise<void>;
-  answerAsk(callId: string, verdict: AskVerdict): Promise<AnswerOutcome>;
+  answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
   tree(id: string | undefined): TreeState;
   openTree(id: string, options?: RefetchOptions): Promise<void>;
   fork(id: string, entryId: string): Promise<ForkOutcome>;
@@ -67,6 +78,7 @@ export interface RefetchOptions {
 
 export interface SessionState {
   readonly summaries: readonly SessionSummary[];
+  readonly trash: readonly SessionSummary[];
   readonly projections: Readonly<Record<string, SessionProjection>>;
   readonly loading: Readonly<Record<string, boolean>>;
   readonly trees: Readonly<Record<string, TreeState>>;
@@ -77,8 +89,11 @@ export interface SessionState {
 
 interface MutableSessionState {
   summaries: SessionSummary[];
+  trash: SessionSummary[];
+  trashed: Record<string, boolean>;
   projections: Record<string, SessionProjection>;
   loading: Record<string, boolean>;
+  missing: Record<string, boolean>;
   trees: Record<string, TreeState>;
   changes: Record<string, ChangesState>;
   gap: { from: number; to: number } | undefined;
@@ -88,8 +103,11 @@ interface MutableSessionState {
 export function createSessionStore(client: KeyworkClient, feed: ServerFeed): SessionStore {
   const [state, setState] = createStore<MutableSessionState>({
     summaries: [],
+    trash: [],
+    trashed: {},
     projections: {},
     loading: {},
+    missing: {},
     trees: {},
     changes: {},
     gap: undefined,
@@ -150,6 +168,9 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     }
     apply(batches);
     follow(envelopes);
+    const moves = trashMovesIn(envelopes);
+    markTrashed(moves);
+    if (moves.length > 0) void openTrash();
     if (envelopes.some(changesSummaries)) void refresh();
     for (const id of rewritten) void reload(id);
   };
@@ -169,6 +190,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
         const loaded = projectAll(emptyProjection, [...history, ...asks, ...live]);
         draft.projections[id] = loaded.standing === undefined ? { ...loaded, standing } : loaded;
         draft.loading[id] = false;
+        draft.missing[id] = detail === undefined;
       }),
     );
   };
@@ -179,6 +201,30 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const refresh = async (): Promise<void> => {
     const summaries = await client.sessions();
     setState("summaries", reconcile([...summaries], { key: "id" }));
+  };
+
+  const openTrash = async (): Promise<void> => {
+    const trash = await client.listTrash();
+    setState("trash", reconcile([...trash], { key: "id" }));
+  };
+
+  const markTrashed = (moves: readonly TrashMove[]): void => {
+    setState(
+      produce((draft) => {
+        for (const move of moves) draft.trashed[move.sessionId] = move.trashed;
+      }),
+    );
+  };
+
+  const settleTrash = async <Outcome>(
+    pending: Promise<Outcome>,
+    moved: (outcome: Outcome) => TrashMove | undefined,
+  ): Promise<Outcome> => {
+    const outcome = await pending;
+    const move = moved(outcome);
+    markTrashed(move === undefined ? [] : [move]);
+    await Promise.all([refresh(), openTrash()]);
+    return outcome;
   };
 
   const openTree = (id: string, options: RefetchOptions = {}): Promise<void> => {
@@ -225,6 +271,19 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       if (state.projections[id] !== undefined || arrivedWhileLoading.has(id)) return;
       await load(id);
     },
+    gone: (id) =>
+      state.missing[id] === true && !state.summaries.some((summary) => summary.id === id),
+    trashed: (id) => state.trashed[id] === true,
+    openTrash,
+    remove: (id) =>
+      settleTrash(client.removeSession(id), (outcome) =>
+        typeof outcome === "string" ? undefined : { sessionId: id, trashed: true },
+      ),
+    restore: (id) =>
+      settleTrash(client.restoreSession(id), (outcome) =>
+        outcome === "missing" ? undefined : { sessionId: id, trashed: false },
+      ),
+    discard: (id) => settleTrash(client.discardTrashedSession(id), () => undefined),
     reload,
     create: async () => {
       const summary = await client.createSession();
@@ -233,12 +292,14 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     },
     prompt: async (id, text, behavior) => {
       controls.forgetSeed(id);
-      await client.prompt(id, text, behavior);
+      const outcome = await client.prompt(id, text, behavior);
+      if (outcome === "missing") setState("missing", id, true);
+      return outcome;
     },
     abort: async (id) => {
       await client.abort(id);
     },
-    answerAsk: (callId, verdict) => client.answerAsk(callId, verdict),
+    answerAsk: (callId, verdict, scope) => client.answerAsk(callId, verdict, scope),
     tree: (id) => (id === undefined ? emptyTreeState : (state.trees[id] ?? emptyTreeState)),
     openTree,
     fork: async (id, entryId) => {
@@ -246,7 +307,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       if (typeof forked !== "string") await refresh();
       return forked;
     },
-    label: (id, entryId, label) => client.label(id, entryId, label),
+    label: (id, entryId, label) => client.labelEntry(id, entryId, label),
     moveLeaf: (id, entryId) => client.moveLeaf(id, entryId),
     changes: (id) =>
       id === undefined ? emptyChangesState : (state.changes[id] ?? emptyChangesState),
@@ -278,6 +339,7 @@ function askEnvelopes(detail: SessionDetail, pending: readonly PendingAsk[]): Bu
           callId: ask.callId,
           arguments: ask.arguments,
           rule: "default" as const,
+          rules: ask.rules ?? [],
         },
       },
     }));
@@ -297,8 +359,28 @@ function changesSummaries(envelope: BusEnvelope): boolean {
   return (
     envelope.type === "turn.started" ||
     envelope.type === "turn.completed" ||
-    envelope.type === "session.state"
+    envelope.type === "session.state" ||
+    envelope.type === "session.removed" ||
+    envelope.type === "session.restored"
   );
+}
+
+interface TrashMove {
+  sessionId: string;
+  trashed: boolean;
+}
+
+function trashMovesIn(envelopes: readonly BusEnvelope[]): TrashMove[] {
+  return envelopes.flatMap((envelope): TrashMove[] => {
+    switch (envelope.type) {
+      case "session.removed":
+        return [{ sessionId: envelope.payload.sessionId, trashed: true }];
+      case "session.restored":
+        return [{ sessionId: envelope.payload.sessionId, trashed: false }];
+      default:
+        return [];
+    }
+  });
 }
 
 export function sessionsRewrittenBy(

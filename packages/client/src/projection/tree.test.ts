@@ -18,35 +18,39 @@ async function snapshot(): Promise<SessionEntries> {
 }
 
 describe("the tree reducer over the recorded fork, label and leaf move", () => {
-  it("goes stale on every session.tree and remembers the leaf and the last change", async () => {
+  it("goes stale on every session.tree, remembers the last change, and follows the leaf", async () => {
     const stream = await envelopes("tree");
     const changes = stream.filter((envelope) => envelope.type === "session.tree");
-    expect(changes.map((envelope) => envelope.payload.reason)).toEqual([
-      "entry",
-      "fork",
-      "label",
-      "leaf",
-      "entry",
-    ]);
-    const afterFork = changes.slice(0, 2).reduce(treeState, emptyTreeState);
+    expect(changes.map((envelope) => envelope.payload.reason)).toEqual(["fork", "label", "leaf"]);
+    const afterFork = changes.slice(0, 1).reduce(treeState, emptyTreeState);
     expect(afterFork.stale).toBe(true);
     expect(afterFork.lastChange).toMatchObject({ reason: "fork", entryId: "q2", forkedTo: "q3" });
     const settled = treeSnapshot(afterFork, await snapshot());
     expect(settled.stale).toBe(false);
-    expect(settled.leafId).toBe("q5");
-    const moved = changes.slice(2).reduce(treeState, settled);
+    expect(settled.leafId).toBe("q4");
+    const moved = changes.slice(1).reduce(treeState, settled);
     expect(moved.stale).toBe(true);
-    expect(moved.leafId).toBe("q5");
+    expect(moved.leafId).toBe("q2");
+  });
+
+  it("goes stale when session.state moves the leaf past the snapshot, and not when it stays", async () => {
+    const stream = await envelopes("tree");
+    const states = stream.filter((envelope) => envelope.type === "session.state");
+    const settled = treeSnapshot(emptyTreeState, await snapshot());
+    const last = states.at(-1) as BusEnvelope;
+    expect(treeState(settled, last)).toBe(settled);
+    const earlier = treeState(settled, states[1] as BusEnvelope);
+    expect(earlier).toMatchObject({ stale: true, leafId: "q1" });
   });
 
   it("ignores every other event and replayed tree changes", async () => {
     const stream = await envelopes("tree");
-    const quiet = stream.filter((envelope) => envelope.type !== "session.tree");
+    const quiet = stream.filter(
+      (envelope) => envelope.type !== "session.tree" && envelope.type !== "session.state",
+    );
     expect(quiet.reduce(treeState, emptyTreeState)).toBe(emptyTreeState);
-    const replayed = {
-      ...stream[4],
-      payload: { ...stream[4]?.payload, replay: true },
-    } as BusEnvelope;
+    const fork = stream.find((envelope) => envelope.type === "session.tree") as BusEnvelope;
+    const replayed = { ...fork, payload: { ...fork.payload, replay: true } } as BusEnvelope;
     expect(treeState(emptyTreeState, replayed)).toBe(emptyTreeState);
   });
 
@@ -65,7 +69,7 @@ describe("the tree reducer over the recorded fork, label and leaf move", () => {
 
   it("folds a branch away and keeps the fold stamp on its row", async () => {
     const rows = treeRows(await snapshot(), new Set(["q1"]));
-    expect(rows.map((row) => row.id)).toEqual(["q2", "q1", "q6", "q5"]);
+    expect(rows.map((row) => row.id)).toEqual(["q2", "q1", "q6", "q4"]);
     expect(rows[1]).toMatchObject({ folded: true, hasChildren: true });
   });
 

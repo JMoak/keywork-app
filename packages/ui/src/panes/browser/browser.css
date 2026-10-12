@@ -31,9 +31,11 @@
 
 .kw-browser-filter {
   font: inherit;
-  padding: 0 0.3rem;
-  border: 1px solid var(--kw-border-focus);
-  background: var(--kw-panel);
+  padding: 0 0.5ch;
+  border: none;
+  outline: none;
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
   color: var(--kw-text);
   width: 10rem;
   max-width: 50%;
@@ -81,9 +83,9 @@
 }
 
 .kw-browser-row[data-cursor] .kw-browser-entry {
-  outline: 1px solid var(--kw-border-focus);
-  outline-offset: -1px;
   color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-pane-ink, var(--kw-accent));
 }
 
 .kw-browser-mark {

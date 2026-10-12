@@ -39,7 +39,7 @@ subagent writing keywork-app code; the perspective is the point.
 - Strict TypeScript everywhere; no `any` without a written reason in the PR description.
 - Every behavior lands with tests; acceptance criteria in `docs/plan.md` are the bar.
 - Exact-pinned dependencies only (`scripts/check-pins.ts` enforces).
-- One theme system: keywork flavors. No hard-coded colors anywhere; every color is a token.
+- One theme system: keywork themes. No hard-coded colors anywhere; every color is a token.
 - Every new config option needs a `.describe()` justification in the schema (keywork D9).
 - The wire is the contract: `docs/events.md` and `/doc` in keywork. The protocol package
   mirrors them and `scripts/check-contract.ts` fails when a real `keywork serve` disagrees.

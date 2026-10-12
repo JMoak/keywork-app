@@ -104,6 +104,8 @@ const host = {
   notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
   onNotificationActivated: subscribe(hostChannels.notificationActivated),
   setPendingAsks: (count: number) => ipcRenderer.invoke(hostChannels.setPendingAsks, count),
+  saveAs: (suggestedName: string, text: string) =>
+    ipcRenderer.invoke(hostChannels.saveAs, { suggestedName, text }),
   onServerLost: subscribe(hostChannels.serverLost),
   pty,
   onUpdateReady: subscribe(hostChannels.updateReady),

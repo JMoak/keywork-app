@@ -55,7 +55,7 @@ function quietClient(): KeyworkClient {
     inject: async () => "started",
     entries: async () => undefined,
     fork: async () => "missing",
-    label: async () => "missing",
+    labelEntry: async () => "missing",
     moveLeaf: async () => "missing",
     changes: async () => "missing",
     ...inertMemoryClient(),
@@ -63,9 +63,15 @@ function quietClient(): KeyworkClient {
     ...emptySurfacesClient(),
     ...inertWorkspaceClient(),
     changedFile: async () => "missing",
-    spill: async () => "missing",
+    removeSession: async () => "missing",
+    listTrash: async () => [],
+    restoreSession: async () => "missing",
+    discardTrashedSession: async () => "missing",
+    purgeTrash: async () => ({ purged: 0 }),
     asks: async () => [],
     answerAsk: async () => "settled" as const,
+    permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
+    revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
   };
 }
 
@@ -163,6 +169,21 @@ describe("keyboard workflows", () => {
     fireEvent.input(palette);
     fireEvent.keyDown(palette, { key: "Enter" });
     await waitFor(() => expect(frames()).toHaveLength(3));
+  });
+
+  it("hands the keys back to the focused pane's composer when the palette closes", async () => {
+    await openWorkspace();
+    const composer = () =>
+      document.querySelector(".kw-frame[data-focused] .kw-composer-input") as HTMLElement;
+    await waitFor(() => expect(document.activeElement).toBe(composer()));
+    press("p", { ctrlKey: true, shiftKey: true });
+    const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
+    expect(document.activeElement).toBe(palette);
+    palette.value = "/thinking";
+    fireEvent.input(palette);
+    fireEvent.keyDown(palette, { key: "Enter" });
+    await waitFor(() => expect(screen.queryByLabelText("palette")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(composer()));
   });
 });
 

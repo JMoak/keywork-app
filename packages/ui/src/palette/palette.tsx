@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import type { Keymap } from "../keys/keymap.ts";
-import type { CommandRegistry, CommandSpec } from "./commands.ts";
+import { type CommandRegistry, type CommandSpec, fuzzyMatches } from "./commands.ts";
 import "./palette.css";
 
 export type PaletteMode = "go" | "commands";
@@ -11,10 +11,31 @@ export function paletteModeOf(query: string): PaletteMode {
   return query.startsWith("/") || query.startsWith(">") ? "commands" : "go";
 }
 
+export function searchTextOf(query: string): string {
+  return paletteModeOf(query) === "commands" ? query.slice(1) : query;
+}
+
+export interface MatchRun {
+  readonly text: string;
+  readonly matched: boolean;
+}
+
+export function matchRuns(text: string, query: string): MatchRun[] {
+  const hits = new Set(fuzzyMatches(query, text) ?? []);
+  const runs: MatchRun[] = [];
+  Array.from(text).forEach((character, index) => {
+    const matched = hits.has(index);
+    const last = runs.at(-1);
+    if (last?.matched === matched) runs[runs.length - 1] = { text: last.text + character, matched };
+    else runs.push({ text: character, matched });
+  });
+  return runs;
+}
+
 export function paletteEntries(registry: CommandRegistry, query: string): CommandSpec[] {
   const commandMode = paletteModeOf(query) === "commands";
   return registry
-    .search(commandMode ? query.slice(1) : query)
+    .search(searchTextOf(query))
     .filter((command) => (command.jump === true) !== commandMode)
     .slice(0, paletteRowLimit);
 }
@@ -69,20 +90,29 @@ export function Palette(props: PaletteProps) {
         role="dialog"
         aria-label={mode() === "commands" ? "commands" : "go to"}
       >
-        <input
-          ref={input}
-          class="kw-palette-input"
-          aria-label="palette"
-          value={query()}
-          placeholder="type to jump · / for commands"
-          onInput={(event) => retype(event.currentTarget.value)}
-          onKeyDown={onKeyDown}
-        />
+        <div class="kw-palette-ask">
+          <span class="kw-palette-mode" aria-hidden="true">
+            {mode() === "commands" ? "run" : "go"}
+          </span>
+          <input
+            ref={input}
+            class="kw-palette-input"
+            aria-label="palette"
+            value={query()}
+            placeholder="type to jump · / for commands"
+            onInput={(event) => retype(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+          />
+        </div>
         <Show
           when={entries().length > 0}
           fallback={<p class="kw-palette-empty">nothing matches · esc closes</p>}
         >
-          <div class="kw-palette-rows" role="listbox">
+          <div
+            class="kw-palette-rows"
+            role="listbox"
+            data-searching={searchTextOf(query()).trim() === "" ? undefined : ""}
+          >
             <For each={entries()}>
               {(entry, at) => (
                 <div
@@ -95,9 +125,11 @@ export function Palette(props: PaletteProps) {
                   onClick={() => run(at())}
                   onKeyDown={onKeyDown}
                 >
-                  <span class="kw-palette-name">{entry.label ?? entry.name}</span>
+                  <span class="kw-palette-name">
+                    <MatchedName text={entry.label ?? entry.name} query={searchTextOf(query())} />
+                  </span>
                   <span class="kw-palette-description">{entry.description}</span>
-                  <span class="kw-palette-shortcut">{entry.shortcut ?? ""}</span>
+                  <kbd class="kw-palette-shortcut">{entry.shortcut ?? ""}</kbd>
                 </div>
               )}
             </For>
@@ -170,5 +202,17 @@ export function HelpOverlay(props: HelpOverlayProps) {
         </dl>
       </div>
     </div>
+  );
+}
+
+function MatchedName(props: { text: string; query: string }) {
+  return (
+    <For each={matchRuns(props.text, props.query)}>
+      {(run) => (
+        <span class="kw-palette-run" data-match={run.matched ? "" : undefined}>
+          {run.text}
+        </span>
+      )}
+    </For>
   );
 }

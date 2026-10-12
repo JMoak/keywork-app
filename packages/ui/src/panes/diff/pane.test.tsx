@@ -17,14 +17,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import {
-  availabilityLine,
-  type DiffSpec,
-  diffPane,
-  fileNote,
-  noBaselineLine,
-  untrustedLine,
-} from "./index.tsx";
+import { availabilityLine, type DiffSpec, diffPane, fileNote, noBaselineLine } from "./index.tsx";
 
 const fixture = (name: string): string =>
   readFileSync(join(process.cwd(), "packages/client/src/fixtures", name), "utf8");
@@ -53,7 +46,6 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
   const changes =
     seams.changes ??
     changesSnapshot(emptyChangesState, {
-      trusted: true,
       baseline: "session start",
       files: [
         { path: "src/a.ts", added: 3, deleted: 1, turn: 2 },
@@ -173,19 +165,16 @@ describe("the changes pane, level one", () => {
     expect(screen.getByText("notes.txt")).toBeTruthy();
   });
 
-  it("says the workspace is untrusted and names the next action", () => {
+  it("says there is no baseline and names why", () => {
     const recorded = recording();
-    const untrusted = changesSnapshot(emptyChangesState, { trusted: false, files: [] });
+    const unanchored = changesSnapshot(emptyChangesState, "no-baseline");
     mount(
       { kind: "diff", sessionId: "s1" },
       recorded,
-      shellSeams(recorded, { changes: untrusted }),
+      shellSeams(recorded, { changes: unanchored }),
     );
-    expect(screen.getByText(untrustedLine)).toBeTruthy();
-    expect(availabilityLine(untrusted)).toBe(untrustedLine);
-    expect(availabilityLine(changesSnapshot(emptyChangesState, "no-baseline"))).toBe(
-      noBaselineLine,
-    );
+    expect(screen.getByText(noBaselineLine)).toBeTruthy();
+    expect(availabilityLine(unanchored)).toBe(noBaselineLine);
     expect(document.querySelectorAll(".kw-diff-file-row")).toHaveLength(0);
   });
 
@@ -197,7 +186,6 @@ describe("the changes pane, level one", () => {
     ).toBeTruthy();
     cleanup();
     const nothing = changesSnapshot(emptyChangesState, {
-      trusted: true,
       baseline: "session start",
       files: [],
     });
@@ -232,7 +220,6 @@ describe("the changes pane, level two", () => {
       recorded,
       shellSeams(recorded, {
         file: {
-          trusted: true,
           path: "big.bin",
           before: null,
           after: null,
@@ -246,7 +233,6 @@ describe("the changes pane, level two", () => {
     expect(document.querySelectorAll(".cm-editor")).toHaveLength(0);
     expect(
       fileNote({
-        trusted: true,
         path: "x",
         before: "a",
         after: "b",
@@ -254,12 +240,19 @@ describe("the changes pane, level two", () => {
         truncated: true,
       }),
     ).toBe("deleted · truncated at 1 MiB per side");
-    expect(
-      fileNote({ trusted: true, path: "x", before: "a", after: "b", truncated: false }),
-    ).toBeUndefined();
-    expect(
-      fileNote({ trusted: false, path: "x", before: null, after: null, truncated: false }),
-    ).toBe(untrustedLine);
+    expect(fileNote({ path: "x", before: "a", after: "b", truncated: false })).toBeUndefined();
+  });
+
+  it("says a path outside the workspace is refused rather than showing an empty diff", async () => {
+    const recorded = recording();
+    mount(
+      { kind: "diff", sessionId: "s1", path: "../secrets.txt" },
+      recorded,
+      shellSeams(recorded, { file: "outside-scope" }),
+    );
+    await settle();
+    expect(screen.getByText("this path is outside the workspace")).toBeTruthy();
+    expect(document.querySelectorAll(".cm-editor")).toHaveLength(0);
   });
 
   it("offers the editor deep link only when the shell provides the seam", async () => {

@@ -25,6 +25,7 @@ export interface Scene {
   readonly homes: ReadonlyMap<PaneId, DropZone>;
   readonly seams: readonly Seam[];
   readonly regions: Regions;
+  readonly seamReach?: number;
 }
 
 export interface Point {
@@ -49,7 +50,10 @@ export function sameSeam(one: Seam | undefined, other: Seam | undefined): boolea
 }
 
 export function hitAt(scene: Scene, point: Point): Hit | undefined {
-  const seam = scene.seams.find((candidate) => contains(seamZoneRect(candidate), point.x, point.y));
+  const reach = scene.seamReach ?? seamReach;
+  const seam = scene.seams.find((candidate) =>
+    contains(seamZoneRect(candidate, reach), point.x, point.y),
+  );
   if (seam !== undefined) return { kind: "seam", seam };
   for (const [id, rect] of scene.rects) {
     if (contains(rect, point.x, point.y)) return { kind: "pane", id };
@@ -57,11 +61,11 @@ export function hitAt(scene: Scene, point: Point): Hit | undefined {
   return undefined;
 }
 
-export function seamZoneRect(seam: Seam): Rect {
-  const reach = seamReach * 2;
+export function seamZoneRect(seam: Seam, reach: number = seamReach): Rect {
+  const span = reach * 2;
   return seam.axis === "x"
-    ? { x: seam.at - seamReach, y: seam.start, width: reach, height: seam.end - seam.start }
-    : { x: seam.start, y: seam.at - seamReach, width: seam.end - seam.start, height: reach };
+    ? { x: seam.at - reach, y: seam.start, width: span, height: seam.end - seam.start }
+    : { x: seam.start, y: seam.at - reach, width: seam.end - seam.start, height: span };
 }
 
 export function ratioAlong(seam: Seam, point: Point): number {

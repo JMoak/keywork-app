@@ -28,8 +28,8 @@ describe("the event vocabulary", () => {
     expect([...serverEventTypes].sort()).toEqual([...server].sort());
   });
 
-  it("has nineteen engine types with no duplicates and the server types beside them", () => {
-    expect(new Set(engineEventTypes).size).toBe(19);
+  it("has seventeen engine types with no duplicates and the server types beside them", () => {
+    expect(new Set(engineEventTypes).size).toBe(17);
     expect(new Set(eventTypes).size).toBe(engineEventTypes.length + serverEventTypes.length);
   });
 
@@ -40,7 +40,7 @@ describe("the event vocabulary", () => {
         ts: "t",
         sessionId: "",
         type: "memory.inbox",
-        payload: { count: 1, kinds: { note: 1 } },
+        payload: { count: 1, staged: 1, airlock: 0, proposals: 0, contradictions: 0 },
       }),
     ).toBe(true);
     expect(

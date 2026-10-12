@@ -1,4 +1,9 @@
-import type { MemoryLayer, MemoryNote, MemoryQueryHit } from "@keywork-app/protocol";
+import type {
+  GardenerActivity,
+  MemoryLayer,
+  MemoryNote,
+  MemoryQueryHit,
+} from "@keywork-app/protocol";
 import { For, Match, Show, Switch } from "solid-js";
 import { relativeAge } from "../../chrome/telemetry.ts";
 import { DensityCells, DensityMark } from "./cells.tsx";
@@ -11,12 +16,12 @@ import {
   curingWord,
   provenanceCell,
 } from "./density.ts";
-import type { MemoryRow, MemoryRowKind, MemorySection } from "./rows.ts";
+import type { LayerTally, MemoryRow, MemoryRowKind, MemorySection } from "./rows.ts";
 
 export interface GardenProps {
   sections: readonly MemorySection[];
   cursor: string | undefined;
-  gardener: { state: string; sweptAt?: string | undefined };
+  gardener: GardenerActivity | undefined;
   onSelect(row: MemoryRow): void;
   onOpen(row: MemoryRow): void;
 }
@@ -24,12 +29,16 @@ export interface GardenProps {
 export function Garden(props: GardenProps) {
   return (
     <div class="kw-memory-garden">
-      <p class="kw-memory-gardener">
-        gardener {props.gardener.state}
-        <Show when={props.gardener.sweptAt}>
-          {(sweptAt) => <span> · swept {relativeAge(sweptAt())}</span>}
-        </Show>
-      </p>
+      <Show when={props.gardener}>
+        {(gardener) => (
+          <p class="kw-memory-gardener">
+            gardener {gardener().state}
+            <Show when={gardener().sweptAt}>
+              {(sweptAt) => <span> · swept {relativeAge(sweptAt())}</span>}
+            </Show>
+          </p>
+        )}
+      </Show>
       <For each={props.sections}>
         {(section) => (
           <section class="kw-memory-section" data-section={section.id}>
@@ -69,7 +78,9 @@ function RowBody(props: { row: MemoryRow }) {
       props.row.kind === kind ? (props.row as Extract<MemoryRow, { kind: K }>) : undefined;
   return (
     <Switch>
-      <Match when={rowAs("layer")()}>{(row) => <LayerRow layer={row().layer} />}</Match>
+      <Match when={rowAs("layer")()}>
+        {(row) => <LayerRow layer={row().layer} tally={row().tally} />}
+      </Match>
       <Match when={rowAs("note")()}>{(row) => <NoteRow note={row().note} />}</Match>
       <Match when={rowAs("hit")()}>{(row) => <HitRow hit={row().hit} />}</Match>
       <Match when={rowAs("date")()}>
@@ -83,15 +94,15 @@ function RowBody(props: { row: MemoryRow }) {
   );
 }
 
-function LayerRow(props: { layer: MemoryLayer }) {
+function LayerRow(props: { layer: MemoryLayer; tally: LayerTally }) {
   return (
     <>
       <DensityCells
-        cells={curingRampCells(props.layer.curing)}
-        label={`curing · ${curingReadout(props.layer.curing) || "no notes"}`}
+        cells={curingRampCells(props.tally.curing)}
+        label={`curing · ${curingReadout(props.tally.curing) || "no notes"}`}
       />
       <span class="kw-memory-title">
-        {`${props.layer.notes} ${props.layer.notes === 1 ? "note" : "notes"}`}
+        {`${props.tally.notes} ${props.tally.notes === 1 ? "note" : "notes"}`}
       </span>
       <Show when={props.layer.prompt}>
         {(prompt) => (

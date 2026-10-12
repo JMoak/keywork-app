@@ -55,7 +55,12 @@ export class Keymap {
     this.disarm();
   }
 
-  press(pressed: Chord | readonly Chord[], nowMs: number, activeScope?: string): KeymapResult {
+  press(
+    pressed: Chord | readonly Chord[],
+    nowMs: number,
+    activeScope?: string,
+    typing = false,
+  ): KeymapResult {
     const chords = isChordList(pressed) ? pressed : [pressed];
     const isLeader = chords.some((chord) => chordsEqual(chord, this.table.leader));
     if (this.isPending(nowMs)) {
@@ -67,8 +72,9 @@ export class Keymap {
       this.pendingSince = nowMs;
       return { type: "leader-pending" };
     }
-    const scopedOnly = this.ownsKeyboard(activeScope);
-    const action = firstOf(chords, (chord) => this.findByChord(chord, activeScope, scopedOnly));
+    const chordScope = typing ? undefined : activeScope;
+    const scopedOnly = this.ownsKeyboard(chordScope);
+    const action = firstOf(chords, (chord) => this.findByChord(chord, chordScope, scopedOnly));
     return action === undefined ? { type: "pass" } : { type: "action", action };
   }
 

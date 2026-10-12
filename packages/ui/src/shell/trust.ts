@@ -110,5 +110,5 @@ export function isUntrusted(state: TrustState): boolean {
 }
 
 function changesWorkspace(envelope: BusEnvelope): boolean {
-  return envelope.type === "surface.changed" && envelope.payload.kind === "workspace";
+  return envelope.type === "surface.changed" && envelope.payload.kind === "workspaces";
 }

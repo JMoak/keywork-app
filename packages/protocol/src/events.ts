@@ -1,4 +1,6 @@
 import type { SessionState } from "./controls.ts";
+import type { AskScope, PermissionRule } from "./permissions.ts";
+import type { CompactionEntry } from "./sessions.ts";
 import type { SurfaceKind } from "./workspace.ts";
 
 export const engineEventTypes = [
@@ -17,15 +19,22 @@ export const engineEventTypes = [
   "context.injected",
   "diagnostics.published",
   "shell.reset",
-  "session.tree",
-  "changes.updated",
-  "engine.error",
   "extension.notice",
+  "engine.error",
 ] as const;
 
 export type EngineEventType = (typeof engineEventTypes)[number];
 
-export const serverEventTypes = ["memory.inbox", "surface.changed", "session.state"] as const;
+export const serverEventTypes = [
+  "memory.inbox",
+  "session.state",
+  "surface.changed",
+  "session.tree",
+  "changes.updated",
+  "session.removed",
+  "session.restored",
+  "session.settled",
+] as const;
 
 export type ServerEventType = (typeof serverEventTypes)[number];
 
@@ -36,9 +45,48 @@ export type EventType = EngineEventType | ServerEventType;
 export const processLevelSessionId = "";
 
 export interface ServerPayloads {
-  "memory.inbox": { count: number; kinds: Record<string, number> };
-  "surface.changed": { kind: SurfaceKind };
+  "memory.inbox": InboxTally;
   "session.state": SessionState;
+  "surface.changed": { kind: SurfaceKind };
+  "session.tree": TreeChange;
+  "changes.updated": ChangesUpdate;
+  "session.removed": SessionRemoval;
+  "session.restored": SessionRemoval;
+  "session.settled": SessionSettlement;
+}
+
+export interface InboxTally {
+  count: number;
+  staged: number;
+  airlock: number;
+  proposals: number;
+  contradictions: number;
+}
+
+export type TreeChangeReason = "fork" | "label" | "leaf";
+
+export interface TreeChange {
+  reason: TreeChangeReason;
+  entryId: string | null;
+  forkedTo?: string;
+}
+
+export interface ChangesUpdate {
+  paths: readonly string[];
+  turn?: number;
+}
+
+export interface SessionRemoval {
+  sessionId: string;
+}
+
+export type SettlePhase = "after-turn" | "between-tool-batches" | "requested";
+
+export interface SessionSettlement {
+  phase: SettlePhase;
+  flushed: number;
+  compacted: CompactionEntry | null;
+  notices: readonly string[];
 }
 
 export type EventPayloads = EnginePayloads & ServerPayloads;
@@ -77,10 +125,8 @@ export interface EnginePayloads {
   "context.injected": { injection: ContextInjection };
   "diagnostics.published": { path: string; count: number };
   "shell.reset": Record<never, never>;
-  "session.tree": TreeChange;
-  "changes.updated": { sessionId: string; paths: readonly string[] };
-  "engine.error": { error: { name: string; message: string } };
   "extension.notice": ExtensionNotice;
+  "engine.error": { error: { name: string; message: string } };
 }
 
 export type ExtensionNoticeLevel = "info" | "warn" | "error";
@@ -90,16 +136,6 @@ export interface ExtensionNotice {
   level: ExtensionNoticeLevel;
   message: string;
   detail?: unknown;
-}
-
-export type TreeChangeReason = "fork" | "label" | "leaf" | "entry";
-
-export interface TreeChange {
-  sessionId: string;
-  leafId: string | null;
-  reason: TreeChangeReason;
-  entryId?: string;
-  forkedTo?: string;
 }
 
 export type TurnDelta =
@@ -126,7 +162,13 @@ export type MessagePart =
   | { type: "visible-thinking"; text: string }
   | { type: "redacted-thinking"; [key: string]: unknown }
   | { type: "tool-call"; callId: string; name: string; arguments: Record<string, unknown> }
-  | { type: "tool-result"; callId: string; output: string; isError: boolean };
+  | {
+      type: "tool-result";
+      callId: string;
+      output: string;
+      isError: boolean;
+      spill?: SpillReference;
+    };
 
 export interface Usage {
   inputTokens: number;
@@ -155,20 +197,22 @@ export interface SpillReference {
   elidedTo: number;
 }
 
-export type PermissionGate = "policy" | "default" | "user" | "headless";
+export type PermissionGate = "policy" | "default" | "user" | "headless" | "trusted";
 
 export interface PermissionDecision {
   tool: string;
   callId: string;
   verdict: "granted" | "denied";
   gate: PermissionGate;
+  scope?: AskScope;
 }
 
 export interface PermissionAsk {
   tool: string;
   callId: string;
   arguments: unknown;
-  rule: "policy" | "default";
+  rule: "policy" | "default" | "trusted";
+  rules?: readonly PermissionRule[];
 }
 
 export interface ContextInjection {

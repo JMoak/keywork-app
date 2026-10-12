@@ -1,12 +1,35 @@
 @import "tailwindcss";
-@import "./flavor/keywork-night.css";
+@import "./fonts/fonts.css";
+@import "./theme/keywork-night.css";
 @import "./page/page.css";
 @import "./composer/composer.css";
 
 :root {
+  --kw-cell: 0.5rem;
+  --kw-tempo-quick: 120ms steps(3, jump-end);
+  --kw-tempo-settle: 240ms steps(5, jump-end);
   color-scheme: dark;
   font-family: var(--kw-font-mono);
   font-size: 14px;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  background: var(--kw-background);
+}
+
+:root[data-appearance="light"] {
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --kw-tempo-quick: 0s;
+    --kw-tempo-settle: 0s;
+  }
+}
+
+::selection {
+  color: var(--kw-selection-text, var(--kw-background));
+  background: var(--kw-selection, var(--kw-accent));
 }
 
 html,

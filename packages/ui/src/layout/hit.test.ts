@@ -36,6 +36,15 @@ describe("hitAt over the layout's rects", () => {
     expect(hitAt(scene, { x: -1, y: 10 })).toBeUndefined();
   });
 
+  it("lets a gapped scene widen the reach so the whole gap grabs the seam", () => {
+    const scene = { ...layoutWith(["a", "b"], {}).scene(screen), seamReach: 14 };
+    const seam = scene.seams[0];
+    expect(hitAt(scene, { x: 800 - 14, y: 500 })).toEqual({ kind: "seam", seam });
+    expect(hitAt(scene, { x: 800 + 13, y: 500 })).toEqual({ kind: "seam", seam });
+    expect(hitAt(scene, { x: 800 + 14, y: 500 })).toEqual({ kind: "pane", id: "b" });
+    expect(seam === undefined ? undefined : seamZoneRect(seam, 14).width).toBe(28);
+  });
+
   it("gives every seam a zone that is the line plus the reach either side", () => {
     const scene = layoutWith(["a", "b", "c"], {}).scene(screen);
     for (const seam of scene.seams) {

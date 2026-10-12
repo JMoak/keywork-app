@@ -18,8 +18,6 @@ const diffSpec = z.object({
 
 export type DiffSpec = z.output<typeof diffSpec>;
 
-export const untrustedLine =
-  "trust this folder to follow its changes · run keywork trust in a terminal";
 export const noBaselineLine = "no baseline · checkpoints are off and this isn't a git repository";
 
 export const diffPane = definePane<DiffSpec>({
@@ -93,18 +91,10 @@ export const diffPane = definePane<DiffSpec>({
 });
 
 export function availabilityLine(state: ChangesState): string | undefined {
-  switch (state.availability) {
-    case "untrusted":
-      return untrustedLine;
-    case "no-baseline":
-      return noBaselineLine;
-    default:
-      return undefined;
-  }
+  return state.availability === "no-baseline" ? noBaselineLine : undefined;
 }
 
 export function fileNote(reading: Exclude<ChangedFileReading, string>): string | undefined {
-  if (!reading.trusted) return untrustedLine;
   const notes: string[] = [];
   if (reading.note === "binary") notes.push("binary · no text to show");
   if (reading.note === "new") notes.push("new file");
@@ -187,7 +177,7 @@ function FilesLevel(props: LevelProps) {
       <Show when={availabilityLine(changes())}>
         {(line) => <p class="kw-diff-unavailable">{line()}</p>}
       </Show>
-      <Show when={changes().availability === "trusted" && files().length === 0}>
+      <Show when={changes().availability === "ready" && files().length === 0}>
         <EmptyState line={diffPane.emptyState(props.shell.keys)} />
       </Show>
       <ol class="kw-diff-turns" data-stale={changes().stale ? "" : undefined}>
@@ -242,14 +232,15 @@ function FileLevel(props: LevelProps & { path: string }) {
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId });
   const sides = () => {
     const file = reading();
-    if (file === undefined || typeof file === "string" || !file.trusted) return undefined;
+    if (file === undefined || typeof file === "string") return undefined;
     if (file.before === null && file.after === null) return undefined;
-    return { before: file.before ?? "", after: file.after ?? "" };
+    return { before: file.before ?? "", after: file.after ?? "", path: props.path };
   };
   const problem = (): string | undefined => {
     const file = reading();
     if (file === "missing") return "this session is gone";
     if (file === "no-baseline") return noBaselineLine;
+    if (file === "outside-scope") return "this path is outside the workspace";
     return file === undefined ? undefined : fileNote(file);
   };
 

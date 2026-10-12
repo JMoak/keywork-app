@@ -96,6 +96,54 @@ describe("project", () => {
     expect(settled.running).toEqual({});
   });
 
+  it("times the tool's own run apart from the minute it waited for a human answer", () => {
+    const asked = projectAll(emptyProjection, [
+      at("turn.started", { userText: "run it" }),
+      at("tool.started", { call }),
+      at(
+        "gate.ask",
+        {
+          ask: { tool: "bash", callId: "c1", arguments: call.arguments, rule: "default" },
+        },
+        200,
+      ),
+    ]);
+    const answered = project(
+      asked,
+      at(
+        "gate.permission",
+        {
+          decision: { tool: "bash", callId: "c1", verdict: "granted", gate: "user", scope: "once" },
+        },
+        61_000,
+      ),
+    );
+    expect(runOf(answered, 1)).toMatchObject({ phase: "running", waitedMs: 61_000 });
+    const settled = project(
+      answered,
+      at("tool.finished", { callId: "c1", output: "hi", isError: false }, 800),
+    );
+    expect(runOf(settled, 1)).toMatchObject({ durationMs: 1000, waitedMs: 61_000 });
+    expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · 1.0s · waited 1m · done");
+  });
+
+  it("names no wait when the policy answered without asking", () => {
+    const settled = projectAll(emptyProjection, [
+      at("turn.started", { userText: "run it" }),
+      at("tool.started", { call }),
+      at(
+        "gate.permission",
+        {
+          decision: { tool: "bash", callId: "c1", verdict: "granted", gate: "policy" },
+        },
+        100,
+      ),
+      at("tool.finished", { callId: "c1", output: "hi", isError: false }, 400),
+    ]);
+    expect(runOf(settled, 1)).toMatchObject({ durationMs: 500, waitedMs: undefined });
+    expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · 500ms · done");
+  });
+
   it("marks a headless refusal on the proposed call and keeps it refused when the error result lands", () => {
     const refused = projectAll(emptyProjection, [
       at("turn.started", { userText: "rm it" }),

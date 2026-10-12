@@ -1,9 +1,8 @@
-import type {
-  FileRange,
-  FileReading,
-  FileSlice,
-  SpillReference,
-  SpillRefusal,
+import {
+  type FileRange,
+  type FileReading,
+  type FileSlice,
+  sliceReachesEnd,
 } from "@keywork-app/protocol";
 import { createEffect, createSignal, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { z } from "zod";
@@ -29,14 +28,13 @@ const fileSpec = z.object({
   from: z.number().int().nonnegative().optional(),
   to: z.number().int().nonnegative().optional(),
   atEnd: z.boolean().optional(),
-  spillOf: z.string().optional(),
 });
 
 export type FileSpec = z.output<typeof fileSpec>;
 
 export type TextSlice = Omit<FileSlice, "path">;
 
-export type TextRefusal = Exclude<FileReading, FileSlice> | SpillRefusal;
+export type TextRefusal = Exclude<FileReading, FileSlice>;
 
 export type FileState =
   | { kind: "loading" }
@@ -48,7 +46,7 @@ export const filePane = definePane<FileSpec>({
   kind: "file",
   spec: fileSpec,
   home: "main",
-  title: (spec) => (spec.spillOf === undefined ? spec.path : `spill ${spec.path}`),
+  title: (spec) => spec.path,
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {
@@ -97,39 +95,8 @@ export const filePane = definePane<FileSpec>({
   },
 });
 
-export function spillFileSpec(spill: SpillReference, sessionId: string): FileSpec {
-  return {
-    kind: "file",
-    path: spill.id,
-    from: spill.elidedFrom,
-    to: spill.elidedTo,
-    spillOf: sessionId,
-  };
-}
-
-export function describeRefusal(reading: TextRefusal, spec: FileSpec): string {
-  return spec.spillOf === undefined
-    ? describeFileRefusal(reading, spec.path)
-    : describeSpillRefusal(reading, spec.path);
-}
-
-function describeSpillRefusal(reading: TextRefusal, spillId: string): string {
+export function describeRefusal(reading: TextRefusal, path: string): string {
   switch (reading) {
-    case "missing-session":
-      return "no session has that id";
-    case "binary":
-      return "binary spill · nothing to show as text";
-    case "invalid-range":
-      return "from and to must be whole numbers";
-    default:
-      return `no spill ${spillId} in this session`;
-  }
-}
-
-function describeFileRefusal(reading: TextRefusal, path: string): string {
-  switch (reading) {
-    case "invalid-range":
-    case "missing-session":
     case "missing":
       return `no file at ${path}`;
     case "outside-scope":
@@ -195,15 +162,14 @@ function FileSlot(props: PaneProps<FileSpec>) {
     }
     const numbering = { label: (index: number) => lineLabel(loaded, index) };
     const existing = untrack(mount);
-    const shown = existing ?? mountTextView(holder, loaded.text, numbering);
+    const shown = existing ?? mountTextView(holder, loaded.text, numbering, props.spec.path);
     if (existing === undefined) setMount(shown);
-    else existing.replace(loaded.text, numbering);
+    else existing.replace(loaded.text, numbering, props.spec.path);
     if (landing === "end") shown.scrollTo("end");
   });
   onCleanup(() => mount()?.destroy());
 
   const openInEditor = (): void => {
-    if (props.spec.spillOf !== undefined) return;
     const line = mount()?.lineAtTop();
     const path = props.spec.path;
     setEditorRefusal(undefined);
@@ -219,7 +185,9 @@ function FileSlot(props: PaneProps<FileSpec>) {
       case "file.top":
         return loaded?.from === 0 ? mount()?.scrollTo("top") : void read({});
       case "file.end":
-        return loaded?.eof ? mount()?.scrollTo("end") : void read("tail");
+        return loaded !== undefined && sliceReachesEnd(loaded)
+          ? mount()?.scrollTo("end")
+          : void read("tail");
       case "file.next": {
         const next = loaded === undefined ? undefined : rangeAfter(loaded);
         return next === undefined ? undefined : void read(next);
@@ -243,7 +211,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
         {(loaded) => (
           <div class="kw-file-head">
             <span class="kw-file-facts">{sliceFacts(loaded())}</span>
-            <Show when={!loaded().eof}>
+            <Show when={!sliceReachesEnd(loaded())}>
               <span class="kw-file-more">
                 ] loads more · {props.shell.keys.chord("file.end")} the tail
               </span>
@@ -266,7 +234,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
         <Match when={refusalOf(state())}>
           {(refused) => (
             <p class="kw-file-note" data-level="error">
-              {describeRefusal(refused().reading, refused().spec)}
+              {describeRefusal(refused().reading, refused().spec.path)}
             </p>
           )}
         </Match>
@@ -288,9 +256,7 @@ function readSlice(
   spec: FileSpec,
   range: FileRange,
 ): Promise<TextSlice | TextRefusal> {
-  return spec.spillOf === undefined
-    ? shell.client.file(spec.path, range)
-    : shell.client.spill(spec.spillOf, spec.path, range);
+  return shell.client.file(spec.path, range);
 }
 
 async function tailOf(shell: ShellSeams, spec: FileSpec): Promise<FileRange | undefined> {

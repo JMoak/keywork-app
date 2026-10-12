@@ -3,7 +3,7 @@
 }
 
 .kw-controls {
-  border-top: 1px solid var(--kw-border);
+  background: var(--kw-panel);
   font-family: var(--kw-font-mono);
 }
 
@@ -23,15 +23,14 @@
   flex: 1;
   font: inherit;
   color: var(--kw-text);
-  background: var(--kw-panel);
-  border: 1px solid var(--kw-border);
-  border-radius: 2px;
-  padding: 0.15rem 0.4rem;
+  background: var(--kw-panel-lift);
+  border: none;
+  padding: 0.125rem 0.5ch;
 }
 
 .kw-controls-input:focus {
   outline: none;
-  border-color: var(--kw-border-focus);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
 }
 
 .kw-controls-choices {

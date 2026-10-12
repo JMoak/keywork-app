@@ -33,7 +33,7 @@ export function idleControlsClient(): ControlsClient {
     cost: async () => "missing",
     exportSession: async () => "missing",
     rename: async () => "missing",
-    setPreset: async () => ({
+    applyPreset: async () => ({
       refused: "unavailable",
       detail: "this process has no preset switch",
     }),
@@ -121,7 +121,7 @@ describe("the controls store", () => {
 
   it("learns the preset from any gate.preset and from its own switch", async () => {
     const { store, emit } = storeOver({
-      setPreset: async (name) => ({ from: "open", to: name }),
+      applyPreset: async (name) => ({ from: "open", to: name }),
     });
     expect(store.state.preset).toBeUndefined();
     emit([
@@ -141,7 +141,7 @@ describe("the controls store", () => {
 
   it("keeps the preset where it was when the switch is refused", async () => {
     const { store } = storeOver({
-      setPreset: async () => ({
+      applyPreset: async () => ({
         refused: "needs-confirmation",
         detail: "loosening needs confirmed: true",
       }),
@@ -165,6 +165,7 @@ describe("the controls store", () => {
     await store.undo("s1");
     expect(store.seed("s1")).toEqual({ text: "turn on the lights" });
     await store.redo("s1");
+    expect(store.seed("s1")).toBeUndefined();
     expect(reloads).toEqual(["s1", "s1"]);
   });
 

@@ -45,8 +45,11 @@ export interface FileSlice {
   to: number;
   text: string;
   truncated: boolean;
-  eof: boolean;
   encoding: "utf-8";
+}
+
+export function sliceReachesEnd(slice: Pick<FileSlice, "to" | "bytes">): boolean {
+  return slice.to >= slice.bytes;
 }
 
 export type FileReading = FileSlice | "outside-scope" | "missing" | "too-large" | "binary";
@@ -58,6 +61,7 @@ export const maxFileBytes = 20 * 1024 * 1024;
 export interface TrustGrant {
   trusted: true;
   root: string;
+  vault: string;
   reopens: boolean;
 }
 
@@ -65,4 +69,4 @@ export type TrustRefusal = "untrusted" | "home";
 
 export type TrustOutcome = TrustGrant | { refused: TrustRefusal; message: string };
 
-export type SurfaceKind = "mcp" | "arcs" | "bots" | "workspaces" | "workspace";
+export type SurfaceKind = "mcp" | "arcs" | "bots" | "workspaces";

@@ -1,6 +1,6 @@
 import type { UsageLedger } from "@keywork-app/client";
 import type { ContextReport } from "@keywork-app/protocol";
-import type { DensityLevel } from "../flavor/schema.ts";
+import type { DensityLevel } from "../theme/schema.ts";
 import { formatTokens } from "./format.ts";
 
 export type ContextBasis = "assumed" | "reported";

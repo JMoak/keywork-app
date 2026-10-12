@@ -110,7 +110,7 @@ function BotsList(props: PaneProps<BotsSpec>) {
       setNotice(noWorkingSession);
       return;
     }
-    const outcome = await surfaces().verbs.switchSessionBot(sessionId, name);
+    const outcome = await surfaces().verbs.bindSessionBot(sessionId, name);
     setNotice(
       isSurfaceRefusal(outcome)
         ? outcome.detail

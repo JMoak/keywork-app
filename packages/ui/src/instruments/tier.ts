@@ -1,7 +1,7 @@
-import type { Flavor } from "../flavor/schema.ts";
+import type { Theme } from "../theme/schema.ts";
 import type { GaugeStyle } from "./context.ts";
 
-export type InstrumentTier = Flavor["instruments"];
+export type InstrumentTier = Theme["instruments"];
 
 export function gaugeStyleFor(tier: InstrumentTier): GaugeStyle {
   return tier === "cockpit" ? "bar" : "steps";

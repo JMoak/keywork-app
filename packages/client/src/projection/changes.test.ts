@@ -29,13 +29,13 @@ describe("the changes reducer over the recorded write turn", () => {
     const updated = stream.filter((envelope) => envelope.type === "changes.updated");
     expect(updated).toHaveLength(1);
     expect(stream.map((envelope) => envelope.type).slice(-3)).toEqual([
-      "session.tree",
-      "memory.inbox",
+      "turn.completed",
+      "session.state",
       "changes.updated",
     ]);
     const state = stream.reduce(changesState, emptyChangesState);
     expect(state).toEqual({
-      availability: "trusted",
+      availability: "ready",
       baseline: undefined,
       files: [{ path: "notes.txt", added: 0, deleted: 0 }],
       stale: true,
@@ -46,7 +46,7 @@ describe("the changes reducer over the recorded write turn", () => {
     const stream = await envelopes("changes");
     const state = changesSnapshot(stream.reduce(changesState, emptyChangesState), await reading());
     expect(state).toEqual({
-      availability: "trusted",
+      availability: "ready",
       baseline: "session start",
       files: [{ path: "notes.txt", added: 2, deleted: 0, turn: 1 }],
       stale: false,
@@ -61,11 +61,7 @@ describe("the changes reducer over the recorded write turn", () => {
     expect(again.stale).toBe(true);
   });
 
-  it("names an untrusted workspace and a missing baseline honestly", () => {
-    expect(changesSnapshot(emptyChangesState, { trusted: false, files: [] })).toMatchObject({
-      availability: "untrusted",
-      files: [],
-    });
+  it("names a missing baseline honestly and forgets a missing session's files", () => {
     expect(changesSnapshot(emptyChangesState, "no-baseline").availability).toBe("no-baseline");
     expect(changesSnapshot(emptyChangesState, "missing")).toMatchObject({
       availability: "unknown",

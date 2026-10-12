@@ -1,9 +1,12 @@
-import { createEffect, createSignal, type JSX, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, type JSX, onCleanup, onMount } from "solid-js";
 import type { ContextLevel } from "../instruments/context.ts";
-import { ContextGauge } from "../instruments/gauge.tsx";
+import { tierOf, type WidthTier } from "../page/tiers.ts";
+import { chromeWeight } from "./root-attributes.ts";
+import { createTileFillStep, type LifecycleState } from "./stamp.ts";
+import { TitleRow } from "./title-row.tsx";
 import "./pane-frame.css";
 
-export type LifecycleState = "idle" | "working" | "needs-you" | "finished-unseen" | "failed";
+export { type LifecycleState, stampGlyph, tileFill, tileFillStepMs } from "./stamp.ts";
 
 export interface PaneFrameProps {
   name: string;
@@ -22,80 +25,48 @@ export interface PaneFrameProps {
 
 export const rampStops = 3;
 
-export const tileFill = ["▌", "▀", "▗", "█"] as const;
-export const tileFillStepMs = 180;
-
-export function stampGlyph(state: LifecycleState, step = 0): string {
-  switch (state) {
-    case "working":
-      return tileFill[step % tileFill.length] ?? "▌";
-    case "needs-you":
-    case "finished-unseen":
-      return "█";
-    case "failed":
-      return "▛";
-    case "idle":
-      return " ";
-  }
-}
-
 export function hueStop(spawnRank: number): number {
   return (Math.max(0, spawnRank) % rampStops) + 1;
 }
 
 export function PaneFrame(props: PaneFrameProps) {
-  const [step, setStep] = createSignal(0);
-  const [drained, setDrained] = createSignal(false);
-  createEffect(() => {
-    if (props.state !== "working" || prefersReducedMotion()) return;
-    const timer = setInterval(() => setStep((at) => at + 1), tileFillStepMs);
-    onCleanup(() => clearInterval(timer));
-  });
-  createEffect(() => {
-    if (props.state !== "finished-unseen") {
-      setDrained(false);
-      return;
-    }
-    if (!props.focused) return;
-    const timer = setTimeout(() => setDrained(true), drainMs);
-    onCleanup(() => clearTimeout(timer));
-  });
-  const shownState = () => (drained() ? "idle" : props.state);
+  const step = createTileFillStep(() => props.state === "working");
+  const shownState = drainedOnReturn(
+    () => props.state,
+    () => props.focused,
+  );
+  const [tier, setTier] = createSignal<WidthTier>("broadsheet");
   let frame: HTMLElement | undefined;
   onMount(() => {
+    if (frame === undefined) return;
     const focus = (): void => props.onFocus?.();
-    frame?.addEventListener("mousedown", focus);
+    frame.addEventListener("mousedown", focus);
     onCleanup(() => frame?.removeEventListener("mousedown", focus));
+    onCleanup(followWidthTier(frame, setTier));
   });
   return (
     <section
       ref={frame}
       class="kw-frame"
+      data-chrome={chromeWeight()}
+      data-tier={tier()}
       data-state={shownState()}
       data-focused={props.focused ? "" : undefined}
       style={{ "--kw-pane-hue": `var(--kw-ramp-${hueStop(props.hueRank ?? props.spawnRank)})` }}
     >
-      <header class="kw-frame-title">
-        <span class="kw-frame-stamp" aria-hidden="true" data-state={shownState()}>
-          {stampGlyph(shownState(), step())}
-        </span>
-        <span class="kw-frame-name" data-state={shownState()}>
-          {props.name}
-        </span>
-        <Show when={props.bot}>{(label) => <span class="kw-frame-bot">{label()}</span>}</Show>
-        <Show when={props.inference}>
-          {(words) => <span class="kw-frame-inference">{words()}</span>}
-        </Show>
-        <Show when={props.context !== undefined || props.telemetry}>
-          <span class="kw-frame-telemetry">
-            <Show when={props.context}>{(level) => <ContextGauge level={level()} />}</Show>
-            <Show when={props.telemetry}>
-              {(text) => <span class="kw-frame-usage">{text()}</span>}
-            </Show>
-          </span>
-        </Show>
-        <Show when={props.modeWord}>{(word) => <span class="kw-frame-mode">{word()}</span>}</Show>
-      </header>
+      <TitleRow
+        name={props.name}
+        state={shownState()}
+        step={step()}
+        focused={props.focused}
+        tier={tier()}
+        weight={chromeWeight()}
+        bot={props.bot}
+        inference={props.inference}
+        modeWord={props.modeWord}
+        telemetry={props.telemetry}
+        context={props.context}
+      />
       <div class="kw-frame-body">{props.children}</div>
     </section>
   );
@@ -103,6 +74,29 @@ export function PaneFrame(props: PaneFrameProps) {
 
 const drainMs = 240;
 
-function prefersReducedMotion(): boolean {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drainedOnReturn(
+  state: () => LifecycleState,
+  focused: () => boolean,
+): () => LifecycleState {
+  const [drained, setDrained] = createSignal(false);
+  createEffect(() => {
+    if (state() !== "finished-unseen") {
+      setDrained(false);
+      return;
+    }
+    if (!focused()) return;
+    const timer = setTimeout(() => setDrained(true), drainMs);
+    onCleanup(() => clearTimeout(timer));
+  });
+  return () => (drained() ? "idle" : state());
+}
+
+function followWidthTier(element: HTMLElement, onTier: (tier: WidthTier) => void): () => void {
+  if (typeof ResizeObserver !== "function") return () => undefined;
+  const observer = new ResizeObserver(([entry]) => {
+    const width = entry?.contentRect.width ?? 0;
+    if (width > 0) onTier(tierOf(width));
+  });
+  observer.observe(element);
+  return () => observer.disconnect();
 }

@@ -35,7 +35,7 @@ async function fixture(name: string): Promise<unknown> {
 async function fixtureServer(): Promise<{ calls: Call[]; fetch: Fetch }> {
   const bodies = Object.fromEntries(
     await Promise.all(
-      ["mcp", "arcs", "bots", "workspaces", "flavors"].map(
+      ["mcp", "arcs", "bots", "workspaces", "themes"].map(
         async (name) => [`/${name}`, await fixture(name)] as const,
       ),
     ),
@@ -64,15 +64,15 @@ describe("the surface routes", () => {
     expect(bots.map((bot) => `${bot.sigil} ${bot.name}`)).toEqual(["◆ reviewer", "✎ scribe"]);
     const workspaces = await client.workspaces();
     expect(workspaces.map((choice) => choice.slug)).toEqual([undefined, "docs", "spike"]);
-    const flavors = await client.flavors();
-    expect(flavors.active).toBe("keywork-night");
-    expect(flavors.placeholders).toEqual(["system"]);
+    const themes = await client.themes();
+    expect(themes.active).toBe("keywork-night");
+    expect(themes.placeholders).toEqual(["system"]);
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
       "GET /mcp",
       "GET /arcs",
       "GET /bots",
       "GET /workspaces",
-      "GET /flavors",
+      "GET /themes",
     ]);
   });
 
@@ -87,7 +87,7 @@ describe("the surface routes", () => {
     expect(await client.mcpServerTools("filesystem")).toEqual(["read", "write"]);
     expect(calls.map((call) => [call.method, call.path, call.body])).toEqual([
       ["POST", "/mcp/filesystem/restart", undefined],
-      ["POST", "/mcp/filesystem/enabled", '{"enabled":false}'],
+      ["POST", "/mcp/filesystem/enabled", '{"on":false}'],
       ["GET", "/mcp/filesystem/tools", undefined],
     ]);
   });
@@ -99,10 +99,9 @@ describe("the surface routes", () => {
       if (call.path.endsWith("/close"))
         return json(200, { kind: "pending", candidates: 2, questions: 1, wedged: 0 });
       if (call.path.endsWith("/abandon")) return json(200, { slug: "arc-3", abandoned: true });
-      return json(200, { sessionId: "s1", arc: call.body?.includes("null") ? null : "arc-3" });
+      return json(200, call.body?.includes("null") ? {} : { arc: "arc-3" });
     });
     const client = keyworkClient(ticket, { fetch });
-    expect(await client.createArc()).toMatchObject({ slug: "arc-3" });
     expect(await client.createArc("named")).toMatchObject({ slug: "arc-3" });
     expect(await client.closeArc("arc-3")).toEqual({
       kind: "pending",
@@ -112,10 +111,9 @@ describe("the surface routes", () => {
     });
     expect(await client.closeArc("arc-3", "ship it")).toMatchObject({ kind: "pending" });
     expect(await client.abandonArc("arc-3")).toBe("abandoned");
-    expect(await client.bindSessionArc("s1", "arc-3")).toEqual({ sessionId: "s1", arc: "arc-3" });
-    expect(await client.bindSessionArc("s1", null)).toEqual({ sessionId: "s1", arc: null });
+    expect(await client.bindSessionArc("s1", "arc-3")).toEqual({ arc: "arc-3" });
+    expect(await client.bindSessionArc("s1", null)).toEqual({});
     expect(calls.map((call) => [call.path, call.body])).toEqual([
-      ["/arcs", "{}"],
       ["/arcs", '{"slug":"named"}'],
       ["/arcs/arc-3/close", "{}"],
       ["/arcs/arc-3/close", '{"direction":"ship it"}'],
@@ -128,7 +126,7 @@ describe("the surface routes", () => {
   it("drives the bot and workspace verbs with the default workspace spelled out", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.path === "/bots") return json(201, { name: "scribe", sigil: "✎", source: "user" });
-      if (call.path === "/sessions/s1/bot") return json(200, { sessionId: "s1", bot: "scribe" });
+      if (call.path === "/sessions/s1/bot") return json(200, { bot: "scribe" });
       if (call.path === "/workspaces") return json(201, { slug: "docs" });
       if (call.path === "/workspaces/use") return json(200, { slug: "docs", reopens: true });
       return json(200, { dir: "packages/ui" });
@@ -137,10 +135,7 @@ describe("the surface routes", () => {
     expect(await client.createBot({ slug: "scribe", scope: "user" })).toMatchObject({
       sigil: "✎",
     });
-    expect(await client.switchSessionBot("s1", "scribe")).toEqual({
-      sessionId: "s1",
-      bot: "scribe",
-    });
+    expect(await client.bindSessionBot("s1", "scribe")).toEqual({ bot: "scribe" });
     expect(await client.createWorkspace("docs")).toEqual({ slug: "docs" });
     expect(await client.useWorkspace("docs")).toEqual({ slug: "docs", reopens: true });
     expect(await client.focusWorkspaceDir(null, "packages/ui")).toEqual({ dir: "packages/ui" });
@@ -149,7 +144,7 @@ describe("the surface routes", () => {
     });
     expect(calls.map((call) => [call.path, call.body])).toEqual([
       ["/bots", '{"slug":"scribe","scope":"user"}'],
-      ["/sessions/s1/bot", '{"slug":"scribe"}'],
+      ["/sessions/s1/bot", '{"name":"scribe"}'],
       ["/workspaces", '{"slug":"docs"}'],
       ["/workspaces/use", '{"slug":"docs"}'],
       ["/workspaces/default/focus", '{"dir":"packages/ui"}'],
@@ -168,18 +163,17 @@ describe("the surface routes", () => {
     const client = keyworkClient(ticket, { fetch });
     const missing = { refused: "missing", detail: "no server has that name" };
     expect(await client.arcs()).toEqual({ refused: "not-ready", detail: notice });
-    expect(await client.createArc()).toEqual({ refused: "not-ready", detail: notice });
+    expect(await client.createArc("arc-9")).toEqual({ refused: "not-ready", detail: notice });
     expect(await client.restartMcpServer("ghost")).toEqual(missing);
     expect(await client.mcpServerTools("ghost")).toEqual(missing);
-    expect(await client.switchSessionBot("nope", "scribe")).toEqual(missing);
-    expect(await client.useWorkspace("nope")).toEqual(missing);
+    expect(await client.bindSessionBot("nope", "scribe")).toEqual(missing);
     expect(await client.focusWorkspaceDir(null, "/etc")).toEqual({
       refused: "invalid",
       detail: "dir is not a directory inside the root",
     });
   });
 
-  it("types each 409 by its route: archived arcs, existing names, a busy session", async () => {
+  it("types each 409 by its route: archived arcs, existing names, a busy session, an unknown or unfit workspace", async () => {
     const { fetch } = recordingFetch(() => json(409, { error: "a turn is running" }));
     const client = keyworkClient(ticket, { fetch });
     const refusals = await Promise.all([
@@ -189,7 +183,9 @@ describe("the surface routes", () => {
       client.createArc("arc-0"),
       client.createBot({ slug: "scribe", scope: "user" }),
       client.createWorkspace("docs"),
-      client.switchSessionBot("s1", "scribe"),
+      client.bindSessionBot("s1", "scribe"),
+      client.useWorkspace("nope"),
+      client.focusWorkspaceDir(null, "README.md"),
     ]);
     expect(refusals.map((refusal) => (isSurfaceRefusal(refusal) ? refusal.refused : "?"))).toEqual([
       "archived",
@@ -199,7 +195,9 @@ describe("the surface routes", () => {
       "exists",
       "exists",
       "busy",
+      "missing",
+      "invalid",
     ]);
-    expect(refusals.at(-1)).toEqual({ refused: "busy", detail: "a turn is running" });
+    expect(refusals.at(-3)).toEqual({ refused: "busy", detail: "a turn is running" });
   });
 });

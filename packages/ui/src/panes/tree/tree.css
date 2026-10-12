@@ -77,9 +77,9 @@
 
 .kw-tree-session[data-cursor] .kw-tree-row,
 .kw-tree-entry[data-cursor] .kw-tree-row {
-  outline: 1px solid var(--kw-border-focus);
-  outline-offset: -1px;
   color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-pane-ink, var(--kw-accent));
 }
 
 .kw-tree-mark {
@@ -120,7 +120,7 @@
 }
 
 .kw-tree-fold {
-  color: var(--kw-density-low);
+  color: var(--kw-density-light);
 }
 .kw-tree-entry[data-active] .kw-tree-fold {
   color: var(--kw-accent);
@@ -146,8 +146,39 @@
   font-family: var(--kw-font-mono);
   color: var(--kw-text);
   background: var(--kw-panel-lift);
-  border: 1px solid var(--kw-border-focus);
-  padding: 0 0.3rem;
+  border: none;
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+  padding: 0 0.5ch;
+}
+
+.kw-tree-trash {
+  border-top: 1px solid var(--kw-border);
+}
+
+.kw-tree-trash-head {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  color: var(--kw-text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.kw-tree-trash-head:hover {
+  color: var(--kw-accent);
+}
+
+.kw-tree-session[data-trashed] .kw-tree-row {
+  color: var(--kw-text-dim);
+}
+
+.kw-tree-quiet {
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  color: var(--kw-text-dim);
 }
 
 @container tree (max-width: 559.98px) {

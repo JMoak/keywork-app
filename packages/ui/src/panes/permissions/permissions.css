@@ -1,0 +1,44 @@
+.kw-perm {
+  overflow: auto;
+}
+
+.kw-perm .kw-perm-grants {
+  flex: none;
+  overflow: visible;
+}
+
+.kw-perm-heading,
+.kw-perm-session-title {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.15rem;
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+
+.kw-perm-session-title {
+  padding-top: 0.15rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-perm-bundle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1.5ch;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+}
+
+.kw-perm-rule {
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+.kw-perm-rule[data-effect="ask"] {
+  color: var(--kw-text-dim);
+}
+
+.kw-perm-quiet {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  color: var(--kw-text-dim);
+}

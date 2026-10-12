@@ -15,6 +15,7 @@ export interface SurfaceOptions {
 
 export interface XtermSurface extends TerminalSurface {
   setTheme(theme: ITheme): void;
+  remeasure(): void;
   fit(): void;
   renderer(): RendererChoice;
 }
@@ -52,6 +53,13 @@ export function xtermSurface(container: HTMLElement, options: SurfaceOptions): X
         .dispose,
     setTheme: (theme) => {
       terminal.options.theme = theme;
+    },
+    remeasure: () => {
+      const size = terminal.options.fontSize ?? options.fontSize;
+      terminal.options.fontSize = size + 1;
+      terminal.options.fontSize = size;
+      terminal.clearTextureAtlas();
+      fit.fit();
     },
     fit: () => fit.fit(),
     renderer: () => renderer,

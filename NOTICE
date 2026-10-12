@@ -2,4 +2,20 @@ keywork-app
 Copyright (c) 2026 Jordan Moak
 
 This file records every piece adapted from third-party sources, with its license.
-Nothing has been adapted yet.
+
+Bundled fonts
+-------------
+
+JetBrains Mono (the mono face, --kw-font-mono)
+  Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+  Licensed under the SIL Open Font License, Version 1.1.
+  Shipped as the npm package @fontsource-variable/jetbrains-mono 5.3.0; the full license
+  text travels with it at node_modules/@fontsource-variable/jetbrains-mono/LICENSE and at
+  https://openfontlicense.org.
+
+Source Serif 4 (the prose face, --kw-font-prose)
+  Copyright 2014-2023 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+  Licensed under the SIL Open Font License, Version 1.1.
+  Shipped as the npm package @fontsource-variable/source-serif-4 5.3.1; the full license
+  text travels with it at node_modules/@fontsource-variable/source-serif-4/LICENSE and at
+  https://openfontlicense.org.

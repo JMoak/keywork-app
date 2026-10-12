@@ -13,6 +13,7 @@
     "status": 400,
     "body": {
       "error": "no model matches mock/gamma",
+      "code": "unknown-model",
       "failure": {
         "code": "unknown-model",
         "message": "no model matches mock/gamma",
@@ -76,7 +77,7 @@
         "inputTokens": 12,
         "outputTokens": 5
       },
-      "basis": "metered by the provider",
+      "modelId": "beta",
       "models": [
         {
           "reference": "mock/alpha",
@@ -91,8 +92,23 @@
             "meteredTurns": 0,
             "unpricedTurns": 1
           }
+        },
+        {
+          "reference": "mock/beta",
+          "turns": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          },
+          "rollup": {
+            "nanos": 0,
+            "pricedTurns": 0,
+            "meteredTurns": 0,
+            "unpricedTurns": 0
+          }
         }
-      ]
+      ],
+      "basis": "no pricing for beta"
     }
   },
   "undo": {
@@ -108,17 +124,15 @@
     }
   },
   "undoAgain": {
-    "status": 409,
+    "status": 404,
     "body": {
-      "error": "already undone · send a prompt to keep it, or redo to bring it back"
+      "error": "nothing to undo"
     }
   },
   "redo": {
-    "status": 200,
+    "status": 404,
     "body": {
-      "restored": true,
-      "undoable": true,
-      "redoable": false
+      "error": "nothing to redo"
     }
   },
   "redoAgain": {
@@ -153,7 +167,7 @@
           "title": "Lights",
           "createdAt": "2026-09-07T12:00:00.000Z",
           "lastActivityAt": "2026-09-07T12:00:00.000Z",
-          "messageCount": 2,
+          "messageCount": 0,
           "model": "mock/beta",
           "thinking": true,
           "effort": "high"

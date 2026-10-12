@@ -6,12 +6,12 @@ import type {
   AirlockTriage,
   AnswerOutcome,
   ApproveOutcome,
-  ArcBinding,
   ArcCloseOutcome,
   ArcSummary,
   ArcsView,
+  AskRefusal,
+  AskScope,
   AskVerdict,
-  BotBinding,
   BotDraft,
   BotEntry,
   BotSummary,
@@ -25,14 +25,17 @@ import type {
   ControlRefusalKind,
   CostReading,
   DiscardOutcome,
+  DiscardTrashedOutcome,
   EffortLevel,
   EffortReading,
+  EntryLabel,
+  EntryRefusal,
   ExportReading,
   ExportRequest,
   FileRange,
   FileReading,
-  FlavorsView,
   FocusedDir,
+  ForkedSession,
   ForkOutcome,
   InjectOutcome,
   LabelOutcome,
@@ -44,26 +47,33 @@ import type {
   MemoryGarden,
   MemoryInbox,
   MemoryLedger,
-  MemoryNoteReading,
+  MemoryNoteDetail,
   MemoryNotes,
   MemoryQuestion,
   ModelReading,
   PendingAsk,
+  PermissionRule,
+  PermissionsView,
   PresetName,
   PresetReading,
   PromptBehavior,
   PromptInjection,
   PromptOutcome,
+  PurgedTrash,
   QuestionChoice,
   RedoReading,
+  RemoveOutcome,
   RenameReading,
   ResolutionFailure,
+  RestoreOutcome,
   RevertReply,
+  RevokeOutcome,
+  SessionBinding,
   SessionDetail,
   SessionEntries,
   SessionSummary,
-  SpillReading,
   SurfaceRefusal,
+  ThemesView,
   ThinkingReading,
   TreeReading,
   TrustOutcome,
@@ -93,11 +103,15 @@ export interface KeyworkClient {
   abort(id: string): Promise<AbortOutcome>;
   entries(id: string): Promise<SessionEntries | undefined>;
   fork(id: string, entryId: string): Promise<ForkOutcome>;
-  label(id: string, entryId: string, label: string | null): Promise<LabelOutcome>;
+  labelEntry(id: string, entryId: string, label: string | null): Promise<LabelOutcome>;
   moveLeaf(id: string, entryId: string | null): Promise<LeafOutcome>;
   changes(id: string): Promise<ChangesReading>;
   changedFile(id: string, path: string): Promise<ChangedFileReading>;
-  spill(sessionId: string, spillId: string, range?: FileRange): Promise<SpillReading>;
+  removeSession(id: string): Promise<RemoveOutcome>;
+  listTrash(): Promise<readonly SessionSummary[]>;
+  restoreSession(id: string): Promise<RestoreOutcome>;
+  discardTrashedSession(id: string): Promise<DiscardTrashedOutcome>;
+  purgeTrash(): Promise<PurgedTrash>;
   setModel(id: string, reference: string): Promise<ModelReading>;
   setThinking(id: string, on: boolean): Promise<ThinkingReading>;
   setEffort(id: string, level: EffortLevel | null): Promise<EffortReading>;
@@ -108,22 +122,24 @@ export interface KeyworkClient {
   cost(id: string): Promise<CostReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
   rename(id: string, title: string): Promise<RenameReading>;
-  setPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
+  applyPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
   asks(): Promise<readonly PendingAsk[]>;
-  answerAsk(callId: string, verdict: AskVerdict): Promise<AnswerOutcome>;
+  answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
+  permissions(): Promise<PermissionsView>;
+  revokeWorkspaceGrant(rule: PermissionRule): Promise<RevokeOutcome>;
   events(options?: EventStreamOptions): AsyncIterable<BusEnvelope>;
   memory(): Promise<MemoryGarden>;
   memoryInbox(): Promise<MemoryInbox>;
   approveStagedItem(id: string): Promise<ApproveOutcome>;
   discardStagedItem(id: string): Promise<DiscardOutcome>;
   memoryNotes(layer?: string): Promise<MemoryNotes | undefined>;
-  memoryNote(name: string, layer?: string): Promise<MemoryNoteReading | undefined>;
+  memoryNote(name: string): Promise<MemoryNoteDetail | undefined>;
   memoryDailyDates(): Promise<MemoryDailyDates>;
   memoryDaily(date: string): Promise<MemoryDaily>;
   memoryLedger(): Promise<MemoryLedger>;
   revertLedgerEntry(id: string): Promise<RevertReply>;
   askMemory(question: MemoryQuestion): Promise<MemoryAnswer>;
-  arcAirlock(slug: string): Promise<AirlockReading | undefined>;
+  airlock(slug: string): Promise<AirlockReading | undefined>;
   triageAirlockCandidate(
     slug: string,
     note: string,
@@ -134,30 +150,30 @@ export interface KeyworkClient {
     title: string,
     choice: QuestionChoice,
   ): Promise<AirlockTriage>;
-  deliverAirlockEligible(slug: string): Promise<AirlockDelivery>;
-  finishArcAirlock(slug: string, force?: boolean): Promise<AirlockFinish>;
+  deliverAirlock(slug: string): Promise<AirlockDelivery>;
+  finishAirlock(slug: string, force?: boolean): Promise<AirlockFinish>;
   workspace(): Promise<WorkspaceView>;
   tree(path: string): Promise<TreeReading>;
   file(path: string, range?: FileRange): Promise<FileReading>;
   trustWorkspace(): Promise<TrustOutcome>;
   mcpServers(): Promise<readonly McpServerStatus[]>;
   restartMcpServer(name: string): Promise<McpServerStatus | SurfaceRefusal>;
-  setMcpServerEnabled(name: string, enabled: boolean): Promise<McpServerStatus | SurfaceRefusal>;
+  setMcpServerEnabled(name: string, on: boolean): Promise<McpServerStatus | SurfaceRefusal>;
   mcpServerTools(name: string): Promise<readonly string[] | SurfaceRefusal>;
   arcs(): Promise<ArcsView | SurfaceRefusal>;
-  createArc(slug?: string): Promise<ArcSummary | SurfaceRefusal>;
+  createArc(slug: string): Promise<ArcSummary | SurfaceRefusal>;
   closeArc(slug: string, direction?: string): Promise<ArcCloseOutcome | SurfaceRefusal>;
   abandonArc(slug: string): Promise<"abandoned" | SurfaceRefusal>;
-  bindSessionArc(id: string, slug: string | null): Promise<ArcBinding | SurfaceRefusal>;
+  bindSessionArc(id: string, slug: string | null): Promise<SessionBinding | SurfaceRefusal>;
   bots(): Promise<readonly BotSummary[]>;
   createBot(draft: BotDraft): Promise<BotEntry | SurfaceRefusal>;
-  switchSessionBot(id: string, slug: string | null): Promise<BotBinding | SurfaceRefusal>;
+  bindSessionBot(id: string, name: string | null): Promise<SessionBinding | SurfaceRefusal>;
   workspaces(): Promise<readonly WorkspaceChoice[]>;
   createWorkspace(slug: string): Promise<{ slug: string } | SurfaceRefusal>;
   useWorkspace(slug: string | null): Promise<WorkspaceUse | SurfaceRefusal>;
   focusWorkspaceDir(slug: string | null, dir: string): Promise<FocusedDir | SurfaceRefusal>;
   unfocusWorkspaceDir(slug: string | null, dir: string): Promise<FocusedDir | SurfaceRefusal>;
-  flavors(): Promise<FlavorsView>;
+  themes(): Promise<ThemesView>;
 }
 
 export interface ServerDocument {
@@ -173,7 +189,6 @@ export interface ServerTicket {
 export interface EventStreamOptions {
   since?: number | undefined;
   session?: string | undefined;
-  onlySession?: boolean | undefined;
   signal?: AbortSignal | undefined;
   onOpen?: (() => void) | undefined;
   onNotice?: ((notice: StreamNotice) => void) | undefined;
@@ -283,23 +298,22 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       const response = await request("POST", `/sessions/${encodeURIComponent(id)}/fork`, {
         entryId,
       });
-      if (response.status === 404) return missingOf(response);
-      return json<SessionSummary>(response);
+      if (response.status === 404) return entryRefusalOf(response);
+      return json<ForkedSession>(response);
     },
-    label: async (id, entryId, label) => {
+    labelEntry: async (id, entryId, label) => {
       const response = await request("POST", `/sessions/${encodeURIComponent(id)}/label`, {
         entryId,
         label,
       });
-      if (response.status === 404) return missingOf(response);
-      await json(response);
-      return "labelled";
+      if (response.status === 404) return entryRefusalOf(response);
+      return json<EntryLabel>(response);
     },
     moveLeaf: async (id, entryId) => {
       const response = await request("POST", `/sessions/${encodeURIComponent(id)}/leaf`, {
         entryId,
       });
-      if (response.status === 404) return missingOf(response);
+      if (response.status === 404) return entryRefusalOf(response);
       if (response.status === 409) return "busy";
       return json<{ leafId: string | null }>(response);
     },
@@ -315,28 +329,35 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
         "GET",
         `/sessions/${encodeURIComponent(id)}/changes/file?${query}`,
       );
+      if (response.status === 403) return "outside-scope";
       if (response.status === 404) return "missing";
       if (response.status === 409) return "no-baseline";
       return json<ChangedFileReading>(response);
     },
-    spill: async (sessionId, spillId, range = {}) => {
-      const path = `/sessions/${encodeURIComponent(sessionId)}/spills/${encodeURIComponent(spillId)}`;
-      const response = await request("GET", `${path}${rangeQuery(range)}`);
-      if (response.status === 400) return "invalid-range";
-      if (response.status === 404) return missingSpillOf(response);
-      if (response.status === 415) return "binary";
-      return json<SpillReading>(response);
-    },
+    ...lifecycleRoutes(request),
     asks: async () => {
       const listed = await json<{ asks: PendingAsk[] }>(await request("GET", "/asks"));
       return listed.asks;
     },
-    answerAsk: async (callId, verdict) => {
-      const response = await request("POST", `/asks/${encodeURIComponent(callId)}`, { verdict });
+    answerAsk: async (callId, verdict, scope) => {
+      const response = await request("POST", `/asks/${encodeURIComponent(callId)}`, {
+        verdict,
+        ...(scope !== undefined && { scope }),
+      });
       if (response.status === 404) return "missing";
       if (response.status === 409) return "already-settled";
+      if (response.status === 400) return askRefusalOf(response);
       await json(response);
       return "settled";
+    },
+    permissions: () => request("GET", "/permissions").then(json<PermissionsView>),
+    revokeWorkspaceGrant: async (rule) => {
+      const response = await request("POST", "/permissions/workspace/revoke", { rule });
+      if (response.status === 400)
+        return { refused: "invalid", detail: await refusalDetail(response) };
+      if (response.status === 404)
+        return { refused: "missing", detail: await refusalDetail(response) };
+      return json<RevokeOutcome>(response);
     },
     ...sessionVerbRoutes(request),
     ...memoryRoutes(request),
@@ -370,7 +391,7 @@ type SessionVerbRoutes = Pick<
   | "cost"
   | "exportSession"
   | "rename"
-  | "setPreset"
+  | "applyPreset"
 >;
 
 function sessionVerbRoutes(request: Request): SessionVerbRoutes {
@@ -387,7 +408,7 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
     setEffort: async (id, level) => answered(await verb(id, "effort", { level })),
     compact: async (id, focus) =>
       answered(await verb(id, "compact", focus === undefined ? {} : { focus })),
-    undo: async (id) => answered(await verb(id, "undo"), undoConflict),
+    undo: async (id) => answered(await verb(id, "undo")),
     redo: async (id) => answered(await verb(id, "redo")),
     context: async (id) => {
       const response = await reading(id, "context");
@@ -402,50 +423,80 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
       return response.status === 200 ? { html: await response.text() } : answered(response);
     },
     rename: async (id, title) => answered(await verb(id, "rename", { title })),
-    setPreset: async (name, confirmed = false) => {
+    applyPreset: async (name, confirmed = false) => {
       const response = await request("POST", "/preset", {
         name,
         ...(confirmed && { confirmed: true }),
       });
-      return (await controlRefusalOf(response, presetConflict)) ?? json(response);
+      return (await controlRefusalOf(response, "needs-confirmation")) ?? json(response);
     },
   };
 }
 
-type ConflictMeaningOf = (detail: string) => ControlRefusalKind;
+type LifecycleRoutes = Pick<
+  KeyworkClient,
+  "removeSession" | "listTrash" | "restoreSession" | "discardTrashedSession" | "purgeTrash"
+>;
 
-const busyConflict: ConflictMeaningOf = () => "busy";
-
-const undoConflict: ConflictMeaningOf = (detail) =>
-  detail.startsWith("already undone") ? "staged" : "busy";
-
-const presetConflict: ConflictMeaningOf = (detail) =>
-  detail.includes("confirmed") ? "needs-confirmation" : "unavailable";
+function lifecycleRoutes(request: Request): LifecycleRoutes {
+  const trashed = (id: string, tail = ""): string => `/trash/${encodeURIComponent(id)}${tail}`;
+  return {
+    removeSession: async (id) => {
+      const response = await request("DELETE", `/sessions/${encodeURIComponent(id)}`);
+      if (response.status === 404) return "missing";
+      if (response.status === 409) return "busy";
+      return json<SessionSummary>(response);
+    },
+    listTrash: async () =>
+      (await json<{ sessions: SessionSummary[] }>(await request("GET", "/trash"))).sessions,
+    restoreSession: async (id) => {
+      const response = await request("POST", trashed(id, "/restore"));
+      return response.status === 404 ? "missing" : json<SessionSummary>(response);
+    },
+    discardTrashedSession: async (id) => {
+      const response = await request("DELETE", trashed(id));
+      if (response.status === 404) return "missing";
+      await json(response);
+      return "discarded";
+    },
+    purgeTrash: () => request("DELETE", "/trash").then(json<PurgedTrash>),
+  };
+}
 
 const missingSessionDetail = "no session has that id";
 
-async function answered<T>(
-  response: Response,
-  conflict: ConflictMeaningOf = busyConflict,
-): Promise<T | ControlRefusal | "missing"> {
+async function answered<T>(response: Response): Promise<T | ControlRefusal | "missing"> {
   if (response.status === 404) {
     const detail = await refusalDetail(response);
     return detail === missingSessionDetail ? "missing" : { refused: "nothing", detail };
   }
-  return (await controlRefusalOf(response, conflict)) ?? json<T>(response);
+  return (await controlRefusalOf(response, "busy")) ?? json<T>(response);
 }
 
 async function controlRefusalOf(
   response: Response,
-  conflict: ConflictMeaningOf,
+  conflict: ControlRefusalKind,
 ): Promise<ControlRefusal | undefined> {
-  if (response.status !== 400 && response.status !== 403 && response.status !== 409) {
-    return undefined;
+  const refused = controlRefusalKindOf(response.status, conflict);
+  return refused === undefined ? undefined : { refused, detail: await refusalDetail(response) };
+}
+
+function controlRefusalKindOf(
+  status: number,
+  conflict: ControlRefusalKind,
+): ControlRefusalKind | undefined {
+  switch (status) {
+    case 400:
+      return "invalid";
+    case 403:
+      return "outside-scope";
+    case 409:
+      return conflict;
+    case 501:
+      return "unavailable";
+    default:
+      return undefined;
   }
-  const detail = await refusalDetail(response);
-  if (response.status === 400) return { refused: "invalid", detail };
-  if (response.status === 403) return { refused: "outside-scope", detail };
-  return { refused: conflict(detail), detail };
 }
 
 async function unresolvedModel(response: Response): Promise<ControlRefusal> {
@@ -459,10 +510,21 @@ async function unresolvedModel(response: Response): Promise<ControlRefusal> {
     : { refused: "unresolved", detail, failure: body.failure };
 }
 
+const askRefusalKinds: ReadonlyMap<string, AskRefusal["refused"]> = new Map([
+  ["write and edit are approved once at a time", "write-once"],
+  ["this call has nothing a grant could remember; approve it once", "nothing-to-remember"],
+]);
+
+async function askRefusalOf(response: Response): Promise<AskRefusal> {
+  const detail = await refusalDetail(response);
+  const refused = askRefusalKinds.get(detail);
+  if (refused === undefined) throw new ServerRefusal(400, detail);
+  return { refused, detail };
+}
+
 function eventsPath(options: EventStreamOptions): string {
   if (options.session === undefined) return "/events";
   const query = new URLSearchParams({ session: options.session });
-  if (options.onlySession === true) query.set("only", "session");
   return `/events?${query}`;
 }
 
@@ -479,12 +541,14 @@ type MemoryRoutes = Pick<
   | "memoryLedger"
   | "revertLedgerEntry"
   | "askMemory"
-  | "arcAirlock"
+  | "airlock"
   | "triageAirlockCandidate"
   | "triageAirlockQuestion"
-  | "deliverAirlockEligible"
-  | "finishArcAirlock"
+  | "deliverAirlock"
+  | "finishAirlock"
 >;
+
+type TrustedNote = (MemoryNoteDetail & { trusted: true }) | { trusted: false };
 
 function memoryRoutes(request: Request): MemoryRoutes {
   const airlock = (slug: string, tail = ""): string =>
@@ -498,8 +562,8 @@ function memoryRoutes(request: Request): MemoryRoutes {
       const response = await request("POST", `/memory/inbox/${encodeURIComponent(id)}/approve`);
       const refusal = writeRefusalOf(response);
       if (refusal !== undefined) return refusal;
-      const approved = await json<{ result: WriteResult | null }>(response);
-      return { kind: "approved", result: approved.result };
+      const approved = await json<WriteResult | Record<string, never>>(response);
+      return { kind: "approved", result: isWriteResult(approved) ? approved : null };
     },
     discardStagedItem: async (id) => {
       const response = await request("POST", `/memory/inbox/${encodeURIComponent(id)}/discard`);
@@ -512,12 +576,11 @@ function memoryRoutes(request: Request): MemoryRoutes {
       const response = await request("GET", layered("/memory/notes", layer));
       return response.status === 404 ? undefined : json<MemoryNotes>(response);
     },
-    memoryNote: async (name, layer) => {
-      const response = await request(
-        "GET",
-        layered(`/memory/notes/${encodeURIComponent(name)}`, layer),
-      );
-      return response.status === 404 ? undefined : json<MemoryNoteReading>(response);
+    memoryNote: async (name) => {
+      const response = await request("GET", `/memory/notes/${encodeURIComponent(name)}`);
+      if (response.status === 404) return undefined;
+      const reading = await json<TrustedNote>(response);
+      return reading.trusted ? reading : undefined;
     },
     memoryDailyDates: () => request("GET", "/memory/daily").then(json<MemoryDailyDates>),
     memoryDaily: (date) =>
@@ -531,7 +594,7 @@ function memoryRoutes(request: Request): MemoryRoutes {
       return { kind: reverted.outcome };
     },
     askMemory: (question) => request("POST", "/memory/ask", question).then(json<MemoryAnswer>),
-    arcAirlock: async (slug) => {
+    airlock: async (slug) => {
       const response = await request("GET", airlock(slug));
       return response.status === 404 ? undefined : json<AirlockReading>(response);
     },
@@ -542,20 +605,24 @@ function memoryRoutes(request: Request): MemoryRoutes {
       ),
     triageAirlockQuestion: (slug, title, choice) =>
       triage(request("POST", airlock(slug, "/questions"), { title, choice }), "no-successor"),
-    deliverAirlockEligible: async (slug) => {
+    deliverAirlock: async (slug) => {
       const response = await request("POST", airlock(slug, "/deliver"));
       const refusal = writeRefusalOf(response);
       if (refusal !== undefined) return refusal;
       const delivery = await json<{ delivered: number }>(response);
       return { kind: "delivered", delivered: delivery.delivered };
     },
-    finishArcAirlock: async (slug, force = false) => {
+    finishAirlock: async (slug, force = false) => {
       const response = await request("POST", airlock(slug, "/finish"), { force });
       const refusal = writeRefusalOf(response);
       if (refusal !== undefined) return refusal;
       return { kind: "finished", outcome: await json(response) };
     },
   };
+}
+
+function isWriteResult(answer: WriteResult | Record<string, never>): answer is WriteResult {
+  return "ledgerId" in answer;
 }
 
 async function triage(
@@ -643,22 +710,9 @@ async function json<T = unknown>(response: Response): Promise<T> {
   throw new ServerRefusal(response.status, await refusalDetail(response));
 }
 
-async function missingOf(response: Response): Promise<"missing" | "unknown-entry"> {
+async function entryRefusalOf(response: Response): Promise<EntryRefusal> {
   const detail = await refusalDetail(response);
-  return detail.includes("entryId") ? "unknown-entry" : "missing";
-}
-
-async function missingSpillOf(response: Response): Promise<"missing-session" | "missing"> {
-  const detail = await refusalDetail(response);
-  return detail === "no session has that id" ? "missing-session" : "missing";
-}
-
-function rangeQuery(range: FileRange): string {
-  const query = new URLSearchParams();
-  if (range.from !== undefined) query.set("from", String(range.from));
-  if (range.to !== undefined) query.set("to", String(range.to));
-  const encoded = query.toString();
-  return encoded === "" ? "" : `?${encoded}`;
+  return detail === missingSessionDetail ? "missing" : "unknown-entry";
 }
 
 async function refusalDetail(response: Response): Promise<string> {
@@ -690,7 +744,10 @@ function workspaceRoutes(request: Request): WorkspaceRoutes {
   return {
     workspace: () => request("GET", "/workspace").then(json<WorkspaceView>),
     tree: async (path) => {
-      const response = await request("GET", `/tree?${new URLSearchParams({ path })}`);
+      const response = await request(
+        "GET",
+        `/tree?${new URLSearchParams({ path, hidden: "true" })}`,
+      );
       if (response.status === 403) return "outside-scope";
       if (response.status === 404) return "missing";
       return json(response);
@@ -730,16 +787,16 @@ type SurfaceRoutes = Pick<
   | "bindSessionArc"
   | "bots"
   | "createBot"
-  | "switchSessionBot"
+  | "bindSessionBot"
   | "workspaces"
   | "createWorkspace"
   | "useWorkspace"
   | "focusWorkspaceDir"
   | "unfocusWorkspaceDir"
-  | "flavors"
+  | "themes"
 >;
 
-type ConflictMeaning = "archived" | "exists" | "busy";
+type ConflictMeaning = SurfaceRefusal["refused"];
 
 function surfaceRoutes(request: Request): SurfaceRoutes {
   const mcp = (name: string, tail: string): string => `/mcp/${encodeURIComponent(name)}${tail}`;
@@ -758,8 +815,8 @@ function surfaceRoutes(request: Request): SurfaceRoutes {
       (await json<{ servers: McpServerStatus[] }>(await request("GET", "/mcp"))).servers,
     restartMcpServer: async (name) =>
       answered<McpServerStatus>(await request("POST", mcp(name, "/restart")), "busy"),
-    setMcpServerEnabled: async (name, enabled) =>
-      answered<McpServerStatus>(await request("POST", mcp(name, "/enabled"), { enabled }), "busy"),
+    setMcpServerEnabled: async (name, on) =>
+      answered<McpServerStatus>(await request("POST", mcp(name, "/enabled"), { on }), "busy"),
     mcpServerTools: async (name) => {
       const response = await request("GET", mcp(name, "/tools"));
       const refusal = await surfaceRefusalOf(response, "busy");
@@ -767,10 +824,7 @@ function surfaceRoutes(request: Request): SurfaceRoutes {
     },
     arcs: async () => answered<ArcsView>(await request("GET", "/arcs"), "archived"),
     createArc: async (slug) =>
-      answered<ArcSummary>(
-        await request("POST", "/arcs", slug === undefined ? {} : { slug }),
-        "exists",
-      ),
+      answered<ArcSummary>(await request("POST", "/arcs", { slug }), "exists"),
     closeArc: async (slug, direction) =>
       answered<ArcCloseOutcome>(
         await request("POST", arc(slug, "/close"), direction === undefined ? {} : { direction }),
@@ -784,23 +838,23 @@ function surfaceRoutes(request: Request): SurfaceRoutes {
       return "abandoned";
     },
     bindSessionArc: async (id, slug) =>
-      answered<ArcBinding>(await request("POST", session(id, "/arc"), { slug }), "archived"),
+      answered<SessionBinding>(await request("POST", session(id, "/arc"), { slug }), "archived"),
     bots: async () => (await json<{ bots: BotSummary[] }>(await request("GET", "/bots"))).bots,
     createBot: async (draft) => answered<BotEntry>(await request("POST", "/bots", draft), "exists"),
-    switchSessionBot: async (id, slug) =>
-      answered<BotBinding>(await request("POST", session(id, "/bot"), { slug }), "busy"),
+    bindSessionBot: async (id, name) =>
+      answered<SessionBinding>(await request("POST", session(id, "/bot"), { name }), "busy"),
     workspaces: async () =>
       (await json<{ workspaces: WorkspaceChoice[] }>(await request("GET", "/workspaces")))
         .workspaces,
     createWorkspace: async (slug) =>
       answered<{ slug: string }>(await request("POST", "/workspaces", { slug }), "exists"),
     useWorkspace: async (slug) =>
-      answered<WorkspaceUse>(await request("POST", "/workspaces/use", { slug }), "busy"),
+      answered<WorkspaceUse>(await request("POST", "/workspaces/use", { slug }), "missing"),
     focusWorkspaceDir: async (slug, dir) =>
-      answered<FocusedDir>(await request("POST", workspace(slug, "/focus"), { dir }), "busy"),
+      answered<FocusedDir>(await request("POST", workspace(slug, "/focus"), { dir }), "invalid"),
     unfocusWorkspaceDir: async (slug, dir) =>
-      answered<FocusedDir>(await request("POST", workspace(slug, "/unfocus"), { dir }), "busy"),
-    flavors: () => request("GET", "/flavors").then(json<FlavorsView>),
+      answered<FocusedDir>(await request("POST", workspace(slug, "/unfocus"), { dir }), "invalid"),
+    themes: () => request("GET", "/themes").then(json<ThemesView>),
   };
 }
 

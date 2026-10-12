@@ -2,15 +2,13 @@ export type Provenance = "user" | "agent" | "untrusted";
 
 export type CuringStage = 0 | 1 | 2 | 3;
 
-export type MemoryLayerKind = "workspace" | "arc";
+export type MemoryLayerKind = "workspace" | "arc" | "user";
 
 export interface MemoryLayer {
   id: string;
   kind: MemoryLayerKind;
   label: string;
   arc?: string;
-  notes: number;
-  curing: Record<CuringStage, number>;
   prompt?: { budget: number; used: number };
 }
 
@@ -43,10 +41,14 @@ export interface NoteRelation {
 
 export interface MemoryNote extends Note {
   layer: string;
-  curing: CuringStage;
+  file: string;
   injected: boolean;
   recalls: number;
-  relations: NoteRelation[];
+  curing: CuringStage;
+}
+
+export interface MemoryNoteDetail extends MemoryNote {
+  relations: readonly NoteRelation[];
 }
 
 export type StagedWriteKind = "note" | "daily" | "moc";
@@ -104,8 +106,6 @@ export type StagedItem = StagedWrite | StagedReview;
 
 export type StagedKind = StagedItem["kind"];
 
-export type InboxItem = StagedItem & { bot?: string };
-
 export type LedgerOp = "create" | "edit" | "approve" | "discard" | "revert";
 
 export interface FileDelta {
@@ -132,6 +132,7 @@ export interface DailyEntry {
   time: string;
   provenance: Provenance;
   text: string;
+  session?: string;
 }
 
 export interface GardenerActivity {
@@ -142,16 +143,16 @@ export interface GardenerActivity {
 export interface MemoryGarden {
   trusted: boolean;
   layers: MemoryLayer[];
-  inbox: InboxItem[];
+  inbox: StagedItem[];
   ledger: readonly LedgerEntry[];
   audit: AuditEntry[];
-  gardener: GardenerActivity;
+  gardener?: GardenerActivity;
   airlocks: AirlockDigest[];
 }
 
 export interface MemoryInbox {
   trusted: boolean;
-  items: InboxItem[];
+  items: StagedItem[];
   count: number;
 }
 
@@ -164,11 +165,6 @@ export interface WriteResult {
 export interface MemoryNotes {
   trusted: boolean;
   notes: MemoryNote[];
-}
-
-export interface MemoryNoteReading {
-  trusted: boolean;
-  note: MemoryNote | null;
 }
 
 export interface MemoryDailyDates {
@@ -243,10 +239,16 @@ export interface AirlockDigest {
   direction?: string;
 }
 
-export interface AirlockReading {
-  trusted: boolean;
-  digest: AirlockDigest | null;
+export interface CloseDecisions {
+  candidates: Record<string, CandidateChoice>;
+  questions: Record<string, QuestionChoice>;
+  successor?: string;
+  direction?: string;
 }
+
+export type DecidedDigest = AirlockDigest & { decisions: CloseDecisions };
+
+export type AirlockReading = DecidedDigest & { trusted: boolean };
 
 export type AirlockFinishOutcome =
   | { kind: "closed"; delivered: number; released: number; notice?: string }
@@ -267,7 +269,7 @@ export type DiscardOutcome = "discarded" | MemoryWriteRefusal;
 export type RevertReply = { kind: "reverted" } | { kind: "needs-rebase" } | MemoryWriteRefusal;
 
 export type AirlockTriage =
-  | { kind: "digest"; digest: AirlockDigest }
+  | { kind: "digest"; digest: DecidedDigest }
   | AirlockRefusal
   | MemoryWriteRefusal;
 

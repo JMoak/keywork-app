@@ -8,6 +8,7 @@ import type { BindingSpec } from "../keys/keymap.ts";
 import type { DockSide, PaneId } from "../layout/index.ts";
 import type { SessionStore } from "../shell/session-store.ts";
 import type { TrustFlow } from "../shell/trust.ts";
+import type { Wardrobe } from "../theme/wardrobe.ts";
 
 export type PaneHome = "main" | DockSide;
 
@@ -105,6 +106,7 @@ export interface ShellSeams {
   readonly client: KeyworkClient;
   readonly feed: ServerFeed;
   readonly trust: TrustFlow;
+  readonly wardrobe?: Wardrobe;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
   openInEditor?(path: string, line: number): Promise<void>;
 }

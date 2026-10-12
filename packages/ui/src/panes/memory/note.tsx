@@ -1,4 +1,4 @@
-import type { LedgerEntry, MemoryNote } from "@keywork-app/protocol";
+import type { LedgerEntry, MemoryNote, MemoryNoteDetail } from "@keywork-app/protocol";
 import { For, Show } from "solid-js";
 import { Markdown } from "../../page/markdown.tsx";
 import { DensityMark } from "./cells.tsx";
@@ -6,7 +6,7 @@ import { curingCell, curingWord, provenanceCell } from "./density.ts";
 import { ledgerSummary } from "./rows.ts";
 
 export interface NoteLensProps {
-  note: MemoryNote | undefined;
+  note: MemoryNoteDetail | undefined;
   loading: boolean;
   history: readonly LedgerEntry[];
 }

@@ -135,13 +135,13 @@
   min-width: 0;
   font: inherit;
   color: var(--kw-text);
-  background: var(--kw-panel);
-  border: 1px solid var(--kw-border);
-  padding: 0.1rem 0.35rem;
+  background: var(--kw-panel-lift);
+  border: none;
+  padding: 0.125rem 0.5ch;
 }
 .kw-ov-draft input:focus {
   outline: none;
-  border-color: var(--kw-border-focus);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
 }
 
 @container frame (max-width: 319.98px) {

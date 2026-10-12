@@ -2,6 +2,7 @@ import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { assumedContextLevel } from "../instruments/context.ts";
 import { hueStop, type LifecycleState, PaneFrame, stampGlyph, tileFill } from "./pane-frame.tsx";
+import { chromeWeights } from "./root-attributes.ts";
 
 afterEach(cleanup);
 
@@ -103,3 +104,48 @@ describe("PaneFrame instruments", () => {
     expect(container.querySelector(".kw-frame-telemetry .kw-gauge")).toBeTruthy();
   });
 });
+
+describe("PaneFrame chrome weights", () => {
+  afterEach(async () => {
+    document.documentElement.removeAttribute("data-chrome");
+    await settled();
+  });
+
+  for (const weight of chromeWeights) {
+    it(`renders the ${weight} weight the root asks for`, async () => {
+      document.documentElement.setAttribute("data-chrome", weight);
+      await settled();
+      const { container } = render(() => (
+        <>
+          <PaneFrame name="focused" state="needs-you" focused spawnRank={0} modeWord="plan">
+            <p>body</p>
+          </PaneFrame>
+          <PaneFrame name="resting" state="finished-unseen" focused={false} spawnRank={1}>
+            <p>body</p>
+          </PaneFrame>
+        </>
+      ));
+      const frames = [...container.querySelectorAll<HTMLElement>(".kw-frame")];
+      expect(frames.map((frame) => frame.dataset.chrome)).toEqual([weight, weight]);
+      expect(container.innerHTML).toMatchSnapshot();
+    });
+  }
+
+  it("follows a weight change without remounting", async () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused spawnRank={0}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.dataset.chrome).toBe("seams");
+    document.documentElement.setAttribute("data-chrome", "borderless");
+    await settled();
+    expect(frame.dataset.chrome).toBe("borderless");
+    expect(frame.querySelector(".kw-frame-lead")?.textContent).toBe("▎");
+  });
+});
+
+function settled(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

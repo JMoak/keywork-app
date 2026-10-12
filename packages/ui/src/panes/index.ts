@@ -7,8 +7,10 @@ import { diffPane } from "./diff/index.tsx";
 import { filePane } from "./file/index.tsx";
 import { mcpPane } from "./mcp/index.tsx";
 import { memoryPane } from "./memory/index.tsx";
+import { permissionsPane } from "./permissions/index.tsx";
 import type { PaneDefinition } from "./registry.ts";
 import { terminalPane } from "./terminal/index.tsx";
+import { themesPane } from "./themes/index.tsx";
 import { treePane } from "./tree/index.tsx";
 import { workspacesPane } from "./workspaces/index.tsx";
 
@@ -24,6 +26,8 @@ export const paneDefinitions = [
   workspacesPane,
   browserPane,
   filePane,
+  themesPane,
+  permissionsPane,
 ] as const;
 
 export type PaneSpec = SpecOf<(typeof paneDefinitions)[number]>;

@@ -92,6 +92,11 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       for (const entry of open.values()) entry.pendingAsks = count;
       document.title = count === 0 ? "keywork" : `(${count}) keywork`;
     },
+    saveAs: async () => ({
+      saved: false,
+      refused: "unavailable",
+      detail: "the browser host has no save dialog",
+    }),
     serverFetch: async (_workspace, path, init): Promise<ServerResponseHead> => {
       if (server === undefined) throw new Error("no server");
       const controller = new AbortController();

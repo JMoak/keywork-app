@@ -3,8 +3,7 @@
   "bytes": 68,
   "from": 34,
   "to": 60,
-  "truncated": false,
-  "eof": false,
   "text": "xport const farewell = \"go",
+  "truncated": false,
   "encoding": "utf-8"
 }

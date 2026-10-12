@@ -2,9 +2,9 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { graphemeCorpus } from "../packages/ui/src/composer/grapheme-corpus.ts";
-import { auditFlavor } from "../packages/ui/src/flavor/contrast-audit.ts";
-import { gallery } from "../packages/ui/src/flavor/flavors.ts";
-import type { Flavor } from "../packages/ui/src/flavor/schema.ts";
+import { auditTheme } from "../packages/ui/src/theme/contrast-audit.ts";
+import type { Theme } from "../packages/ui/src/theme/schema.ts";
+import { gallery } from "../packages/ui/src/theme/themes.ts";
 import { repoRoot, reportViolations } from "./lib/repo-files.ts";
 import {
   coverageGaps,
@@ -24,13 +24,16 @@ export interface TextureVerdict {
 export function judgeTextures(
   ratchets: Ratchets,
   committed: Ratchets | undefined,
-  flavors: readonly Flavor[],
+  themes: readonly Theme[],
 ): TextureVerdict {
-  const audits = flavors.map(auditFlavor);
+  const audits = themes.map(auditTheme);
   const measured = {
     "T1.graphemeCorpusSamples": graphemeCorpus.length,
     ...Object.fromEntries(
-      audits.map((audit) => [`T6.minMarginLc.${audit.flavor}`, audit.minMarginLc]),
+      audits.flatMap((audit) => [
+        [`T6.minMarginLc.${audit.theme}`, audit.minMarginLc],
+        [`T6.sectionMarginLc.${audit.theme}`, audit.sectionMarginLc],
+      ]),
     ),
   };
   return {
@@ -38,19 +41,19 @@ export function judgeTextures(
       ...coverageGaps(ratchets),
       ...(committed === undefined ? [] : loosenings(ratchets, committed)),
       ...audits.flatMap((audit) =>
-        audit.failures.map((failure) => `T6 ${audit.flavor}: ${failure}`),
+        audit.failures.map((failure) => `T6 ${audit.theme}: ${failure}`),
       ),
-      ...lightAndDark(flavors),
+      ...lightAndDark(themes),
       ...regressions(ratchets, measured),
     ],
     hints: tightenable(ratchets, measured),
   };
 }
 
-function lightAndDark(flavors: readonly Flavor[]): string[] {
+function lightAndDark(themes: readonly Theme[]): string[] {
   return (["light", "dark"] as const)
-    .filter((appearance) => !flavors.some((flavor) => flavor.appearance === appearance))
-    .map((appearance) => `T6: the gallery ships no ${appearance} flavor`);
+    .filter((appearance) => !themes.some((theme) => theme.appearance === appearance))
+    .map((appearance) => `T6: the gallery ships no ${appearance} theme`);
 }
 
 async function recordedRatchets(): Promise<Ratchets> {
@@ -78,7 +81,7 @@ if (import.meta.main) {
     {
       check: "check:textures",
       heading: `Texture ratchets regressed (${ratchetsFile}, docs/textures.md):`,
-      scanned: `${gallery.length} flavors, ${graphemeCorpus.length} grapheme samples, ${committed === undefined ? "no committed ratchets yet" : "held against HEAD"}`,
+      scanned: `${gallery.length} themes, ${graphemeCorpus.length} grapheme samples, ${committed === undefined ? "no committed ratchets yet" : "held against HEAD"}`,
     },
     verdict.violations,
   );

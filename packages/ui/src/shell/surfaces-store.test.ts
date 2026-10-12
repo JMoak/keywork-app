@@ -23,7 +23,7 @@ export const surfaceFixtures = {
   workspaces: fixture<{ workspaces: Awaited<ReturnType<SurfacesClient["workspaces"]>> }>(
     "workspaces",
   ).workspaces,
-  flavors: fixture<Awaited<ReturnType<SurfacesClient["flavors"]>>>("flavors"),
+  themes: fixture<Awaited<ReturnType<SurfacesClient["themes"]>>>("themes"),
 };
 
 export function fixtureSurfacesClient(
@@ -49,7 +49,7 @@ export function fixtureSurfacesClient(
       "workspaces",
       overrides.workspaces ?? (async () => surfaceFixtures.workspaces),
     ),
-    flavors: counted("flavors", overrides.flavors ?? (async () => surfaceFixtures.flavors)),
+    themes: counted("themes", overrides.themes ?? (async () => surfaceFixtures.themes)),
   };
 }
 
@@ -60,7 +60,7 @@ export function emptySurfacesClient(): SurfacesClient {
     arcs: async () => ({ arcs: [], ordinals: {} }),
     bots: async () => [],
     workspaces: async () => [],
-    flavors: async () => ({ flavors: [], active: "keywork-night", placeholders: ["system"] }),
+    themes: async () => ({ themes: [], active: "keywork-night", placeholders: ["system"] }),
     restartMcpServer: async () => missing,
     setMcpServerEnabled: async () => missing,
     mcpServerTools: async () => missing,
@@ -69,7 +69,7 @@ export function emptySurfacesClient(): SurfacesClient {
     abandonArc: async () => missing,
     bindSessionArc: async () => missing,
     createBot: async () => missing,
-    switchSessionBot: async () => missing,
+    bindSessionBot: async () => missing,
     createWorkspace: async () => missing,
     useWorkspace: async () => missing,
     focusWorkspaceDir: async () => missing,
@@ -139,22 +139,19 @@ describe("the surfaces store", () => {
     expect(store.arcOrdinal(undefined)).toBeUndefined();
     expect(store.bot("reviewer")?.sigil).toBe("◆");
     expect(store.state.workspaces.filter((choice) => choice.current)).toHaveLength(1);
-    expect(store.state.flavors.map((flavor) => flavor.name)).toEqual([
-      "keywork-night",
-      "closet-mist",
-    ]);
-    expect(store.state.activeFlavor).toBe("keywork-night");
+    expect(store.state.themes.map((theme) => theme.name)).toEqual(["keywork-night", "closet-mist"]);
+    expect(store.state.activeTheme).toBe("keywork-night");
     expect(store.state.loaded).toEqual({
       mcp: true,
       arcs: true,
       bots: true,
       workspaces: true,
-      flavors: true,
+      themes: true,
     });
     expect(store.state.notices).toEqual({});
   });
 
-  it("refetches exactly the surface a surface.changed names, and both trust-bound ones for workspace", async () => {
+  it("refetches exactly the surface a surface.changed names, and the trust-bound ones beside the workspaces", async () => {
     const client = fixtureSurfacesClient();
     const feed = fakeFeed();
     const store = inRoot(() => createSurfacesStore(client, feed.feed));
@@ -164,10 +161,10 @@ describe("the surfaces store", () => {
     await settle();
     expect(client.calls).toEqual(["mcpServers"]);
     client.calls.splice(0);
-    feed.emit("workspace");
+    feed.emit("workspaces");
     await settle();
-    expect(client.calls.sort()).toEqual(["arcs", "bots"]);
-    expect(surfacesOfKind("workspaces")).toEqual(["workspaces"]);
+    expect(client.calls.sort()).toEqual(["arcs", "bots", "workspaces"]);
+    expect(surfacesOfKind("arcs")).toEqual(["arcs"]);
   });
 
   it("tells the session store when arc or bot bindings moved, since summaries carry both", async () => {
@@ -201,7 +198,7 @@ describe("the surfaces store", () => {
     expect(store.state.notices.arcs).toBe(notice);
     expect(store.state.loaded.arcs).toBe(true);
     ready = true;
-    await store.refetch("workspace");
+    await store.refetch("workspaces");
     expect(store.state.arcs).toHaveLength(3);
     expect(store.state.notices.arcs).toBeUndefined();
   });
@@ -231,7 +228,7 @@ describe("the surfaces store across a reopened server", () => {
     feed.connect();
     await settle();
     expect([...client.calls].sort()).toEqual(
-      ["arcs", "bots", "flavors", "mcpServers", "workspaces"].sort(),
+      ["arcs", "bots", "mcpServers", "themes", "workspaces"].sort(),
     );
     store.dispose();
   });

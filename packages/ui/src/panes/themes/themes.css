@@ -1,0 +1,82 @@
+.kw-themes-button {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  grid-template-areas:
+    "mark name source"
+    ". strip strip"
+    ". taste taste"
+    ". pair pair"
+    ". refusal refusal";
+  column-gap: 0.35rem;
+  row-gap: 0.2rem;
+  width: 100%;
+  padding: 0.4rem 0.75rem 0.45rem 0.5rem;
+  font: inherit;
+  text-align: left;
+  color: var(--kw-text-mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.kw-themes-row[data-cursor] .kw-themes-button {
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  box-shadow: inset 2px 0 0 var(--kw-border-focus);
+}
+
+.kw-themes-mark {
+  grid-area: mark;
+  text-align: center;
+  color: var(--kw-density-full);
+}
+
+.kw-themes-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-themes-row[data-worn] .kw-themes-name {
+  color: var(--kw-text);
+}
+
+.kw-themes-source {
+  grid-area: source;
+  color: var(--kw-text-dim);
+}
+
+.kw-themes-strip {
+  grid-area: strip;
+  display: flex;
+  height: 0.7rem;
+  overflow: hidden;
+  border: 1px solid var(--kw-border);
+}
+
+.kw-themes-swatch {
+  flex: 1;
+  min-width: 0.4rem;
+}
+
+.kw-themes-taste,
+.kw-themes-pair {
+  color: var(--kw-text-dim);
+  font-size: 0.9em;
+}
+
+.kw-themes-taste {
+  grid-area: taste;
+}
+
+.kw-themes-pair {
+  grid-area: pair;
+}
+
+.kw-themes-refusal {
+  grid-area: refusal;
+  color: var(--kw-error);
+  font-size: 0.9em;
+  white-space: normal;
+}

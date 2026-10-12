@@ -6,7 +6,7 @@ import {
   type PresetName,
   type PromptBehavior,
 } from "@keywork-app/protocol";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { z } from "zod";
 import { FirstRun } from "../../chrome/first-run.tsx";
 import { arcHueRank, botTitle } from "../../chrome/identity.ts";
@@ -14,11 +14,13 @@ import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { sessionName, telemetry } from "../../chrome/telemetry.ts";
 import { Composer } from "../../composer/composer.tsx";
 import { contextLevelOf, contextLevelOfReport } from "../../instruments/context.ts";
-import { costReadout, reportedUsageLine } from "../../instruments/cost-report.ts";
+import { costReadout } from "../../instruments/cost-report.ts";
+import { askChordsOf } from "../../page/ask-card.tsx";
 import { ConversationPane } from "../../page/pane.tsx";
 import { EmptyState } from "../empty-state.tsx";
-import { spillFileSpec } from "../file/index.tsx";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
+import { restoreNotice } from "../tree/trash.ts";
 import { type ControlAsk, ControlRow } from "./control-row.tsx";
 import {
   compactNotice,
@@ -26,15 +28,20 @@ import {
   exportedNotice,
   inferenceWords,
   isSettled,
+  leftInTrashNotice,
   leftUnchanged,
   looseningQuestion,
   nextEffort,
   type PresetDirection,
+  pageNameFor,
   presetNotice,
   presetStep,
+  promptRehomedNotice,
   redoneNotice,
   refusalNotice,
+  sessionGoneNotice,
   thinkingNotice,
+  trashedQuestion,
   undoneNotice,
   unsteppableNotice,
 } from "./controls.ts";
@@ -95,8 +102,11 @@ export const conversationPane = definePane<ConversationSpec>({
     },
     "conversation.export": {
       chords: "leader shift+e",
-      help: "export the session",
-      command: { name: "export", description: "copy this session as a self-contained page" },
+      help: "save and copy the session",
+      command: {
+        name: "export",
+        description: "save this session as a self-contained page, and copy it",
+      },
     },
     "conversation.export-file": {
       chords: "none",
@@ -152,8 +162,7 @@ export const conversationPane = definePane<ConversationSpec>({
     const summary = shell.store.summary(spec.sessionId);
     const readings = shell.store.controls.readings(spec.sessionId);
     return {
-      telemetry:
-        readings.cost === undefined ? telemetry(projection) : reportedUsageLine(readings.cost),
+      telemetry: telemetry(projection, readings.cost),
       context:
         readings.context === undefined
           ? contextLevelOf(projection.usage)
@@ -191,19 +200,41 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   const say = (...said: string[]): void => {
     setLines(said);
   };
+  const knownName = lastKnownName(props.shell, () => props.spec.sessionId);
+  let composerInput: HTMLTextAreaElement | undefined;
+  keepKeyboardHome(
+    () => composerInput,
+    () => props.focused && pending() === undefined,
+  );
 
   createEffect(() => {
     const id = props.spec.sessionId;
     if (id !== undefined) void props.shell.store.controls.watchReadings(id);
   });
 
+  createEffect(() => {
+    const id = props.spec.sessionId;
+    if (id === undefined || !props.shell.store.gone(id)) return;
+    props.shell.rebind(props.id, { kind: "conversation" });
+    say(sessionGoneNotice);
+  });
+
+  createEffect(() => {
+    const id = props.spec.sessionId;
+    if (id === undefined || !props.shell.store.trashed(id)) return;
+    setPending(restoreOffer(props.shell, id, knownName(), say));
+  });
+
   const send =
     (behavior: PromptBehavior) =>
-    (text: string): void => {
+    async (text: string): Promise<void> => {
       setLines([]);
       const id = props.spec.sessionId;
-      if (id === undefined) void props.shell.sessions.startSession(props.id, text);
-      else void props.shell.store.prompt(id, text, behavior);
+      if (id === undefined) return props.shell.sessions.startSession(props.id, text);
+      const outcome = await props.shell.store.prompt(id, text, behavior);
+      if (outcome !== "missing") return;
+      await props.shell.sessions.startSession(props.id, text);
+      say(promptRehomedNotice);
     };
   const interrupt = (): void => {
     const id = props.spec.sessionId;
@@ -235,10 +266,10 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         >
           <ConversationPane
             projection={projection()}
-            onAnswerAsk={(callId, verdict) => void props.shell.store.answerAsk(callId, verdict)}
-            onOpenSpill={(spill) =>
-              props.shell.openPane(spillFileSpec(spill, props.spec.sessionId ?? ""))
+            onAnswerAsk={(callId, verdict, scope) =>
+              props.shell.client.answerAsk(callId, verdict, scope)
             }
+            askChords={askChordsOf(props.shell.keys)}
           />
         </Show>
       </div>
@@ -253,9 +284,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         queue={projection().queue}
         busy={projection().turn !== undefined}
         seed={props.shell.store.controls.seed(props.spec.sessionId)}
-        onSteer={send("steer")}
-        onQueue={send("queue")}
+        onSteer={(text) => void send("steer")(text)}
+        onQueue={(text) => void send("queue")(text)}
         onInterrupt={interrupt}
+        inputRef={(input) => {
+          composerInput = input;
+        }}
       />
     </>
   );
@@ -348,7 +382,9 @@ function sessionControlsOf(
       const reading = await verbs.exportSession(id);
       if (!isSettled(reading)) return say(refusalNotice(reading));
       if (!("html" in reading)) return say(`session page written to ${reading.file}`);
-      say(await copiedToClipboard(reading.html));
+      const copied = await copiedToClipboard(reading.html);
+      const saved = await shell.host.saveAs(pageNameFor(currentTitle(shell, id)), reading.html);
+      say(exportedNotice(reading.html, copied, saved));
     }),
     "conversation.export-file": withSession(async (id) => {
       report(await verbs.exportSession(id, { out: "." }), (exported) =>
@@ -382,12 +418,12 @@ function currentTitle(shell: ShellSeams, id: string): string {
   return title === undefined || title === untitled ? "" : title;
 }
 
-async function copiedToClipboard(html: string): Promise<string> {
+async function copiedToClipboard(html: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(html);
-    return exportedNotice(new TextEncoder().encode(html).length);
+    return true;
   } catch {
-    return "the clipboard refused the page · export-file writes it into the workspace";
+    return false;
   }
 }
 
@@ -400,4 +436,39 @@ function settledState(projection: SessionProjection): LifecycleState | undefined
   }
   const last = projection.entries.at(-1);
   return last?.kind === "notice" && last.level === "error" ? "failed" : undefined;
+}
+
+function restoreOffer(
+  shell: ShellSeams,
+  sessionId: string,
+  name: string | undefined,
+  say: Say,
+): PendingAsk {
+  return {
+    ask: { kind: "confirm", question: trashedQuestion(name ?? "this session") },
+    answer: async (agreed) => {
+      if (agreed !== true) return say(leftInTrashNotice);
+      say(restoreNotice(await shell.store.restore(sessionId), name));
+    },
+  };
+}
+
+interface KnownName {
+  readonly sessionId: string;
+  readonly name: string;
+}
+
+function lastKnownName(
+  shell: ShellSeams,
+  sessionId: () => string | undefined,
+): () => string | undefined {
+  const known = createMemo<KnownName | undefined>((previous) => {
+    const id = sessionId();
+    const summary = shell.store.summary(id);
+    if (summary !== undefined) {
+      return { sessionId: summary.id, name: sessionName(summary, shell.store.projection(id)) };
+    }
+    return previous?.sessionId === id ? previous : undefined;
+  });
+  return () => known()?.name;
 }

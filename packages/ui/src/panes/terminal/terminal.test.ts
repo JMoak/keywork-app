@@ -3,13 +3,18 @@ import { join } from "node:path";
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
 import { describe, expect, it } from "vitest";
 import { parseJsonl } from "../../dev/replay.ts";
-import { flavorVariables, keyworkDay, keyworkNight } from "../../flavor/index.ts";
+import {
+  keyworkDay,
+  keyworkNight,
+  terminalKeys,
+  themeVariables as variablesOfTheme,
+} from "../../theme/index.ts";
 import { nextMode } from "./index.tsx";
 import { terminalKeeps } from "./keys.ts";
 import { bashCommand, mirrorDelta, mirrorText } from "./mirror.ts";
 import { chooseRenderer, probeWebgl2 } from "./renderer.ts";
 import { bridgeArgs } from "./session.ts";
-import { terminalTheme, themeVariables } from "./theme.ts";
+import { type FontFaces, terminalTheme, themeVariables, watchFonts } from "./theme.ts";
 
 const fixtures = join(import.meta.dirname, "..", "..", "..", "..", "client", "src", "fixtures");
 
@@ -37,15 +42,15 @@ describe("mirror mode", () => {
 
   it("echoes the live tail while the command runs and the reason when it fails", async () => {
     const envelopes = parseJsonl(await readFile(join(fixtures, "tool.jsonl"), "utf8"));
-    const running = projectAll(emptyProjection, envelopes.slice(0, 6));
+    const running = projectAll(emptyProjection, envelopes.slice(0, 7));
     expect(plain(mirrorText(running)).split("\r\n").slice(0, -1)).toEqual([
       "░ $ echo served",
       "served",
     ]);
     const failed = projectAll(emptyProjection, [
-      ...envelopes.slice(0, 5),
+      ...envelopes.slice(0, 6),
       {
-        id: 6,
+        id: 7,
         ts: "2026-09-07T12:00:02.250Z",
         sessionId: "s1",
         type: "tool.finished",
@@ -73,6 +78,8 @@ describe("mirror mode", () => {
       live: undefined,
       reason: undefined,
       durationMs: undefined,
+      askedAt: undefined,
+      waitedMs: undefined,
       outputChars: undefined,
       detail: undefined,
       spill: undefined,
@@ -91,25 +98,21 @@ describe("mirror mode", () => {
 });
 
 describe("the xterm theme", () => {
-  it("maps every ANSI slot to a flavor token and omits what the flavor lacks", () => {
-    const variables = flavorVariables(keyworkNight);
+  it("dresses all sixteen ANSI colours, the cursor and the selection from the theme", () => {
+    const variables = variablesOfTheme(keyworkNight);
     const theme = terminalTheme((name) => variables[name] ?? "");
     expect(theme.background).toBe(keyworkNight.tokens.panel);
     expect(theme.foreground).toBe(keyworkNight.tokens.text);
-    expect(theme.red).toBe(keyworkNight.tokens.error);
-    expect(theme.green).toBe(keyworkNight.tokens.success);
-    expect(theme.brightBlack).toBe(keyworkNight.tokens.textDim);
-    expect(theme.brightWhite).toBe(keyworkNight.tokens.text);
-    expect(theme.blue).toBe(keyworkNight.tokens.ramp[1]);
+    for (const key of terminalKeys) expect(theme[key], key).toBe(keyworkNight.terminal[key]);
+    expect(theme.cursor).toBe(keyworkNight.cursor);
+    expect(theme.selectionBackground).toBe(keyworkNight.selection.background);
+    expect(theme.selectionForeground).toBe(keyworkNight.selection.text ?? keyworkNight.tokens.text);
     expect(theme.extendedAnsi).toBeUndefined();
-    for (const slot of ["black", "white", "yellow", "magenta", "cyan", "cursor"] as const) {
-      expect(theme[slot], slot).toMatch(/^#[0-9a-f]{6}$/);
-    }
     expect(terminalTheme(() => "")).toEqual({});
   });
 
-  it("survives a flavor swap and a monochrome flavor without inventing colors", () => {
-    const day = flavorVariables(keyworkDay);
+  it("survives a theme swap and a monochrome theme without inventing colors", () => {
+    const day = variablesOfTheme(keyworkDay);
     const theme = terminalTheme((name) => day[name] ?? "");
     expect(theme.background).toBe(keyworkDay.tokens.panel);
     const grey = terminalTheme(() => " #777777 ");
@@ -117,6 +120,54 @@ describe("the xterm theme", () => {
     for (const variable of Object.values(themeVariables)) {
       expect(variable === "" || variable.startsWith("--kw-")).toBe(true);
     }
+  });
+});
+
+describe("the font watch", () => {
+  function fakeFonts(): FontFaces & { finish(): void; listeners: number } {
+    let resolve: () => void = () => {};
+    const handlers = new Set<() => void>();
+    return {
+      ready: new Promise<void>((done) => {
+        resolve = done;
+      }),
+      addEventListener: (_: string, handler: unknown) => void handlers.add(handler as () => void),
+      removeEventListener: (_: string, handler: unknown) =>
+        void handlers.delete(handler as () => void),
+      finish: () => {
+        resolve();
+        for (const handler of handlers) handler();
+      },
+      get listeners() {
+        return handlers.size;
+      },
+    } as FontFaces & { finish(): void; listeners: number };
+  }
+
+  it("re-measures once the bundled faces settle, so cells never keep a fallback size", async () => {
+    const fonts = fakeFonts();
+    let measured = 0;
+    const stop = watchFonts(() => {
+      measured += 1;
+    }, fonts);
+    expect(measured).toBe(0);
+    fonts.finish();
+    await Promise.resolve();
+    expect(measured).toBe(2);
+    stop();
+    expect(fonts.listeners).toBe(0);
+  });
+
+  it("stays quiet after the pane is gone and without a font set", async () => {
+    const fonts = fakeFonts();
+    let measured = 0;
+    watchFonts(() => {
+      measured += 1;
+    }, fonts)();
+    fonts.finish();
+    await Promise.resolve();
+    expect(measured).toBe(0);
+    expect(() => watchFonts(() => {}, undefined)()).not.toThrow();
   });
 });
 

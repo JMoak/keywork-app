@@ -1,0 +1,70 @@
+.kw-status {
+  display: flex;
+  align-items: baseline;
+  gap: 2ch;
+  min-width: 0;
+  padding: 0.25rem 0.75rem 0.25rem 1.5rem;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  color: var(--kw-text-dim);
+  background: var(--kw-background);
+  box-shadow: inset 0 1px 0 var(--kw-border);
+}
+:root[data-chrome="borderless"] .kw-status {
+  background: var(--kw-panel);
+  box-shadow: none;
+}
+
+.kw-status-items {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kw-status-item + .kw-status-item::before {
+  content: "·";
+  margin: 0 1ch;
+  color: var(--kw-text-dim);
+}
+.kw-status-item[data-tone="mark"] {
+  color: var(--kw-density-full);
+  font-weight: 600;
+}
+.kw-status-item[data-tone="where"] {
+  color: var(--kw-text-mid);
+}
+.kw-status-item[data-tone="warn"] {
+  color: var(--kw-accent-soft);
+}
+.kw-status-item[data-tone="word"] {
+  color: var(--kw-text);
+}
+.kw-status[data-lost] .kw-status-item {
+  color: var(--kw-text-dim);
+}
+
+.kw-status-moment {
+  display: flex;
+  gap: 2ch;
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kw-status-leader {
+  font: inherit;
+  color: var(--kw-background);
+  background: var(--kw-accent);
+  padding: 0 0.5ch;
+}
+.kw-status-notice {
+  color: var(--kw-text-mid);
+}
+.kw-status-lost {
+  color: var(--kw-error);
+}
+.kw-status-gap {
+  color: var(--kw-accent-soft);
+}

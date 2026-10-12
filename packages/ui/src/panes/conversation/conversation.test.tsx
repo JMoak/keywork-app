@@ -1,5 +1,6 @@
 import {
   emptyProjection,
+  projectAll,
   type SessionControls,
   type SessionProjection,
   unknownControls,
@@ -11,11 +12,15 @@ import type {
   PresetName,
   PresetReading,
   PromptBehavior,
+  PromptOutcome,
+  SessionSummary,
 } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import recordedAnswers from "../../../../client/src/fixtures/controls.json";
 import { browserHost } from "../../host/browser.ts";
+import type { SaveOutcome } from "../../host/port.ts";
 import type { SessionReadings } from "../../shell/controls-store.ts";
 import type { ShellSeams } from "../registry.ts";
 import {
@@ -50,17 +55,39 @@ interface Fakes {
   presetAnswer?: (name: PresetName, confirmed: boolean) => PresetReading;
   seed?: { text: string };
   models?: string[];
+  saved?: SaveOutcome;
+  promptOutcome?: PromptOutcome;
+  title?: string;
+  trashed?: boolean;
+  live?: LiveSession;
+}
+
+interface LiveSession {
+  summary(): SessionSummary | undefined;
+  projection(): SessionProjection;
+  trashed(): boolean;
 }
 
 function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
-  const controls = { ...unknownControls, ...fakes.controls };
+  const controls = {
+    ...unknownControls,
+    ...fakes.controls,
+    ...(fakes.title !== undefined && { title: fakes.title }),
+  };
   const store = {
-    state: { summaries: [{ id: "s1" }] },
-    projection: (): SessionProjection => emptyProjection,
-    summary: () => undefined,
+    projection: (): SessionProjection => fakes.live?.projection() ?? emptyProjection,
+    summary: () => fakes.live?.summary(),
     controlsOf: () => controls,
     prompt: async (id: string, text: string, behavior: PromptBehavior) => {
       sent.prompts.push([id, text, behavior]);
+      return fakes.promptOutcome ?? "started";
+    },
+    state: { summaries: [{ id: "s1" }] },
+    gone: () => false,
+    trashed: () => fakes.live?.trashed() ?? fakes.trashed === true,
+    restore: async (id: string) => {
+      sent.verbs.push(`restore ${id}`);
+      return { id, title: "Lights", createdAt: "t", lastActivityAt: "t", messageCount: 2 };
     },
     abort: async () => undefined,
     answerAsk: async () => "settled",
@@ -105,8 +132,23 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
   const shell: Partial<ShellSeams> = {
     store: store as unknown as ShellSeams["store"],
     keys: { chord: (action) => `ctrl+k ${action}`, leader: () => "ctrl+k" },
-    sessions: { openSession: () => {}, newSession: async () => {}, startSession: async () => {} },
-    host: browserHost(),
+    sessions: {
+      openSession: () => {},
+      newSession: async () => {},
+      startSession: async (paneId: string, text: string) => {
+        sent.verbs.push(`start ${paneId} ${text}`);
+      },
+    },
+    rebind: (paneId: string, spec: { kind: string }) => {
+      sent.verbs.push(`rebind ${paneId} ${JSON.stringify(spec)}`);
+    },
+    host: {
+      ...browserHost(),
+      saveAs: async (name: string, text: string) => {
+        sent.verbs.push(`save ${name} ${text.length}`);
+        return fakes.saved ?? { saved: false, refused: "cancelled" };
+      },
+    },
     trust: { untrusted: () => false } as ShellSeams["trust"],
     openPane: () => {},
     unseen: () => false,
@@ -300,17 +342,54 @@ describe("the conversation pane's controls", () => {
     expect(lines()).toEqual(["permissions preset → careful"]);
   });
 
-  it("copies the exported page to the clipboard and says so, or writes it into the workspace", async () => {
+  it("offers a save named for the session beside the clipboard copy", async () => {
     const copied: string[] = [];
     vi.stubGlobal("navigator", {
       clipboard: { writeText: async (text: string) => void copied.push(text) },
     });
-    const { act } = mount();
+    const { act, sent } = mount({
+      title: "Lights & beta",
+      saved: { saved: true, path: "C:/work/lights-beta.html" },
+    });
     await act("conversation.export");
     expect(copied).toEqual(["<!doctype html><title>Lights</title>"]);
-    expect(lines()[0]).toMatch(/^session page copied to the clipboard · 36 B of html/);
+    expect(sent.verbs).toEqual(["save lights-beta.html 36"]);
+    expect(lines()).toEqual([
+      "session page saved to C:/work/lights-beta.html · copied to the clipboard · 36 B of html",
+    ]);
     await act("conversation.export-file");
     expect(lines()).toEqual(["session page written to <cwd>/Lights.html"]);
+  });
+
+  it("says a cancelled save plainly and keeps the clipboard copy", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: async () => undefined } });
+    const { act, sent } = mount();
+    await act("conversation.export");
+    expect(sent.verbs).toEqual(["save session.html 36"]);
+    expect(lines()).toEqual([
+      "session page copied to the clipboard · 36 B of html · save cancelled",
+    ]);
+  });
+
+  it("points at export-file when neither the clipboard nor a save dialog took the page", async () => {
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: async () => {
+          throw new Error("not focused");
+        },
+      },
+    });
+    const { act } = mount({
+      saved: {
+        saved: false,
+        refused: "unavailable",
+        detail: "the browser host has no save dialog",
+      },
+    });
+    await act("conversation.export");
+    expect(lines()).toEqual([
+      "the browser host has no save dialog and the clipboard refused the page · export-file writes it into the workspace",
+    ]);
   });
 
   it("reads the cost lineage per model and never hides unpriced turns", async () => {
@@ -323,6 +402,7 @@ describe("the conversation pane's controls", () => {
       "tokens 12▸5",
       "cost unknown · no pricing for mock/beta",
       "  mock/alpha · 1 turn · 12▸5 · no pricing",
+      "  mock/beta · 0 turns · 0▸0 · no pricing",
     ]);
   });
 
@@ -331,6 +411,92 @@ describe("the conversation pane's controls", () => {
     await act("conversation.thinking");
     expect(sent.verbs).toEqual([]);
     expect(lines()).toEqual(["no session here yet · send a prompt first"]);
+  });
+});
+
+describe("a session the server no longer knows", () => {
+  it("offers to restore a session moved to the trash, in keywork's words", async () => {
+    const { sent } = mount({ trashed: true });
+    await settle();
+    const confirm = document.querySelector(".kw-controls-confirm") as HTMLElement;
+    expect(confirm.textContent).toBe(
+      'removed "this session" · it is in the trash, memory notes stay · restore it? y/n',
+    );
+    fireEvent.keyDown(confirm, { key: "y" });
+    await settle();
+    expect(sent.verbs).toEqual(["restore s1"]);
+    expect(lines()).toEqual(['restored "Lights" · it is back in the session tree']);
+  });
+
+  it("names the session as its frame did, though the store forgot it on removal", async () => {
+    const [summary, setSummary] = createSignal<SessionSummary | undefined>({
+      id: "s1",
+      title: "(untitled session)",
+      createdAt: "t",
+      lastActivityAt: "t",
+      messageCount: 2,
+    });
+    const [trashed, setTrashed] = createSignal(false);
+    const projection = projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: "2026-09-07T12:00:00.000Z",
+        sessionId: "s1",
+        type: "turn.started",
+        payload: { userText: "bash cat hello.txt" },
+      },
+    ]);
+    mount({ live: { summary, trashed, projection: () => projection } });
+    setSummary(undefined);
+    setTrashed(true);
+    await settle();
+    const confirm = document.querySelector(".kw-controls-confirm") as HTMLElement;
+    expect(confirm.textContent).toBe(
+      'removed "bash cat hello.txt" · it is in the trash, memory notes stay · restore it? y/n',
+    );
+    fireEvent.keyDown(confirm, { key: "y" });
+    await settle();
+    expect(lines()).toEqual(['restored "bash cat hello.txt" · it is back in the session tree']);
+  });
+
+  it("leaves a declined session in the trash and says where to restore it", async () => {
+    const { sent } = mount({ trashed: true });
+    await settle();
+    fireEvent.keyDown(document.querySelector(".kw-controls-confirm") as HTMLElement, { key: "n" });
+    await settle();
+    expect(sent.verbs).toEqual([]);
+    expect(lines()).toEqual(["left in the trash · the sessions pane restores it"]);
+  });
+
+  it("starts a new session with the prompt instead of dropping it", async () => {
+    const { sent } = mount({ promptOutcome: "missing" });
+    const input = document.querySelector(".kw-composer-input") as HTMLTextAreaElement;
+    input.value = "are you there";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    await settle();
+    await settle();
+    expect(sent.prompts).toEqual([["s1", "are you there", "queue"]]);
+    expect(sent.verbs).toEqual(["start conversation-1 are you there"]);
+    expect(lines()).toEqual([
+      "that session was gone from the server · your prompt started a new one",
+    ]);
+  });
+});
+
+describe("the conversation pane's keyboard home", () => {
+  it("puts the keys in the composer when the pane is focused, so typing is never dropped", () => {
+    mount();
+    expect(document.activeElement).toBe(document.querySelector(".kw-composer-input"));
+  });
+
+  it("hands the keys to an inline ask and back to the composer once it is answered", async () => {
+    const { act } = mount();
+    await act("conversation.rename");
+    expect(document.activeElement).toBe(document.querySelector(".kw-controls-input"));
+    answer("Lights");
+    await settle();
+    expect(document.activeElement).toBe(document.querySelector(".kw-composer-input"));
   });
 });
 

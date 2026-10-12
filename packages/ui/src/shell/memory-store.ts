@@ -1,19 +1,22 @@
 import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
 import type {
   AirlockDelivery,
-  AirlockDigest,
   AirlockFinish,
   AirlockTriage,
   ApproveOutcome,
   BusEnvelope,
   CandidateChoice,
   DailyEntry,
+  DecidedDigest,
   DiscardOutcome,
+  InboxTally,
   MemoryAnswer,
   MemoryGarden,
   MemoryNote,
+  MemoryNoteDetail,
   QuestionChoice,
   RevertReply,
+  StagedItem,
 } from "@keywork-app/protocol";
 import { createStore, reconcile } from "solid-js/store";
 import { onReconnected } from "./surfaces-store.ts";
@@ -25,7 +28,7 @@ export interface MemoryStore {
   discard(id: string): Promise<DiscardOutcome>;
   revert(ledgerId: string): Promise<RevertReply>;
   notes(layer?: string): Promise<readonly MemoryNote[]>;
-  note(name: string, layer?: string): Promise<MemoryNote | undefined>;
+  note(name: string): Promise<MemoryNoteDetail | undefined>;
   dailyDates(): Promise<readonly string[]>;
   daily(date: string): Promise<readonly DailyEntry[]>;
   ask(query: string, arc?: string): Promise<MemoryAnswer>;
@@ -35,7 +38,7 @@ export interface MemoryStore {
 }
 
 export interface AirlockIntents {
-  digest(slug: string): Promise<AirlockDigest | undefined>;
+  digest(slug: string): Promise<DecidedDigest | undefined>;
   triageCandidate(slug: string, note: string, choice: CandidateChoice): Promise<AirlockTriage>;
   triageQuestion(slug: string, title: string, choice: QuestionChoice): Promise<AirlockTriage>;
   deliver(slug: string): Promise<AirlockDelivery>;
@@ -49,32 +52,35 @@ export interface MemoryState {
   readonly inbox: InboxTally;
 }
 
-export interface InboxTally {
-  readonly count: number;
-  readonly kinds: Readonly<Record<string, number>>;
-}
-
 export const inertGarden: MemoryGarden = {
   trusted: false,
   layers: [],
   inbox: [],
   ledger: [],
   audit: [],
-  gardener: { state: "idle" },
   airlocks: [],
 };
 
+export const emptyInbox: InboxTally = {
+  count: 0,
+  staged: 0,
+  airlock: 0,
+  proposals: 0,
+  contradictions: 0,
+};
+
 export function inboxTallyOf(garden: MemoryGarden): InboxTally {
-  const kinds: Record<string, number> = {};
-  for (const item of garden.inbox) kinds[item.kind] = (kinds[item.kind] ?? 0) + 1;
-  return { count: garden.inbox.length, kinds };
+  const tally = { ...emptyInbox, count: garden.inbox.length };
+  for (const item of garden.inbox) tally[inboxBucketOf(item)] += 1;
+  return tally;
 }
 
 export function inboxAfter(tally: InboxTally, envelopes: Iterable<BusEnvelope>): InboxTally {
   let latest = tally;
   for (const envelope of envelopes) {
     if (envelope.type === "memory.inbox") {
-      latest = { count: envelope.payload.count, kinds: envelope.payload.kinds };
+      const { replay: _replay, ...tally } = envelope.payload;
+      latest = tally;
     }
   }
   return latest;
@@ -90,7 +96,7 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
     garden: structuredClone(inertGarden),
     loaded: false,
     revision: 0,
-    inbox: { count: 0, kinds: {} },
+    inbox: { ...emptyInbox },
   });
   const listeners = new Set<(count: number) => void>();
 
@@ -130,18 +136,21 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
     discard: (id) => refreshing(() => client.discardStagedItem(id), notRefused),
     revert: (ledgerId) => refreshing(() => client.revertLedgerEntry(ledgerId), notRefused),
     notes: async (layer) => (await client.memoryNotes(layer))?.notes ?? [],
-    note: async (name, layer) => (await client.memoryNote(name, layer))?.note ?? undefined,
+    note: (name) => client.memoryNote(name),
     dailyDates: async () => (await client.memoryDailyDates()).dates,
     daily: async (date) => (await client.memoryDaily(date)).entries,
     ask: (query, arc) => client.askMemory(arc === undefined ? { query } : { query, arc }),
     airlock: {
-      digest: async (slug) => (await client.arcAirlock(slug))?.digest ?? undefined,
+      digest: async (slug) => {
+        const reading = await client.airlock(slug);
+        return reading?.trusted === true ? reading : undefined;
+      },
       triageCandidate: (slug, note, choice) =>
         refreshing(() => client.triageAirlockCandidate(slug, note, choice), notRefused),
       triageQuestion: (slug, title, choice) =>
         refreshing(() => client.triageAirlockQuestion(slug, title, choice), notRefused),
-      deliver: (slug) => refreshing(() => client.deliverAirlockEligible(slug), notRefused),
-      finish: (slug, force) => refreshing(() => client.finishArcAirlock(slug, force), notRefused),
+      deliver: (slug) => refreshing(() => client.deliverAirlock(slug), notRefused),
+      finish: (slug, force) => refreshing(() => client.finishAirlock(slug, force), notRefused),
     },
     onInbox: (listener) => {
       listeners.add(listener);
@@ -153,4 +162,15 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
       listeners.clear();
     },
   };
+}
+
+type InboxBucket = Exclude<keyof InboxTally, "count">;
+
+const stagedWriteKinds: ReadonlySet<string> = new Set(["note", "daily", "moc"]);
+
+function inboxBucketOf(item: StagedItem): InboxBucket {
+  if (stagedWriteKinds.has(item.kind)) return "staged";
+  if (item.kind === "arc-distillation" || item.kind === "arc-question") return "airlock";
+  if (item.kind === "contradiction") return "contradictions";
+  return "proposals";
 }

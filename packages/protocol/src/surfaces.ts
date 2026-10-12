@@ -29,9 +29,9 @@ export type ArcCloseOutcome =
   | { kind: "closed"; delivered: number; released: number; notice?: string }
   | { kind: "pending"; candidates: number; questions: number; wedged: number; notice?: string };
 
-export interface ArcBinding {
-  sessionId: string;
-  arc: string | null;
+export interface SessionBinding {
+  arc?: string;
+  bot?: string;
 }
 
 export type BotScope = "project" | "user";
@@ -57,11 +57,6 @@ export interface BotDraft {
   purpose?: string;
 }
 
-export interface BotBinding {
-  sessionId: string;
-  bot: string | null;
-}
-
 export interface WorkspaceChoice {
   slug: string | undefined;
   name: string;
@@ -82,7 +77,7 @@ export interface FocusedDir {
   dir: string;
 }
 
-export interface ServerFlavor {
+export interface ServerTheme {
   name: string;
   appearance: "dark" | "light";
   tokens: Record<string, string | readonly string[]>;
@@ -90,15 +85,21 @@ export interface ServerFlavor {
   gap: number;
   chromeWeight: string;
   instruments: string;
+  terminal?: Record<string, string>;
+  syntax?: Record<string, string>;
+  diff?: Record<string, string>;
+  selection?: { background: string; text?: string };
+  cursor?: string;
+  pair?: string;
 }
 
-export interface FlavorsView {
-  flavors: readonly ServerFlavor[];
+export interface ThemesView {
+  themes: readonly ServerTheme[];
   active: string;
   placeholders: readonly string[];
 }
 
-export const systemFlavorName = "system";
+export const systemThemeName = "system";
 
 export interface SurfaceRefusal {
   refused: "not-ready" | "invalid" | "missing" | "archived" | "exists" | "busy";

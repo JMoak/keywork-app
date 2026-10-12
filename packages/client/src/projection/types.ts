@@ -89,6 +89,8 @@ export interface ToolRun {
   readonly live: string | undefined;
   readonly reason: string | undefined;
   readonly durationMs: number | undefined;
+  readonly askedAt: string | undefined;
+  readonly waitedMs: number | undefined;
   readonly outputChars: number | undefined;
   readonly detail: readonly string[] | undefined;
   readonly spill: SpillReference | undefined;

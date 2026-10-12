@@ -4,10 +4,6 @@
   min-height: 0;
   flex: 1;
   font-family: var(--kw-font-mono);
-  --kw-diff-inserted-line: color-mix(in oklab, var(--kw-success) 14%, transparent);
-  --kw-diff-deleted-line: color-mix(in oklab, var(--kw-error) 14%, transparent);
-  --kw-diff-inserted-text: color-mix(in oklab, var(--kw-success) 32%, transparent);
-  --kw-diff-deleted-text: color-mix(in oklab, var(--kw-error) 32%, transparent);
 }
 
 .kw-diff-head {
@@ -85,9 +81,9 @@
 }
 
 .kw-diff-file[data-cursor] .kw-diff-file-row {
-  outline: 1px solid var(--kw-border-focus);
-  outline-offset: -1px;
   color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-pane-ink, var(--kw-accent));
 }
 
 .kw-diff-path {

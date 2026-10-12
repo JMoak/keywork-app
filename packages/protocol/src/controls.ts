@@ -19,6 +19,8 @@ export interface SessionState {
   effort?: EffortLevel;
   title: string;
   leafId: string | null;
+  arc?: string;
+  bot?: string;
   undoable: boolean;
   redoable: boolean;
 }
@@ -116,6 +118,7 @@ export interface CostReport {
   rollup: CostRollup;
   usage: Usage;
   basis: string;
+  modelId?: string;
   cacheMiss?: CacheMiss;
   models: readonly ModelCost[];
 }
@@ -142,7 +145,6 @@ export type ControlRefusalKind =
   | "invalid"
   | "unresolved"
   | "busy"
-  | "staged"
   | "nothing"
   | "outside-scope"
   | "needs-confirmation"

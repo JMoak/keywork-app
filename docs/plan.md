@@ -46,7 +46,7 @@ The repo becomes a keywork-shaped monorepo with the check rail before any produc
 - **M0.2 (1pt) Ratchets.** `scripts/check-pins.ts` (exact npm pins),
   `scripts/check-guardrails.ts` (no `@keywork/engine|tui|cli` imports; no credential-shaped
   code; no OAuth strings), `scripts/check-colors.ts` (no color literals outside
-  `packages/ui/src/flavor/`). `MIRROR:keywork scripts/`.
+  `packages/ui/src/theme/`). `MIRROR:keywork scripts/`.
   **Accept:** each script has a fixture that fails it and a test proving the failure.
 - **M0.3 (1pt) CI.** GitHub Actions: check + test on ubuntu, windows, macos; Windows
   required-green (AD10); SHA-pinned actions. `OWN`.
@@ -56,7 +56,7 @@ The repo becomes a keywork-shaped monorepo with the check rail before any produc
   (`sidecar.ts`, `pty.ts`, `notify.ts`, `windows.ts`). electron-builder config with the
   sidecar under `extraResources`. `OWN` (OpenCode's `packages/desktop` as an MIT reference
   for supervision and packaging, attributed if adapted).
-  **Accept:** `bun run dev` opens a window on Windows showing the flavor's ground color;
+  **Accept:** `bun run dev` opens a window on Windows showing the theme's ground color;
   `bun run dist` produces an installer.
 
 ## M1: Protocol and client (9pt)
@@ -155,19 +155,19 @@ streams. This is the milestone that proves the architecture and is the first dem
   terminal first is attached to, not duplicated, and `keywork attach` from a terminal joins
   the app's server; killing the sidecar by hand shows one calm notice and reconnects;
   closing the window leaves no orphan process (Windows and Linux fixtures).
-- **M2.3 (2pt) Flavors.** Load keywork flavor JSON (the schema mirrored from
-  `packages/shared/src/config/flavor.ts`, APCA floor included), map tokens and density to CSS
+- **M2.3 (2pt) Themes.** Load keywork theme JSON (the schema mirrored from
+  `packages/shared/src/config/theme.ts`, APCA floor included), map tokens and density to CSS
   variables, `system` appearance default, hot-swap from the palette. Ship keywork-night and
-  the first-class light flavor. `MIRROR:keywork flavor.ts + contrast.ts`.
-  **Accept:** a flavor that fails contrast is refused with keywork's exact message; every
-  shipped flavor passes; `check-colors.ts` proves no literal escaped.
+  the first-class light theme. `MIRROR:keywork theme.ts + contrast.ts`.
+  **Accept:** a theme that fails contrast is refused with keywork's exact message; every
+  shipped theme passes; `check-colors.ts` proves no literal escaped.
 - **M2.4 (3pt) The conversation pane, v1.** Transcript from the projection: the density
   rail with voice stamps, prose in the text face at the width tier's measure, machine output
   full bleed, markdown rendered through tokens, the tool row (fold stamp · verb · subject ·
   duration · outcome, outcome the only colored word), streamed text arriving by ink. Composer
   with `Enter` steer, `Alt+Enter` queue, `Esc` interrupt; the queue rendered. Virtualized.
   `OWN` (keywork `104` page grammar as the spec).
-  **Accept:** the M1.4 fixtures render to Playwright screenshots per flavor and per width
+  **Accept:** the M1.4 fixtures render to Playwright screenshots per theme and per width
   tier; 5k-line paste lands intact with the UI responsive (T2); keystroke-to-echo under a
   streaming fixture stays under 16 ms (T8, measured).
 - **M2.5 (2pt) Sessions list and switching.** Newest-first, title, age, live mark as
@@ -182,7 +182,7 @@ Needs **S0**. Asks still answer no here, shown honestly as keywork attach does.
 
 ### M2 ledger, wave 2 (landed 2026-09-07, two parallel lanes)
 
-**The page (lane A, `packages/ui`).** `src/flavor/`: keywork's flavor schema and APCA
+**The page (lane A, `packages/ui`).** `src/theme/`: keywork's theme schema and APCA
 validator mirrored with the same floors and the same failure message; `keywork-night` from
 keywork's exact values and a designed `keywork-day`; tokens mapped to `--kw-*` variables;
 the default stylesheet generated from the same values and byte-checked by a test.
@@ -194,7 +194,7 @@ as the only colored word and detail under a faint rule, an own markdown renderer
 `marked`'s lexer that never touches innerHTML. `src/composer/`: Enter steers, Alt+Enter
 queues, Shift+Enter newline, Esc interrupts, paste never submits. `src/dev/`: the review
 page at `/?dev` replaying the six recorded fixtures plus a prose scenario with scenario,
-flavor, and width pickers. Verified by Electron captures of plain, tool, prose in
+theme, and width pickers. Verified by Electron captures of plain, tool, prose in
 keywork-day, and denied at clipping width (`artifacts/shots/`, untracked).
 
 **The host (lane B, `packages/client` and `packages/desktop`).** `client/src/feed.ts`: one
@@ -437,7 +437,7 @@ carrying a held ticket, output batched per 8 ms frame or 4 KiB, PTYs tied to the
 (`nativeModules` in the vite config, `npmRebuild` and `asarUnpack` in the builder).
 `HostPort.pty` is six calls; the preload keeps pty bytes ordered through the same
 `chunkQueue` as the relay. `ui/src/panes/terminal/` is xterm 6 with fit and WebGL (DOM
-fallback on context loss), themed from `--kw-*` tokens and re-themed on flavor change,
+fallback on context loss), themed from `--kw-*` tokens and re-themed on theme change,
 three modes in one spec: shell, mirror (a pure projection→text tail of the agent's bash
 calls), bridge (the real `keywork attach` or `connect` from the binary main resolves, no
 token passed). A keyboard-owning pane is a registry concept: `keyboard: "owned"` makes the
@@ -499,7 +499,7 @@ install to `--version` (fails above 60 s) and creates a draft release; no secret
 green, signing gated on `WIN_CSC_*`, `MAC_CSC_*`, `APPLE_*`. Updater: electron-updater 6.8.9
 against the app's GitHub releases, a check 30 s after launch then every 6 h, download
 silently, surface `onUpdateReady`, install on quit only after `acceptUpdate`, off in dev.
-Parity scaffold: Playwright 1.63.0 captures the transcript scenarios per flavor and width
+Parity scaffold: Playwright 1.63.0 captures the transcript scenarios per theme and width
 tier on three runners; `scripts/compare-shots.ts` diffs across OS with a 5% tolerance for
 font fallback, advisory until the first baselines exist. `docs/release.md` records the ritual.
 Decision for Jordan: `productName: keywork` makes the deb executable `keywork`, shadowing
@@ -530,7 +530,7 @@ the CLI on PATH; `executableName: keywork-app` would avoid it.
   (jailed to the tool scope, 403 outside, ignored entries flagged never dropped, reading
   needs no trust, `[from,to)` 1 MiB per request, 415 on NUL), `POST /workspace/trust {}` →
   `{ trusted, root, reopens }` (the server does not recompose; the app restarts the sidecar),
-  `GET /flavors` with a `system` placeholder; `/mcp` + restart/enabled/tools, `/arcs` +
+  `GET /themes` with a `system` placeholder; `/mcp` + restart/enabled/tools, `/arcs` +
   new/close/abandon and per-session bind, `/bots` + create and per-session switch (409
   mid-turn), `/workspaces` + new/use (`reopens: true`)/focus/unfocus. One
   `surface.changed { kind }` event with `sessionId: ""`. Session summaries carry `arc` and
@@ -597,14 +597,14 @@ the CLI on PATH; `executableName: keywork-app` would avoid it.
 - **M4.6, M4.7, S9, the overview panes.** `protocol/src/surfaces.ts` mirrors K3's status
   surfaces whole; eighteen routes; every refusal typed as `{refused, detail}` carrying the
   server's words. `shell/surfaces-store.ts` holds mcp, arcs with ordinals, bots, workspaces
-  and flavors, refetching exactly the kind a `surface.changed` names. Panes `mcp` (tile-fill
+  and themes, refetching exactly the kind a `surface.changed` names. Panes `mcp` (tile-fill
   while connecting, missing tile down, `enter` tools, `r`, `t`), `arcs` on `leader a` (hue
   chip by ordinal, sessions grouped, `n`/`c`/`shift+a` with a confirm, `b`/`u`), `bots`
   (`sigil name`, never hue; `enter` switches, a mid-turn 409 shown as the server says),
   `workspaces` (`enter` uses one and restarts the sidecar on `reopens`). The conversation
   title row shows the bound bot typographically and takes its hue from the arc's ordinal
-  (AD5). `flavor/wardrobe.ts` lists server flavors beside the gallery, `system` from the OS,
-  a flavor below the APCA floor refused with keywork's exact message. Live verification
+  (AD5). `theme/wardrobe.ts` lists server themes beside the gallery, `system` from the OS,
+  a theme below the APCA floor refused with keywork's exact message. Live verification
   deferred.
 - **Consolidation.** `record.ts` now merges `doc.json` additively and waits for the
   post-turn `session.tree` and `memory.inbox` before cutting the SSE capture; every fixture
@@ -629,7 +629,7 @@ silently on a full layout; `shift+.` and `shift+,` chords; M3.6 when keywork bui
 
 **Decisions for Jordan.** Q-AS1 to Q-AS8 in keywork's 118 doc (the trust route, preset
 loosening over HTTP, rename pinning and `effort: null`, cost lineage, the events filter,
-one `surface.changed` or four, context-dir linking, the `system` flavor placeholder); the
+one `surface.changed` or four, context-dir linking, the `system` theme placeholder); the
 deb executable name; installing Bun 1.3.14 locally; whether to persist injection origin.
 
 ### Wave 5 ledger (2026-10-10): K1 consumed, the panes verified live, the leftovers closed
@@ -733,9 +733,9 @@ caret walking one cluster, Backspace and Delete erasing one cluster, submit byte
 (`composer/graphemes.ts` over `Intl.Segmenter`); **finding: the browser could split a
 decomposed cluster on delete**. T2: `composer/paste-vault.ts` mirrors keywork's vault, a paste
 over six lines or 4096 characters lands as `[pasted #n, N lines, 5.0 MB]` and expands on
-submit; **finding: the composer had no paste handling at all**. T6: `flavor/contrast-audit.ts`
+submit; **finding: the composer had no paste handling at all**. T6: `theme/contrast-audit.ts`
 applies keywork's APCA floors to every pair plus a measured polarity check so a tinted dark
-flavor fails as light; keywork-night's smallest headroom is 3.1 Lc. T7: every pane's zero state
+theme fails as light; keywork-night's smallest headroom is 3.1 Lc. T7: every pane's zero state
 is `state · chord action`, one chord, ≤ 320 px at a worst-case mono advance (eight empty
 states rewritten). T8: every fixture streamed one character per event at 800 events per frame,
 batched equal to unbatched, the busiest frame under the reducer budget, first paint under the
@@ -763,8 +763,8 @@ fixture mode; no process or ticket left behind.
   switch", `/undo` 404 for both a missing session and "nothing to undo". A `code` field would
   make the client's mapping robust.
 - `costBasis` says "metered by the provider" when no turn was priced (0 === 0).
-- `GET /flavors` serves only `keywork-night` plus the `system` placeholder: no keywork-day, no
-  user flavors, so "server flavors beside the gallery" has nothing to show yet.
+- `GET /themes` serves only `keywork-night` plus the `system` placeholder: no keywork-day, no
+  user themes, so "server themes beside the gallery" has nothing to show yet.
 - `/memory/ledger` discard entries carry only the staging path, not the note's name.
 - The identity derivation is not on the wire before connecting; `/doc` is unauthenticated, so
   checking a token needs an authenticated route (a ping would do).
@@ -779,6 +779,232 @@ main's modules from bun); the T8 load rising with a longer fixture; Ctrl+Z after
 the conversation pane's typed text before the composer has DOM focus and one empty transcript
 after a reopen (observed by A6, not reproduced); the duplicate `/mcp` and `/memory` loads at
 startup; `docs/README.md` now indexes `textures.md`.
+
+### Wave 6 ledger (2026-10-11): the wardrobe, and trust that remembers
+
+Jordan's brief: keep pushing with quality, and "get the themes and multi-theme options in there
+similar to omarchy (thoroughly themed)"; the app "looks a lot like vscode". Mid-wave: the word
+is **theme**, not theme, everywhere a person sees it and in new code (keywork keeps `theme`
+only as a one-release config alias). Then: pre-load read permissions on trust so a new
+workspace or session does not ask for every read. Seven lanes, three in keywork.
+
+**Lane K6, keywork: the themes (staged on `app-surface/next`).** The theme schema gained
+optional, whole sections `terminal` (16 ANSI), `syntax` (15 roles), `diff` (four grounds),
+`selection`, `cursor` and `pair`, each `.describe()`d, floored by APCA (syntax ≥ 30 on panel,
+comment 15; chromatic terminal colours ≥ 30; selection ≥ 45; text on diff lines ≥ 60; cursor
+≥ 40) with keywork's exact refusal wording; `completeTheme` derives any missing section from
+the thirteen base tokens by one deterministic rule (terminal from error, success, ramp, accent
+and the text rungs, bright hues 20% toward text, floors cleared in 1% OKLab steps; diff by
+mixing success and error into panel at 14% and 28%; selection from accentSoft; cursor the
+accent). The gallery is nineteen themes with every section filled by hand: keywork-night and
+keywork-day, catppuccin mocha and latte, nord and nord-light, gruvbox dark and light,
+everforest dark and light, kanagawa wave and lotus, rose-pine and dawn, flexoki dark and
+light, matte-black, osaka-jade and ristretto (an original warm palette), with taste varied so
+they differ in kind (nord and gruvbox `regular`, matte-black and osaka-jade `borderless`,
+gaps of 1 on catppuccin, everforest, rose-pine, flexoki and matte-black, cockpit instruments on
+matte-black and ristretto) and twins sharing taste so following the OS never relayouts.
+Twenty-six canonical shades were stepped by the smallest OKLCh lightness change that clears a
+floor, each tabled with its canonical value in `gallery.test.ts`. Rename throughout: `Theme`,
+`themeSchema`, `parseTheme`, `gallery`, the TUI's bare tokens now `Palette`, config key `theme`
+(`theme` read one release), overrides key `palette`, commands `theme-<name>`, route
+`GET /themes` (`listThemes`, `{ themes, active, placeholders }`, every theme served complete).
+`docs/themes.md` is new. NOTICE carries the eight MIT palettes; the lead verified the copyright
+lines against the upstream licence files and corrected four (gruvbox publishes no copyright line
+and is MIT/X11 by README; Everforest is "sainnhe"; Rosé Pine is 2023; Omarchy's holder is David
+Heinemeier Hansson) and spot-checked twelve canonical grounds. Gate: 327 files, 4595 tests.
+
+**Lane F2, the app theme engine and the `themes` pane (M2.3 finished).** `theme/` became
+`theme/`: `Theme`, `parseTheme`, `completeTheme` (proven identical to keywork's on all nineteen
+themes with sections stripped), `themeVariables`, `applyTheme`; the storage key `keywork.theme`
+with a one-time read of the old key. Variables now cover every surface: `--kw-terminal-*`
+(16), `--kw-syntax-*` (15), `--kw-diff-*`, `--kw-selection`, `--kw-selection-text`,
+`--kw-cursor`, `--kw-gap`; the root carries `data-theme`, `data-appearance`, `data-chrome`,
+`data-instruments`, `data-gap`. `scripts/sync-themes.ts` reads keywork's gallery from the
+checkout into `theme/gallery.json` and regenerates the static `keywork-night.css`;
+`check:themes` fails on drift. xterm takes all sixteen ANSI colours, cursor and selection;
+CodeMirror gained real syntax highlighting (`@codemirror/language` 6.13.1, `@lezer/highlight`
+1.2.5, thirteen exact-pinned language packages lazy-loaded by extension) with a `HighlightStyle`
+built only from `--kw-syntax-*`; the diff's `color-mix` grounds are gone. The `themes` pane on
+`leader shift+f` (palette `theme`, per-theme `theme-<name>`): swatch strips drawn from the
+parsed theme, taste words, the pair, `j`/`k` previewing live per frame tick, `enter` wearing,
+`escape` restoring, `s` following the OS (`theme-follow`). The wardrobe orders gallery, then
+server themes (overriding by name), then `system` between a theme and its pair. T6 now measures
+all nineteen themes on tokens and sections (38 ratchet rows; nord and flexoki-dark sit exactly
+on the floor). Follow-ups from the captures: the mono stack leads with the bundled face and
+keeps block-capable faces before `ui-monospace`; the remembered theme is worn at boot so the
+open screen is dressed; the duplicate `theme-system` palette row is gone; the terminal's tiny
+text was xterm measuring before the bundled font loaded, now re-measured on `fonts.ready`.
+
+**Lane F3, chrome and typography (M3.4 finished, the design pass).** Chrome weights render
+for real: `regular` boxes each pane in its ink, `seams` draws one hairline per split from each
+frame's right and bottom edge with focus as the title row's underline, `borderless` draws no
+line and lifts the focused ground to panel with a `▎` density mark; `gap` becomes `0.5rem` per
+cell of ground with seams hidden and the seam's grab zone widened to the gap. Pane ink is the
+ramp stop by spawn rank (or the arc ordinal), 30% into border at rest, 82% toward text on
+focus, the bare hue for needs-you. The title row is one component (stamp, name, detail zone of
+bot · inference · mode, telemetry) shedding by tier (broadsheet all, column drops inference,
+clipping keeps telemetry only when focused, masthead stamp and name). Fonts bundled as
+exact-pinned `@fontsource-variable/jetbrains-mono` 5.3.0 and `source-serif-4` 5.3.1 (OFL,
+recorded in NOTICE); the page on a 1.5rem rhythm with serif prose at 1.0625rem and mono at
+0.9375rem, headings one step up, the 70ch measure on prose only with fences full bleed, dark
+themes at weight 370; a tier-variable bug fixed (`@container pane` never matched its own
+element, so the broadsheet measure never applied). Status line, open screen, palette (mode
+word, matched characters as density, selected row inverted), composer, first run and every
+pane's cursor row and input re-expressed on the density material. Motion tokens
+`--kw-tempo-quick` and `--kw-tempo-settle`, zero under reduced motion, ink only. Evidence:
+Playwright `chrome.spec.ts` over five themes and three scenes at two widths (30 shots under
+`artifacts/shots/windows/chrome/`), plus the running app over CDP in three themes.
+
+**Lane V1, the built app verified (what wave 5 proved only by tests).** Every K1 control, undo
+and redo, the tray badge, both toasts and their clicks, the per-workspace ticket attach, the
+second-instance deep link and the file pane's `o` verified in the built Electron app against
+keywork's real `serve()`, with request and main-process logs and 31 screenshots. Eight defects
+fixed with tests: leader chords were dead while the composer had focus (the keymap keeps leader
+chords while typing; single keys still type); a redo left the undone prompt in the composer;
+typed text was dropped until the composer had DOM focus after launch, a palette jump, an
+answered ask or a command (the pane keeps keyboard home, hands it to an inline ask and takes it
+back; overlays return it on close); a pane bound to a never-prompted session restored to a 404
+and swallowed prompts (the store marks sessions `gone`, the pane says so, a prompt starts a new
+one); a swallowed exception in the open flow left the open screen silent (it now says "could
+not open <path> · <reason>"); and `HostPort.saveAs` (main's save dialog, typed refusals,
+preload still one object) so export offers a real save beside the clipboard.
+
+**Lane K7, keywork: trusted reads and ask scopes (staged on `app-surface/next`).** Jordan's
+decisions, recorded in keywork's 50-trust ledger: the read bundle applies automatically on
+trust; it is fixed in keywork with no config option; workspace grants cover bash and MCP only,
+never write or edit. A trusted workspace runs a bundle of read-only shell commands without
+asking (`git status|log|diff|show|rev-parse|remote -v`, explicit read forms of `git branch`,
+`ls`, `dir`, `cat`, `head`, `tail`, `wc`, `pwd`, `which`, `where`, `rg`, `grep`, `find`,
+`tree`, `stat`, `file`, `echo`, `type`, version checks), with ask carve-outs for the forms that
+write or run (`find -delete|-exec`, `rg --pre`, `--output`); compound commands keep every-part
+judgement. `POST /asks/{callId}` takes `scope: once | session | workspace`; a rule is derived
+from the call (`<program> <flag> *` or `<program> *` per part; `<server>__<tool>` for MCP;
+nothing for write and edit, which answer 400 "write and edit are approved once at a time");
+`gate.ask` carries the `rules` a grant would record, `gate.permission` carries `scope` and the
+new origin `gate: "trusted"`. Workspace grants persist to
+`~/.keywork/workspaces/<identity>/permissions.json` (private, atomic, strict); session grants
+live in the server; the TUI's `always` now records the same derived session rules. Layering:
+user rules decide first, then one list of bundle, workspace grants, session grants, last match
+winning. `GET /permissions` lists everything; `POST /permissions/workspace/revoke` removes one.
+`activePreset` ignores the bundle (posture, not user rules). Gate: 329 files, 4685 tests, 64
+`/doc` paths.
+
+**Lane A9, asks answered with scope (M3.5 finished).** `protocol/src/permissions.ts` mirrors
+K7 (`PermissionRule`, `AskScope`, the two refusals, `PermissionsView`, the two routes);
+`gate.ask` carries `rules`, `gate.permission` carries `scope` and the `trusted` origin. The
+client's `answerAsk(callId, verdict, scope?)` maps the two 400s by the server's words to
+`write-once` and `nothing-to-remember`; `permissions()` and `revokeWorkspaceGrant(rule)` are
+typed. Fixture `grants` recorded from `next` in a trusted temp workspace: a session grant, the
+same command running with no ask, a workspace grant, a write refused beyond once, a redirect
+with nothing to remember, and `git status` under `gate: "trusted"`; `doc.json` at 64 paths.
+The ask card, extracted to `page/ask-card.tsx`: `y` once, `n` deny, `s` session, `w` workspace,
+the last two offered only with non-empty `rules` and never for write or edit; the derived rules
+shown in keywork's glob form before the pick, with "this would allow every <program> command"
+on a blanket rule; both refusals in the server's words with the card left pending; the card
+never steals focus from a text field holding a draft. Settled rows read `done · trusted`,
+`done · session grant` or `done · workspace grant`, never as needs-you. The `permissions` pane
+on `leader shift+p`: the bundle with its trust word, workspace grants with `x` revoke behind a
+one-line confirm, session grants grouped by session, refetched on any scoped
+`gate.permission`, after revoke and on reconnect. Verified over real HTTP + SSE: `git status`
+ran under `trusted`, the first `mkdir` asked with its rule, the second ran without asking.
+
+**Consolidation.** The lead verified the NOTICE copyright lines upstream (above), removed a
+dead global ticket a dev run left at port 49276, restored `rules` on asks rebuilt from
+`GET /asks` after a reopen (the card had offered only once and deny), and pinned nothing else:
+every other cross-lane finding was closed by its lane. **Evidence:** 102 files, 1188 tests
+(wave 5: 981); `bun run check` green with `KEYWORK_REPO=C:\src\keywork-lanes\next` (68
+routes, 0.1.1, 19 themes) and in fixture mode; keywork `next` staged with lint and prose
+clean; no process or ticket left behind.
+
+**Findings for keywork, from the app's side (wave 6).**
+- `GET /sessions/{id}/context` estimates from the conversation text and ignores reported
+  usage: after a turn reporting 52 000 input tokens it answered `used: 16, basis: estimated`.
+- `GET /sessions/{id}/cost` forgets turns made before a server restart (the usage ledger lives
+  in memory).
+- A compaction summary comes back from `GET /sessions/{id}` as a plain `role: "user"` message
+  with no marker.
+- A session created by `POST /sessions` but never prompted is gone after a restart; its 404
+  is indistinguishable from a deleted session.
+- `GET /asks` entries carry no `rule` origin, so a restored card cannot word its reason.
+- Session and workspace grants fire no `surface.changed`, and session grants have no revoke
+  route; in the TUI a call covered by a session rule still emits `gate.ask`.
+- `keywork serve` still writes the user-level ticket and refuses a second workspace (wave 5).
+- `/themes` serves the gallery; keywork has no source of user theme files yet, so the closet
+  is empty under serve.
+
+**Decisions for Jordan.** Merge `app-surface/next` (K2 to K7 together, 329 files, 4685 tests).
+K7's reversible choices: the bundle is a constant, `git branch` narrowed to read forms, ask
+carve-outs inside the bundle, `activePreset` ignoring the bundle, user rules deciding before
+the bundle and grants, derived rules keeping a flag (`rm -rf *`), the line REPL sharing the
+posture. K6's: `ristretto` as an original palette, `tokyo-night-storm` skipped, the overrides
+config key renamed to `palette`.
+
+**Left after wave 6.** Mode cycling (keywork PD12); the arc slug tag in the title row (no
+`arc` adornment yet) and a `textFaint` token for the broadsheet ladder; the ASCII fallback for
+`▎`; one-mover arbitration in the motion grammar; the status line's usage reading the local
+projection after compact, undo or reopen; `/open` falling back to a nonexistent README; a
+Playwright scenario for the themes pane and the permissions pane; screenshots of the new ask
+card; a posix identity fixture; re-running the built-app checks against `next` once it settles
+(V1 ran against an exported index mid-rename); the keywork findings above.
+
+**The merge with keywork main, and the app realigned (2026-10-11, after the ledger above).**
+Jordan's keywork `main` landed its own shape of the app-surface lane the same day (session
+trash and restore, K2 tree and diff, serve parity, multi-host memory; different operation
+ids), and PR #7 (`app-surface/next` → `main`) conflicted in 34 files with 152 auto-merged.
+Resolution rule: main's architecture wins wherever both sides built the same ground; the PR
+contributes only the themes (K6) and trusted reads with ask scopes (K7), re-applied in main's
+shape (`listThemes` in `listFlavors`'s slot, the permissions family last, config `theme` with
+`flavor` read one release); the PR's duplicate modules were dropped, including the separate
+spill route since main serves spills through `/files`. Five end-to-end goldens changed by one
+line each (the write ask row no longer offers `always`). Resolved and staged in the `next`
+worktree for Jordan's commit; keywork's gate 346 files, 4797 tests, 49 of 49 scenarios.
+The app then moved onto main's wire (lane A10): every renamed id mapped one to one in
+`client/src/operations.ts` with a test holding the map to the server's ids; shapes re-read
+against the server's own typed client (the changes reading lost `trusted`, airlock digests
+flattened, `bindSessionBot` takes `name`, `applyPreset` answers 409 and 501, memory layers
+no longer carry counts so the app counts from `/memory/notes`, `memory.inbox` and
+`session.tree` payloads reshaped, `session.state` carries `arc` and `bot`); **a real bug
+found: `setMcpServerEnabled` sent `{ enabled }` where the server reads `{ on }`**; the three
+lifecycle events and the trash routes added (`protocol/src/lifecycle.ts`, `DELETE` joins the
+methods); the tree pane gained `x` to trash a session behind a confirm, a collapsed trash
+section on `shift+x` with `enter` restoring and `d` discarding, and a pane bound to a trashed
+session offers restore in keywork's words. The spill viewer is withdrawn: the spill file sits
+outside the tool jail and no route names it. All 34 fixtures re-recorded from the merged tree
+with `doc.json` rebuilt from scratch (66 paths, 72 operations, 25 event types) plus a `trash`
+scenario; one ratchet loosened honestly (`T8.reducerStepsPerFrame` 14 → 15, main sends
+`session.state` on every prompt). **Evidence:** 104 files, 1198 tests; `bun run check` green
+against `next` and in fixture mode at 72 routes. Keywork findings added: spills unreachable
+over the wire; `POST /redo` answers 404 right after an undo announced `redoable: true`;
+`gate.preset` arrives per session while `events.md` calls it process-level; memory layers
+carry no counts and inbox items lose their bot; `GET /memory/notes/{name}` ignores `?layer`;
+per-model cost rows include zero-turn models. Left: a `purgeTrash` UI, the spill viewer
+pending a route, built-app verification of the trash flow.
+
+**The live round, and what it fixed (2026-10-12).** The built app was driven as a user drives
+it against a mock `keywork serve` from the merged tree in a clean sandbox home: trust by chord,
+the read bundle applied without asks, a redirect inside a bundled program still asked, bash
+asks with `s`/`w` scopes landing in the workspace file and lifting on revoke from the
+permissions pane, write asks offering once and deny only, the themes pane, trash and restore,
+and a restart that kept the theme, the trust and the layout. Seven defects came out and three
+lanes closed them. **A11 (app):** the themes pane opened with its cursor on the last, offscreen
+row when "system" was worn (the system choice now leads the list and the cursor opens on the
+theme being worn); list cursors now scroll into view (`keepInView` in `overview/rows.tsx`);
+the ask card claims focus from a composer that holds no draft, and `alt+s` / `alt+w` answer for
+the session or the workspace from anywhere, so the card and the permissions hint name chords
+that work; every trash line names the session as its row did, captured before the store
+forgets it; tool rows subtract the time spent waiting for the person and say `· waited 4.3s`
+instead; the title row and the status line read one `telemetry()` so the two token counts
+agree, and a count built only from streamed turns says `live turns only`. **K8 (keywork +
+app):** two original themes, `whiplash` (dark, borderless: cold black, chrome greys, white-hot
+focus, ice cyan accent, red-magenta error) and `whiplash-flash` (its light pair), every section
+written by hand, floors cleared with margins of 4.8 and 14.6, gallery now 21, synced and
+ratcheted in the app. **K9 (keywork):** derived ask rules no longer hand out open-ended
+destructive grants: `rm`, `rmdir`, `del`, `Remove-Item` and `git branch -D` remember only the
+exact command, force pushes, `reset --hard`, `clean` and `checkout --` remember nothing, git
+global options are skipped before the subcommand, and a remembered wildcard can never cover a
+destructive variant (`git push *` no longer matches `git push --force`). **Evidence:** every
+fix re-verified in the rebuilt app; app rail 105 files, 1214 tests, `check:themes` 21;
+keywork 346 files, 4828 tests. The outline of waves 7 to 11 follows M5.
 
 ## M4: The panes (20pt)
 
@@ -844,7 +1070,7 @@ change when an event is added. Loopback and bearer posture never changes.
 | **S6 memory** | 2 | `GET /memory/notes`, `GET /memory/notes/{title}`, `GET /memory/daily/{date}`, `GET /memory/staging`, `POST /memory/staging/{id}` `{ action: approve \| discard }`; inert when untrusted, exactly as the store is | M4.5 |
 | **S7 status surfaces** | 1 | `GET /mcp`, `GET /arcs`, `GET /bots`, `GET /workspaces` as the existing pane models already compute them | M4.6, M4.7 |
 | **S8 stream and prompt shape** | 1 | `/events?session=` filter; `POST /sessions/{id}/prompt` gains `behavior: steer \| queue` and the P2.6 `provenance` field | M2.4 |
-| **S9 flavors** | 1 | `GET /flavors` listing the gallery and user flavors so the app and the TUI agree on what exists | M2.3 (optional) |
+| **S9 themes** | 1 | `GET /themes` listing the gallery and user themes so the app and the TUI agree on what exists | M2.3 (optional) |
 
 S1 is the one that changes the product: without it the app is a viewer with a composer.
 
@@ -864,10 +1090,122 @@ lane must never add is a route that lets a client hold state the server does not
 ## Design pass (runs alongside M2–M3)
 
 A short design pass in the `design` canvas before M2.4 and M3.4 land: the conversation pane
-at three width tiers in both shipped flavors, the tool row, the ask card, the title row's
+at three width tiers in both shipped themes, the tool row, the ask card, the title row's
 five stamp states, the palette, the status line, and the first-run screen. The serif is
 decided (AD7); the canvas picks the two faces and the measure by showing the same fixture
-transcript in both flavors. Nothing decorative that is not also informative.
+transcript in both themes. Nothing decorative that is not also informative.
+
+## Waves 7 to 11: after the merge (outline, 2026-10-12)
+
+M0 through M5 have landed across waves 4 to 6, PR #7 carries the themes and the trusted
+read posture into keywork `main`, and the live round on 2026-10-11 found only small defects.
+The app is a complete client. What follows is ordered by what turns it into the surface
+Jordan reaches for every day, each wave sized in the same points as the milestones above
+and split into lanes that can run in parallel on agents. Waves are outlines, not ledgers:
+each one gets its brief when it starts and its ledger when it lands.
+
+### Wave 7 (12pt): the daily driver
+
+The goal is one week of Jordan using the app instead of the TUI, with the release rail
+proving the install.
+
+- **W7.1 (3pt) First release.** keywork cuts a release carrying K6 and K7; the app pins it
+  as the sidecar, tags `v0.1.0`, and the three-platform rail produces signed installers
+  with the 60-second clock measured. The updater is proven by shipping `v0.1.1` over it.
+  **Needs** keywork's release after PR #7.
+- **W7.2 (2pt) Open loops from the live round.** `purgeTrash` in the tree pane's trash
+  section; mode cycling once keywork PD12 lands; the arc slug and bot sigil in the title
+  row; the `textFaint` token; `/open` with a README fallback; a posix identity fixture.
+- **W7.3 (3pt) Dogfood ledger.** A `docs/dogfood.md` kept during the week: every moment
+  the TUI was reached for instead, with the reason, triaged into this wave's fixes or the
+  waves below. The acceptance test for the wave is that list getting shorter.
+- **W7.4 (2pt) Second-workspace story.** Two windows on two workspaces with their own
+  servers, the MRU order, asks pending across both in the tray, and the keywork user-level
+  ticket no longer blocking the second `serve` (S10 below).
+- **W7.5 (2pt) Three-platform baselines.** The screenshot parity job gets its first
+  committed baselines for the transcript, the diff view, the terminal and the themes pane,
+  in `keywork-night` and `whiplash`; font fallback stays the only allowed difference.
+
+### Wave 8 (14pt): many sessions, one head
+
+The app's advantage over a terminal is that several sessions can be in view and the person
+answers whichever needs them. This wave makes that the primary posture rather than a
+layout trick.
+
+- **W8.1 (3pt) The needs-you queue.** One ordered list of everything waiting on the
+  person across sessions and workspaces: asks, airlock deliveries, memory inbox items,
+  failed turns. A pane and a chord that jumps to the next item and back. The tray badge
+  and toasts read from the same queue.
+- **W8.2 (3pt) Session groups.** Arcs as the grouping in the tree with collapse, counts
+  of waiting items per group, and bots shown by sigil; a new session can be started inside
+  an arc with its bot bound in one step.
+- **W8.3 (3pt) Fan-out and compare.** Fork a session N ways with one prompt each (the
+  existing fork and prompt routes), tile the children, and a compare pane that shows the
+  changed files of two siblings side by side with turn provenance. No engine logic: the
+  server already holds every piece; the app only composes.
+- **W8.4 (2pt) Quiet mode.** A per-session "let it run" posture built on the session
+  scope from K7, with a visible mark in the title row and a one-key way back. The gate
+  stays on the server: the app only chooses a scope the server already offers.
+- **W8.5 (3pt) Performance at scale.** Ten live sessions streaming, a 20k-entry transcript,
+  reducer steps per frame and paint time ratcheted in `scripts/textures/ratchets.json`;
+  a virtualized transcript if the numbers demand it.
+
+### Wave 9 (12pt): review as a first-class surface
+
+The changes pane is a viewer today. Reviewing an agent's work is where the app can beat
+every terminal, and Zed's review UI stays observed behaviour only.
+
+- **W9.1 (3pt) Hunk-level verdicts.** Keep or revert per hunk through checkpoints: a
+  keywork route that reverts one hunk's range (S11) and an app pane that walks hunks
+  with `n` and `p`, keeps with `k`, reverts with `r`, and keeps a summary line of what is
+  still unreviewed.
+- **W9.2 (2pt) Talk to the diff.** A comment typed on a hunk becomes an inject carrying
+  the file, the range and the hunk text (the `inject` route exists); the agent's answer
+  threads back under the hunk.
+- **W9.3 (2pt) The review ledger.** Per session: files touched, hunks reviewed, hunks
+  reverted, tests run (from bash rows), with the undo and redo tree shown as a timeline.
+- **W9.4 (2pt) Open in editor, done properly.** `$EDITOR` at the line on every platform,
+  with the app noticing the file changed underneath and offering the agent the diff.
+- **W9.5 (3pt) Spills and large outputs.** The keywork spill route (S12) so tool outputs
+  that spilled to disk open in a pane with search; the withdrawn spill viewer returns.
+
+### Wave 10 (10pt): the vault and the airlock
+
+- **W10.1 (3pt) Memory as a garden you tend.** Inbox triage with keys, editing of the
+  person's own notes only (the server writes), entity pages, the daily log with provenance
+  density, and the curing state visible per note.
+- **W10.2 (2pt) The airlock.** Deliveries and finishes shown with their arc context, so
+  what an arc sends out is read where it lands.
+- **W10.3 (2pt) Search everywhere.** One search over transcripts, notes, changed files and
+  spills, served by keywork (S13), opened from the palette.
+- **W10.4 (3pt) Export and share.** The session export gains a reviewable HTML with the
+  diff and the review ledger inline; copy-as-markdown for a selection of entries.
+
+### Wave 11 (10pt): platform and craft
+
+- **W11.1 (3pt) Accessibility.** Every pane reachable by screen reader with the same
+  grammar as the keys; reduced motion honoured through the tempo tokens; APCA floors
+  enforced on the app's own chrome, not only on themes.
+- **W11.2 (2pt) Theme craft.** A theme designer's pane: live token editing against the
+  floors with the refusal text inline, saved as a user theme file keywork reads; `whiplash`
+  and the gallery's light themes tuned from real use.
+- **W11.3 (2pt) macOS and Linux as first-class.** Menu and chord parity (`cmd` as the
+  leader modifier where it belongs), the tray and notifications on each shell, the
+  AppImage and deb installed cold on the clock.
+- **W11.4 (3pt) Keyboard craft.** A chord recorder in the keys overlay, conflicts shown as
+  they are typed, the config file edited in place from the overlay, and a printable key
+  card per theme.
+
+### Server lane, continued (keywork repo)
+
+| Task | Size | What | Needed by |
+|---|---|---|---|
+| **S10 one serve per workspace, for real** | 1 | The user-level ticket stops blocking a second workspace's `serve`; the legacy read path is dropped after its one release | W7.4 |
+| **S11 hunk revert** | 2 | `POST /sessions/{id}/changes/{path}/revert { range }` over checkpoints, recorded as a session entry | W9.1 |
+| **S12 spills** | 1 | `GET /sessions/{id}/spills/{id}` with a range, served from the session's own directory, never the tool jail | W9.5 |
+| **S13 search** | 2 | `GET /search?q=&in=transcripts,notes,changes,spills` with ranges and provenance | W10.3 |
+| **S14 the open findings** | 2 | `POST /redo` after an undo that announced `redoable`; context from reported usage; cost that survives a restart; compaction summaries marked; `surface.changed` on grants; `?layer` on notes; zero-turn cost rows dropped | W7.3 |
+| **PD12 mode cycling** | 1 | The one decision the app has waited on since M3.6 | W7.2 |
 
 ## What is deliberately not in this plan
 

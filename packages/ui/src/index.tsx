@@ -20,7 +20,7 @@ function devPageRequested(): boolean {
 
 export { App } from "./app.tsx";
 export { Composer } from "./composer/composer.tsx";
-export * from "./flavor/index.ts";
 export type { HostPort } from "./host/port.ts";
 export { ConversationPane } from "./page/pane.tsx";
 export { tierOf, type WidthTier } from "./page/tiers.ts";
+export * from "./theme/index.ts";

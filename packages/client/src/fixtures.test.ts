@@ -65,7 +65,7 @@ describe("fixtures recorded from keywork serve", () => {
 
   it("tool: the wire fires tool.started before the policy grant, tails output, and settles with a duration", async () => {
     const stream = await envelopes("tool");
-    expect(stream.map((envelope) => envelope.type).slice(1, 6)).toEqual([
+    expect(stream.map((envelope) => envelope.type).slice(2, 7)).toEqual([
       "turn.delta",
       "turn.delta",
       "tool.started",
@@ -89,13 +89,13 @@ describe("fixtures recorded from keywork serve", () => {
 
   it("denied: an unanswered ask arrives as tool.started, the ask, the timed-out denial, then an error result", async () => {
     const stream = await envelopes("denied");
-    expect(stream.map((envelope) => envelope.type).slice(3, 7)).toEqual([
+    expect(stream.map((envelope) => envelope.type).slice(4, 8)).toEqual([
       "tool.started",
       "gate.ask",
       "gate.permission",
       "tool.finished",
     ]);
-    const asking = projectAll(emptyProjection, stream.slice(0, 5));
+    const asking = projectAll(emptyProjection, stream.slice(0, 6));
     expect(toolRun(asking, 1)).toMatchObject({ phase: "asking", ask: { rule: "default" } });
     expect(toolRowText(toolRun(asking, 1))).toBe("bash echo served · waiting for your answer");
     const state = projectAll(emptyProjection, stream);
@@ -121,8 +121,11 @@ describe("fixtures recorded from keywork serve", () => {
       phase: "done",
       ask: undefined,
       decision: { verdict: "granted", gate: "user" },
+      durationMs: 1250,
+      waitedMs: 250,
+      askedAt: undefined,
     });
-    expect(toolRowText(run)).toBe("bash echo served · 1.5s · done");
+    expect(toolRowText(run)).toBe("bash echo served · 1.3s · waited 250ms · done");
   });
 
   it("asked-denied: answering no refuses the call with the user's reason", async () => {
@@ -150,10 +153,10 @@ describe("fixtures recorded from keywork serve", () => {
 
   it("queued: a second prompt waits in the queue and runs as its own turn afterwards", async () => {
     const stream = await envelopes("queued");
-    const midway = projectAll(emptyProjection, stream.slice(0, 3));
+    const midway = projectAll(emptyProjection, stream.slice(0, 4));
     expect(midway.queue).toEqual([{ id: "q1", text: "second", behavior: "queue" }]);
     expect(midway.turn?.userText).toBe("first");
-    const state = projectAll(midway, stream.slice(3));
+    const state = projectAll(midway, stream.slice(4));
     expect(state.queue).toEqual([]);
     expect(
       state.entries.map((entry) => (entry.kind === "tool" ? entry.run.name : entry.text)),
@@ -164,11 +167,11 @@ describe("fixtures recorded from keywork serve", () => {
   it("injected: a prompt from another client queues with its origin and runs as its own turn", async () => {
     const stream = await envelopes("injected");
     const origin = { kind: "external", client: "wispr-flow" };
-    const midway = projectAll(emptyProjection, stream.slice(0, 3));
+    const midway = projectAll(emptyProjection, stream.slice(0, 4));
     expect(midway.queue).toEqual([{ id: "q1", text: "second", behavior: "queue", origin }]);
     expect(midway.turn).toMatchObject({ userText: "first" });
     expect(midway.turn?.origin).toBeUndefined();
-    const state = projectAll(midway, stream.slice(3));
+    const state = projectAll(midway, stream.slice(4));
     expect(state.queue).toEqual([]);
     expect(state.entries[2]).toEqual({ kind: "user", text: "second", origin, replay: false });
     expect(state.usage.turns).toBe(2);
@@ -225,7 +228,7 @@ describe("controls recorded from K1's session verbs", () => {
   it("folds each session.state into the projection's standing, whole rather than merged", async () => {
     const stream = await envelopes("controls");
     const states = stream.filter((envelope) => envelope.type === "session.state");
-    expect(states).toHaveLength(6);
+    expect(states).toHaveLength(7);
     const afterThinking = projectAll(emptyProjection, stream.slice(0, 8));
     expect(afterThinking.standing).toMatchObject({ model: "mock/beta", thinking: true });
     expect(afterThinking.standing?.effort).toBeUndefined();
@@ -237,17 +240,17 @@ describe("controls recorded from K1's session verbs", () => {
       thinking: true,
       effort: "high",
       title: "Lights",
-      leafId: "q5",
-      undoable: true,
-      redoable: false,
+      leafId: null,
+      undoable: false,
+      redoable: true,
     });
   });
 
-  it("carries the preset switch as a process-level envelope", async () => {
+  it("carries the preset switch on every live session's stream", async () => {
     const preset = (await envelopes("controls")).find(
       (envelope) => envelope.type === "gate.preset",
     );
-    expect(preset).toMatchObject({ sessionId: "", payload: { from: "standard", to: "open" } });
+    expect(preset).toMatchObject({ sessionId: "s1", payload: { from: "standard", to: "open" } });
   });
 
   it("seeds the same controls from the session summary before any event arrives", async () => {
@@ -266,18 +269,20 @@ describe("controls recorded from K1's session verbs", () => {
     });
     expect(sessionControls(summary, await projected("controls"))).toMatchObject({
       basis: "reported",
-      undoable: true,
+      undoable: false,
+      redoable: true,
     });
   });
 
-  it("answers undo with the prompt text, refuses a second undo, and redo brings it back", async () => {
+  it("answers undo with the prompt text and refuses a second undo as nothing to undo", async () => {
     const recorded = await answers();
-    expect((recorded.undo as Answer<Undone>).body.prompt?.text).toBe("turn on the lights");
-    expect(recorded.undoAgain).toEqual({
-      status: 409,
-      body: { error: "already undone · send a prompt to keep it, or redo to bring it back" },
+    expect((recorded.undo as Answer<Undone>).body).toMatchObject({
+      prompt: { text: "turn on the lights" },
+      undoable: false,
+      redoable: true,
     });
-    expect(recorded.redo).toMatchObject({ status: 200, body: { restored: true, redoable: false } });
+    expect(recorded.undoAgain).toEqual({ status: 404, body: { error: "nothing to undo" } });
+    expect(recorded.redo).toEqual({ status: 404, body: { error: "nothing to redo" } });
     expect(recorded.redoAgain).toEqual({ status: 404, body: { error: "nothing to redo" } });
   });
 
@@ -298,7 +303,10 @@ describe("controls recorded from K1's session verbs", () => {
   it("reports cost per model and a context reading with its basis", async () => {
     const recorded = await answers();
     const cost = (recorded.cost as Answer<CostReport>).body;
-    expect(cost.models.map((row) => [row.reference, row.turns])).toEqual([["mock/alpha", 1]]);
+    expect(cost.models.map((row) => [row.reference, row.turns])).toEqual([
+      ["mock/alpha", 1],
+      ["mock/beta", 0],
+    ]);
     expect(cost.rollup.unpricedTurns).toBe(1);
     expect(recorded.context).toMatchObject({
       status: 200,

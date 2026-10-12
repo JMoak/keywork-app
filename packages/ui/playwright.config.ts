@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 export const devPageUrl = "http://127.0.0.1:5173/?dev";
+export const chromeGalleryUrl = "http://127.0.0.1:5173/screenshots/chrome.html";
 
 export default defineConfig({
   testDir: "screenshots",

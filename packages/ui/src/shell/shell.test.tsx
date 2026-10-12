@@ -24,6 +24,13 @@ const toolStream = fixture("tool.jsonl")
   .filter((line) => line !== "")
   .map((line) => JSON.parse(line) as BusEnvelope);
 
+const liveAsk = fixture("asked-granted.jsonl")
+  .split("\n")
+  .filter((line) => line !== "")
+  .map((line) => JSON.parse(line) as BusEnvelope)
+  .filter((envelope) => envelope.id <= 6)
+  .map((envelope) => ({ ...envelope, id: envelope.id + 300, ts: new Date().toISOString() }));
+
 const storedDetail = JSON.parse(fixture("session-detail.json")) as SessionDetail;
 
 function fakeClient(options: { pendingAsk?: boolean } = {}): {
@@ -63,8 +70,9 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
       summaries.unshift(created);
       return created;
     },
-    prompt: async (_id, text) => {
-      prompts.push(text);
+    prompt: async (id, text) => {
+      if (!summaries.some((summary) => summary.id === id)) return "missing";
+      prompts.push(`${id}: ${text}`);
       return "started";
     },
     abort: async (id) => {
@@ -74,7 +82,7 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
     inject: async () => "started",
     entries: async () => undefined,
     fork: async () => "missing",
-    label: async () => "missing",
+    labelEntry: async () => "missing",
     moveLeaf: async () => "missing",
     changes: async () => "missing",
     ...inertMemoryClient(),
@@ -82,7 +90,11 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
     ...inertWorkspaceClient(),
     ...emptySurfacesClient(),
     changedFile: async () => "missing",
-    spill: async () => "missing",
+    removeSession: async () => "missing",
+    listTrash: async () => [],
+    restoreSession: async () => "missing",
+    discardTrashedSession: async () => "missing",
+    purgeTrash: async () => ({ purged: 0 }),
     asks: async () =>
       options.pendingAsk
         ? [
@@ -92,13 +104,16 @@ function fakeClient(options: { pendingAsk?: boolean } = {}): {
               tool: "bash",
               arguments: { command: "rm -rf dist" },
               askedAt: new Date().toISOString(),
+              rules: [{ action: "bash", resource: "rm -rf *", effect: "allow" as const }],
             },
           ]
         : [],
-    answerAsk: async (callId, verdict) => {
-      answers.push(`${callId}:${verdict}`);
+    answerAsk: async (callId, verdict, scope) => {
+      answers.push([callId, verdict, scope].filter((part) => part !== undefined).join(":"));
       return "settled" as const;
     },
+    permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
+    revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
     events: async function* (options) {
       options?.onOpen?.();
       for (;;) {
@@ -157,7 +172,9 @@ describe("the app shell", () => {
     }));
     fake.emit(later);
     await waitFor(() => expect(screen.getAllByText("It printed served.")).toHaveLength(2));
-    expect(screen.getByText("17 tokens · unpriced", { selector: ".kw-frame-usage" })).toBeTruthy();
+    const usage = "17 tokens · unpriced · live turns only";
+    expect(screen.getByText(usage, { selector: ".kw-frame-usage" })).toBeTruthy();
+    expect(screen.getByText(usage, { selector: ".kw-status-item" })).toBeTruthy();
   });
 
   it("sends the composer's prompt and interrupt to the server", async () => {
@@ -169,7 +186,7 @@ describe("the app shell", () => {
     input.value = "hello there";
     fireEvent.input(input);
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(fake.prompts).toEqual(["hello there"]));
+    await waitFor(() => expect(fake.prompts).toEqual(["s1: hello there"]));
     fireEvent.keyDown(input, { key: "Escape" });
     await waitFor(() => expect(fake.aborts).toEqual(["s1"]));
   });
@@ -180,8 +197,127 @@ describe("the app shell", () => {
     await openTyped("C:/work");
     const card = await screen.findByRole("group", { name: "permission ask" });
     expect(card.textContent).toContain("rm -rf dist");
+    expect(card.textContent).toContain("rm -rf *");
     fireEvent.keyDown(document, { key: "y", ctrlKey: true });
     await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
+  });
+
+  it("lets the ask card take the keys from a composer that just sent its prompt", async () => {
+    const fake = fakeClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    await screen.findByText("It printed served.");
+    const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
+    input.focus();
+    input.value = "run echo served";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(fake.prompts).toEqual(["s1: run echo served"]));
+    expect(document.activeElement).toBe(input);
+    fake.emit(liveAsk);
+    const card = await screen.findByRole("group", { name: "permission ask" });
+    await waitFor(() => expect(document.activeElement).toBe(card));
+    fireEvent.keyDown(card, { key: "w" });
+    await waitFor(() => expect(fake.answers).toEqual(["c1:granted:workspace"]));
+  });
+
+  it("answers for the workspace with the global chord while a draft holds the composer", async () => {
+    const fake = fakeClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    const card = await screen.findByRole("group", { name: "permission ask" });
+    expect(card.textContent).toContain("alt+w");
+    const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
+    input.focus();
+    input.value = "while you wait";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "w", code: "KeyW", altKey: true });
+    await waitFor(() => expect(fake.answers).toEqual(["c9:granted:workspace"]));
+    expect(input.value).toBe("while you wait");
+  });
+
+  it("offers to restore the session a pane shows when the server moves it to the trash", async () => {
+    const fake = fakeClient();
+    const restored: string[] = [];
+    const client: KeyworkClient = {
+      ...fake.client,
+      restoreSession: async (id) => {
+        restored.push(id);
+        return (await fake.client.sessions())[0] ?? "missing";
+      },
+    };
+    render(() => <App host={hostWithServer()} connect={() => client} />);
+    await openTyped("C:/work");
+    await screen.findByText("It printed served.");
+    fake.emit([
+      {
+        id: 200,
+        ts: new Date().toISOString(),
+        sessionId: "",
+        type: "session.removed",
+        payload: { sessionId: "s1" },
+      },
+    ]);
+    const offer = await screen.findByText(
+      'removed "run echo served" · it is in the trash, memory notes stay · restore it? y/n',
+    );
+    fireEvent.keyDown(offer, { key: "y" });
+    await waitFor(() => expect(restored).toEqual(["s1"]));
+    await screen.findByText('restored "run echo served" · it is back in the session tree');
+  });
+
+  it("rehomes a restored pane whose session the server no longer knows", async () => {
+    localStorage.setItem(
+      "keywork.layout:C:/work",
+      JSON.stringify({
+        layout: {
+          version: 1,
+          tree: { kind: "leaf", id: "conversation-1" },
+          focused: "conversation-1",
+          docks: {},
+        },
+        specs: { "conversation-1": { kind: "conversation", sessionId: "never-prompted" } },
+      }),
+    );
+    const fake = fakeClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    await openTyped("C:/work");
+    await screen.findByText(/the session this pane showed is gone from the server/);
+    const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
+    input.value = "are you there";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(fake.prompts).toEqual(["s2: are you there"]));
+  });
+
+  it("says why when the server answers the open but its sessions cannot be read", async () => {
+    const fake = fakeClient();
+    const failing: KeyworkClient = {
+      ...fake.client,
+      sessions: async () => {
+        throw new Error("GET /sessions answered 500");
+      },
+    };
+    render(() => <App host={hostWithServer()} connect={() => failing} />);
+    await openTyped("C:/work");
+    await screen.findByText("could not open C:/work · GET /sessions answered 500");
+    expect(screen.queryByText(/starting keywork in/)).toBeNull();
+  });
+
+  it("says why when the host itself throws while opening a recent workspace", async () => {
+    const host = {
+      ...hostWithServer(),
+      recentWorkspaces: async () => [{ path: "C:/work", openedAt: new Date().toISOString() }],
+      openWorkspace: async () => {
+        throw new Error("Error invoking remote method 'host:open-workspace'");
+      },
+    };
+    render(() => <App host={host} connect={() => fakeClient().client} />);
+    fireEvent.click(await screen.findByText("C:/work"));
+    await screen.findByText(
+      "could not open C:/work · Error invoking remote method 'host:open-workspace'",
+    );
+    expect(screen.queryByText(/starting keywork in/)).toBeNull();
   });
 
   it("shows the host's failure text when a workspace cannot open", async () => {

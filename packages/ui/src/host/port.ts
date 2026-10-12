@@ -16,6 +16,7 @@ export interface HostPort {
   notify(notice: HostNotice): Promise<void>;
   onNotificationActivated(listener: (trigger: NeedsYouTrigger) => void): () => void;
   setPendingAsks(count: number): Promise<void>;
+  saveAs(suggestedName: string, text: string): Promise<SaveOutcome>;
   serverFetch(
     workspace: string,
     path: string,
@@ -118,6 +119,11 @@ export interface OpenWorkspaceEntry {
 export type NeedsYouTrigger =
   | { kind: "ask"; workspace: string; sessionId: string; callId: string }
   | { kind: "memory-inbox"; workspace: string; pending: number };
+
+export type SaveOutcome =
+  | { saved: true; path: string }
+  | { saved: false; refused: "cancelled" }
+  | { saved: false; refused: "invalid" | "failed" | "unavailable"; detail: string };
 
 export interface HostNotice {
   title: string;

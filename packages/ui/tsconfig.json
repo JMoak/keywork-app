@@ -6,9 +6,10 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "jsxImportSource": "solid-js",
+    "resolveJsonModule": true
   },
-  "include": ["src", "vite.config.ts", "playwright.config.ts", "screenshots"],
+  "include": ["src", "src/**/*.json", "vite.config.ts", "playwright.config.ts", "screenshots"],
   "references": [
     {
       "path": "../protocol"

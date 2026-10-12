@@ -13,6 +13,7 @@ import { notifyOnInbox } from "./shell/needs-you.ts";
 import { OpenScreen } from "./shell/open-screen.tsx";
 import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
 import { WorkspaceView } from "./shell/workspace-view.tsx";
+import { wearRememberedTheme } from "./theme/wardrobe.ts";
 import "./shell/shell.css";
 
 export interface AppProps {
@@ -29,6 +30,7 @@ interface Connected {
 }
 
 export function App(props: AppProps) {
+  wearRememberedTheme({ storage: localStorageOrNone() });
   const [connected, setConnected] = createSignal<Connected>();
   const [opening, setOpening] = createSignal<string>();
   const [failure, setFailure] = createSignal<string>();
@@ -40,8 +42,17 @@ export function App(props: AppProps) {
   const open = async (path: string): Promise<void> => {
     setFailure(undefined);
     setOpening(path);
+    try {
+      await attach(path);
+    } catch (cause) {
+      setFailure(`could not open ${path} · ${messageOf(cause)}`);
+    } finally {
+      setOpening(undefined);
+    }
+  };
+
+  const attach = async (path: string): Promise<void> => {
     const result = await props.host.openWorkspace(path);
-    setOpening(undefined);
     if (!result.ok) {
       setFailure(describeFailure(result.failure));
       return;
@@ -61,7 +72,14 @@ export function App(props: AppProps) {
       stopInbox();
       stopAsks();
     };
-    await store.refresh();
+    try {
+      await store.refresh();
+    } catch (cause) {
+      stopNotifying();
+      store.dispose();
+      feed.close();
+      throw cause;
+    }
     void store.surfaces.load();
     setConnected({ opened: result.opened, client, feed, store, stopNotifying });
   };
@@ -117,4 +135,16 @@ export function App(props: AppProps) {
 
 function serverLabel(opened: OpenedWorkspace): string {
   return opened.attached ? `attached · ${opened.serverLabel}` : opened.serverLabel;
+}
+
+function messageOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+function localStorageOrNone(): Storage | undefined {
+  try {
+    return typeof localStorage === "object" ? localStorage : undefined;
+  } catch {
+    return undefined;
+  }
 }

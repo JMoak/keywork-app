@@ -1,0 +1,606 @@
+{
+  "pendingWrite": {
+    "status": 200,
+    "body": {
+      "asks": [
+        {
+          "sessionId": "s1",
+          "callId": "g4",
+          "tool": "write",
+          "arguments": {
+            "path": "notes.txt",
+            "content": "one\ntwo\n"
+          },
+          "rules": [],
+          "askedAt": "2026-09-07T12:00:00.000Z"
+        }
+      ]
+    }
+  },
+  "writeBeyondOnce": {
+    "status": 400,
+    "body": {
+      "error": "write and edit are approved once at a time"
+    }
+  },
+  "nothingToRemember": {
+    "status": 400,
+    "body": {
+      "error": "this call has nothing a grant could remember; approve it once"
+    }
+  },
+  "permissions": {
+    "status": 200,
+    "body": {
+      "trusted": true,
+      "bundle": [
+        {
+          "action": "bash",
+          "resource": "git status*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git log*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git diff*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git show*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git rev-parse*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git remote -v",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -a",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -r",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -v",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -vv",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --all",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --remotes",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --show-current",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --list *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --contains *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --merged *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --no-merged *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "ls*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "dir*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "cat *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "head *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "tail *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "wc *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "pwd",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "which *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "where *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "rg *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "grep *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "find *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "tree*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "stat *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "file *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "echo *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "type *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "node --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "bun --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "npm --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "python --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-delete*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-exec*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-ok*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-fprint*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-fls*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "rg *--pre*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git log*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git diff*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git show*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "tree*-o*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "file *-C*",
+          "effect": "ask"
+        }
+      ],
+      "workspace": [
+        {
+          "action": "bash",
+          "resource": "git add *",
+          "effect": "allow"
+        }
+      ],
+      "session": {
+        "s1": [
+          {
+            "action": "bash",
+            "resource": "mkdir -p *",
+            "effect": "allow"
+          }
+        ]
+      }
+    }
+  },
+  "revoked": {
+    "status": 200,
+    "body": {
+      "revoked": {
+        "action": "bash",
+        "resource": "git add *",
+        "effect": "allow"
+      }
+    }
+  },
+  "revokedAgain": {
+    "status": 404,
+    "body": {
+      "error": "no workspace grant matches that rule"
+    }
+  },
+  "revokeMalformed": {
+    "status": 400,
+    "body": {
+      "error": "the body must be { rule: { action, resource, effect: \"allow\" } }"
+    }
+  },
+  "afterRevoke": {
+    "status": 200,
+    "body": {
+      "trusted": true,
+      "bundle": [
+        {
+          "action": "bash",
+          "resource": "git status*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git log*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git diff*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git show*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git rev-parse*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git remote -v",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -a",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -r",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -v",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch -vv",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --all",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --remotes",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --show-current",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --list *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --contains *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --merged *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git branch --no-merged *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "ls*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "dir*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "cat *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "head *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "tail *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "wc *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "pwd",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "which *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "where *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "rg *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "grep *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "find *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "tree*",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "stat *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "file *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "echo *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "type *",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "node --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "bun --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "npm --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "git --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "python --version",
+          "effect": "allow"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-delete*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-exec*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-ok*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-fprint*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "find *-fls*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "rg *--pre*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git log*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git diff*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "git show*--output*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "tree*-o*",
+          "effect": "ask"
+        },
+        {
+          "action": "bash",
+          "resource": "file *-C*",
+          "effect": "ask"
+        }
+      ],
+      "workspace": [],
+      "session": {
+        "s1": [
+          {
+            "action": "bash",
+            "resource": "mkdir -p *",
+            "effect": "allow"
+          }
+        ]
+      }
+    }
+  }
+}

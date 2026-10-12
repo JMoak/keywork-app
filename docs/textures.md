@@ -14,11 +14,11 @@ DOM, fails a regression, and fails any value that loosened against `HEAD` withou
 | `T2.floodBytes` | 5242880 | higher | `packages/ui/src/composer/textures.test.tsx` |
 | `T2.floodLines` | 10000 | higher | `packages/ui/src/composer/textures.test.tsx` |
 | `T2.floodDraftChars` | 33 | lower | `packages/ui/src/composer/textures.test.tsx` |
-| `T6.minMarginLc.keywork-night` | 3.1 | higher | `packages/ui/src/flavor/textures.test.ts`, `check:textures` |
-| `T6.minMarginLc.keywork-day` | 13.1 | higher | `packages/ui/src/flavor/textures.test.ts`, `check:textures` |
+| `T6.minMarginLc.<theme>` | one per gallery theme (keywork-night 3.1, keywork-day 13.1) | higher | `packages/ui/src/theme/textures.test.ts`, `check:textures` |
+| `T6.sectionMarginLc.<theme>` | one per gallery theme (keywork-night 1.7, keywork-day 16.5) | higher | `packages/ui/src/theme/textures.test.ts`, `check:textures` |
 | `T7.emptyStateMinWidthPx` | 127 | lower | `packages/ui/src/panes/registry.test.ts` |
 | `T8.eventsPerFrame` | 800 | higher | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
-| `T8.reducerStepsPerFrame` | 14 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
+| `T8.reducerStepsPerFrame` | 15 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 | `T8.firstPaintElements` | 185 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 
 ## T1: grapheme-correct editing
@@ -41,11 +41,15 @@ payload, so `floodDraftChars` bounds what a flood costs the frame.
 
 ## T6: first-class light
 
-`flavor/contrast-audit.ts` measures every composited pair with keywork's APCA floors (text 60,
-textMid 30, textDim 15, border 5, focus, accent, outcomes and the density ramp) and checks
-polarity: every pair in a light flavor reads dark-on-light and every pair in a dark one reads
-light-on-dark, so a tinted dark flavor fails. The ratchet is each flavor's smallest headroom
-above its floor, so a flavor that drifts toward the floor fails before it crosses it.
+`theme/contrast-audit.ts` measures every composited pair of every gallery theme with keywork's
+APCA floors (text 60, textMid 30, textDim 15, border 5, focus, accent, outcomes and the density
+ramp) and the section floors (syntax 30 on panel and comments 15, the twelve chromatic ANSI
+colours 30 on background, text 60 on either diff line, selection 45, cursor 40), and checks
+polarity: every pair in a light theme reads dark-on-light and every pair in a dark one reads
+light-on-dark, so a tinted dark theme fails. Two ratchets per theme hold the smallest headroom
+above the floor, one across the tokens and one across the sections, so a theme that drifts toward
+the floor fails before it crosses it. The gallery is keywork's (`bun run sync:themes`;
+`check:themes` fails on drift), so a theme added there needs its two rows here.
 
 ## T7: empty states that teach
 

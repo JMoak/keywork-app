@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { gallery, keyworkDay, keyworkNight } from "../packages/ui/src/flavor/flavors.ts";
+import { gallery, keyworkDay, keyworkNight } from "../packages/ui/src/theme/themes.ts";
 import { judgeTextures } from "./check-textures.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 import { parseRatchets, ratchetsFile } from "./textures/ratchets.ts";
@@ -13,23 +13,23 @@ describe("check:textures", () => {
     expect(judgeTextures(ratchets, ratchets, gallery).violations).toEqual([]);
   });
 
-  it("fails a light flavor that only tints a dark one", () => {
+  it("fails a light theme that only tints a dark one", () => {
     const tinted = { ...keyworkNight, name: "keywork-day", appearance: "light" as const };
     expect(judgeTextures(ratchets, undefined, [keyworkNight, tinted]).violations).toEqual(
       expect.arrayContaining([
-        "T6 keywork-day: text on background reads light-on-dark in a light flavor",
+        "T6 keywork-day: text on background reads light-on-dark in a light theme",
         expect.stringMatching(/^T6\.minMarginLc\.keywork-day regressed to /),
       ]),
     );
   });
 
-  it("fails a gallery without a light flavor", () => {
+  it("fails a gallery without a light theme", () => {
     expect(judgeTextures(ratchets, undefined, [keyworkNight]).violations).toContain(
-      "T6: the gallery ships no light flavor",
+      "T6: the gallery ships no light theme",
     );
   });
 
-  it("fails a flavor whose contrast headroom shrank even while it clears the floor", () => {
+  it("fails a theme whose contrast headroom shrank even while it clears the floor", () => {
     const fainterBorder = {
       ...keyworkDay,
       tokens: { ...keyworkDay.tokens, border: "#cdd1df" },

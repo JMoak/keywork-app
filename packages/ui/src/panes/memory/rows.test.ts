@@ -1,4 +1,4 @@
-import type { InboxItem, LedgerEntry, MemoryGarden, MemoryNote } from "@keywork-app/protocol";
+import type { LedgerEntry, MemoryGarden, MemoryNote, StagedItem } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { inertGarden } from "../../shell/memory-store.ts";
 import {
@@ -24,10 +24,10 @@ function note(name: string, layer = "workspace"): MemoryNote {
     tokens: 4,
     frontmatter: {},
     layer,
+    file: `C:/vault/${name}.md`,
     curing: 1,
     injected: false,
     recalls: 0,
-    relations: [],
   };
 }
 
@@ -40,7 +40,7 @@ function entry(id: string, op: LedgerEntry["op"], path: string): LedgerEntry {
   };
 }
 
-const staged: InboxItem = {
+const staged: StagedItem = {
   id: "s1",
   kind: "note",
   target: "Stray Claim.md",
@@ -56,8 +56,6 @@ const garden: MemoryGarden = {
       id: "workspace",
       kind: "workspace",
       label: "workspace",
-      notes: 2,
-      curing: { 0: 1, 1: 1, 2: 0, 3: 0 },
       prompt: { budget: 4096, used: 120 },
     },
     {
@@ -65,8 +63,6 @@ const garden: MemoryGarden = {
       kind: "arc",
       label: "launch",
       arc: "launch",
-      notes: 1,
-      curing: { 0: 1, 1: 0, 2: 0, 3: 0 },
     },
   ],
   inbox: [
@@ -151,15 +147,11 @@ describe("inbox items as rows", () => {
       detail: "note",
       note: "Stray Claim",
     });
-    expect(inboxView(garden.inbox[1] as InboxItem)).toMatchObject({
+    expect(inboxView(garden.inbox[1] as StagedItem)).toMatchObject({
       group: "contradiction",
       title: "Layout Rects vs Layout Cells",
       provenance: "agent",
     });
-  });
-
-  it("names the bot that staged an owned item", () => {
-    expect(inboxView({ ...staged, bot: "scout" }).title).toBe("scout · Stray Claim.md");
   });
 });
 

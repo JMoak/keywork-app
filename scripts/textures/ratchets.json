@@ -29,6 +29,206 @@
     "better": "higher",
     "why": "smallest APCA headroom above keywork's floor across every composited pair"
   },
+  "T6.minMarginLc.catppuccin-mocha": {
+    "value": 4.2,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.catppuccin-latte": {
+    "value": 9.3,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.nord": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.nord-light": {
+    "value": 0.3,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.gruvbox-dark": {
+    "value": 0.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.gruvbox-light": {
+    "value": 16.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.everforest-dark": {
+    "value": 0.9,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.everforest-light": {
+    "value": 5.6,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.kanagawa-wave": {
+    "value": 0.8,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.kanagawa-lotus": {
+    "value": 0.7,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.rose-pine": {
+    "value": 2.3,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.rose-pine-dawn": {
+    "value": 7.6,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.matte-black": {
+    "value": 0.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.osaka-jade": {
+    "value": 2.3,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.ristretto": {
+    "value": 2.5,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.flexoki-dark": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.flexoki-light": {
+    "value": 13.6,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.whiplash": {
+    "value": 4.8,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.minMarginLc.whiplash-flash": {
+    "value": 14.6,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across every composited pair"
+  },
+  "T6.sectionMarginLc.keywork-night": {
+    "value": 1.7,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.keywork-day": {
+    "value": 16.5,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.catppuccin-mocha": {
+    "value": 11.5,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.catppuccin-latte": {
+    "value": 2.8,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.nord": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.nord-light": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.gruvbox-dark": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.gruvbox-light": {
+    "value": 9.8,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.everforest-dark": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.everforest-light": {
+    "value": 4.2,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.kanagawa-wave": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.kanagawa-lotus": {
+    "value": 1.7,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.rose-pine": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.rose-pine-dawn": {
+    "value": 7.7,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.matte-black": {
+    "value": 2.2,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.osaka-jade": {
+    "value": 6.9,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.ristretto": {
+    "value": 9.2,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.flexoki-dark": {
+    "value": 0,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.flexoki-light": {
+    "value": 14.5,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.whiplash": {
+    "value": 6.9,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
+  "T6.sectionMarginLc.whiplash-flash": {
+    "value": 17.1,
+    "better": "higher",
+    "why": "smallest APCA headroom above keywork's floor across the declared terminal, syntax, diff, selection and cursor sections; a 0 is a palette pressed onto the floor and may only rise"
+  },
   "T7.emptyStateMinWidthPx": {
     "value": 127,
     "better": "lower",
@@ -40,9 +240,9 @@
     "why": "events pushed into one frame before it paints; the prose fixture streamed per character fills it"
   },
   "T8.reducerStepsPerFrame": {
-    "value": 14,
+    "value": 15,
     "better": "lower",
-    "why": "projection steps the reducer takes in the busiest frame of any fixture streamed one character per event"
+    "why": "projection steps the reducer takes in the busiest frame of any fixture streamed one character per event; keywork serve now sends a session.state after every accepted and every persisted prompt, so the two-prompt queued and injected fixtures carry 15 envelopes the coalescer may not merge"
   },
   "T8.firstPaintElements": {
     "value": 185,

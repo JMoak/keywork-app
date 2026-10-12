@@ -29,6 +29,8 @@ export type ArcsSpec = z.output<typeof arcsSpec>;
 
 export const unboundGroup = "unbound";
 
+export const unnamedArcLine = "an arc needs a slug · lowercase letters, digits, hyphens";
+
 export const arcsPane = definePane<ArcsSpec>({
   kind: "arcs",
   spec: arcsSpec,
@@ -186,7 +188,11 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
 
   const create = async (slug: string): Promise<void> => {
     setPrompt(undefined);
-    const created = await surfaces().verbs.createArc(slug === "" ? undefined : slug);
+    if (slug === "") {
+      setNotice(unnamedArcLine);
+      return;
+    }
+    const created = await surfaces().verbs.createArc(slug);
     setNotice(isSurfaceRefusal(created) ? created.detail : `${created.slug} opened`);
     await surfaces().refetch("arcs");
   };
@@ -289,7 +295,7 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
       <Show when={naming()}>
         <DraftLine
           label="arc slug"
-          placeholder="blank lets the server pick arc-<n>"
+          placeholder="slug · lowercase letters, digits, hyphens"
           onSubmit={(slug) => void create(slug)}
           onCancel={() => setPrompt(undefined)}
         />

@@ -1,4 +1,4 @@
-import { createSignal, type JSX, Show } from "solid-js";
+import { createEffect, createSignal, type JSX, Show } from "solid-js";
 import "./overview.css";
 
 export interface Cursor {
@@ -16,6 +16,12 @@ export function createCursor(count: () => number): Cursor {
     move: (delta) => setRaw(clamp(index() + delta)),
     set: (next) => setRaw(clamp(next)),
   };
+}
+
+export function keepInView(row: HTMLElement, isCursor: () => boolean): void {
+  createEffect(() => {
+    if (isCursor()) row.scrollIntoView({ block: "nearest" });
+  });
 }
 
 export type RowDensity = "light" | "medium" | "heavy" | "full";

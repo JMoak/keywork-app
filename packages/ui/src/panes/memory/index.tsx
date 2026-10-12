@@ -165,7 +165,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     const current = lens();
     return current.kind === "note" ? { ...current, revision: revision() } : undefined;
   };
-  const [openedNote] = createResource(noteKey, (key) => memory().note(key.name, key.layer));
+  const [openedNote] = createResource(noteKey, (key) => memory().note(key.name));
   const dailyKey = () => {
     const current = lens();
     return current.kind === "daily" ? { date: current.date, revision: revision() } : undefined;
@@ -186,7 +186,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     rows().find((row) => row.id === cursor()) ?? rows()[0];
   const focusedLedgerId = (): string | undefined =>
     ledgerEntries().find((entry) => entry.id === cursor())?.id ?? ledgerEntries()[0]?.id;
-  const gardenEmpty = () => state().garden.layers.every((layer) => layer.notes === 0);
+  const gardenEmpty = () => (notes() ?? []).length === 0;
   const inert = () => state().loaded && !state().garden.trusted;
 
   if (!state().loaded) void memory().refresh();

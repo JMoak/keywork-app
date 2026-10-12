@@ -4,13 +4,14 @@ import {
   type ServerFeed,
   type SessionProjection,
 } from "@keywork-app/client";
-import type { AskVerdict } from "@keywork-app/protocol";
+import type { AskScope, AskVerdict } from "@keywork-app/protocol";
 import {
   createEffect,
   createMemo,
   createSignal,
   For,
   Match,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -18,11 +19,13 @@ import {
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { FirstRun } from "../chrome/first-run.tsx";
+import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
-import { createWardrobe } from "../flavor/wardrobe.ts";
+import { gapCells } from "../chrome/root-attributes.ts";
+import { StatusLine } from "../chrome/status-line.tsx";
+import { telemetry } from "../chrome/telemetry.ts";
 import { followActivations } from "../host/activation.ts";
 import type { HostPort } from "../host/port.ts";
-import { usageLine } from "../instruments/cost.ts";
 import {
   type ActionTarget,
   appActions,
@@ -31,7 +34,7 @@ import {
   type Keymap,
   keymapFromConfig,
 } from "../keys/index.ts";
-import { scopeWhileTyping } from "../keys/typing.ts";
+import { keyFocusOf } from "../keys/typing.ts";
 import {
   type DropZone,
   dropZoneRects,
@@ -44,6 +47,7 @@ import {
   seamZoneRect,
   type Verdict,
 } from "../layout/index.ts";
+import { rememberableRules } from "../page/ask-card.tsx";
 import { CommandRegistry } from "../palette/commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
 import { fileUrlOf } from "../panes/file/range.ts";
@@ -54,6 +58,8 @@ import {
   parsePaneSpec,
   type ShellSeams,
 } from "../panes/index.ts";
+import { returnKeyboardHome } from "../panes/keyboard-home.ts";
+import { createWardrobe } from "../theme/wardrobe.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import type { SessionStore } from "./session-store.ts";
 import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
@@ -80,11 +86,16 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const keymap = props.keymap ?? keymapFromConfig();
   const registry = new CommandRegistry();
   const wardrobe = createWardrobe({
-    serverFlavors: () => props.store.surfaces.state.flavors,
+    serverThemes: () => props.store.surfaces.state.themes,
     storage,
   });
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
+  createEffect(
+    on(overlay, (open, wasOpen) => {
+      if (open === undefined && wasOpen !== undefined) returnKeyboardHome();
+    }),
+  );
   const [leaderArmed, setLeaderArmed] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
@@ -119,6 +130,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     client: props.client,
     feed: props.feed,
     trust,
+    wardrobe,
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.open(parsed, screen()));
@@ -174,7 +186,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     if (definition.summon === undefined) return;
     act(tiler.summon(await definition.summon.spec(shell, variant), screen()));
   };
-  const answerFocusedAsk = (verdict: AskVerdict): void => {
+  const answerFocusedAsk = (verdict: AskVerdict, scope?: AskScope): void => {
     const asking = props.store
       .projection(focusedSession())
       .entries.find((entry) => entry.kind === "tool" && entry.run.phase === "asking");
@@ -182,7 +194,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       say("nothing is waiting for an answer here");
       return;
     }
-    void props.store.answerAsk(asking.run.callId, verdict);
+    if (scope !== undefined && rememberableRules(asking.run).length === 0) {
+      say(`this ask can only be answered once · ${shell.keys.chord("ask.approve")} approves it`);
+      return;
+    }
+    void props.store.answerAsk(asking.run.callId, verdict, scope);
   };
 
   const target: ActionTarget = {
@@ -202,7 +218,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       if (id !== undefined) localHandlers.get(id)?.(action);
     },
     cycleMode: () => say("modes arrive with the server's mode route"),
-    approveAsk: () => answerFocusedAsk("granted"),
+    approveAsk: (scope) => answerFocusedAsk("granted", scope),
     denyAsk: () => answerFocusedAsk("denied"),
     toggleHelp: () =>
       setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
@@ -230,8 +246,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   }
   registry.addSource(() =>
     wardrobe.choices().map((choice) => ({
-      name: `flavor-${choice.name}`,
-      description: `wear ${choice.name} (${choice.source} flavor)`,
+      name: `theme-${choice.name}`,
+      description: `wear ${choice.name} (${choice.source} theme)`,
       run: () => {
         const refusal = wardrobe.wear(choice.name);
         if (refusal !== undefined) say(refusal);
@@ -252,8 +268,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     if (overlay() !== undefined) return;
     const chords = chordsOfKey(event);
     if (chords.length === 0) return;
-    const scope = scopeWhileTyping(tiler.focusedSpec()?.kind, event.target, keymap);
-    const result = keymap.press(chords, performance.now(), scope);
+    const focus = keyFocusOf(tiler.focusedSpec()?.kind, event.target, keymap);
+    const result = keymap.press(chords, performance.now(), focus.scope, focus.typing);
     setLeaderArmed(result.type === "leader-pending");
     if (result.type === "pass") return;
     event.preventDefault();
@@ -311,7 +327,12 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     definitionOf(slot.spec.kind).adornments?.(slot.spec, shell) ?? {};
 
   const slots = createMemo(() => tiler.slots(screen()));
-  const scene = createMemo((): Scene => tiler.scene(screen()));
+  const scene = createMemo(
+    (): Scene => ({
+      ...tiler.scene(screen()),
+      seamReach: gapSeamReach(gapCells(), rootRemPx()),
+    }),
+  );
   const pointer = () => gestures()?.state() ?? { phase: "idle" };
   const activeSeam = () => {
     const state = pointer();
@@ -390,7 +411,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
               class="kw-seam"
               data-axis={seam.axis}
               data-active={sameSeam(activeSeam(), seam) ? "" : undefined}
-              style={rectStyle(seamZoneRect(seam))}
+              style={rectStyle(seamZoneRect(seam, scene().seamReach))}
             />
           )}
         </For>
@@ -413,6 +434,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       <StatusLine
         serverLabel={props.serverLabel}
         projection={focusedProjection()}
+        usage={telemetry(focusedProjection(), props.store.controls.readings(focusedSession()).cost)}
         preset={props.store.controls.state.preset}
         trust={trustStatusItem(trust, shell.keys.chord("trust.workspace"))}
         leader={leaderArmed() ? keymap.leader : undefined}
@@ -442,46 +464,6 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         )}
       </Show>
     </div>
-  );
-}
-
-interface StatusLineProps {
-  serverLabel: string;
-  projection: SessionProjection;
-  preset: string | undefined;
-  trust: string | undefined;
-  leader: string | undefined;
-  notice: string | undefined;
-  gap: { from: number; to: number } | undefined;
-  lost: string | undefined;
-}
-
-function StatusLine(props: StatusLineProps) {
-  const items = () =>
-    [
-      "keywork",
-      props.serverLabel,
-      props.trust,
-      props.preset,
-      props.projection.mode,
-      usageLine(props.projection.usage),
-    ].filter((item): item is string => item !== undefined && item !== "");
-  return (
-    <footer class="kw-status" data-lost={props.lost !== undefined ? "" : undefined}>
-      <span class="kw-status-items">{items().join(" · ")}</span>
-      <Show when={props.leader}>
-        {(leader) => <span class="kw-status-leader">{leader()} …</span>}
-      </Show>
-      <Show when={props.notice}>{(text) => <span class="kw-status-notice">{text()}</span>}</Show>
-      <Show when={props.lost}>{(reason) => <span class="kw-status-lost">{reason()}</span>}</Show>
-      <Show when={props.gap}>
-        {(gap) => (
-          <span class="kw-status-gap">
-            events {gap().from} to {gap().to} were missed while disconnected
-          </span>
-        )}
-      </Show>
-    </footer>
   );
 }
 

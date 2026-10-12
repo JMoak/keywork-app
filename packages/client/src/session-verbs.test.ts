@@ -113,7 +113,7 @@ describe("the session verbs", () => {
     }
   });
 
-  it("returns the undone prompt and tells nothing-to-undo and a staged undo apart", async () => {
+  it("returns the undone prompt and tells nothing-to-undo from a busy session", async () => {
     const undone = {
       prompt: { entryId: "e3", text: "say hello" },
       filesNote: "files put back",
@@ -127,16 +127,13 @@ describe("the session verbs", () => {
       if (turn === 1) return json(200, undone);
       if (turn === 2) {
         return json(409, {
-          error: "already undone · send a prompt to keep it, or redo to bring it back",
+          error: "a turn is running",
         });
       }
       return json(404, { error: "nothing to undo" });
     });
     expect(await client.undo("s1")).toEqual(undone);
-    expect(await client.undo("s1")).toEqual({
-      refused: "staged",
-      detail: "already undone · send a prompt to keep it, or redo to bring it back",
-    });
+    expect(await client.undo("s1")).toEqual({ refused: "busy", detail: "a turn is running" });
     expect(await client.undo("s1")).toEqual({ refused: "nothing", detail: "nothing to undo" });
     expect(await client.redo("s1")).toEqual({ refused: "nothing", detail: "nothing to redo" });
   });
@@ -204,18 +201,19 @@ describe("the preset switch", () => {
   it("sends confirmed only when asked and tells a loosening refusal from a missing switch", async () => {
     const { client, sent } = serverAnswering(({ body }) => {
       const { name, confirmed } = body as { name: string; confirmed?: true };
-      if (name === "careful") return json(409, { error: "this process has no preset switch" });
+      if (name === "careful")
+        return json(501, { error: "this server was started without a preset switch" });
       if (confirmed !== true) return json(409, { error: "loosening needs confirmed: true" });
       return json(200, { from: "standard", to: name });
     });
-    expect(await client.setPreset("open")).toEqual({
+    expect(await client.applyPreset("open")).toEqual({
       refused: "needs-confirmation",
       detail: "loosening needs confirmed: true",
     });
-    expect(await client.setPreset("open", true)).toEqual({ from: "standard", to: "open" });
-    expect(await client.setPreset("careful")).toEqual({
+    expect(await client.applyPreset("open", true)).toEqual({ from: "standard", to: "open" });
+    expect(await client.applyPreset("careful")).toEqual({
       refused: "unavailable",
-      detail: "this process has no preset switch",
+      detail: "this server was started without a preset switch",
     });
     expect(sent.map((call) => call.body)).toEqual([
       { name: "open" },
@@ -227,7 +225,7 @@ describe("the preset switch", () => {
 });
 
 describe("the events filter", () => {
-  async function pathsOpened(options: { session?: string; onlySession?: boolean }) {
+  async function pathsOpened(options: { session?: string }) {
     const paths: string[] = [];
     const controller = new AbortController();
     const client = keyworkClientOver(
@@ -241,11 +239,8 @@ describe("the events filter", () => {
     return paths;
   }
 
-  it("asks for one session's envelopes, and only those when told to", async () => {
+  it("asks for one session's envelopes beside the process-level ones", async () => {
     expect(await pathsOpened({})).toEqual(["/events"]);
     expect(await pathsOpened({ session: "s 1" })).toEqual(["/events?session=s+1"]);
-    expect(await pathsOpened({ session: "s1", onlySession: true })).toEqual([
-      "/events?session=s1&only=session",
-    ]);
   });
 });

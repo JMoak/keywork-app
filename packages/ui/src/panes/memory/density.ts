@@ -1,6 +1,6 @@
 import type { CuringStage, Provenance } from "@keywork-app/protocol";
-import type { DensityLevel } from "../../flavor/schema.ts";
 import type { GaugeCell } from "../../instruments/context.ts";
+import type { DensityLevel } from "../../theme/schema.ts";
 
 export const curingStages: readonly CuringStage[] = [0, 1, 2, 3];
 

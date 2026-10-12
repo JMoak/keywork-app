@@ -1,5 +1,5 @@
 import type { KeyworkClient, ServerFeed, StreamNotice } from "@keywork-app/client";
-import type { BusEnvelope, InboxItem, MemoryGarden } from "@keywork-app/protocol";
+import type { BusEnvelope, InboxTally, MemoryGarden, StagedItem } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import recordedEvents from "../../../client/src/fixtures/memory.jsonl?raw";
@@ -19,11 +19,11 @@ export type MemoryClient = Pick<
   | "memoryLedger"
   | "revertLedgerEntry"
   | "askMemory"
-  | "arcAirlock"
+  | "airlock"
   | "triageAirlockCandidate"
   | "triageAirlockQuestion"
-  | "deliverAirlockEligible"
-  | "finishArcAirlock"
+  | "deliverAirlock"
+  | "finishAirlock"
 >;
 
 export function inertMemoryClient(): MemoryClient {
@@ -33,31 +33,41 @@ export function inertMemoryClient(): MemoryClient {
     approveStagedItem: async () => "inert",
     discardStagedItem: async () => "inert",
     memoryNotes: async () => ({ trusted: false, notes: [] }),
-    memoryNote: async () => ({ trusted: false, note: null }),
+    memoryNote: async () => undefined,
     memoryDailyDates: async () => ({ trusted: false, dates: [] }),
     memoryDaily: async (date) => ({ trusted: false, date, entries: [] }),
     memoryLedger: async () => ({ trusted: false, entries: [] }),
     revertLedgerEntry: async () => "inert",
     askMemory: async () => ({ trusted: false, hits: [], source: "lexical" }),
-    arcAirlock: async () => ({ trusted: false, digest: null }),
+    airlock: async (slug) => ({
+      trusted: false,
+      arc: slug,
+      candidates: [],
+      questions: [],
+      decisions: { candidates: {}, questions: {} },
+    }),
     triageAirlockCandidate: async () => "inert",
     triageAirlockQuestion: async () => "inert",
-    deliverAirlockEligible: async () => "inert",
-    finishArcAirlock: async () => "inert",
+    deliverAirlock: async () => "inert",
+    finishAirlock: async () => "inert",
   };
 }
 
-export function stagedNote(id: string, target: string): InboxItem {
+export function stagedNote(id: string, target: string): StagedItem {
   return { id, kind: "note", target, created: "2026-09-07T12:00:00.000Z", content: "body" };
 }
 
-export function inboxEnvelope(id: number, count: number, kinds: Record<string, number>) {
+export function stagedTally(count: number): InboxTally {
+  return { count, staged: count, airlock: 0, proposals: 0, contradictions: 0 };
+}
+
+export function inboxEnvelope(id: number, count: number) {
   return {
     id,
     ts: "2026-09-07T12:00:01.000Z",
     sessionId: "",
     type: "memory.inbox",
-    payload: { count, kinds },
+    payload: stagedTally(count),
   } satisfies BusEnvelope;
 }
 
@@ -89,24 +99,48 @@ export function feedOf(): ServerFeed & {
   };
 }
 
-function trustedGarden(inbox: InboxItem[]): MemoryGarden {
+function trustedGarden(inbox: StagedItem[]): MemoryGarden {
   return { ...inertGarden, trusted: true, inbox };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("inbox tallies", () => {
-  it("counts the garden's inbox by kind", () => {
+  it("counts the garden's inbox into the server's buckets", () => {
     expect(inboxTallyOf(trustedGarden([stagedNote("a", "A.md"), stagedNote("b", "B.md")]))).toEqual(
-      { count: 2, kinds: { note: 2 } },
+      stagedTally(2),
     );
+    const contradiction: StagedItem = {
+      id: "c",
+      key: "k",
+      created: "t",
+      kind: "contradiction",
+      a: "A",
+      b: "B",
+      aProvenance: "user",
+      bProvenance: "agent",
+      confidence: 0.5,
+    };
+    const question: StagedItem = {
+      id: "q",
+      key: "q",
+      created: "t",
+      kind: "arc-question",
+      arc: "x",
+      note: "n",
+    };
+    expect(inboxTallyOf(trustedGarden([contradiction, question]))).toEqual({
+      count: 2,
+      staged: 0,
+      airlock: 1,
+      proposals: 0,
+      contradictions: 1,
+    });
   });
 
   it("folds a stream to the last memory.inbox payload and keeps the tally when none arrives", () => {
-    const start = { count: 3, kinds: { note: 3 } };
-    expect(
-      inboxAfter(start, [inboxEnvelope(5, 2, { note: 2 }), inboxEnvelope(6, 1, { note: 1 })]),
-    ).toEqual({ count: 1, kinds: { note: 1 } });
+    const start = stagedTally(3);
+    expect(inboxAfter(start, [inboxEnvelope(5, 2), inboxEnvelope(6, 1)])).toEqual(stagedTally(1));
     expect(
       inboxAfter(start, [
         { id: 7, ts: "t", sessionId: "s1", type: "session.mode", payload: { mode: "agent" } },
@@ -128,7 +162,7 @@ describe("the memory store", () => {
       await store.refresh();
       expect(store.state.loaded).toBe(true);
       expect(store.state.garden.trusted).toBe(true);
-      expect(store.state.inbox).toEqual({ count: 1, kinds: { note: 1 } });
+      expect(store.state.inbox).toEqual(stagedTally(1));
       expect(announced).toEqual([1]);
       dispose();
     });
@@ -149,7 +183,7 @@ describe("the memory store", () => {
       const store = createMemoryStore(client, feed);
       await store.refresh();
       inbox = [stagedNote("b", "B.md")];
-      feed.push([inboxEnvelope(9, 1, { note: 1 })]);
+      feed.push([inboxEnvelope(9, 1)]);
       expect(store.state.inbox.count).toBe(1);
       await settle();
       expect(reads).toBe(2);
@@ -190,12 +224,12 @@ describe("the recorded memory fixture", () => {
       .filter((line) => line !== "")
       .map((line) => JSON.parse(line) as BusEnvelope);
     expect(envelopes.map((envelope) => envelope.payload)).toEqual([
-      { count: 2, kinds: { note: 2 } },
-      { count: 1, kinds: { note: 1 } },
-      { count: 2, kinds: { note: 2 } },
+      stagedTally(2),
+      stagedTally(1),
+      stagedTally(2),
     ]);
     expect(envelopes.every((envelope) => envelope.sessionId === "")).toBe(true);
-    const seeded = { count: 3, kinds: { note: 3 } };
+    const seeded = stagedTally(3);
     expect(inboxAfter(seeded, envelopes)).toEqual(inboxTallyOf(garden));
     expect(garden.ledger.map((entry) => entry.op)).toEqual(["approve", "discard", "revert"]);
   });

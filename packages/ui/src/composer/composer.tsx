@@ -12,6 +12,7 @@ export interface ComposerProps {
   onSteer: (text: string) => void;
   onQueue: (text: string) => void;
   onInterrupt: () => void;
+  inputRef?: ((input: HTMLTextAreaElement) => void) | undefined;
 }
 
 export type ComposerIntent = "steer" | "queue" | "interrupt" | "newline" | "none";
@@ -33,7 +34,10 @@ export function Composer(props: ComposerProps) {
   createEffect(
     on(
       () => props.seed,
-      (seed) => seed !== undefined && setDraft(seed.text),
+      (seed, withdrawn) => {
+        if (seed !== undefined) setDraft(seed.text);
+        else if (withdrawn !== undefined && draft() === withdrawn.text) setDraft("");
+      },
     ),
   );
   const submit = (send: (text: string) => void): void => {
@@ -92,6 +96,7 @@ export function Composer(props: ComposerProps) {
           ❯
         </span>
         <textarea
+          ref={(input) => props.inputRef?.(input)}
           class="kw-composer-input"
           aria-label="prompt"
           rows={1}

@@ -8,7 +8,7 @@ const shotsDirectory = resolve(import.meta.dirname, "../../../artifacts/shots", 
 const tiers = ["broadsheet", "column", "clipping", "masthead"];
 
 for (const tier of tiers) {
-  test(`transcript scenarios per flavor at the ${tier} tier`, async ({ page }) => {
+  test(`transcript scenarios per theme at the ${tier} tier`, async ({ page }) => {
     await page.goto(devPageUrl);
     await page.evaluate(() => {
       document.body.insertAdjacentHTML(
@@ -17,13 +17,13 @@ for (const tier of tiers) {
       );
     });
     await choose(page, "width", tier);
-    for (const flavor of await choicesOf(page, "flavor", (name) => name !== "system")) {
-      await choose(page, "flavor", flavor);
+    for (const theme of await choicesOf(page, "theme", (name) => name !== "system")) {
+      await choose(page, "theme", theme);
       for (const scenario of await choicesOf(page, "scenario")) {
         await choose(page, "scenario", scenario);
         await settled(page);
         await page.locator(".kw-dev-frame").screenshot({
-          path: `${shotsDirectory}/${scenario}--${flavor}--${tier}.png`,
+          path: `${shotsDirectory}/${scenario}--${theme}--${tier}.png`,
           animations: "disabled",
         });
       }

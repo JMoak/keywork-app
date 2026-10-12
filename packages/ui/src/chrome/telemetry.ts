@@ -1,9 +1,14 @@
 import type { SessionProjection } from "@keywork-app/client";
-import type { SessionSummary } from "@keywork-app/protocol";
+import type { CostReport, SessionSummary } from "@keywork-app/protocol";
 import { usageLine } from "../instruments/cost.ts";
+import { reportedUsageLine } from "../instruments/cost-report.ts";
 
-export function telemetry(projection: SessionProjection): string {
-  return usageLine(projection.usage);
+export const liveTurnsOnly = "live turns only";
+
+export function telemetry(projection: SessionProjection, report?: CostReport): string {
+  if (report !== undefined) return reportedUsageLine(report);
+  const live = usageLine(projection.usage);
+  return live === "" ? "" : `${live} · ${liveTurnsOnly}`;
 }
 
 export function sessionName(

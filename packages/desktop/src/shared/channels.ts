@@ -20,6 +20,7 @@ export const hostChannels = {
   serverEnd: "host:server-end",
   updateReady: "host:update-ready",
   acceptUpdate: "host:accept-update",
+  saveAs: "host:save-as",
 } as const;
 
 export interface RelayRequest {

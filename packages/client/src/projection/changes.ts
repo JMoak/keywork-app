@@ -1,6 +1,6 @@
 import type { BusEnvelope, ChangedPath, ChangesReading } from "@keywork-app/protocol";
 
-export type ChangesAvailability = "unknown" | "trusted" | "untrusted" | "no-baseline";
+export type ChangesAvailability = "unknown" | "ready" | "no-baseline";
 
 export interface ChangesState {
   readonly availability: ChangesAvailability;
@@ -26,7 +26,7 @@ export function changesState(state: ChangesState, envelope: BusEnvelope): Change
   const known = new Map(state.files.map((file) => [file.path, file]));
   return {
     ...state,
-    availability: state.availability === "unknown" ? "trusted" : state.availability,
+    availability: state.availability === "unknown" ? "ready" : state.availability,
     files: envelope.payload.paths.map((path) => known.get(path) ?? unknownCounts(path)),
     stale: true,
   };
@@ -37,11 +37,8 @@ export function changesSnapshot(state: ChangesState, reading: ChangesReading): C
   if (reading === "no-baseline") {
     return { availability: "no-baseline", baseline: undefined, files: [], stale: false };
   }
-  if (!reading.trusted) {
-    return { availability: "untrusted", baseline: undefined, files: [], stale: false };
-  }
   return {
-    availability: "trusted",
+    availability: "ready",
     baseline: reading.baseline,
     files: [...reading.files].sort(byTurnThenPath),
     stale: false,

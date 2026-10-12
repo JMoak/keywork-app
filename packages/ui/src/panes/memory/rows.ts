@@ -2,27 +2,33 @@ import type {
   AirlockCandidate,
   AirlockDigest,
   AirlockQuestion,
-  InboxItem,
+  CuringStage,
   LedgerEntry,
   MemoryGarden,
   MemoryLayer,
   MemoryNote,
   MemoryQueryHit,
   Provenance,
+  StagedItem,
   StagedWrite,
 } from "@keywork-app/protocol";
 
 export type MemoryRow =
-  | { id: string; kind: "layer"; layer: MemoryLayer }
+  | { id: string; kind: "layer"; layer: MemoryLayer; tally: LayerTally }
   | { id: string; kind: "note"; note: MemoryNote }
   | { id: string; kind: "date"; date: string }
-  | { id: string; kind: "inbox"; item: InboxItem; view: InboxView }
+  | { id: string; kind: "inbox"; item: StagedItem; view: InboxView }
   | { id: string; kind: "candidate"; arc: string; candidate: AirlockCandidate }
   | { id: string; kind: "question"; arc: string; question: AirlockQuestion }
   | { id: string; kind: "finish"; arc: string; digest: AirlockDigest }
   | { id: string; kind: "hit"; hit: MemoryQueryHit };
 
 export type MemoryRowKind = MemoryRow["kind"];
+
+export interface LayerTally {
+  readonly notes: number;
+  readonly curing: Readonly<Record<CuringStage, number>>;
+}
 
 export interface MemorySection {
   readonly id: string;
@@ -69,9 +75,10 @@ export function flatRows(sections: readonly MemorySection[]): MemoryRow[] {
   return sections.flatMap((section) => section.rows);
 }
 
-export function inboxView(item: InboxItem): InboxView {
-  const view = stagedView(item);
-  return item.bot === undefined ? view : { ...view, title: `${item.bot} · ${view.title}` };
+export function layerTallyOf(notes: readonly MemoryNote[]): LayerTally {
+  const curing: Record<CuringStage, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+  for (const note of notes) curing[note.curing] += 1;
+  return { notes: notes.length, curing };
 }
 
 export function ledgerSummary(entry: LedgerEntry): string {
@@ -108,16 +115,19 @@ function layerSections(
   layers: readonly MemoryLayer[],
   notes: readonly MemoryNote[],
 ): MemorySection[] {
-  return layers.map((layer) => ({
-    id: `layer:${layer.id}`,
-    heading: layer.label,
-    rows: [
-      { id: `layer:${layer.id}`, kind: "layer", layer },
-      ...notes
-        .filter((note) => note.layer === layer.id)
-        .map((note): MemoryRow => ({ id: `note:${layer.id}:${note.name}`, kind: "note", note })),
-    ],
-  }));
+  return layers.map((layer) => {
+    const layered = notes.filter((note) => note.layer === layer.id);
+    return {
+      id: `layer:${layer.id}`,
+      heading: layer.label,
+      rows: [
+        { id: `layer:${layer.id}`, kind: "layer", layer, tally: layerTallyOf(layered) },
+        ...layered.map(
+          (note): MemoryRow => ({ id: `note:${layer.id}:${note.name}`, kind: "note", note }),
+        ),
+      ],
+    };
+  });
 }
 
 function dailySection(dates: readonly string[]): MemorySection[] {
@@ -131,7 +141,7 @@ function dailySection(dates: readonly string[]): MemorySection[] {
   ];
 }
 
-function inboxSections(inbox: readonly InboxItem[]): MemorySection[] {
+function inboxSections(inbox: readonly StagedItem[]): MemorySection[] {
   const rows = inbox.map(
     (item): Extract<MemoryRow, { kind: "inbox" }> => ({
       id: `inbox:${item.id}`,
@@ -173,7 +183,7 @@ function airlockSections(airlocks: readonly AirlockDigest[]): MemorySection[] {
   }));
 }
 
-function stagedView(item: InboxItem): InboxView {
+export function inboxView(item: StagedItem): InboxView {
   switch (item.kind) {
     case "note":
     case "daily":

@@ -14,10 +14,10 @@ describe("check:colors", () => {
     );
   });
 
-  it("scans the renderer but not the flavor mapping or tests", () => {
+  it("scans the renderer but not the theme mapping or tests", () => {
     expect(styledPath("packages/ui/src/panes/conversation.tsx")).toBe(true);
     expect(styledPath("packages/ui/src/app.css")).toBe(true);
-    expect(styledPath("packages/ui/src/flavor/tokens.ts")).toBe(false);
+    expect(styledPath("packages/ui/src/theme/tokens.ts")).toBe(false);
     expect(styledPath("packages/ui/src/app.test.tsx")).toBe(false);
     expect(styledPath("packages/desktop/src/main/index.ts")).toBe(false);
   });

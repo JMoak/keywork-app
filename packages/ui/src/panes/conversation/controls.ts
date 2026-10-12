@@ -10,6 +10,7 @@ import {
   presetOrder,
   type Undone,
 } from "@keywork-app/protocol";
+import type { SaveOutcome } from "../../host/port.ts";
 
 export type PresetDirection = "tighter" | "looser";
 
@@ -90,6 +91,18 @@ export function undoneNotice(undone: Undone): string {
 
 export const redoneNotice = "redone · the turn and its files are back";
 
+export const sessionGoneNotice =
+  "the session this pane showed is gone from the server · type to start a new one";
+
+export const promptRehomedNotice =
+  "that session was gone from the server · your prompt started a new one";
+
+export function trashedQuestion(title: string): string {
+  return `removed "${title}" · it is in the trash, memory notes stay · restore it? y/n`;
+}
+
+export const leftInTrashNotice = "left in the trash · the sessions pane restores it";
+
 export function refusalNotice(reading: "missing" | ControlRefusal): string {
   return reading === "missing" ? "this session is gone" : reading.detail;
 }
@@ -100,8 +113,23 @@ export function isSettled<Reading>(
   return reading !== "missing" && !isControlRefusal(reading);
 }
 
-export function exportedNotice(bytes: number): string {
-  return `session page copied to the clipboard · ${kilobytes(bytes)} of html · this host has no save dialog yet, export-file writes it into the workspace`;
+export function exportedNotice(page: string, copied: boolean, saved: SaveOutcome): string {
+  const clipboard = copied
+    ? `copied to the clipboard · ${kilobytes(new TextEncoder().encode(page).length)} of html`
+    : "the clipboard refused it";
+  if (saved.saved) return `session page saved to ${saved.path} · ${clipboard}`;
+  const save = saved.refused === "cancelled" ? "save cancelled" : saved.detail;
+  return copied
+    ? `session page ${clipboard} · ${save}`
+    : `${save} and the clipboard refused the page · export-file writes it into the workspace`;
+}
+
+export function pageNameFor(title: string | undefined): string {
+  const slug = (title ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${slug === "" ? "session" : slug}.html`;
 }
 
 function kilobytes(bytes: number): string {
