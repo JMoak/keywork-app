@@ -68,7 +68,14 @@ export interface SurfacesSeams {
 export const surfaceNames: readonly SurfaceName[] = ["mcp", "arcs", "bots", "workspaces", "themes"];
 
 export function surfacesOfKind(kind: SurfaceKind): readonly SurfaceName[] {
-  return kind === "workspaces" ? ["workspaces", "arcs", "bots"] : [kind];
+  switch (kind) {
+    case "workspaces":
+      return ["workspaces", "arcs", "bots"];
+    case "permissions":
+      return [];
+    default:
+      return [kind];
+  }
 }
 
 export function createSurfacesStore(

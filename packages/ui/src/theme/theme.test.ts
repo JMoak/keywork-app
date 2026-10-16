@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { completeTheme } from "./complete.ts";
-import { apcaLc } from "./contrast.ts";
+import { completeTheme, derivedTextFaint, faintFloor, faintStep } from "./complete.ts";
+import { apcaLc, contrastPolarity } from "./contrast.ts";
 import { mixOklab } from "./oklab.ts";
 import { contrastFailures, parseTheme, type ThemeDeclaration } from "./schema.ts";
 import {
@@ -187,6 +187,33 @@ describe("completeTheme", () => {
 
   it("is deterministic", () => {
     expect(completeTheme(bareNight)).toEqual(night);
+  });
+});
+
+describe("the faint rung", () => {
+  it.each(gallery.map((theme) => [theme.name, theme] as const))(
+    "%s resolves textFaint one step quieter than textDim and still above the floor",
+    (_, theme) => {
+      const { background, textDim } = theme.tokens;
+      const faint = themeVariables(theme)["--kw-text-faint"] ?? "";
+      expect(faint).toMatch(/^#[0-9a-f]{6}$/);
+      expect(apcaLc(faint, background)).toBeGreaterThanOrEqual(faintFloor);
+      expect(apcaLc(faint, background)).toBeLessThan(apcaLc(textDim, background));
+      expect(contrastPolarity(faint, background)).toBe(contrastPolarity(textDim, background));
+    },
+  );
+
+  it("takes half the dim rung's distance to the ground when the floor leaves room", () => {
+    const { background, textDim } = keyworkDay.tokens;
+    expect(derivedTextFaint(keyworkDay.tokens)).toBe(mixOklab(textDim, background, faintStep));
+  });
+
+  it("climbs back toward the dim rung when half a step would sink below the floor", () => {
+    const { background, textDim } = keyworkNight.tokens;
+    const faint = derivedTextFaint(keyworkNight.tokens);
+    expect(faint).not.toBe(mixOklab(textDim, background, faintStep));
+    expect(apcaLc(faint, background)).toBeGreaterThanOrEqual(faintFloor);
+    expect(apcaLc(faint, background)).toBeLessThan(apcaLc(textDim, background));
   });
 });
 

@@ -6,6 +6,7 @@ import type {
 } from "@keywork-app/protocol";
 import { For, Match, Show, Switch } from "solid-js";
 import { relativeAge } from "../../chrome/telemetry.ts";
+import { keepInView } from "../overview/rows.tsx";
 import { DensityCells, DensityMark } from "./cells.tsx";
 import {
   budgetCells,
@@ -51,6 +52,7 @@ export function Garden(props: GardenProps) {
                     data-kind={row.kind}
                     data-row={row.id}
                     data-cursor={props.cursor === row.id ? "" : undefined}
+                    ref={(item) => keepInView(item, () => props.cursor === row.id)}
                   >
                     <button
                       type="button"
@@ -175,6 +177,13 @@ function InboxRow(props: { row: Extract<MemoryRow, { kind: "inbox" }> }) {
       <span class="kw-memory-facts">
         <Show when={view().detail}>
           {(detail) => <span class="kw-memory-fact">{detail()}</span>}
+        </Show>
+        <Show when={view().odds}>
+          {(odds) => (
+            <span class="kw-memory-fact" data-fact="odds">
+              {odds()}
+            </span>
+          )}
         </Show>
         <span class="kw-memory-fact">{relativeAge(props.row.item.created)}</span>
       </span>

@@ -16,11 +16,15 @@ import {
 } from "solid-js";
 import { z } from "zod";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
+import { sessionName } from "../../chrome/telemetry.ts";
 import type { MemoryStore } from "../../shell/memory-store.ts";
 import { inboxNeedsYouAt } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
+import { workingSession } from "../overview/working-session.ts";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
+import { DecisionLens } from "./decision-lens.tsx";
+import { decisionRows } from "./decisions.ts";
 import { Garden } from "./garden.tsx";
 import { DailyLens, LedgerLens } from "./ledger.tsx";
 import { NoteLens } from "./note.tsx";
@@ -31,6 +35,7 @@ import {
   type MemoryRow,
   newestFirst,
   noteNameOf,
+  rowRevealing,
 } from "./rows.ts";
 import "./memory.css";
 
@@ -42,6 +47,7 @@ export type MemoryLens =
   | { kind: "garden" }
   | { kind: "note"; name: string; layer: string }
   | { kind: "ledger" }
+  | { kind: "decisions" }
   | { kind: "daily"; date: string };
 
 export const memoryPane = definePane<MemorySpec>({
@@ -101,10 +107,21 @@ export const memoryPane = definePane<MemorySpec>({
       help: "the write ledger",
       command: { name: "ledger", description: "show this run's memory writes" },
     },
+    "memory.decisions": {
+      chords: "w",
+      help: "why memory decided",
+      command: {
+        name: "decisions",
+        description: "show what memory decided this session, and why",
+      },
+    },
     "memory.open": {
       chords: "enter",
       help: "open the focused row",
-      command: { name: "open-note", description: "open the focused note or day" },
+      command: {
+        name: "open-note",
+        description: "open the focused note or day, or unfold the focused decision",
+      },
     },
     "memory.back": {
       chords: "escape",
@@ -153,6 +170,8 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const [answer, setAnswer] = createSignal<MemoryAnswer>();
   const [notice, setNotice] = createSignal<string>();
   const [reverted, setReverted] = createSignal<Record<string, "reverted" | "needs-rebase">>({});
+  const [unfolded, setUnfolded] = createSignal<Readonly<Record<string, boolean>>>({});
+  const decisionSession = workingSession(props.shell, props.shell.currentSession());
   let askInput: HTMLInputElement | undefined;
 
   const revision = () => (state().loaded ? state().revision : undefined);
@@ -179,6 +198,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
       notes: notes() ?? [],
       dates: dates() ?? [],
       hits: answer()?.hits,
+      entryDecisions: state().entryDecisions,
     }),
   );
   const rows = createMemo(() => flatRows(sections()));
@@ -187,6 +207,18 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     rows().find((row) => row.id === cursor()) ?? rows()[0];
   const focusedLedgerId = (): string | undefined =>
     ledgerEntries().find((entry) => entry.id === cursor())?.id ?? ledgerEntries()[0]?.id;
+  const decisions = createMemo(() => {
+    if (lens().kind !== "decisions") return [];
+    const projection = props.shell.store.projection(decisionSession());
+    return decisionRows(projection.memoryDecisions, projection.entries);
+  });
+  const decisionSessionName = (): string | undefined => {
+    const id = decisionSession();
+    if (id === undefined) return undefined;
+    return sessionName(props.shell.store.summary(id), props.shell.store.projection(id));
+  };
+  const focusedDecisionId = (): string | undefined =>
+    decisions().find((row) => row.id === cursor())?.id ?? decisions()[0]?.id;
   const gardenEmpty = () => (notes() ?? []).length === 0;
   const inert = () => state().loaded && !state().garden.trusted;
 
@@ -202,13 +234,20 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     }),
   );
 
+  const cursorIds = (): string[] => {
+    switch (lens().kind) {
+      case "ledger":
+        return ledgerEntries().map((entry) => entry.id);
+      case "decisions":
+        return decisions().map((row) => row.id);
+      default:
+        return rows().map((row) => row.id);
+    }
+  };
+
   const move = (delta: number): void => {
-    const ids =
-      lens().kind === "ledger"
-        ? ledgerEntries().map((entry) => entry.id)
-        : rows().map((row) => row.id);
-    const current = lens().kind === "ledger" ? focusedLedgerId() : focusedRow()?.id;
-    const at = ids.indexOf(current ?? "");
+    const ids = cursorIds();
+    const at = Math.max(0, ids.indexOf(cursor() ?? ""));
     const next = ids[Math.min(ids.length - 1, Math.max(0, at + delta))];
     if (next !== undefined) setCursor(next);
   };
@@ -216,6 +255,17 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const open = (row: MemoryRow | undefined): void => {
     const next = lensFor(row);
     if (next !== undefined) setLens(next);
+  };
+
+  const toggleDecision = (id: string | undefined): void => {
+    if (id === undefined) return;
+    setCursor(id);
+    setUnfolded((known) => ({ ...known, [id]: known[id] !== true }));
+  };
+
+  const openFocused = (): void => {
+    if (lens().kind === "garden") open(focusedRow());
+    else if (lens().kind === "decisions") toggleDecision(focusedDecisionId());
   };
 
   const approve = (row: MemoryRow | undefined): void => {
@@ -326,6 +376,21 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     setQuery("");
   };
 
+  let revealed: number | undefined;
+  createEffect(() => {
+    const request = props.shell.needsYou?.revealing();
+    if (request === undefined || request.seq === revealed || request.pane !== props.id) return;
+    const rowId = rowRevealing(rows(), request.item);
+    if (rowId === undefined) return;
+    if (lens().kind !== "garden" || asking()) return backToGarden();
+    revealed = request.seq;
+    setCursor(rowId);
+  });
+  const backToGarden = (): void => {
+    closeAsk();
+    setLens({ kind: "garden" });
+  };
+
   const back = (): void => {
     if (asking()) {
       closeAsk();
@@ -360,8 +425,10 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
         return jumpToInbox();
       case "memory.ledger":
         return setLens({ kind: "ledger" });
+      case "memory.decisions":
+        return setLens({ kind: "decisions" });
       case "memory.open":
-        return lens().kind === "garden" ? open(focusedRow()) : undefined;
+        return openFocused();
       case "memory.back":
         return back();
       case "memory.next":
@@ -409,6 +476,16 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
             cursor={focusedLedgerId()}
             reverted={reverted()}
             onSelect={setCursor}
+          />
+        </Match>
+        <Match when={lens().kind === "decisions"}>
+          <DecisionLens
+            session={decisionSessionName()}
+            rows={decisions()}
+            cursor={focusedDecisionId()}
+            unfolded={unfolded()}
+            onSelect={setCursor}
+            onToggle={toggleDecision}
           />
         </Match>
         <Match when={lensAs(lens(), "note")}>

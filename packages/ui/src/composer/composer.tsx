@@ -9,6 +9,7 @@ export interface ComposerProps {
   busy?: boolean | undefined;
   placeholder?: string | undefined;
   seed?: { readonly text: string } | undefined;
+  hold?: string | undefined;
   onSteer: (text: string) => void;
   onQueue: (text: string) => void;
   onInterrupt: () => void;
@@ -42,7 +43,7 @@ export function Composer(props: ComposerProps) {
   );
   const submit = (send: (text: string) => void): void => {
     const text = pastes.expandAll(draft()).trim();
-    if (text === "") return;
+    if (text === "" || props.hold !== undefined) return;
     send(text);
     pastes.clear();
     setDraft("");
@@ -107,6 +108,7 @@ export function Composer(props: ComposerProps) {
           onKeyDown={onKeyDown}
         />
       </div>
+      <Show when={props.hold}>{(reason) => <p class="kw-composer-hold">{reason()}</p>}</Show>
     </div>
   );
 }

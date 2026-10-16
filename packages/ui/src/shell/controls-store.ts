@@ -19,6 +19,7 @@ import {
   type RenameReading,
   type ResolutionFailure,
   type ThinkingReading,
+  type TurnRestoreReading,
   type UndoReading,
 } from "@keywork-app/protocol";
 import { createStore } from "solid-js/store";
@@ -31,6 +32,7 @@ export type ControlsClient = Pick<
   | "compact"
   | "undo"
   | "redo"
+  | "restoreTurn"
   | "context"
   | "cost"
   | "exportSession"
@@ -67,6 +69,7 @@ export interface ControlsStore {
   compact(id: string, focus?: string): Promise<CompactReading>;
   undo(id: string): Promise<UndoReading>;
   redo(id: string): Promise<RedoReading>;
+  restoreTurn(id: string, turn: number): Promise<TurnRestoreReading>;
   rename(id: string, title: string): Promise<RenameReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
   setPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
@@ -166,6 +169,11 @@ export function createControlsStore(
     redo: (id) =>
       whenAnswered(client.redo(id), async () => {
         setState("seeds", id, undefined);
+        await seams.reload(id);
+      }),
+    restoreTurn: (id, turn) =>
+      whenAnswered(client.restoreTurn(id, turn), async (restored) => {
+        setState("seeds", id, { text: restored.prompt.text });
         await seams.reload(id);
       }),
     rename: (id, title) => client.rename(id, title),

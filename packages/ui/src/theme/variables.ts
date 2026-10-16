@@ -1,3 +1,4 @@
+import { derivedTextFaint } from "./complete.ts";
 import type { Theme } from "./schema.ts";
 import { densityLevels, diffKeys, syntaxKeys, terminalKeys } from "./sections.ts";
 import { keyworkNight } from "./themes.ts";
@@ -19,6 +20,7 @@ export function themeVariables(theme: Theme): ThemeVariables {
     "--kw-text": tokens.text,
     "--kw-text-mid": tokens.textMid,
     "--kw-text-dim": tokens.textDim,
+    "--kw-text-faint": derivedTextFaint(tokens),
     "--kw-border": tokens.border,
     "--kw-house-border": tokens.border,
     "--kw-border-focus": tokens.borderFocus,

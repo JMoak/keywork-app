@@ -18,6 +18,15 @@ export function provenanceCell(provenance: Provenance): GaugeCell {
   return provenanceCells[provenance];
 }
 
+export function oddsCell(odds: number): GaugeCell {
+  const step = Math.floor(Math.min(1, Math.max(0, odds)) * curingStages.length);
+  return ramp[curingStages[Math.min(step, curingStages.length - 1)] ?? 0];
+}
+
+export function ruleCell(): GaugeCell {
+  return ramp[2];
+}
+
 export function curingRampCells(
   tally: Readonly<Record<CuringStage, number>>,
   width = rampWidth,

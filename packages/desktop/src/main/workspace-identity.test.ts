@@ -63,3 +63,50 @@ describe("workspace identity, as keywork derives it", () => {
     ]);
   });
 });
+
+const keyworkRuleOnPosix = [
+  { cwd: "/srv/fx/plain", root: "/srv/fx/plain", source: "launch", identity: "af205435e241" },
+  { cwd: "/srv/fx/repo/src", root: "/srv/fx/repo", source: "git", identity: "8760a98c2740" },
+  {
+    cwd: "/srv/fx/declared/deep",
+    root: "/srv/fx/declared",
+    source: "declaration",
+    identity: "a14af0704a5c",
+  },
+] as const;
+
+const posixMarkers = new Set(["/srv/fx/repo/.git", "/srv/fx/declared/.keywork/workspace.json"]);
+
+const linux: IdentitySeams = {
+  home: "/home/me",
+  platform: "linux",
+  exists: async (path) => posixMarkers.has(path),
+};
+
+describe("workspace identity on posix, as keywork derives it", () => {
+  it.each(keyworkRuleOnPosix)(
+    "hashes the subject keywork forms for a $source anchor",
+    async ({ cwd, root, source, identity }) => {
+      expect(await resolveAnchor(cwd, linux)).toEqual({ root, source });
+      expect((await locateTickets(cwd, linux)).identity).toBe(identity);
+    },
+  );
+
+  it("keeps case, so a differently cased path is another workspace on Linux and macOS", async () => {
+    expect((await locateTickets("/srv/FX/plain", linux)).identity).toBe("73051f599ecd");
+    const mac: IdentitySeams = { ...linux, home: "/Users/me", platform: "darwin" };
+    expect((await locateTickets("/srv/FX/plain", mac)).identity).toBe("73051f599ecd");
+  });
+
+  it("resolves trailing slashes and dot segments before hashing", async () => {
+    expect((await locateTickets("/srv/fx/plain/", linux)).identity).toBe("af205435e241");
+    expect((await locateTickets("/srv/fx/repo/src/../src", linux)).identity).toBe("8760a98c2740");
+  });
+
+  it("files the tickets under ~/.keywork/workspaces/<identity> with posix separators", async () => {
+    expect((await locateTickets("/srv/fx/repo/src", linux)).files).toEqual([
+      "/home/me/.keywork/workspaces/8760a98c2740/server.json",
+      "/home/me/.keywork/server.json",
+    ]);
+  });
+});

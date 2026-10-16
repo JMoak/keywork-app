@@ -101,9 +101,9 @@ export function registerHostHandlers(
   });
   ipcMain.handle(hostChannels.listOpenWorkspaces, () => desktop.windows.list());
   ipcMain.handle(hostChannels.switchWorkspace, (_event, path: string) => desktop.openPath(path));
-  ipcMain.handle(hostChannels.setPendingAsks, (event, count: number) => {
+  ipcMain.handle(hostChannels.setNeedsYou, (event, count: number) => {
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (window !== null) desktop.windows.setPendingAsks(window.id, count);
+    if (window !== null) desktop.windows.setNeedsYou(window.id, count);
   });
   ipcMain.handle(hostChannels.openExternal, (_event, url: string) =>
     openExternal(url, workspaces.openRoots()),

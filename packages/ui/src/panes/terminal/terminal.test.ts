@@ -92,6 +92,8 @@ describe("mirror mode", () => {
       spill: undefined,
       decision: undefined,
       ask: undefined,
+      child: undefined,
+      recall: undefined,
     };
     expect(bashCommand(run)).toBe("a very long command that the subject line truncates");
     expect(bashCommand({ ...run, args: "not json" })).toBe(run.subject);

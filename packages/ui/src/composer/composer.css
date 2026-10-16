@@ -80,3 +80,10 @@
 .kw-composer-input::placeholder {
   color: var(--kw-text-dim);
 }
+
+.kw-composer-hold {
+  margin: 0;
+  padding: 0 0.75rem 0.5rem 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--kw-text-dim);
+}

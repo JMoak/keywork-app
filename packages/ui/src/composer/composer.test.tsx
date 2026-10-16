@@ -140,3 +140,33 @@ describe("the composer's seed", () => {
     expect(input.value).toBe("write hello.txt twice");
   });
 });
+
+describe("a held composer", () => {
+  it("keeps the draft and says why until the hold lifts", () => {
+    const [hold, setHold] = createSignal<string | undefined>("the child is still working");
+    const queued: string[] = [];
+    const { container } = render(() => (
+      <Composer
+        queue={[]}
+        hold={hold()}
+        onSteer={(text) => queued.push(`steer ${text}`)}
+        onQueue={(text) => queued.push(text)}
+        onInterrupt={() => {}}
+      />
+    ));
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    input.value = "and the callers too";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", altKey: true });
+    expect(queued).toEqual([]);
+    expect(input.value).toBe("and the callers too");
+    expect(container.querySelector(".kw-composer-hold")?.textContent).toBe(
+      "the child is still working",
+    );
+    setHold(undefined);
+    expect(container.querySelector(".kw-composer-hold")).toBeNull();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(queued).toEqual(["and the callers too"]);
+  });
+});

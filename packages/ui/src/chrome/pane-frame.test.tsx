@@ -6,7 +6,7 @@ import type { Outfit } from "../theme/attire.ts";
 import { keyworkDay, keyworkNight } from "../theme/themes.ts";
 import { hueStop, type LifecycleState, PaneFrame, stampGlyph, tileFill } from "./pane-frame.tsx";
 import { chromeWeights } from "./root-attributes.ts";
-import { paneMark, TitleRow } from "./title-row.tsx";
+import { paneMark, quietMark, TitleRow } from "./title-row.tsx";
 
 afterEach(cleanup);
 
@@ -121,7 +121,15 @@ describe("PaneFrame chrome weights", () => {
       await settled();
       const { container } = render(() => (
         <>
-          <PaneFrame name="focused" state="needs-you" focused spawnRank={0} modeWord="plan">
+          <PaneFrame
+            name="focused"
+            state="needs-you"
+            focused
+            spawnRank={0}
+            modeWord="plan"
+            arc="pricing-v2"
+            bot={{ sigil: "◆", name: "reviewer" }}
+          >
             <p>body</p>
           </PaneFrame>
           <PaneFrame name="resting" state="finished-unseen" focused={false} spawnRank={1}>
@@ -249,6 +257,28 @@ describe("PaneFrame outfits", () => {
     expect(mark.getAttribute("aria-label")).toBe("marked");
     expect(mark.textContent).toBe(paneMark);
     expect(mark.nextElementSibling?.className).toBe("kw-frame-name");
+  });
+
+  it("carries the quiet mark in its title row when its session is quiet", () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="needs-you" focused spawnRank={0} quiet>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const quiet = container.querySelector(".kw-frame-quiet") as HTMLElement;
+    expect(quiet.textContent).toBe(quietMark);
+    expect(quiet.nextElementSibling?.className).toBe("kw-frame-name");
+  });
+
+  it("carries its conversation's turn ribbon to the end of its title row's facts", () => {
+    const { container } = render(() => (
+      <PaneFrame name="a" state="idle" focused spawnRank={0} ribbon="turn 2 · $0.01">
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const detail = container.querySelector(".kw-frame-detail") as HTMLElement;
+    expect(detail.lastElementChild?.className).toBe("kw-frame-turn");
+    expect(detail.lastElementChild?.textContent).toBe("turn 2 · $0.01");
   });
 });
 

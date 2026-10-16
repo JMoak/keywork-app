@@ -74,6 +74,8 @@ export function presetNotice(from: ActivePreset, to: PresetName): string {
 
 export const leftUnchanged = "left unchanged";
 
+export const compactingNotice = "compacting · folding the older conversation into a summary";
+
 export function compactNotice(
   reading: Exclude<CompactReading, "missing" | ControlRefusal>,
 ): string {
@@ -96,6 +98,9 @@ export const sessionGoneNotice =
 
 export const promptRehomedNotice =
   "that session was gone from the server · your prompt started a new one";
+
+export const childAtWorkNotice =
+  "this child is still working for its parent · it takes prompts once it finishes";
 
 export function trashedQuestion(title: string): string {
   return `removed "${title}" · it is in the trash, memory notes stay · restore it? y/n`;

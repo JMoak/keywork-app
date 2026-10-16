@@ -2,6 +2,7 @@ import type {
   BusEnvelope,
   EngineEventType,
   EnginePayloads,
+  MemoryDecision,
   Replayable,
 } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
@@ -297,5 +298,153 @@ describe("extension notices and session state", () => {
       { kind: "notice", level: "info", text: "█ lint · quarantined in activate: boom" },
     ]);
     expect(state.lastError).toBeUndefined();
+  });
+});
+
+describe("delegated children on the parent's transcript", () => {
+  const delegate = (args: Record<string, unknown>, callId = "d1") =>
+    ({ type: "tool-call", callId, name: "delegate", arguments: args }) as const;
+  const usage = { inputTokens: 40, outputTokens: 9 };
+
+  it("marks a delegate call as a child from its arguments, flattening and capping the title", () => {
+    const long = `audit\n\tthe ${"trust ".repeat(20)}rules`;
+    const state = projectAll(emptyProjection, [
+      at("tool.started", { call: delegate({ title: long, prompt: "p", bot: "scout" }) }),
+      at("tool.started", { call: delegate({ prompt: "p" }, "d2") }),
+      at("tool.started", { call }),
+    ]);
+    const titled = runOf(state, 0).child;
+    expect(titled?.title).toHaveLength(60);
+    expect(titled?.title.startsWith("audit the trust trust")).toBe(true);
+    expect(titled?.title.endsWith("…")).toBe(true);
+    expect(titled?.bot).toBe("scout");
+    expect(runOf(state, 1).child?.title).toBe("child");
+    expect(runOf(state, 2).child).toBeUndefined();
+  });
+
+  it("takes the server's title, id, outcome, usage, cost and refusals from the child events", () => {
+    const state = projectAll(emptyProjection, [
+      at("tool.started", { call: delegate({ title: "draft", prompt: "p" }) }),
+      at("child.started", {
+        callId: "d1",
+        sessionId: "k1",
+        title: "find the callers",
+        bot: "scout",
+      }),
+      at("tool.output", { chunk: "read src/a.ts\n", callId: "d1" }),
+    ]);
+    expect(runOf(state, 0)).toMatchObject({
+      live: "read src/a.ts",
+      child: { title: "find the callers", sessionId: "k1", bot: "scout", outcome: undefined },
+    });
+    const refused = [{ tool: "bash", callId: "c9" }];
+    const ended = projectAll(state, [
+      at("child.finished", {
+        callId: "d1",
+        sessionId: "k1",
+        outcome: "denied",
+        usage,
+        costNanos: 3_100_000,
+        refused,
+      }),
+      at("tool.finished", {
+        callId: "d1",
+        output:
+          "↳ child k1 · scout · denied\n\nthe child stopped at a call no one could approve: bash",
+        isError: true,
+      }),
+    ]);
+    expect(runOf(ended, 0)).toMatchObject({
+      phase: "failed",
+      reason: undefined,
+      detail: ["the child stopped at a call no one could approve: bash"],
+      child: { outcome: "denied", usage, costNanos: 3_100_000, refused },
+    });
+  });
+
+  it("keeps a delegate refused before any child existed a plain failure with its reason", () => {
+    const state = projectAll(emptyProjection, [
+      at("tool.started", { call: delegate({ title: "scout it", prompt: "p", bot: "ghost" }) }),
+      at("tool.finished", {
+        callId: "d1",
+        output: "no bot named ghost · bots here: scout",
+        isError: true,
+      }),
+    ]);
+    expect(runOf(state, 0)).toMatchObject({
+      phase: "failed",
+      reason: "no bot named ghost · bots here: scout",
+      child: { title: "scout it", sessionId: undefined, outcome: undefined },
+    });
+  });
+
+  it("ignores child events for calls it is not running", () => {
+    const before = projectAll(emptyProjection, [at("tool.started", { call })]);
+    const after = projectAll(before, [
+      at("child.started", { callId: "c1", sessionId: "k1", title: "t" }),
+      at("child.finished", { callId: "zz", outcome: "completed", usage }),
+    ]);
+    expect(after.entries).toEqual(before.entries);
+  });
+});
+
+describe("memory decisions", () => {
+  const recall: MemoryDecision = {
+    id: "m1",
+    question: "action-relevance@1",
+    about: { kind: "call", callId: "c1" },
+    candidates: ["Shell Echo"],
+    choice: { kept: ["Shell Echo"], dropped: [] },
+    decider: "builtin",
+    rule: '[[Shell Echo]] shares "echo" with the command',
+    latencyMs: 2,
+  };
+  const triage: MemoryDecision = {
+    ...recall,
+    id: "m2",
+    question: "entry-durability@1",
+    about: { kind: "entry", entryId: "2026-09-06#1" },
+    candidates: ["2026-09-06#1"],
+    choice: "unsure",
+  };
+
+  it("keeps every decision in arrival order and rides a recall on the call it decided for", () => {
+    const state = projectAll(emptyProjection, [
+      at("tool.started", { call }),
+      at("memory.decided", { decision: recall }),
+      at("memory.decided", { decision: triage }),
+      at("tool.finished", { callId: "c1", output: "hi", isError: false }, 40),
+    ]);
+    expect(state.memoryDecisions.map((decision) => decision.id)).toEqual(["m1", "m2"]);
+    expect(runOf(state, 0).recall).toEqual(recall);
+    expect(toolRowText(runOf(state, 0))).toBe(
+      'bash echo hi · 40ms · done · recalled [[Shell Echo]] · shares "echo" with the command',
+    );
+  });
+
+  it("finds a settled call for a decision the journal replays after the turn", () => {
+    const settled = projectAll(emptyProjection, [
+      at("tool.started", { call, replay: true }),
+      at("tool.finished", { callId: "c1", output: "hi", isError: false, replay: true }),
+    ]);
+    const replayed = project(settled, at("memory.decided", { decision: recall, replay: true }));
+    expect(runOf(replayed, 0).recall?.id).toBe("m1");
+  });
+
+  it("holds one record per decision id when a replay repeats a decision it already has", () => {
+    const state = projectAll(emptyProjection, [
+      at("memory.decided", { decision: recall }),
+      at("memory.decided", { decision: { ...recall, latencyMs: 3 }, replay: true }),
+    ]);
+    expect(state.memoryDecisions).toEqual([{ ...recall, latencyMs: 3 }]);
+  });
+
+  it("leaves the transcript alone for a decision about no call it holds", () => {
+    const before = projectAll(emptyProjection, [at("tool.started", { call })]);
+    const after = projectAll(before, [
+      at("memory.decided", { decision: triage }),
+      at("memory.decided", { decision: { ...recall, about: { kind: "call", callId: "zz" } } }),
+    ]);
+    expect(after.entries).toEqual(before.entries);
   });
 });

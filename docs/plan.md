@@ -218,7 +218,7 @@ so the separator and the refusal reason vanished; spans now carry a `part`, and 
 **Decisions Jordan may reverse.** Voice stamps are literal block glyphs in mono; the
 streaming animation steps the stamp's color through density tokens; the measure applies at
 broadsheet only; `keywork-day`'s palette is a first design; links allow http(s), mailto,
-and anchors only; the version check is exact on the pinned `protocolVersion` (0.1.1 since wave 4); a dead or corrupt ticket counts
+and anchors only; the version check is exact on the pinned `protocolVersion` (0.1.1 from wave 4, 0.2.0 from the keywork v0.2.0 cut); a dead or corrupt ticket counts
 as absent; unresolved inference is read from stderr's first line.
 
 **Left for rung 3.** The workspace open flow in the window, and the token-in-main
@@ -1074,6 +1074,650 @@ the edge, and the mark glyph collided with a bot sigil. The mark is now `▣` (n
 Gate: app 107 files, 1271 tests; `bun run check` green at 21 themes and 72 routes. Left for later: no palette entries derived from marks; `theme-<name>` stays
 window-scoped by design; a server-held arc theme (S15).
 
+### Wave 7 ledger (2026-10-15)
+
+**Open loops (N5).** The trash empties: `shift+d` in the sessions pane (`empty-trash`, the
+trash's `d` made plural) rereads and shows the trash, then asks in the grammar remove and
+discard already speak, `empty the trash? 2 sessions go for good, there is no undo`, and
+answers from the server's own count (`DELETE /trash`, `purgeTrash`, already in the client and
+the `trash` fixture): `deleted 2 sessions for good · the trash is empty`, or `the trash is
+already empty` with no ask when nothing is there. The shown trash's head teaches the chord
+(`trash · 2 sessions · shift+d empties it`); the empty section keeps `the trash is empty · x
+sends a session here`. The title row tags the arc at broadsheet only, as keywork's TUI does:
+`#pricing-v2` right after the name through a new `arc` adornment, the words on `textDim` and
+the `#` and hyphens a rung below (`chrome/slug.ts`, keywork's slug grammar shifted one rung for
+chrome). The bot adornment became `{ sigil, name }` (`titleBot`), so the sigil is its own glyph
+span inked with its name; stamp, mark, name, detail, theme and telemetry keep their rhythm at
+every tier. `textFaint` is derived in the app (`derivedTextFaint` in `theme/complete.ts`,
+`--kw-text-faint` in `themeVariables` and the regenerated `keywork-night.css`): half way from
+`textDim` to the ground, raised back toward `textDim` in 1% OKLab steps until it clears Lc 15,
+the floor the dim rung is held to. All 21 themes resolve it strictly quieter than `textDim` with
+the same polarity; light themes land near Lc 30, dark ones on the floor, so the fourth rung is a
+whisper where a theme left no room. It is worn only where the design language reserves it, at
+broadsheet: the arc tag's marks and the detail zone's `·` joints, pinned by a test over
+`pane-frame.css`. `/open` with nothing the agent touched now opens the workspace root, and the
+file pane resolves any path that `/files` calls missing but `/tree` lists as a folder: its
+README (markdown first, then bare, `.txt`, `.rst`, `.adoc`, `.org`, any case) by rebinding the
+pane, else `the workspace has no README · leader f browses the files` instead of the old
+`no file at README.md`; the root titles itself `workspace`. The posix identity fixture pins the
+three anchors under `/srv/fx`, case kept on Linux and macOS, dot segments and trailing slashes
+resolved, tickets at `/home/me/.keywork/workspaces/<identity>/server.json`; its identities are
+coreutils `sha256sum` over the subject keywork's rule forms (`resolve`, no case fold off
+Windows), a method that reproduces the Windows identities keywork itself computed (keywork's
+`canonicalPath` resolves with the host's own `path`, so it cannot be run for posix here). Mode
+cycling stays out: keywork still has no mode route and PD12 is still a spec (`docs/modes.md`),
+so it waits on keywork. **For the server lane:** `textFaint` belongs in keywork's theme schema
+as the optional broadsheet token the design language reserves (C49), derived by keywork's
+`completeTheme` with this rule when a theme omits it, so the TUI's broadsheet ladder and the
+app agree; until then the app derives it outside `completeTheme`, which keeps the proof of
+identity with keywork's completion intact. **Evidence:** 110 files, 1345 tests (from 108 and
+1295); types, pins, guardrails, colors (135 files), themes (21), textures and lint green with
+`KEYWORK_REPO=C:\src\keywork`; `check:contract` green in fixture mode (74 routes) and, against
+keywork `main`, reporting only `child.started` and `child.finished` (another lane) and keywork's
+new `0.2.0` against the app's `0.1.1` pin (`615cc5c`, the release's); the frame snapshots
+updated on purpose (the focused frame now carries `#pricing-v2` and `◆ reviewer`); the wide
+chrome shots re-taken and read in keywork-night and keywork-day. Left: the sigil alone at the
+clipping tier, as keywork's TUI keeps it (the app still sheds the bot there); `/open <path>`
+with an argument, which the palette cannot pass yet; `check:themes` without a keywork checkout
+compares the 21-theme gallery to the two-theme `scripts/themes/house.json` and fails whatever
+changes, so a worktree must set `KEYWORK_REPO`.
+
+**Quiet mode (N11).** A per-session "let it run" posture on the K7 session scope, built as
+the posture keywork's grant model can carry today. The server records a session grant only
+when a person answers an ask with `scope: "session"`; no route sets a per-session policy or
+records a grant ahead of its ask, so an app that answered asks by itself would be sending
+`gate: "user"` verdicts no person gave, which is the app loosening policy (AD8 now says so).
+Quiet therefore changes which scope the approve key sends, never whether a person answers.
+In a quiet session `ctrl+y` (and `y` on the card) answers `session` whenever the ask's
+`rules` name something to remember, so each kind of call asks once and then runs for the
+rest of the session under the server's own grant. Approve stays `once` for everything keywork
+approves one at a time (write and edit, K9's remember-nothing forms, a call with no rule)
+and for three cases the app keeps strict on its own: an exact-command rule (keywork derives
+one only for deletes and `git branch -D`), a blanket rule (`<program> *`, or a code runner
+with a flag), and a form the trusted reads ask about; the card says which in one dim line
+(`quiet · a destructive command is never the quiet default`). The card leads with
+`this session ctrl+y` and moves once to the new hot-path `alt+o` (`ask.once`, palette
+`approve-once`, `o` on the card); `alt+s`, `alt+w` and `ctrl+n` mean what they did. One
+`askChoiceFor(pick, run, quiet)` resolves the five picks for the card and the global chords
+alike, and `ActionTarget.answerAsk(pick)` replaces `approveAsk` and `denyAsk`.
+`leader shift+s` (`session.quiet`, palette `quiet`, alias `let-it-run`, listed in the keys
+overlay) toggles the focused conversation's session and says
+`quiet · ctrl+y now grants an ask for the rest of this session · ctrl+k shift+s ends it`, or
+`no session is focused · quiet is kept per session`. The title row carries `»` after the
+stamp and ahead of the `▣` mark at every width tier, in `--kw-density-full`, labelled
+`quiet`: no stamp, voice glyph, focus mark, pane mark, theme row, fold or sample sigil uses
+it, and being Latin-1 it draws from the bundled JetBrains Mono on every platform. Leaving
+quiet revokes nothing: the same chord reads `GET /permissions` and offers the revoke
+(`quiet off · 2 session grants still hold · ctrl+k shift+p revokes them`, or
+`quiet off · ctrl+y answers once again` when none were left). The permissions pane now
+revokes session grants: one cursor walks the workspace grants and then each session's, `x`
+confirms `revoke mkdir -p * for Build and stage` and posts `revokeSessionGrant`, and a quiet
+session's group reads `» quiet`. The posture is `shell.quiet` (`shell/quiet.ts`: `has`,
+`toggle`, `all`), held by the window and never stored, so a restart opens every session
+listening again; asks stay where they were, waiting in each session's projection, so the
+needs-you queue reads a quiet session's asks like any other. The stronger posture, a gate
+that grants what the session scope covers with no person at the keyboard, is server-lane
+task S16. Tests: `shell/quiet.test.ts` (the set, both notices, the grant count and its
+failure), the card in a quiet session (labels, the chord beside the rules, every key, the
+four exemptions with their lines, `askChoiceFor` as a table), the mark's glyph and place at
+every tier, the chords, the pane's session revoke and quiet tag, the client's session
+revoke route, and five shell flows (approve for the session, once from anywhere, a delete
+held to once, quiet off then revoke through the pane, no focused session). Gate: app 109
+files, 1332 tests (from 1295); `bun run check` green except `check:contract` against
+keywork `main`, which reports `child.started` and `child.finished` (another lane) and the
+server's 0.2.0 against the 0.1.1 pin (N2); `check:contract -- --source fixture` is green at
+74 routes.
+
+**Concept lane.** Jordan's brief: "a creativity lane for research", with prototypes we can see.
+`docs/research/field-scan-2026-10.md` scans what Claude Code's desktop app, the Codex app,
+Cursor 3's Agents Window, Zed's agent panel, OpenCode v2's TUI and desktop, Pi, Warp, Conductor,
+Superset, Vibe Kanban and VS Code's Agent Sessions do that the app does not (observed behaviour
+only; nothing adapted, `NOTICE` untouched, Crush not consulted), names what the app has that none
+of them do, and ranks ten ideas by how likely each is to make the app the daily surface:
+(1) **the desk**, every session grouped needs you, working, back and quiet, its ask answered in
+place with the card's own keys; (2) **asks that show their consequence**, the merge view, the
+typeset command or the argument table above the card's answers; (3) **the context map**, one
+square per percent of the window with ink area for the parts and fences at the flush and
+compaction lines; (4) **the turn ledger**; (5) **the review stream with talk-back** (W9.1 and
+W9.2, comments batched); (6) **terminal blocks to the agent**; (7) **the follow cam**;
+(8) **isolated sessions** in keywork-owned worktrees that bring work back uncommitted; (9) **the
+side question**; (10) **workspace houses**. Twelve field patterns are rejected with the decision
+each would break (cloud agents, commits and pull requests from review, the embedded editor,
+loosening the gate from the client, a best-of-N judge, voice, an agent-driven browser, scheduled
+automations, driving other agents, kanban, vendor ratings, subscription sign-in), and six server
+asks are proposed under provisional numbers S17 to S22 (desk rows, ask previews from the tool's
+own dry run, context parts, restore to a turn, isolated sessions, asides). The top three are
+prototyped as dev-only modules in `ui/src/dev/concepts/` (no registry entry, no chord, no
+protocol or client change, never imported by the app) built from the real `PaneFrame`,
+`AskCard`, `mountMergeView`, `ContextGauge`, overview head and density tokens over fixture data,
+staged in the chrome gallery as `concept-desk`, `concept-asks` and `concept-context`, and
+rendered by a new `chrome.spec.ts` test to `artifacts/shots/windows/concepts/stage--desk.png`,
+`stage--asks.png` and `stage--context.png`. The context map first drew glyph cells and read as a
+bar chart; ink area reads as a quantity, so density in pixels is area. One product defect
+surfaced: the merge view's collapsed-lines bar painted CodeMirror's own `#f3f3f3` gradient
+because `mergeTheme` set `backgroundColor`; it now sets `background` to `--kw-panel-lift`. Gate:
+app 112 files, 1328 tests; `bun run check` green with `KEYWORK_REPO` at the keywork checkout for
+`check:themes` (21 themes; a lane worktree has no `../keywork`) and in fixture mode for
+`check:contract` (74 routes). Against keywork `main` the contract reports `child.started` and
+`child.finished`, another lane's, and the server's `0.2.0` against the pinned `0.1.1`.
+
+**Children lane.** keywork 120 gave the engine `delegate`: a child session starts under the
+current one, runs one turn under the parent's gate and answers as the call's result. The app
+shows the child in both places Jordan picked. The protocol mirrors `child.started { callId,
+sessionId?, title, bot? }` and `child.finished { callId, sessionId?, outcome, usage, costNanos?,
+refused? }` as engine events (nineteen now) in `protocol/children.ts`, beside `childProvenanceOf`
+for the `↳ child <id> · <bot> · <outcome>` first line of a `delegate` result, the only way a
+replayed transcript names its child. `doc.json` is regenerated from keywork's own
+`openApiDocument` (the two event names, `x-keywork-contract`, three reworded summaries), the
+events mirror is keywork's `docs/events.md` again, and a recorded fixture `delegated` (a project
+bot `researcher` with sigil `◇`, one child, the parent's detail, the child read by id, the list)
+drives the tests. The projection marks a `delegate` run with a `ChildMark` (title from the
+arguments until the server names it, id, bot, outcome, usage, cost, refused calls), settles it
+from the provenance line live and on replay with the answer rather than the provenance as its
+detail, and leaves a call refused before any child existed a plain failure with its reason. The
+transcript row reads `child "audit the trust rules" · ◇ researcher · 1.0s · 17 tokens ·
+completed ·· ↵ open`; a running row carries the child's latest step from `tool.output`, refused
+calls and cost sit with the facts the way `waited` does, the state is the only coloured word,
+`enter` or a click opens the child through `shell.sessions.openSession`, and the stamp still
+folds the answer. The session store keeps a lineage ledger (`client/projection/lineage.ts`) fed
+by child events on any session's bus and by every transcript it loads, keeps the summary of a
+session read by id that `GET /sessions` never lists (`unlisted`, so a child's pane wears its
+title and bot), and rereads an open child on its parent's activity lines and when it finishes;
+`reload` now rereads after an in-flight load instead of skipping. While a child works, its
+pane's composer holds the draft (`hold`) and says `this child is still working for its parent ·
+it takes prompts once it finishes`, because `serve` would otherwise adopt the child's file as a
+second writer. In the tree, `panes/tree/rows.ts` nests children under their parent as `└ title ·
+state · ◇ bot` rows with the keys of any session row (`enter`, `l`, `x`, click, `›`); a parent
+folds and unfolds with the entry tree's own `h` and `l` (`h` on a child goes up to its parent
+first) and reads `▸ 2 children` folded; a child the server lists on its own nests under a listed
+parent rather than twice, and one whose parent is trashed or not loaded lists flat with
+`↳ child of x · trashed` or `· not loaded`. No chord, palette command or action id was added;
+the tree's root lost its focus outline as the other panes' did. `stage--children` in the chrome
+gallery puts the tree beside the parent's transcript. What the server does not expose: lineage
+reaches a client only through the parent (the two events, live and never replayed, and the
+provenance line in the stored result); `GET /sessions/{child}` names no parent, and there is no
+`spawnedBy`, no `GET /sessions/{id}/children` and no child bus on `/events` (keywork 120's S6
+and S9), so after a restart the tree learns a parent's children only as the parent is opened;
+`serve` adopting a running child on prompt is S5's to close. Gate: app 112 files, 1337 tests;
+`bun run check` green with `KEYWORK_REPO=C:\src\keywork` but for `check:contract`, whose only
+disagreement is keywork `main`'s bump to 0.2.0 (615cc5c, landed during the lane) against the
+pinned `protocolVersion` 0.1.1, the release lane's call; routes (74) and events (27) agree.
+`T8.firstPaintElements` moved 185 → 207 with a rewritten `why`, the delegated fixture having
+joined the sum.
+
+**Needs-you queue (N9).** One ordered list of everything waiting on the person, held per
+window and keyed by workspace: `shell/needs-you.ts` the model and its words,
+`needs-you-ledger.ts` the folds from the wire, `needs-you-queue.ts` the reactive queue,
+`needs-you-jumps.ts` the walk. It grew from the wave-5 seed rather than beside it: the inbox
+rising edge and both toasts moved in, and `host/pending-asks.ts` is gone because its tally is
+now the queue. **The ordering rule:** urgency first, by kind (a permission ask, then an
+airlock delivery, then a memory inbox item, then a failed turn); then age, the longest
+waiting first so nothing starves; then workspace and key, so the order never depends on
+arrival. An item with no timestamp sorts as the oldest of its kind. **Sources:** asks from
+`gate.ask` and `gate.permission`, seeded by `GET /asks` and reconciled on reconnect (an ask
+the server no longer holds drops, one that arrived meanwhile stays); a failed turn is an
+`engine.error` in a session not known to be between turns, cleared by its next
+`turn.started` or the trash, keyed per error so dismissing one never hides the next; inbox
+items and airlock digests from the memory garden, which the queue reads once at attach when
+no pane has. A batch carrying none of those seven events returns the same ledger, so
+streaming costs the queue nothing. **The strip** (`chrome/needs-you-strip.tsx`) sits above
+the status line only while something waits and is never focusable (`role="status"`, no
+control): `█ 3 need you · ask: rm -rf dist (refactor-permissions)   ctrl+k n`. Its stamp is
+the frame's own needs-you `█`, not the mockup's `▲`, so the strip and the pane frames speak
+one glyph. While the pane is open the strip collapses to `█ 3 need you`, the pane being the
+detail; `needs-you-strip` in the palette hides or shows it, remembered under
+`keywork.needs-you-strip` the way attire is. **The chords:** `leader n` (`needs-you-next`)
+focuses the pane that answers the next item (the session's conversation, opening one if no
+pane shows it; memory for inbox and airlock items) and that pane reveals it: the ask card
+scrolled into view and handed the keys, the latest failure scrolled to, the memory cursor on
+the inbox row or the airlock's first undecided entry. Pressed again while focus rests where
+it landed, it walks on to the following item; once that item is answered it starts again
+from the new head. `leader shift+n` (`needs-you-back`) returns to the pane the person left,
+skipping panes closed since, and each further press steps one jump further back through a
+return stack of eight. `leader q` (`needs-you`, alias `waiting`) summons **the needs-you
+pane** (`panes/needs-you/`, docked right, house attire): one row per item with urgency as
+density (`█` ask, `▓` airlock, `▒` inbox, `▛` failed), its gloss, where it is answered and
+its age; `j`/`k` move, `enter` or a click jumps, `d` dismisses anything but an ask (`an ask
+is answered, never dismissed · enter goes to its card`), workspace headings appear only when
+more than one workspace waits, and the frame wears needs-you while anything does. A toast
+click is a jump too, so `leader shift+n` walks back from it. **Main stays thin:**
+`HostPort.setPendingAsks` became `setNeedsYou` (channel `host:set-needs-you`); the tray badge
+is the queue's length (`keywork · 3 need you`, per workspace in the tray menu); the toast
+rules are unchanged, an ask arriving live toasts only while the window is unfocused and the
+memory inbox keeps keywork's rising edge at three, now counted from the queue. Dismissals
+live for the window's life; the server is never told. Multi-workspace is in the shape (keys,
+grouping, `switchWorkspace` for a foreign item) and proven with one workspace, since N8 is
+not built. The gallery gained `stage--needs-you` and `stage--needs-you-pane`
+(`artifacts/shots/windows/themes/`), captured in keywork-night, keywork-day and whiplash.
+Gate: 114 files, 1390 tests (base 108, 1295); `bun run check` green except
+`check:contract` against keywork `main`, which reports the server at 0.2.0 against the
+pinned 0.1.1 and the `child.started`/`child.finished` events another lane owns.
+Jordan decided on 2026-10-15 that the desk (the concept lane's idea 1) absorbs the queue in a
+later lane: the needs-you pane becomes the desk's needs-you group, the strip and the chords
+unchanged.
+
+**What the server would need for the queue to be complete.**
+- A failed turn exists only on the live stream: `GET /sessions` carries no last-turn
+  outcome, so a failure before the window attached, or across a restart, is not in the
+  queue; and `engine.error` does not say whether a turn failed or a listener or the settling
+  did, so the app infers it from turn boundaries.
+- Airlock digests carry no time they started waiting (candidate and question `created` are
+  optional) and no event announces one; the queue falls back to first sight and only sees a
+  new digest when a `memory.inbox` tally change refetches the garden.
+- The inbox is read through the whole garden on every tally change: `memory.inbox` carries
+  counts, not items.
+- Another workspace's queue is out of reach from this window: each server knows its own, so
+  a cross-workspace list needs main to relay queues between windows (N8 with S10).
+
+**Trust onboarding.** Jordan's brief: an auto-mode onboarding "like Claude Code has but
+better", a guided first run into trust "and then only adjusting when contextual / things are
+different from the scenario it was built for". Trusting a workspace now opens the `trust setup`
+house pane (kind `posture`, `leader shift+u`, palette `trust-setup`, `j`/`k` move, `y` accepts,
+`n` declines, `a` accepts every offer not declined), which reads only what the server serves
+and proposes a posture in keywork's grant grammar, each offer with its reason: the trusted
+reads as a fact (`trusted reads · 40 commands without an ask · fixed in keywork`, from
+`GET /permissions`), the workspace grants already recorded, the offers, and what still asks.
+Command families are offered at workspace scope from the manifests `GET /tree?path=` lists at
+the root and the scripts `GET /files?path=package.json` returns, through one table in
+`posture/toolchains.ts`, each written as the rule an answered ask would derive: `bun install *`
+from `bun.lock` (pnpm, yarn and npm by their lockfiles, npm with none), `<pm> run *` naming
+every script it would cover, `npm|pnpm|yarn test *` for a `test` script but never `bun test`,
+which is bun's own runner, `cargo build|test|check|fmt|clippy *`, `go build|test|vet|fmt *`,
+`deno test|fmt|lint|task *`, `uv run|sync *`, `poetry run|install *`. Each enabled MCP server
+from `GET /mcp` is offered whole for one session at a time (`mcp playwright__*` · `mcp server
+playwright · connected · 12 tools`). Still asks: `write and edit · approved once at a time,
+never remembered`; K9's destructive forms as `docs/events.md` states them, mirrored in the
+protocol as `exactOnlyCommands` and `unrememberedCommands`; the bundle's ask carve-outs from
+`GET /permissions`; `any other command or mcp tool · asks until a rule covers it`. A fact the
+server would not give is named in its words (`could not read the mcp servers · …`), never
+guessed; the app reads no file of its own. Nothing is granted silently, and here the brief met
+the wire: keywork records a grant through one door, `POST /asks/{callId}` with a scope, and no
+route records a rule ahead of a call. So an accepted rule waits in the app's storage for its
+first ask, and the ask card names it then (`accepted in trust setup · alt+w records it for the
+workspace`, or `alt+s … for this session` on a tool of an accepted MCP server); the person's
+key records it through the route an answered ask uses, and a workspace rule leaves the wait
+once `GET /permissions` lists it. A decline changes nothing. The app never answers an ask by
+itself: that would be the app-held allowlist AD8 refuses, and with the TUI attached it would
+answer the terminal's asks too; AD8 says so now, and an accepted rule answering its own first
+ask is Jordan's call, not a lane's. **Closed by S23** (2026-10-16): keywork's contract 1.2 records
+a rule ahead of its ask, so the setup now grants each acceptance the moment it is made and only an
+MCP offer accepted with no session focused waits for its first ask; see **Asks with their
+consequence** below. **Jordan's decision (2026-10-16):** an MCP server is offered whole, and
+keywork's S23 grows to accept `mcp <server>__*` at session scope (being built in keywork now),
+so the setup keeps one row per server rather than offering a server's tools one by one; until
+keywork takes it, the grant route declines the whole-server rule ahead and the offer stays
+undecided. **The fingerprint rule:** a posture is remembered with the
+facts it was built from (the manifests seen at the root, the enabled MCP servers, the bots,
+the keywork version) under `keywork.posture:<workspace>` as `{ version: 1, settled, noticed,
+accepted }`, never on the server, and a review settles once every offer it shows is decided.
+A later launch of a trusted workspace shows nothing unless the fingerprint differs from the
+settled one; then one quiet notice names the difference (`new mcp server: playwright ·
+trust-setup proposes 1 rule`), said once per fingerprint, and `trust-setup` reopens scoped to
+the new facts alone (`new since the last setup · new mcp server: playwright`). A difference
+that proposes nothing (a new bot, a new keywork version, a server gone) settles silently; a
+fact that could not be read is carried from the settled fingerprint, so a failed read never
+reads as change; a workspace trusted before the setup existed hears once `no trust setup for
+this workspace yet · trust-setup proposes 3 rules`. With nothing new, `trust-setup` reviews
+the whole posture with the decisions so far. **Server-lane asks:** S23 (below) is the one that
+makes acceptance immediate: `POST /permissions/workspace/grant` and
+`POST /permissions/session/{sessionId}/grant` (`grantWorkspaceRule`, `grantSessionRule`), body
+`{ rule }` exactly as the revoke routes take it, `200 { granted: rule }`, `400` on a malformed
+rule, `409` in keywork's words for anything an answered ask could never record (a `write`,
+`edit` or `*` action, a wildcard over a destructive form, an untrusted workspace), persisted
+where a `scope: "workspace"` answer persists and firing `surface.changed { kind:
+"permissions" }`, which also closes S14's "surface.changed on grants". With it the setup
+records each acceptance as it is made and the card's line retires; MCP offers stay a per-session
+line on the card, since a setup runs before the session exists. S24: `GET /workspace/toolchain`
+(`{ manifests: [{ path, kind }], families: [{ rule, reason }] }`) so detection lives in
+keywork, sees nested packages and monorepo workspaces, speaks the grant grammar and filters K9
+itself, and `GET /permissions` serving the destructive forms, so the app stops mirroring prose
+`check:contract` cannot hold; until then the table reads root manifests only. Evidence:
+`posture/` (facts, toolchains, proposal, fingerprint, record, trust-setup) and `panes/posture/`
+with tests beside each, the ask card's accepted line, and `shell/trust-arrival.test.tsx`
+driving the app: trusting by chord opens the setup focused and `a` settles it with no write
+but the trust itself; a later launch with a new MCP server says the notice once and is quiet
+the next time; `leader shift+u` opens scoped to the difference; an unchanged launch shows
+nothing. Gate: app 115 files, 1430 tests; `bun run check` green but `check:contract` against
+keywork `main` (0.2.0 against the pinned 0.1.1, and `child.started`/`child.finished`), both
+other lanes'. Left: S24 (S23 landed with contract 1.2 and closed the wait); a Playwright scene
+and a live run of the setup against a real `keywork serve`.
+
+**Server mirror.** keywork's contract 1.2 lands in the protocol and client exactly as the server
+has it, with `doc.json` re-recorded from its `openApiDocument`. Four shapes: `gate.ask` and
+`GET /asks` carry an optional `preview: ToolPreview` (`{ path, before: string | null, after }`)
+on a write or edit; `GET /sessions/{id}/context` adds `parts: ContextParts` (`system`, `tools`,
+`injected`, `conversation`, `free`, each `{ tokens, basis: "reported" | "estimated" }`) and
+`thresholds: ContextThresholds` on the parts' axis; `restoreSessionTurn` is
+`client.restoreTurn(id, turn)`, a `TurnRestored` or undo's refusals (a turn off the path reads
+as `nothing`); and `grantWorkspaceRule` / `grantSessionRule` answer a `GrantOutcome`
+(`{ granted }`, or `invalid`, `missing`, `declined` in keywork's words), while `surface.changed`
+gains `kind: "permissions"`, which the surfaces store maps to no listing. All recorded, none
+hand-written: `controls.json` holds real parts, `grants` the write's preview, five permissions
+changes and every grant-ahead answer, and a new `restored` scenario a restore, its refusals, the
+redo that takes it back and the log's `restore` / `restore-undone` entries. S23 is met on the
+wire; the setup's waiting line, the ask card's diff and the context bar are the UI lanes'. Gate:
+15 tests added, app 1719 tests; `check:contract` ok at 77 routes against keywork's working tree.
+
+**The context map.** Field-scan idea 3 is a real pane and its prototype is gone from
+`ui/src/dev/concepts/`. `panes/context/` registers `context` (attire `work`, home the right dock,
+so it opens beside the conversation): `leader shift+g` (`context.summon`, palette `context`,
+alias `context-map`) maps the focused session's window, and a click on a conversation's
+title-row gauge, now a bare `button.kw-frame-gauge` whenever the frame is given an opener
+(`PaneFrame.onGauge`), maps that pane's session, rebinding an open map rather than opening a
+second. The pane belongs to a session as the diff pane does and follows focus: whichever
+conversation takes focus, the map rebinds to it, and a house pane taking focus leaves it where it
+was. It reads `context(id)` through the controls store's `watchReadings`, so it refreshes on
+`turn.completed` and `session.state` exactly as the gauge does, and draws what keywork sends. The
+model is `instruments/context-map.ts` (`mapCells`, `legendRows`, `fenceRows`, `mapHead`,
+`basisLine`, `pastWindowLine`, `partsReadout`): one square per percent of a 200k window and per
+half percent of a larger one (ten by ten, twenty by ten), the parts in order of distance from
+the person (system prompt, tool schemas, memory and skills, conversation) inked by area from
+`--kw-density-*`, free room a dot, and the flush and compaction fences placed at `thresholds` on
+the parts' axis. The head counts everything the next request carries (`128k of 200k · 64%`),
+not the settler's conversation-only `used`, which the gauge keeps; the legend gives tokens and
+share per part (`<1%` for a sliver that would read `0%`) and the two lines (`at 187k`); the basis
+line says what was reported (`conversation from the usage the provider reported at the last turn
+· the rest estimated from the text keywork sends · window declared in keywork.json`). A size
+container fits the grid to a short pane. Keys: `c` (`context.compact`) compacts through
+`controls.compact` in the conversation's own words (`compactingNotice`, now shared, then
+`compactNotice` or the refusal) and rereads; `esc` (`context.close`) closes the pane through a new
+`ShellSeams.closePane`; `f` (`context.flush`) answers `memory flushes when a turn settles past
+187k · keywork has no route to flush now`, because there is none: keywork flushes only in
+`settleTurn` when a turn crosses the line, `compactNow` passes `noFlush`, and `flushNow` is
+reached only by the arc sweep, so the hint line reads `c compacts now · f says when memory
+flushes · esc closes`. **What the map found:** `thresholds` are the settler's lines plus every
+token the settler does not count, so once system, tools and injected outgrow the 24k flush
+reserve, both lines fall past the window and the request outgrows the window before the
+conversation alone reaches either; the pane says so in one dim line (`memory flush at 227k,
+compaction at 235k · past the window · keywork measures the conversation only`). The title-row
+gauge's hover carries the parts under its readout (`gaugeHover`, tokens and basis only; the
+accessible label is unchanged), `ContextLevel` carries the report's `parts`, and
+`sessionContextLevel` is the one rule both panes use for their gauge. The gallery's `context`
+scene (`screenshots/context-stage.tsx`) stages the real pane over a fake shell, a 200k map in the
+house, a 91% session in whiplash whose lines fall past the window and a 1M map in rose-pine-dawn,
+rendered to `artifacts/shots/windows/themes/stage--context.png`; `concept-context` is gone, and
+the other concept scenes followed once the asks and the desk landed. **For the server lane:** `POST
+/sessions/{id}/flush` over the session's `MemoryFlush.flushNow`, answering `{ flushed, notices }`
+as compact answers, so `f` can flush on demand; and a settler that measures the whole request (or
+a reserve that counts the fixed parts), so the lines land inside the window. Tests: the model
+(12: square counts at both scales, fill order, fences, no fence past the window, the cap, the
+legend, the recorded answer, the head, the basis wordings, the past-window line, the readout),
+the pane (15: the map, the 1M scale, the finding, readings watched and rewatched on rebind, both
+empty lines, `c` settled, refused and without a session, `f`, `esc`, a notice dropped on rebind,
+focus followed, the summon, the adornment and its fallback), the gauge's hover and
+`sessionContextLevel`, the title row's opener, and two shell flows (`leader shift+g` docked right
+then `esc`; the gauge's click, `c` and the palette). Gate: app 134 files, 1744 tests (from 133
+and 1719); `bun run check` green with `KEYWORK_REPO=C:\src\keywork` but for `check:contract`,
+whose only disagreement is `memory.decided`, an event another lane added to keywork's working
+tree during this one; `check:contract -- --source fixture` is ok at 77 routes.
+
+**Asks with their consequence.** The ask card shows what an answer would do, between its head
+and its keys, and the concept prototype that proved the idea is gone (`dev/concepts/consequence*`
+and the `concept-asks` scene). `page/consequence.ts` reads an ask into one shape and
+`page/consequence-view.tsx` draws it. A `write` or `edit` with keywork's `preview` renders through
+the diff pane's own `mountMergeView` (unified, unchanged lines collapsed, syntax and diff tokens)
+under a head that says where and how much (`edit src/layout/verbs.ts · line 12 · +6 −6`,
+`· 3 places` when it touches more than one, `write notes.txt · new file · 2 lines`), held to
+22rem with its own scroll; the counts come from the two sides keywork sent, and the app never
+re-applies an edit. Without a preview the arguments stay and one dim line says `no preview from
+keywork · too large, binary, a memory note, or an edit that would not apply`, keywork's own four
+reasons. A `bash` ask typesets its command with tokens only: each program after a separator in
+`--kw-syntax-function`, flags in `-attribute`, `|`, `&&`, `;`, `&` and redirections in
+`-operator`, paths and redirect targets in `-string`, a leading `VAR=x` read apart from the program
+it sets up, quotes kept whole, no character lost. Under the rules line each remembering key says
+in plain words what it would cover, worded from the ask's `rules` exactly as keywork reports them:
+`s no ask for any bun test command or any tee command until this session ends`, `w the same in
+every session of this workspace, until revoked`; an exact rule reads `the exact command rm -rf
+build`, and a wildcard over a program with a form keywork holds back names it (`any git push
+command but git push --force`, from the mirrored `unrememberedCommands` and `exactOnlyCommands`).
+In a quiet session the first line leads with `y`. An MCP ask reads `github · create_issue` over
+its arguments as a two-column table, each value one line cut at 80 characters with `…` and a
+multi-line value folded `… 2 more lines`, the transcript's grammar. The keys, the rules line,
+the blanket warning, the quiet line and the accepted line keep their places; the raw argument
+line goes wherever a consequence stands in for it. A pending ask seeded from `GET /asks` now
+carries its `preview` into the projection, so a card opened after the ask arrived shows the diff
+too. Trust setup records an acceptance through S23 as it is made: a workspace offer calls
+`grantWorkspaceRule`; an MCP offer calls `grantSessionRule` for the session the setup was summoned
+from or the conversation focused since (the posture spec carries `sessionId`, as the arcs and bots
+specs do), and with no session it waits in `keywork.posture:<workspace>` as before, its card line
+intact, so the waiting list keeps only what could not be granted. A `declined` refusal shows
+keywork's `detail` verbatim under the offer and leaves it undecided; `missing` and `invalid` read
+`not recorded · that session is gone` and `not recorded · keywork could not read the rule`; an
+unreachable server says why. An offer recorded in this window keeps its row (`proposalOf` takes
+the rules recorded here, so a reread does not move it under granted), and declining it says
+`keywork already holds bun run * · ctrl+k shift+p revokes it` rather than pretending. The notices
+follow: `accepted bun run * · keywork holds it for every session`, `settled · 2 accepted · 1
+declined · 1 waits for its first ask`. The permissions store and the posture pane refetch on
+`surface.changed { kind: "permissions" }` as well as on a remembered answer
+(`changesPermissions`). What the grant route taught: a whole-server rule (`mcp playwright__*`) is
+nothing an answered ask records, so keywork declines it ahead (`an answered ask never records mcp
+playwright__*; grants hold bash commands and MCP tools as an answer would remember them`); the
+setup shows that and the offer stays undecided, so with a session focused an MCP server cannot
+be granted ahead today. **For the server lane:** S23 accepting `mcp <server>__*` at session
+scope, or the setup offering a server's tools one by one, was Jordan's call; he chose the whole
+server on 2026-10-16 (see **Trust onboarding**). `stage--asks` in the
+chrome gallery (`artifacts/shots/windows/themes/`) renders the three kinds with the real card in
+keywork-night, gruvbox-dark and catppuccin-latte. No chord claimed. Tests:
+`page/consequence.test.ts` (shapes, heads, typesetting, the table's fold, the coverage words), the
+card (the parts in order, the diff mounted, keys kept, the no-preview line, the typeset roles,
+the coverage lines and their quiet key, the table), the seeded preview, the setup (grant at once,
+for a session or waiting, keywork's decline verbatim, missing, invalid and unreachable, the held
+decline, the stable row, accepting the rest), the posture pane's notices and refusal row, both
+panes' refetch; `shell/trust-arrival.test.tsx` now sees `a` write two grants after the trust.
+Gate: app 133 files, 1755 tests (from 1719); `bun run check` green with
+`KEYWORK_REPO=C:\src\keywork` but for `check:contract` against keywork's working tree, which
+reports the event `memory.decided` another lane added there; fixture mode is ok at 77 routes.
+
+**Memory decisions (AJ1–AJ3).** keywork's K10 put every memory judgment on the record
+(`memory.decided { decision: MemoryDecision }` on the session bus, journaled as a
+`memory_decision` entry and replayed with `replay: true`; backlog 121-5), and the app now shows
+that record without deciding anything itself: no decider, no threshold, no key. The mirror is
+`protocol/src/decisions.ts`, built as `children.ts` is: `MemoryDecision`, `DecisionSubject`,
+`DecisionChoice`, `RecallSelection`, `DecisionFallback`, the catalog as `decisionQuestions`
+(`DecisionQuestion`, because `MemoryQuestion` already names an ask), the option lists
+(`entryDurabilities`, `pairRelations`, `driftVerdicts`, `mentionVerdicts`, `deciderNames`,
+`fallbackReasons`), `isRecallSelection`, and `candidateClausesOf`, which reads the builtin's
+action rule one clause per candidate, as `docs/events.md` promises it speaks. `memory.decided`
+joins `engineEventTypes` after `context.injected` (twenty engine types), the events mirror is
+keywork's `docs/events.md` again, `doc.json` is re-recorded (one line, the envelope's enum), and
+a new recorded scenario, `decided`, seeds the vault and writes `src/layout/rects.ts` and then
+`src/layout/rects.test.ts`, so the fixture holds a real builtin decision that kept
+`[[Layout Rects]]` (`shares "layout", "rects" with the path`) and one that dropped it (`was
+already surfaced`), each after the grant and before its `context.injected` and `tool.finished`;
+it records byte-stable. The projection keeps `memoryDecisions` in arrival order, one per id (a
+replay that repeats a decision replaces it), and rides a call's decision on its tool run as
+`recall`, found among the running calls and then the settled ones, because the journal replays
+decisions after the turn. **Why a note arrived (AJ2):** `context.injected` is not a transcript
+row today (the projection only lists injections), so the fact lands on the row of the call the
+recall rode: `write src/layout/rects.ts · 1.0s · done · recalled [[Layout Rects]] · shares
+"layout", "rects" with the path`, or `recalled [[Auth Tokens]] · jev 0.94` when the note was
+scored; a dim `recall` span that hides under 560px with `waited` and the other facts, and
+nothing at all for a decision that kept no note. When K14 lands `ContextInjection.decision`, an
+injection row can take the same words by id. **The decisions lens (AJ1):** `w` in the memory
+pane (`memory.decisions`, palette `decisions`) opens `decisions · <session>` for the working
+session (the focused conversation, kept while the memory pane holds focus), newest first, one
+row per decision in the facts grammar: the question in words (`recall before write
+src/layout/rects.ts`, `triage entry 2026-10-15#3`, `relate [[Old]] and [[New]]`, `does [[Note]]
+still hold`, `link [[A]] to [[B]]`), the choice (`kept 1 of 3`, `newer supersedes older`), the
+decider with its odds (`builtin`, `jev 0.94`: the confidence, else the weakest kept note's
+score, else the chosen option's), `fallback late` when the builtin stood in, and the latency.
+The mark is density, never a verdict: odds step the ramp by quarters, a rule with no odds reads
+heavy (`by rule`), `unsure` light. `j`/`k` move, `enter` folds a row open to its candidates
+marked kept or dropped with their scores and the rule sentence, `esc` goes back to the garden;
+rows arrive live through the session's projection; the empty lens teaches (`no decisions yet ·
+memory decides what to recall before each write, edit or command`) and, with no session, asks
+for one. **Odds on the inbox (AJ3):** the memory store keeps the latest decision per entry from
+any `memory.decided` envelope, process-level or a session's (`entryDecisions`), and a
+`borderline-promotion` card whose `source` is that entry gains one fact, `new durable · jev
+0.93`. The builtin answers `unsure` for every entry it triages and the card renders that as
+nothing, which a test says. No entry decision reaches the app yet: K10's sweep decisions ride no
+bus until 121-5's process-level event, so AJ3 is wired and waiting. **Not built (AJ4, AJ5):** the
+card that sends a person to `keywork connect typesafe` and the once-per-workspace invitation
+read the decider's state, which nothing serves; S25 in the server lane names what they need.
+The numbering is this lane's; 121's own table calls the mirror AJ1, the lens AJ2, why-this-note
+AJ3, the card AJ4 and the inbox odds AJ5. Tests: 39 new (the protocol mirror against the events
+doc 6, the projection 4 and the recorded `decided` fixture with its snapshot, the words 8, the
+lens rows and the triage odds 9, the odds ramp 1, the card's odds through rows and the store 3,
+the pane 5: keys and fold, a live arrival, both empty lines, the card's odds and the builtin's
+nothing; the transcript fact and its stylesheet 2). Gate: app 137 files, 1788 tests (from 134
+and 1744; five suites import the memory store's tests, so its one new test counts six times); `KEYWORK_REPO=C:\src\keywork bun run
+check` green, `check:contract` ok at 77 routes from keywork's working tree.
+
+**The turn ledger.** The concept lane's idea 4, built on the mirror's `restoreTurn`. Every settled
+turn now closes with one dim line in the tool rows' facts grammar: `turn 1 · 1 file · +2 −0 ·
+500ms in tools · $0.0123 ·· ↵ files · u restores to before · f forks here`. No word is coloured,
+because the turn's state already has its own row (`· interrupted`, the error notice). The facts
+come from four places, and a fact with no source is left out. A line with no facts is not drawn.
+**The number** is the server's own count, the 1-based place of the prompt among the user
+messages on the active path (`restorePointOf`'s rule). It is read from `GET /sessions/{id}/entries`
+by `client/projection/ledger.ts` (`pathReading`, memoised per snapshot; `transcriptLedger`;
+`latestLedger`; `restoreReach`). The transcript's settled prompts are matched to the path newest
+first, by entry id when a replay names one, else by text. A compaction summary or an injected
+message shown as a prompt stays unplaced and does not shift every number after it, and a repeated
+`continue` keeps its own turn. **Files** are the `GET /sessions/{id}/changes` rows whose `turn` is
+that number, with their lines summed. **Time in tools** is the sum of the turn's tool rows'
+`durationMs`, waits excluded, live rows only. **Cost** adds `usage.costUsd` over the turn's assistant
+entries in the log, which `serve` records per model call, and is formatted the way the status line
+prices. It is shown only when every reply in the turn carries a price, and because it is read from
+the log, replayed turns are priced too. `turn.completed` carries only the last call's usage, so it
+could not price a turn. The
+conversation pane opens its session's tree and changes, which the store then keeps fresh.
+
+**Restore and fork.** The ledger line is a row in the transcript's own focus walk, like tool and
+child rows: tab reaches it and a click focuses it. `enter` or `space` unfolds the turn's files
+with their counts, `u` restores to before the turn, and `f` forks there. No chord is claimed. The
+palette gets `restore-turn` and `fork-turn` (`conversation.restore-turn`,
+`conversation.fork-turn`, chords `none`), which act on the line that last held focus, else on the
+latest placed turn. A test holds that no binding a conversation hears takes a bare `u` or `f`.
+Both verbs reread the tree first (forced `openTree`), so a confirm never names a stale number. A
+turn the path no longer holds says `that turn has no place on the server's path · it was folded or
+taken back`. A restore asks `restore to before turn 1, "write two lines to notes.txt"? 2 turns and
+1 file go back · redo brings them back · y/n`. It counts turns from the path and files from the
+changes' attribution, and drops the files clause when nothing is attributed. `y` posts
+`restoreTurn`, staged in the controls store exactly like undo: the turn's prompt seeds the
+composer and the transcript reloads. It then says `restored to before turn 1 · 2 turns went back ·
+1 file put back · the prompt is back in the composer` (the server's `filesNote` when no file moved).
+A refusal reads in undo's words (`refusalNotice`: `a turn is running`, `no turn 9 on this
+session's path`, `this session is gone`), and `n` leaves it unchanged. The server's `restore`
+entry is drawn as a row where the path puts it, after the turn it follows, or first when it
+precedes every turn: `restored to before turn 1 · redo brings the turns back` while it is the leaf
+and `redoable`, then plain `restored to before turn 1`. A `restore-undone` reads `the restore to
+before turn 1 was taken back`. Fork posts `fork` at the turn's last message entry (the existing
+path the tree pane uses), opens the fork through `openSession` and says `forked after turn 1 ·
+the fork opens as its own session`.
+
+**The ribbon.** A new `ribbon` adornment fills a `turn` title zone at broadsheet only. It is the
+last child of the detail zone, after the theme name, worn in `--kw-text-dim`, and it reads
+`turn 12 · 3 files · $0.41` for the latest settled, placed turn. Only conversation panes supply
+it. The stamp, the quiet mark, the pane mark, the name, the arc tag, the bot and the theme keep
+their order. The frame snapshots did not change, on purpose: no snapshotted frame carries a ribbon,
+and its place is pinned by the title-row and pane-frame tests instead.
+
+**A defect found and fixed.** `openTree` and `openChanges` seeded a session with the shared
+`emptyTreeState` and `emptyChangesState` objects. Solid merges an object set onto the object
+already there, so the first snapshot was written into the shared constants, and every session's
+tree and changes were one object, later reads overwriting earlier ones. The diff and tree panes
+hid this by showing one session each. A ledger per conversation exposed it. Each session now gets
+its own copy, and `session-store.test.ts` holds two sessions apart.
+
+**Gallery and gate.** `stage--turn-ledger` in the chrome gallery (`screenshots/turn-ledger-stage.tsx`,
+staged through the real `transcriptLedger` over the `tool` and `plain` fixtures) is rendered to
+`artifacts/shots/windows/themes/stage--turn-ledger.png`: two closed turns, the second focused with
+its files unfolded, a restore row, and the ribbon. Tests: `ledger.test.ts` (client: the recorded
+`restored` log, placement, pricing, reach), `page/ledger.test.tsx` (facts, ribbon, marks, keys, the
+page's rows), `panes/conversation/turn-ledger.test.tsx` (a real session store over the recorded
+scenario: lines, the restore asked, confirmed, declined and refused, the restore row, the redo's
+row, fork, the palette's target, no path, no chord), plus the controls store, the title row, the
+pane frame and the session store. Gate: app 136 files, 1764 tests (from 133 and 1719). Types, pins,
+guardrails, colors (168 files), themes (21), textures and lint are green with
+`KEYWORK_REPO=C:\src\keywork`. `check:contract` is green in fixture mode (77 routes). Against
+keywork's working tree it reports only `memory.decided`, an event another keywork lane added
+during this lane, as the baseline did. **For the server lane:** `ChangedPath.turn` (and
+`changes.updated`'s `turn`) is the checkpoint store's ordinal, turns counted since this server's
+checkpoints opened, not the path's place. After an undo, a restore or a restart the two part, and
+the ledger's files and the confirm's file count follow the changes' numbering. Attributing changes
+by the prompt's entry id, or by the path ordinal `restore` takes, would close this. Left: diffs
+inline on `enter` (the field scan's sketch, now files and counts), the ribbon as one cell per turn,
+and tool time for replayed turns, since `serve` keeps no durations.
+
+**The desk.** Jordan decided on 2026-10-15 that the desk absorbs the needs-you queue, and N9's
+pane became the desk: one pane kind, still `needs-you` under `ShellSeams.needsYou`, summoned by
+`leader q` with the palette name `desk` and `needs-you` and `waiting` kept as aliases, titled by
+its count (`desk · 3 need you`, plain `desk` when nothing waits). It moved from the right dock to
+the main area, since its rows carry a session's facts and the dock's 22% shed every one of them.
+The strip, `leader n`, `leader shift+n`, the return stack, the `needs-you-strip` toggle, the tray
+badge and the toasts are untouched and still read the queue. **The groups**
+(`panes/needs-you/desk.ts`): *needs you* is the queue in its own order, asks, airlock deliveries,
+inbox items and failed turns alike, each a row that jumps, with workspace headings only when two
+workspaces wait; *working* is every session whose projection holds a live turn, latest activity
+first; *back* is every idle session whose `lastActivityAt` is newer than the person's read mark,
+newest first; *quiet* is every session in `shell.quiet`. A session appears once: waiting wins,
+then quiet (a session left to run stays out of the way while it works and when it finishes, until
+it asks), then working, then back. An idle session already read is not on the desk; the head
+still counts it (`8 sessions · 4 need you · 2 working · $1.55`) and the tree lists it. **Read
+marks** are new and held by the window (`shell/session-reads.ts`): a session's first sighting
+counts as read, since the window cannot know what the person saw before it opened; focusing a
+conversation pane reads its session; `d` on a back row marks it read (`marked read · the sessions
+tree still lists it`). **The rows** carry only what a store holds: the title (`sessionName`), the
+arc chip and slug in the arc's ramp hue, inverted under the name while it asks, the bot's sigil
+and name (`botNamed`), the theme the session's pane wears as an eight-swatch strip when dressed
+(`NeedsYouSeams.dressed`: the outfit of the pane that shows it, else its arc's theme), the context
+gauge in steps (the controls reading, else the reported usage), the cost from `costNanos`, the age
+(`waiting 6m` on a waiting row) and `»` on any row whose session is quiet, asks included, since
+quiet changes what `y` sends. The second line is the ask or the failure in the strip's words
+(`ask: rm -rf dist`) or a working session's live tool row (`edit src/page/page.css · running`,
+else `thinking`). The prototype's changes line (`3 files · +42 −7`) is left out: no store holds
+it before S17. **In place:** the cursor row's ask shows the card's own offers (`askOffers` and
+`answerLabel`, now exported) and `y`, `o`, `s`, `w`, `n` answer it through `answerHeldAsk`
+(`shell/answer-ask.ts`), the one path `ActionTarget.answerAsk` now runs too: the asking run from
+the session's projection, `askChoiceFor` with the session's quiet posture, `answerAsk`, and a
+refusal from the server in its own words, which the global chords now say on the status line as
+well. The desk opens each asking session it lists so the run is in hand. `tab` walks the waiting
+rows and wraps; `enter` jumps a waiting row as before and visits a session row through the jumps
+(`toPlace`), so `leader shift+n` comes back to the desk; `d` dismisses as before and says why an
+ask cannot be (`an ask is answered, never dismissed · y or n answers it here`); the foot of the
+pane teaches `j k move · enter goes there · y o s w n answer an ask · d dismisses · tab next
+waiting` and gives the line to a notice while one stands. The prototype modules
+(`dev/concepts/desk*`) are deleted, and with every prototype now landed, `dev/concepts/` and
+`screenshots/concept-stages.tsx` are gone entirely. The gallery's `needs-you-pane` and `concept-desk` scenes became one
+`desk` scene that stages the real pane beside the asking session in rose-pine-dawn and the
+working one in whiplash (`artifacts/shots/windows/themes/stage--desk.png`); `stage--needs-you`
+keeps the strip. Tests: the model as a table (`desk.test.ts`), the pane (groups, facts, both
+quiet postures, a once-only ask, a server refusal, the keys, dismissals, headings, the clear
+desk), the one answer path, the read marks, the visit jump, and two shell flows: the restored
+ask answered from the desk with `s`, and a session that moved unseen coming back to the desk and
+leaving it once visited. **For the server lane:** S17 is what makes *working* and
+*back* right for a session this window never opened: `live` on `GET /sessions` rows and a
+`changes` summary; until then a session driven only from the TUI shows as working only once a pane
+here has loaded it, and comes back by its `lastActivityAt` alone. Left: `ctrl+y` and its siblings
+answer the focused conversation's ask, not the desk's cursor row, which answers to the card's
+keys; `leader shift+s` quiets the focused conversation only. Gate: app 134 files, 1733 tests
+(from 133 and 1719); `bun run check` green with `KEYWORK_REPO=C:\src\keywork` but for
+`check:contract`, which reports keywork's working tree adding the event `memory.decided`
+(another lane's), and is ok in fixture mode at 77 routes.
+
+**Gate (2026-10-16).** Wave 7.5 folded the last three lanes into this tree in the order above,
+memory decisions, the turn ledger, then the desk, each as a three-way patch over wave 7 with the
+mirror, the context map and the asks. Every conflict resolved as a union of both sides: this
+ledger's paragraphs, the gallery's scenes and imports, the session store's test (the preview
+seeded from `GET /asks` beside each session's own tree and changes), the workspace view's frame
+props (the gauge's opener beside the ribbon), and the stage tests. The ask card merged on its
+own into the consequence view, the exported `askOffers` and `answerLabel`, the quiet line and the
+accepted line. The ribbon ends the title row's facts, after the quiet mark, the arc tag, the bot
+and the theme name; no frame snapshot moved, because no snapshotted frame carries a ribbon and
+its place is pinned by the title-row and pane-frame tests. With the desk landed every field-scan
+prototype is a real surface, so `ui/src/dev/concepts/` and `screenshots/concept-stages.tsx` are
+gone, with the gallery's concept scene type and its `concept stage` test, and the field scan's
+prototype table says so. The desk stage's asking pane now replays the asks scene's edit, so the
+real card beside the desk shows keywork's preview. App 141 files, 1883 tests (from 134 and 1780).
+`KEYWORK_REPO=C:\src\keywork bun run check` is green: `tsc --build`; `check:pins: ok (5
+manifests, 2 workflows)`; `check:guardrails: ok`; `check:colors: ok (170 styled files)`;
+`check:contract: ok (77 routes, server version 0.2.0, from C:\src\keywork)`; `check:themes: ok
+(21 themes)`; `check:textures: ok (21 themes, 17 grapheme samples, held against HEAD)`; biome
+over 426 files with nothing to fix. `bun run screenshots -g stage` renders all eight stages to
+`artifacts/shots/windows/themes/`, among them `stage--desk`, `stage--turn-ledger`,
+`stage--asks`, `stage--context`, `stage--children` and `stage--needs-you`.
+
 ## M4: The panes (20pt)
 
 Each pane earns its place with daily use. Order is by how often Jordan reaches for it.
@@ -1210,11 +1854,30 @@ in the report instead. Gate: app 108 files, 1295 tests, every check green except
 adding `child.started`/`child.finished`; keywork 355 files, 4913 tests, its own types failing
 on that same in-flight work.
 
+**N1 ledger and the v0.2.0 pin (2026-10-15).** K9 is on keywork `main` (615cc5c), taken
+from the `next` worktree (read only, not touched): the code and `docs/events.md` hunks as they
+were, the two new trust files copied, and the 118 ledger hunk rewritten as its own "K9" entry
+since K8's half had already landed there as theme parity; one fix rode along (`programName`
+now splits Windows paths, so `C:\tools\RM.EXE -rf out` is still a delete). keywork's CLI
+manifest is `0.2.0`, and this repo pins `protocolVersion = "0.2.0"`, which the sidecar fetch,
+`expectedServerVersion` and `check:contract` all read; `fetch-sidecar`'s usage shows a
+`<x.y.z>` placeholder instead of a stale number. `scripts/lib/repo-files.ts` now skips
+`.claude` like keywork's walker and Biome already do, since agent worktrees under
+`.claude/worktrees` were failing `check:guardrails` with their own copies of the exempt
+pattern table. Nothing else in `next` is unlanded: its whiplash file and gallery change match
+`main` byte for byte and only its `themes.md` wording differs, so that checkout can retire. N2
+waits on keywork's `v0.2.0` release existing. Gate: app 109 files, 1296 tests, every check green
+except `check:contract`'s two known unknown events (`child.started`, `child.finished`), with no
+version disagreement; keywork 364 files, 5025 passed, 3 skipped, `bun run check` green.
+
 **Rung 2: the daily driver.**
 
-- **N5 (2pt) Open loops (W7.2).** `purgeTrash` in the tree's trash section; mode cycling
-  (needs PD12); the arc slug and bot sigil in the title row at broadsheet; the `textFaint`
-  token; `/open` with a README fallback; a posix identity fixture.
+- **N0 Children.** (landed 2026-10-15, see the Wave 7 ledger) keywork's delegated child
+  sessions, shown in the parent's transcript and nested in the tree.
+- **N5 (2pt) Open loops (W7.2).** (landed 2026-10-15, see the Wave 7 ledger) `purgeTrash`
+  in the tree's trash section; mode cycling (needs PD12); the arc slug and bot sigil in the
+  title row at broadsheet; the `textFaint` token; `/open` with a README fallback; a posix
+  identity fixture.
 - **N6 (2pt) S14 findings (keywork).** `POST /redo` after an undo that announced `redoable`;
   context from reported usage; cost that survives a restart; compaction summaries marked;
   `surface.changed` on grants; zero-turn cost rows dropped.
@@ -1226,14 +1889,14 @@ on that same in-flight work.
 
 **Rung 3: many sessions, one head (the start of wave 8).**
 
-- **N9 (3pt) The needs-you queue (W8.1).** One ordered list across sessions and workspaces;
-  a chord that jumps to the next waiting item and back; tray badge and toasts from the same
-  queue.
+- **N9 (3pt) The needs-you queue (W8.1).** (landed 2026-10-15, see the Wave 7 ledger) One
+  ordered list across sessions and workspaces; a chord that jumps to the next waiting item and
+  back; tray badge and toasts from the same queue.
 - **N10 (3pt) Session groups (W8.2).** Arcs as the grouping in the tree with collapse and
   per-group waiting counts; a session started inside an arc with its bot bound in one step;
   the arc's theme worn by the new session's pane from its first paint.
-- **N11 (2pt) Quiet mode (W8.4).** A per-session "let it run" posture on the K7 session
-  scope, marked in the title row, one key back.
+- **N11 (2pt) Quiet mode (W8.4).** (landed 2026-10-15, see the Wave 7 ledger) A per-session
+  "let it run" posture on the K7 session scope, marked in the title row, one key back.
 
 What is deliberately after these: fan-out and compare (W8.3), performance at scale (W8.5),
 and review as a surface (wave 9), each needing the daily-driver week's evidence first.
@@ -1275,7 +1938,8 @@ The app's advantage over a terminal is that several sessions can be in view and 
 answers whichever needs them. This wave makes that the primary posture rather than a
 layout trick.
 
-- **W8.1 (3pt) The needs-you queue.** One ordered list of everything waiting on the
+- **W8.1 (3pt) The needs-you queue.** (landed 2026-10-15 as N9, its pane grown into the
+  desk; see the Wave 7 ledger) One ordered list of everything waiting on the
   person across sessions and workspaces: asks, airlock deliveries, memory inbox items,
   failed turns. A pane and a chord that jumps to the next item and back. The tray badge
   and toasts read from the same queue.
@@ -1350,6 +2014,10 @@ every terminal, and Zed's review UI stays observed behaviour only.
 | **S14 the open findings** | 2 | `POST /redo` after an undo that announced `redoable`; context from reported usage; cost that survives a restart; compaction summaries marked; `surface.changed` on grants; `?layer` on notes; zero-turn cost rows dropped | W7.3 |
 | **PD12 mode cycling** | 1 | The one decision the app has waited on since M3.6 | W7.2 |
 | **S15 arc theme on the record** | 1 | An optional `theme` on an arc, set by `POST /arcs/{slug}/theme`, so a second client (the TUI, another window) can wear what the app chose; the app keeps its local choice as the fallback | W8.2 |
+| **S16 quiet sessions** | 2 | A per-session quiet posture the gate applies itself, so "let it run" needs no person at the keyboard for what the session scope already covers: `POST /sessions/{id}/quiet { on: boolean }` recorded as a session entry and carried on `session.state` as `quiet`; while on, a call whose derived `rules` a `session` answer would record, none blanket (`<program> *`) and no part destructive in K9's sense, is granted by the gate, its rules join the session layer, and the decision reads `gate.permission { gate: "quiet", scope: "session" }`, a new origin so no surface mistakes it for a person's answer; `write`, `edit`, K9's exact-only and remember-nothing forms, blanket rules and the trusted reads' carve-outs still fire `gate.ask`; turning it off revokes nothing; `GET /permissions` names the quiet sessions; `keywork run` and every headless gate never go quiet | W8.4 |
+| **S23 grants ahead of an ask** | 2 | `POST /permissions/workspace/grant` (`grantWorkspaceRule`) and `POST /permissions/session/{sessionId}/grant` (`grantSessionRule`), body `{ rule: { action, resource, effect: "allow" } }` as the revoke routes take it; `200 { granted: rule }`, `400` malformed, `409` in keywork's words for a `write`, `edit` or `*` action, a wildcard over a K9 destructive form, or an untrusted workspace; persisted where a `scope: "workspace"` answer persists; fires `surface.changed { kind: "permissions" }`. Trust setup records an accepted rule the moment it is accepted instead of at its first ask | Trust onboarding (wave 7) |
+| **S24 posture facts** | 1 | `GET /workspace/toolchain` → `{ manifests: [{ path, kind }], families: [{ rule, reason }] }`, detected by keywork across the workspace in its grant grammar with K9 applied; `GET /permissions` serves the destructive forms (exact-only and never-remembered) so the app stops mirroring them from `docs/events.md` | Trust onboarding (wave 7) |
+| **S25 the decider's state** | 1 | 121-12's `decider` block on `GET /memory`, read the way K12's doctor row reads it (config, the credential store, connect's observations; no network call): `{ selected: "builtin" \| "jev", active: "builtin" \| "jev", credential: "saved" \| "environment" \| "missing" \| "refused", model?, proven: string[], lastFailure?: { at, reason }, nextAction? }`, the credential a fact and never a value, `nextAction` the command in keywork's words (`keywork connect typesafe`); a new `surface.changed` kind, `decider`, whenever any of it moves (a connect, a removal, a 401 latching `refused`), so a card clears without polling; and 121-5's process-level `memory.decided` (`sessionId: ""`) for sweep decisions, with staged items carrying `decision`, `score` and `decider`. The persistent card shows while `selected` is `jev` and `credential` is `missing` or `refused`; the invitation while `selected` is `builtin` and `credential` is `missing`, dismissed per workspace in the app; neither has a key field or a decider toggle, and the one action opens a terminal pane on `nextAction` | AJ4, AJ5 (needs K12, K13, K17) |
 
 ## What is deliberately not in this plan
 

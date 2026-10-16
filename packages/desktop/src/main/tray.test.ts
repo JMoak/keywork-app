@@ -4,19 +4,19 @@ import { decodePngHeader, encodePng, trayMarkPng, trayModel } from "./tray.ts";
 import { windowRegistry } from "./windows.ts";
 
 describe("trayModel", () => {
-  it("names the pending ask count in the tooltip and badge, and lists every open workspace", () => {
+  it("names the needs-you count in the tooltip and badge, and lists every open workspace", () => {
     const model = trayModel([
-      { workspace: "C:/work/app", windows: 1, pendingAsks: 2 },
-      { workspace: "/home/me/tool", windows: 2, pendingAsks: 0 },
+      { workspace: "C:/work/app", windows: 1, needsYou: 2 },
+      { workspace: "/home/me/tool", windows: 2, needsYou: 0 },
     ]);
-    expect(model.tooltip).toBe("keywork · 2 asks waiting");
-    expect(model.badge).toBe("2 asks waiting");
+    expect(model.tooltip).toBe("keywork · 2 need you");
+    expect(model.badge).toBe("2 need you");
     expect(model.menu).toEqual([
       { kind: "action", label: "Open Folder…", action: "open-folder" },
       { kind: "separator" },
       {
         kind: "action",
-        label: "app  (C:/work/app) · 2 asks waiting",
+        label: "app  (C:/work/app) · 2 need you",
         action: "open-recent",
         payload: "C:/work/app",
       },
@@ -40,19 +40,18 @@ describe("trayModel", () => {
       "separator",
       "quit",
     ]);
-    expect(trayModel([{ workspace: "C:/w", windows: 1, pendingAsks: 1 }]).badge).toBe(
-      "1 ask waiting",
-    );
+    expect(trayModel([{ workspace: "C:/w", windows: 1, needsYou: 1 }]).badge).toBe("1 needs you");
   });
 
-  it("follows the count a window reports as an ask arrives and its gate.permission settles it", () => {
+  it("follows the queue length a window reports as items arrive and are answered", () => {
     const registry = windowRegistry();
     registry.add(7, "C:/work/app");
     const badges: Array<string | undefined> = [];
     registry.onChange(() => badges.push(trayModel(registry.list()).badge));
-    registry.setPendingAsks(7, 1);
-    registry.setPendingAsks(7, 0);
-    expect(badges).toEqual(["1 ask waiting", undefined]);
+    registry.setNeedsYou(7, 1);
+    registry.setNeedsYou(7, 3);
+    registry.setNeedsYou(7, 0);
+    expect(badges).toEqual(["1 needs you", "3 need you", undefined]);
   });
 });
 

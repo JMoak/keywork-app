@@ -1,6 +1,13 @@
-import type { LedgerEntry, MemoryGarden, MemoryNote, StagedItem } from "@keywork-app/protocol";
+import type {
+  LedgerEntry,
+  MemoryDecision,
+  MemoryGarden,
+  MemoryNote,
+  StagedItem,
+} from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { inertGarden } from "../../shell/memory-store.ts";
+import { airlockItem, askItem, inboxItem } from "../../shell/needs-you-testing.ts";
 import {
   entriesTouching,
   flatRows,
@@ -9,6 +16,7 @@ import {
   ledgerSummary,
   newestFirst,
   noteNameOf,
+  rowRevealing,
 } from "./rows.ts";
 
 function note(name: string, layer = "workspace"): MemoryNote {
@@ -138,6 +146,49 @@ describe("garden sections", () => {
   });
 });
 
+describe("rows a needs-you jump reveals", () => {
+  const rows = flatRows(gardenSections({ garden, notes: [], dates: [] }));
+
+  it("finds an inbox item by its id", () => {
+    expect(rowRevealing(rows, inboxItem("r1"))).toBe("inbox:r1");
+    expect(rowRevealing(rows, inboxItem("gone"))).toBeUndefined();
+  });
+
+  it("lands an airlock on its first undecided entry, else on its close row", () => {
+    expect(rowRevealing(rows, airlockItem("launch"))).toBe("candidate:launch:Plan");
+    const decided = flatRows(
+      gardenSections({
+        garden: {
+          ...garden,
+          airlocks: [
+            {
+              arc: "launch",
+              candidates: [
+                {
+                  note: "Plan",
+                  title: "Plan",
+                  provenance: "agent",
+                  eligible: true,
+                  shortfalls: [],
+                  choice: "deliver",
+                },
+              ],
+              questions: [{ title: "Ship first?", provenance: "user", choice: "carry" }],
+            },
+          ],
+        },
+        notes: [],
+        dates: [],
+      }),
+    );
+    expect(rowRevealing(decided, airlockItem("launch"))).toBe("finish:launch");
+  });
+
+  it("reveals nothing for an item answered in a session", () => {
+    expect(rowRevealing(rows, askItem("c1"))).toBeUndefined();
+  });
+});
+
 describe("inbox items as rows", () => {
   it("reads a staged write as untrusted and a contradiction by its worse side", () => {
     expect(inboxView(staged)).toEqual({
@@ -152,6 +203,49 @@ describe("inbox items as rows", () => {
       title: "Layout Rects vs Layout Cells",
       provenance: "agent",
     });
+  });
+});
+
+describe("a promotion card's odds", () => {
+  const promotion: StagedItem = {
+    id: "p1",
+    key: "k",
+    created: "2026-10-15T12:00:00.000Z",
+    kind: "borderline-promotion",
+    title: "Auth Tokens Rotate",
+    body: "body",
+    confidence: 0.7,
+    source: "2026-10-15#3",
+  };
+  const triage: MemoryDecision = {
+    id: "t1",
+    question: "entry-durability@1",
+    about: { kind: "entry", entryId: "2026-10-15#3" },
+    candidates: ["2026-10-15#3"],
+    choice: "changes-a-note",
+    confidence: 0.91,
+    decider: "jev",
+    latencyMs: 80,
+  };
+  const viewOf = (decision: MemoryDecision) => {
+    const sections = gardenSections({
+      garden: { ...garden, inbox: [promotion] },
+      notes: [],
+      dates: [],
+      entryDecisions: { "2026-10-15#3": decision },
+    });
+    const row = flatRows(sections).find((item) => item.kind === "inbox");
+    return row?.kind === "inbox" ? row.view : undefined;
+  };
+
+  it("carries the entry's decision onto the card it was promoted from", () => {
+    expect(viewOf(triage)?.odds).toBe("changes a note · jev 0.91");
+  });
+
+  it("carries nothing for the builtin, whose triage is always unsure", () => {
+    const view = viewOf({ ...triage, choice: "unsure", decider: "builtin" });
+    expect(view).toEqual(inboxView(promotion));
+    expect(view).not.toHaveProperty("odds");
   });
 });
 

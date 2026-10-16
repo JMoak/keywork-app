@@ -1,4 +1,6 @@
+import type { ChildFinished, ChildStarted } from "./children.ts";
 import type { SessionState } from "./controls.ts";
+import type { MemoryDecision } from "./decisions.ts";
 import type { AskScope, PermissionRule } from "./permissions.ts";
 import type { CompactionEntry } from "./sessions.ts";
 import type { SurfaceKind } from "./workspace.ts";
@@ -17,6 +19,9 @@ export const engineEventTypes = [
   "gate.preset",
   "session.mode",
   "context.injected",
+  "memory.decided",
+  "child.started",
+  "child.finished",
   "diagnostics.published",
   "shell.reset",
   "extension.notice",
@@ -123,6 +128,9 @@ export interface EnginePayloads {
   "gate.preset": { from: string; to: string };
   "session.mode": { mode: string };
   "context.injected": { injection: ContextInjection };
+  "memory.decided": { decision: MemoryDecision };
+  "child.started": ChildStarted;
+  "child.finished": ChildFinished;
   "diagnostics.published": { path: string; count: number };
   "shell.reset": Record<never, never>;
   "extension.notice": ExtensionNotice;
@@ -213,6 +221,13 @@ export interface PermissionAsk {
   arguments: unknown;
   rule: "policy" | "default" | "trusted";
   rules?: readonly PermissionRule[];
+  preview?: ToolPreview;
+}
+
+export interface ToolPreview {
+  path: string;
+  before: string | null;
+  after: string;
 }
 
 export interface ContextInjection {

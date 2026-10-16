@@ -1,6 +1,6 @@
-import type { AskScope } from "@keywork-app/protocol";
 import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
+import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { BindingSpec } from "./keymap.ts";
 
@@ -20,13 +20,16 @@ export interface ActionTarget {
   summon(kind: PaneKind, variant?: string): void;
   paneAction(action: string): void;
   cycleMode(): void;
-  approveAsk(scope?: AskScope): void;
-  denyAsk(): void;
+  answerAsk(pick: AskPick): void;
+  toggleQuiet(): void;
   toggleHelp(): void;
   openPalette(initialQuery?: string): void;
   trustWorkspace(): void;
   toggleMark(): void;
   clearMarks(): void;
+  nextNeedsYou(): void;
+  returnFromNeedsYou(): void;
+  toggleNeedsYouStrip(): void;
 }
 
 export interface AppAction {
@@ -168,16 +171,29 @@ export const coreActions: Record<string, AppAction> = {
   },
   "ask.approve": {
     chords: "ctrl+y",
-    help: "approve the pending ask",
+    help: "approve the pending ask · for the session when quiet",
     hotPath: true,
-    invoke: (target) => target.approveAsk(),
-    command: { name: "approve", description: "approve the pending tool call" },
+    invoke: (target) => target.answerAsk("approve"),
+    command: {
+      name: "approve",
+      description: "approve the pending tool call: once, or for the session when it is quiet",
+    },
+  },
+  "ask.once": {
+    chords: "alt+o",
+    help: "approve the pending ask once",
+    hotPath: true,
+    invoke: (target) => target.answerAsk("once"),
+    command: {
+      name: "approve-once",
+      description: "approve the pending tool call this one time, even in a quiet session",
+    },
   },
   "ask.session": {
     chords: "alt+s",
     help: "approve the pending ask for this session",
     hotPath: true,
-    invoke: (target) => target.approveAsk("session"),
+    invoke: (target) => target.answerAsk("session"),
     command: {
       name: "approve-session",
       description: "approve the pending tool call and its rules for this session",
@@ -187,7 +203,7 @@ export const coreActions: Record<string, AppAction> = {
     chords: "alt+w",
     help: "approve the pending ask for this workspace",
     hotPath: true,
-    invoke: (target) => target.approveAsk("workspace"),
+    invoke: (target) => target.answerAsk("workspace"),
     command: {
       name: "approve-workspace",
       description: "approve the pending tool call and its rules for this workspace",
@@ -197,8 +213,19 @@ export const coreActions: Record<string, AppAction> = {
     chords: "ctrl+n",
     help: "deny the pending ask",
     hotPath: true,
-    invoke: (target) => target.denyAsk(),
+    invoke: (target) => target.answerAsk("deny"),
     command: { name: "deny", description: "deny the pending tool call" },
+  },
+  "session.quiet": {
+    chords: "leader shift+s",
+    help: "quiet: let this session run (toggle)",
+    invoke: (target) => target.toggleQuiet(),
+    command: {
+      name: "quiet",
+      description:
+        "let the focused session run: approving an ask grants it for the session; again to end it",
+      aliases: ["let-it-run"],
+    },
   },
   "help.toggle": {
     chords: ["leader /", "f1"],
@@ -232,6 +259,33 @@ export const coreActions: Record<string, AppAction> = {
     help: "unmark every marked pane",
     invoke: (target) => target.clearMarks(),
     command: { name: "unmark-all", description: "unmark every marked pane" },
+  },
+  "needs-you.next": {
+    chords: "leader n",
+    help: "go to the next thing waiting on you",
+    invoke: (target) => target.nextNeedsYou(),
+    command: {
+      name: "needs-you-next",
+      description: "jump to the next item waiting on you: asks first, then the oldest",
+    },
+  },
+  "needs-you.back": {
+    chords: "leader shift+n",
+    help: "back to where you were before the jump",
+    invoke: (target) => target.returnFromNeedsYou(),
+    command: {
+      name: "needs-you-back",
+      description: "return to the pane you left for the last needs-you jump",
+    },
+  },
+  "needs-you.strip": {
+    chords: "none",
+    help: "show or hide the needs-you strip",
+    invoke: (target) => target.toggleNeedsYouStrip(),
+    command: {
+      name: "needs-you-strip",
+      description: "show or hide the one-line needs-you strip above the status line",
+    },
   },
   "trust.workspace": {
     chords: "leader u",

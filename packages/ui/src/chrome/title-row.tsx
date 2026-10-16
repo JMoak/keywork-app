@@ -1,12 +1,23 @@
 import { For, Show } from "solid-js";
-import type { ContextLevel } from "../instruments/context.ts";
+import type { ContextLevel, GaugeStyle } from "../instruments/context.ts";
 import { ContextGauge } from "../instruments/gauge.tsx";
 import { gaugeStyleFor, type InstrumentTier } from "../instruments/tier.ts";
 import type { WidthTier } from "../page/tiers.ts";
+import type { TitleBot } from "./identity.ts";
 import type { ChromeWeight } from "./root-attributes.ts";
+import { arcTagParts } from "./slug.ts";
 import { type LifecycleState, stampGlyph } from "./stamp.ts";
 
-export type TitleZone = "stamp" | "name" | "bot" | "inference" | "mode" | "theme" | "telemetry";
+export type TitleZone =
+  | "stamp"
+  | "name"
+  | "arc"
+  | "bot"
+  | "inference"
+  | "mode"
+  | "theme"
+  | "turn"
+  | "telemetry";
 
 export interface ThemeMark {
   readonly name: string;
@@ -20,23 +31,38 @@ export interface TitleRowProps {
   focused: boolean;
   tier: WidthTier;
   weight: ChromeWeight;
-  bot?: string | undefined;
+  arc?: string | undefined;
+  bot?: TitleBot | undefined;
   inference?: string | undefined;
   modeWord?: string | undefined;
   telemetry?: string | undefined;
   context?: ContextLevel | undefined;
   marked?: boolean | undefined;
+  quiet?: boolean | undefined;
+  ribbon?: string | undefined;
   themeMark?: ThemeMark | undefined;
   instruments?: InstrumentTier | undefined;
+  onGauge?: (() => void) | undefined;
 }
 
 export const focusMark = "▎";
 export const paneMark = "▣";
+export const quietMark = "»";
 
 export function titleZones(tier: WidthTier, focused: boolean): ReadonlySet<TitleZone> {
   switch (tier) {
     case "broadsheet":
-      return new Set(["stamp", "name", "bot", "inference", "mode", "theme", "telemetry"]);
+      return new Set([
+        "stamp",
+        "name",
+        "arc",
+        "bot",
+        "inference",
+        "mode",
+        "theme",
+        "turn",
+        "telemetry",
+      ]);
     case "column":
       return new Set(["stamp", "name", "bot", "mode", "theme", "telemetry"]);
     case "clipping":
@@ -48,11 +74,8 @@ export function titleZones(tier: WidthTier, focused: boolean): ReadonlySet<Title
 
 export function TitleRow(props: TitleRowProps) {
   const zones = () => titleZones(props.tier, props.focused);
-  const detailText = (zone: DetailZone): string | undefined =>
-    zone === "bot" ? props.bot : zone === "inference" ? props.inference : props.modeWord;
-  const details = () =>
-    detailZones.filter((zone) => zones().has(zone) && present(detailText(zone)));
-  const themeMark = () => (zones().has("theme") ? props.themeMark : undefined);
+  const shown = <Value,>(zone: TitleZone, value: Value | undefined): Value | undefined =>
+    zones().has(zone) && value !== "" ? value : undefined;
   const gaugeStyle = () =>
     props.instruments === undefined ? undefined : gaugeStyleFor(props.instruments);
   const telemetryShown = () =>
@@ -67,6 +90,11 @@ export function TitleRow(props: TitleRowProps) {
       <span class="kw-frame-stamp" aria-hidden="true" data-state={props.state}>
         {stampGlyph(props.state, props.step)}
       </span>
+      <Show when={props.quiet}>
+        <span class="kw-frame-quiet" role="img" aria-label="quiet">
+          {quietMark}
+        </span>
+      </Show>
       <Show when={props.marked}>
         <span class="kw-frame-mark" role="img" aria-label="marked">
           {paneMark}
@@ -75,22 +103,30 @@ export function TitleRow(props: TitleRowProps) {
       <span class="kw-frame-name" data-state={props.state}>
         {props.name}
       </span>
+      <Show when={shown("arc", props.arc)}>{(slug) => <ArcTag slug={slug()} />}</Show>
       <span class="kw-frame-detail">
-        <For each={details()}>
-          {(zone) => <span class={`kw-frame-${zone}`}>{detailText(zone)}</span>}
-        </For>
-        <Show when={themeMark()}>
+        <Show when={shown("bot", props.bot)}>{(bot) => <BotIdentity bot={bot()} />}</Show>
+        <Show when={shown("inference", props.inference)}>
+          {(words) => <span class="kw-frame-inference">{words()}</span>}
+        </Show>
+        <Show when={shown("mode", props.modeWord)}>
+          {(word) => <span class="kw-frame-mode">{word()}</span>}
+        </Show>
+        <Show when={shown("theme", props.themeMark)}>
           {(mark) => (
             <span class="kw-frame-theme" data-source={mark().source}>
               {mark().name}
             </span>
           )}
         </Show>
+        <Show when={shown("turn", props.ribbon)}>
+          {(ribbon) => <span class="kw-frame-turn">{ribbon()}</span>}
+        </Show>
       </span>
       <Show when={telemetryShown()}>
         <span class="kw-frame-telemetry">
           <Show when={props.context}>
-            {(level) => <ContextGauge level={level()} style={gaugeStyle()} />}
+            {(level) => <TitleGauge level={level()} style={gaugeStyle()} onOpen={props.onGauge} />}
           </Show>
           <Show when={props.telemetry}>
             {(text) => <span class="kw-frame-usage">{text()}</span>}
@@ -101,8 +137,47 @@ export function TitleRow(props: TitleRowProps) {
   );
 }
 
-const detailZones = ["bot", "inference", "mode"] as const;
-type DetailZone = (typeof detailZones)[number];
+interface TitleGaugeProps {
+  level: ContextLevel;
+  style: GaugeStyle | undefined;
+  onOpen: (() => void) | undefined;
+}
+
+function TitleGauge(props: TitleGaugeProps) {
+  const gauge = () => <ContextGauge level={props.level} style={props.style} />;
+  return (
+    <Show when={props.onOpen} fallback={gauge()}>
+      <button type="button" class="kw-frame-gauge" onClick={() => props.onOpen?.()}>
+        {gauge()}
+      </button>
+    </Show>
+  );
+}
+
+function ArcTag(props: { slug: string }) {
+  return (
+    <span class="kw-frame-arc">
+      <For each={arcTagParts(props.slug)}>
+        {(part) => <span data-role={part.role}>{part.text}</span>}
+      </For>
+    </span>
+  );
+}
+
+function BotIdentity(props: { bot: TitleBot }) {
+  return (
+    <span class="kw-frame-bot">
+      <Show when={props.bot.sigil}>
+        {(sigil) => (
+          <>
+            <span class="kw-frame-sigil">{sigil()}</span>{" "}
+          </>
+        )}
+      </Show>
+      {props.bot.name}
+    </span>
+  );
+}
 
 function present(text: string | undefined): text is string {
   return text !== undefined && text !== "";

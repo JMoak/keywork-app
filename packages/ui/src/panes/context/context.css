@@ -1,0 +1,116 @@
+.kw-context-map {
+  flex: 1;
+  min-height: 0;
+  container: context-map / size;
+}
+
+.kw-context-map-total {
+  margin-left: auto;
+  color: var(--kw-text-mid);
+}
+
+.kw-context-map-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem 2.5rem;
+  padding: 1.25rem 1rem 0.75rem 1.5rem;
+}
+
+.kw-context-map-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--kw-map-columns), minmax(0, 1fr));
+  gap: max(1px, 0.125rem);
+  width: clamp(11rem, min(40cqi, var(--kw-map-fit-height)), 26rem);
+  --kw-map-fit-height: calc((100cqb - 12rem) * var(--kw-map-columns) / var(--kw-map-rows));
+}
+
+.kw-context-map-ink {
+  --kw-ink: 1;
+  --kw-ink-color: var(--kw-density-full);
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+}
+.kw-context-map-ink::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--kw-ink-color);
+  transform: scale(var(--kw-ink));
+}
+.kw-context-map-ink[data-cell="system"] {
+  --kw-ink: 0.42;
+  --kw-ink-color: var(--kw-density-light);
+}
+.kw-context-map-ink[data-cell="tools"] {
+  --kw-ink: 0.62;
+  --kw-ink-color: var(--kw-density-medium);
+}
+.kw-context-map-ink[data-cell="injected"] {
+  --kw-ink: 0.82;
+  --kw-ink-color: var(--kw-density-heavy);
+}
+.kw-context-map-ink[data-cell="free"] {
+  --kw-ink: 0.16;
+  --kw-ink-color: var(--kw-text-dim);
+}
+.kw-context-map-ink[data-cell="flush"]::before,
+.kw-context-map-ink[data-cell="compaction"]::before {
+  background: none;
+  transform: scale(0.82);
+  box-shadow: inset 0 0 0 1px var(--kw-text-dim);
+}
+.kw-context-map-ink[data-cell="compaction"]::before {
+  box-shadow: inset 0 0 0 2px var(--kw-text-mid);
+}
+
+.kw-context-map-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 0.875rem max-content max-content max-content;
+  gap: 0.4rem 1.5ch;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.kw-context-map-row {
+  display: contents;
+}
+.kw-context-map-label {
+  color: var(--kw-text-mid);
+}
+.kw-context-map-tokens {
+  text-align: right;
+  color: var(--kw-text);
+}
+.kw-context-map-share {
+  text-align: right;
+  color: var(--kw-text-dim);
+}
+.kw-context-map-row[data-cell="flush"] .kw-context-map-label,
+.kw-context-map-row[data-cell="compaction"] .kw-context-map-label {
+  color: var(--kw-text-dim);
+}
+
+.kw-context-map-basis,
+.kw-context-map-finding {
+  margin: 0;
+  padding: 0.35rem 1rem 0.5rem 1.5rem;
+  color: var(--kw-text-dim);
+  font-size: 0.8125rem;
+}
+.kw-context-map-finding {
+  padding-top: 0;
+}
+
+@container context-map (max-width: 559.98px) {
+  .kw-context-map-body {
+    padding-left: 0.75rem;
+  }
+}

@@ -1,4 +1,5 @@
-import type { ResolutionFailure } from "@keywork-app/protocol";
+import { readFile } from "node:fs/promises";
+import type { ResolutionFailure, TurnRestored } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { keyworkClientOver } from "./client.ts";
 
@@ -88,6 +89,7 @@ describe("the session verbs", () => {
     expect(await busy.compact("s1")).toMatchObject({ refused: "busy" });
     expect(await busy.undo("s1")).toMatchObject({ refused: "busy" });
     expect(await busy.redo("s1")).toMatchObject({ refused: "busy" });
+    expect(await busy.restoreTurn("s1", 1)).toMatchObject({ refused: "busy" });
 
     const invalid = serverAnswering(() =>
       json(400, { error: 'the body must be { level: "low" | "medium" } ' }),
@@ -104,6 +106,7 @@ describe("the session verbs", () => {
       await gone.compact("s9"),
       await gone.undo("s9"),
       await gone.redo("s9"),
+      await gone.restoreTurn("s9", 1),
       await gone.context("s9"),
       await gone.cost("s9"),
       await gone.exportSession("s9"),
@@ -139,12 +142,21 @@ describe("the session verbs", () => {
   });
 
   it("reads the context and cost reports as the server sends them", async () => {
+    const estimated = (tokens: number) => ({ tokens, basis: "estimated" });
     const context = {
       used: 40,
       window: 200_000,
       flushAt: 175_424,
       compactAt: 183_616,
       declared: false,
+      parts: {
+        system: estimated(137),
+        tools: estimated(1728),
+        injected: estimated(0),
+        conversation: { tokens: 40, basis: "reported" },
+        free: estimated(198_095),
+      },
+      thresholds: { flushAt: 177_289, compactAt: 185_481 },
       fullness: 0.0002,
       flushDue: false,
       compactionDue: false,
@@ -194,6 +206,43 @@ describe("the session verbs", () => {
       { scope: "tree", out: "exports" },
       { out: ".." },
     ]);
+  });
+});
+
+describe("restoring to just before a turn", () => {
+  type RestoreAnswers = Record<
+    "restored" | "restoreUnknownTurn" | "restoreMalformed",
+    { status: number; body: unknown }
+  >;
+
+  const recorded = async (): Promise<RestoreAnswers> =>
+    JSON.parse(
+      await readFile(new URL("./fixtures/restored.json", import.meta.url), "utf8"),
+    ) as RestoreAnswers;
+
+  const replaying = (answer: RestoreAnswers[keyof RestoreAnswers]) =>
+    serverAnswering(() => json(answer.status, answer.body));
+
+  it("posts the turn and hands back the server's report whole", async () => {
+    const { restored } = await recorded();
+    const { client, sent } = replaying(restored);
+    const report = (await client.restoreTurn("s 1", 1)) as TurnRestored;
+    expect(report).toEqual(restored.body);
+    expect(report.prompt.text).toBe("write two lines to notes.txt");
+    expect(report.files).toEqual([{ path: "notes.txt", added: 0, deleted: 2 }]);
+    expect(sent).toEqual([{ method: "POST", path: "/sessions/s%201/restore", body: { turn: 1 } }]);
+  });
+
+  it("reads an unknown turn as nothing to restore and a turn below one as invalid", async () => {
+    const { restoreUnknownTurn, restoreMalformed } = await recorded();
+    expect(await replaying(restoreUnknownTurn).client.restoreTurn("s1", 9)).toEqual({
+      refused: "nothing",
+      detail: "no turn 9 on this session's path",
+    });
+    expect(await replaying(restoreMalformed).client.restoreTurn("s1", 0)).toEqual({
+      refused: "invalid",
+      detail: "the body must be { turn: a positive integer }",
+    });
   });
 });
 

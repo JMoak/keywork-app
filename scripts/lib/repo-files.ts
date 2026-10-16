@@ -30,6 +30,7 @@ export function reportViolations(report: Report, violations: readonly string[]):
 
 const skippedDirectories = new Set([
   ".git",
+  ".claude",
   "node_modules",
   "dist",
   "out",

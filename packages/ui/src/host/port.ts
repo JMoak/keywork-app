@@ -15,7 +15,7 @@ export interface HostPort {
   openExternal(url: string): Promise<void>;
   notify(notice: HostNotice): Promise<void>;
   onNotificationActivated(listener: (trigger: NeedsYouTrigger) => void): () => void;
-  setPendingAsks(count: number): Promise<void>;
+  setNeedsYou(count: number): Promise<void>;
   saveAs(suggestedName: string, text: string): Promise<SaveOutcome>;
   serverFetch(
     workspace: string,
@@ -113,7 +113,7 @@ export interface ServerLoss {
 export interface OpenWorkspaceEntry {
   workspace: string;
   windows: number;
-  pendingAsks: number;
+  needsYou: number;
 }
 
 export type NeedsYouTrigger =

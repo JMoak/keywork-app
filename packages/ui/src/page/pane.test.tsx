@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
+import decided from "../../../client/src/fixtures/decided.jsonl?raw";
+import { parseJsonl } from "../dev/replay.ts";
 import { scenarios } from "../dev/scenarios.ts";
 import { ConversationPane, headline, wordCount } from "./pane.tsx";
 import { tierMinPx, tierOf } from "./tiers.ts";
@@ -21,7 +23,7 @@ function rows(container: HTMLElement): string[] {
 }
 
 describe("ConversationPane over the recorded fixtures", () => {
-  it.each(["plain", "thinking", "tool", "denied", "interrupt", "queued", "injected"])(
+  it.each(["plain", "thinking", "tool", "denied", "interrupt", "queued", "injected", "delegated"])(
     "renders %s",
     async (name) => {
       const projection = await fixture(name);
@@ -119,6 +121,111 @@ describe("ConversationPane over the recorded fixtures", () => {
     expect(headline(projection)).toBe("say hello");
     expect(headline(emptyProjection)).toBe("keywork");
     expect(wordCount("one")).toBe("1 word");
+  });
+});
+
+describe("a delegated child on the parent's transcript", () => {
+  const recorded = async (count?: number) => {
+    const scenario = scenarios.find((candidate) => candidate.name === "delegated");
+    return projectAll(emptyProjection, scenario?.envelopes.slice(0, count) ?? []);
+  };
+  const sigils = (name: string) => (name === "researcher" ? `◇ ${name}` : name);
+
+  it("reads title, bot by sigil, time, usage and the outcome as the only colored word", async () => {
+    const projection = await recorded();
+    const opened: string[] = [];
+    const { container } = render(() => (
+      <ConversationPane
+        projection={projection}
+        botLabel={sigils}
+        onOpenSession={(id) => opened.push(id)}
+      />
+    ));
+    const row = container.querySelector(".kw-tool[data-child]") as HTMLElement;
+    expect(row.textContent).toBe(
+      'child "audit the trust rules" · ◇ researcher · 1.0s · 17 tokens · completed ·· ↵ open',
+    );
+    expect([...row.querySelectorAll("[data-tone='ok']")].map((span) => span.textContent)).toEqual([
+      "completed",
+    ]);
+    fireEvent.keyDown(row, { key: "Enter" });
+    fireEvent.click(row);
+    expect(opened).toEqual(["q1", "q1"]);
+    expect(container.querySelector(".kw-tool-detail")).toBeNull();
+    fireEvent.click(container.querySelector(".kw-stamp-fold") as HTMLElement);
+    expect(container.querySelector(".kw-tool-detail")?.textContent).toBe(
+      "Two rules allow more than they say.",
+    );
+  });
+
+  it("says running with the child's latest step while it works", async () => {
+    const working = projectAll(await recorded(7), [
+      {
+        id: 50,
+        ts: "2026-09-07T12:00:01.900Z",
+        sessionId: "s1",
+        type: "tool.output",
+        payload: { chunk: "read docs/trust.md\n", callId: "d1" },
+      },
+    ]);
+    const { container } = render(() => (
+      <ConversationPane projection={working} onOpenSession={() => undefined} />
+    ));
+    expect(container.querySelector(".kw-tool")?.textContent).toBe(
+      'child "audit the trust rules" · researcher · running · read docs/trust.md ·· ↵ open',
+    );
+  });
+
+  it("names refused calls and cost as facts, and offers no open without a way to open", async () => {
+    const refused = projectAll(await recorded(7), [
+      {
+        id: 51,
+        ts: "2026-09-07T12:00:02.000Z",
+        sessionId: "s1",
+        type: "child.finished",
+        payload: {
+          callId: "d1",
+          sessionId: "q1",
+          outcome: "denied",
+          usage: { inputTokens: 1200, outputTokens: 300 },
+          costNanos: 3_100_000,
+          refused: [
+            { tool: "bash", callId: "c1" },
+            { tool: "bash", callId: "c2" },
+          ],
+        },
+      },
+    ]);
+    const { container } = render(() => <ConversationPane projection={refused} />);
+    const row = container.querySelector(".kw-tool") as HTMLElement;
+    expect(row.querySelector("[data-part='facts']")?.textContent).toBe(
+      " · 1.5k tokens · $0.0031 · refused bash",
+    );
+    expect(row.querySelector("[data-tone='bad']")?.textContent).toBe("denied");
+    expect(row.textContent).not.toContain("open");
+    expect(row.tagName).toBe("DIV");
+  });
+});
+
+describe("why memory recalled a note", () => {
+  it("reads the decision on the call it rode, dim, and says nothing where nothing was recalled", () => {
+    const projection = projectAll(emptyProjection, parseJsonl(decided));
+    const { container } = render(() => <ConversationPane projection={projection} />);
+    const [recalled, dropped] = [...container.querySelectorAll(".kw-tool")];
+    const fact = recalled?.querySelector("[data-part='recall']");
+    expect(fact?.textContent).toBe(
+      ' · recalled [[Layout Rects]] · shares "layout", "rects" with the path',
+    );
+    expect(fact?.getAttribute("data-tone")).toBe("meta");
+    expect(dropped?.querySelector("[data-part='recall']")).toBeNull();
+  });
+
+  it("hides the recall fact under 560px with the waited and duration facts", () => {
+    const css = readFileSync(join(process.cwd(), "packages/ui/src/page/page.css"), "utf8");
+    const narrow = css.slice(css.indexOf("@container pane (max-width: 559.98px)"));
+    expect(narrow).toMatch(
+      /\.kw-tool-span\[data-part="facts"\],\s*\.kw-tool-span\[data-part="recall"\] \{\s*display: none;/,
+    );
   });
 });
 

@@ -35,11 +35,11 @@ describe("releaseAssetName", () => {
 
 describe("releaseAsset", () => {
   it("points at the tagged GitHub release and its .sha256 sibling", () => {
-    expect(releaseAsset("0.1.1", { platform: "win32", arch: "x64" })).toEqual({
+    expect(releaseAsset("0.2.0", { platform: "win32", arch: "x64" })).toEqual({
       name: "keywork-windows-x64.exe",
-      url: "https://github.com/JMoak/keywork/releases/download/v0.1.1/keywork-windows-x64.exe",
+      url: "https://github.com/JMoak/keywork/releases/download/v0.2.0/keywork-windows-x64.exe",
       checksumUrl:
-        "https://github.com/JMoak/keywork/releases/download/v0.1.1/keywork-windows-x64.exe.sha256",
+        "https://github.com/JMoak/keywork/releases/download/v0.2.0/keywork-windows-x64.exe.sha256",
     });
   });
 });
@@ -113,7 +113,7 @@ describe("fetchSidecar", () => {
     directory = await mkdtemp(join(tmpdir(), "sidecar-"));
     const destination = join(directory, "sidecar", "keywork.exe");
     const fetched = await fetchSidecar(
-      "0.1.1",
+      "0.2.0",
       { platform: "win32", arch: "x64" },
       destination,
       serving(`${binaryDigest}  keywork-windows-x64.exe\n`),
@@ -127,7 +127,7 @@ describe("fetchSidecar", () => {
     const destination = join(directory, "sidecar", "keywork");
     await expect(
       fetchSidecar(
-        "0.1.1",
+        "0.2.0",
         { platform: "linux", arch: "x64" },
         destination,
         serving(`${"0".repeat(64)}  keywork-linux-x64\n`),

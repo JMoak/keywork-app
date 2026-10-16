@@ -1,10 +1,22 @@
 import type { KeyworkClient, ServerFeed, StreamNotice } from "@keywork-app/client";
-import type { BusEnvelope, InboxTally, MemoryGarden, StagedItem } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  InboxTally,
+  MemoryDecision,
+  MemoryGarden,
+  StagedItem,
+} from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import recordedEvents from "../../../client/src/fixtures/memory.jsonl?raw";
 import recordedGarden from "../../../client/src/fixtures/memory-garden.json";
-import { createMemoryStore, inboxAfter, inboxTallyOf, inertGarden } from "./memory-store.ts";
+import {
+  createMemoryStore,
+  entryDecisionsIn,
+  inboxAfter,
+  inboxTallyOf,
+  inertGarden,
+} from "./memory-store.ts";
 
 export type MemoryClient = Pick<
   KeyworkClient,
@@ -211,6 +223,49 @@ describe("the memory store", () => {
       expect(await store.approve("a")).toEqual({ kind: "approved", result: null });
       await settle();
       expect(reads).toBe(1);
+      dispose();
+    });
+  });
+});
+
+describe("entry decisions", () => {
+  const triage: MemoryDecision = {
+    id: "t1",
+    question: "entry-durability@1",
+    about: { kind: "entry", entryId: "2026-10-15#3" },
+    candidates: ["2026-10-15#3"],
+    choice: "episodic",
+    confidence: 0.92,
+    decider: "jev",
+    latencyMs: 80,
+  };
+  const decided = (id: number, decision: MemoryDecision, sessionId = "") =>
+    ({
+      id,
+      ts: "2026-10-15T12:00:00.000Z",
+      sessionId,
+      type: "memory.decided",
+      payload: { decision },
+    }) satisfies BusEnvelope;
+
+  it("keeps the latest decision per entry from any envelope, a sweep's or a session's", async () => {
+    const recall: MemoryDecision = {
+      ...triage,
+      id: "r1",
+      question: "action-relevance@1",
+      about: { kind: "call", callId: "c1" },
+      choice: { kept: [], dropped: [] },
+    };
+    const reread = { ...triage, id: "t2", choice: "new-durable" as const };
+    expect(entryDecisionsIn([decided(1, triage), decided(2, recall, "s1")])).toEqual([
+      ["2026-10-15#3", triage],
+    ]);
+    const feed = feedOf();
+    await createRoot(async (dispose) => {
+      const store = createMemoryStore(inertMemoryClient() as KeyworkClient, feed);
+      feed.push([decided(3, triage), decided(4, recall, "s1")]);
+      feed.push([decided(5, reread)]);
+      expect(store.state.entryDecisions).toEqual({ "2026-10-15#3": reread });
       dispose();
     });
   });

@@ -1,18 +1,27 @@
-import type {
-  BusEnvelope,
-  EnginePayloads,
-  ExtensionNotice,
-  ExtensionNoticeLevel,
-  PermissionAsk,
-  PermissionDecision,
-  SessionSettlement,
-  ToolCallPart,
-  TurnDelta,
-  Usage,
+import {
+  type BusEnvelope,
+  type ChildFinished,
+  type ChildProvenance,
+  type ChildStarted,
+  childAnswerOf,
+  childProvenanceOf,
+  delegateToolName,
+  type EnginePayloads,
+  type ExtensionNotice,
+  type ExtensionNoticeLevel,
+  type MemoryDecision,
+  type PermissionAsk,
+  type PermissionDecision,
+  type SessionSettlement,
+  type ToolCallPart,
+  type TurnDelta,
+  type Usage,
 } from "@keywork-app/protocol";
+import { withDecision } from "./decisions.ts";
 import { compactJson, toolSubject } from "./tool-row.ts";
 import type {
   AssistantEntry,
+  ChildMark,
   SessionProjection,
   ThinkingEntry,
   ToolEntry,
@@ -68,6 +77,11 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       return { ...state, standing: envelope.payload };
     case "context.injected":
       return { ...state, injections: [...state.injections, envelope.payload.injection] };
+    case "memory.decided":
+      return recordDecision(state, envelope.payload.decision);
+    case "child.started":
+    case "child.finished":
+      return markChild(state, envelope.payload);
     case "diagnostics.published":
       return {
         ...state,
@@ -227,20 +241,70 @@ function settleTool(
   const index = state.running[payload.callId];
   if (index === undefined) return state;
   const { [payload.callId]: _, ...running } = state.running;
-  const settled = updateRun(state, index, (run) => ({
+  const settled = updateRun(state, index, (run) => settledRun(run, payload, ts));
+  return { ...settled, running };
+}
+
+function settledRun(run: ToolRun, payload: EnginePayloads["tool.finished"], ts: string): ToolRun {
+  const provenance = run.child === undefined ? undefined : childProvenanceOf(payload.output);
+  const shown = provenance === undefined ? payload.output : childAnswerOf(payload.output);
+  const unexplained = run.phase !== "refused" && payload.isError && provenance === undefined;
+  return {
     ...run,
     phase: run.phase === "refused" ? "refused" : payload.isError ? "failed" : "done",
     live: undefined,
-    reason: run.phase !== "refused" && payload.isError ? firstLine(payload.output) : run.reason,
+    reason: unexplained ? firstLine(payload.output) : run.reason,
     durationMs:
       run.replay || run.phase === "refused" || run.startedAt === undefined
         ? undefined
         : Math.max(0, elapsed(run.startedAt, ts) - (run.waitedMs ?? 0)),
     outputChars: payload.spill?.bytes ?? payload.output.length,
-    detail: detailLines(payload.output),
+    detail: detailLines(shown),
     spill: payload.spill,
-  }));
-  return { ...settled, running };
+    child: childSettledBy(run.child, provenance),
+  };
+}
+
+function markChild(
+  state: SessionProjection,
+  news: ChildStarted | ChildFinished,
+): SessionProjection {
+  const index = state.running[news.callId];
+  if (index === undefined) return state;
+  const { callId: _, ...told } = news;
+  return updateRun(state, index, (run) =>
+    run.child === undefined ? run : { ...run, child: { ...run.child, ...told } },
+  );
+}
+
+function recordDecision(state: SessionProjection, decision: MemoryDecision): SessionProjection {
+  const recorded = { ...state, memoryDecisions: withDecision(state.memoryDecisions, decision) };
+  if (decision.about.kind !== "call") return recorded;
+  const index = runIndexOf(recorded, decision.about.callId);
+  if (index === undefined) return recorded;
+  return updateRun(recorded, index, (run) => ({ ...run, recall: decision }));
+}
+
+function runIndexOf(state: SessionProjection, callId: string): number | undefined {
+  const running = state.running[callId];
+  if (running !== undefined) return running;
+  const settled = state.entries.findLastIndex(
+    (entry) => entry.kind === "tool" && entry.run.callId === callId,
+  );
+  return settled === -1 ? undefined : settled;
+}
+
+function childSettledBy(
+  child: ChildMark | undefined,
+  provenance: ChildProvenance | undefined,
+): ChildMark | undefined {
+  if (child === undefined || provenance === undefined) return child;
+  return {
+    ...child,
+    outcome: provenance.outcome,
+    sessionId: provenance.sessionId ?? child.sessionId,
+    bot: provenance.bot ?? child.bot,
+  };
 }
 
 function askFor(state: SessionProjection, ask: PermissionAsk, ts: string): SessionProjection {
@@ -360,8 +424,30 @@ function newRun(
     spill: undefined,
     decision: undefined,
     ask: undefined,
+    child: call.name === delegateToolName ? childMarkOf(call.arguments) : undefined,
+    recall: undefined,
   };
 }
+
+function childMarkOf(args: Record<string, unknown>): ChildMark {
+  const named = typeof args.title === "string" ? flatTitle(args.title) : "";
+  return {
+    title: named === "" ? "child" : named,
+    sessionId: undefined,
+    bot: typeof args.bot === "string" ? args.bot : undefined,
+    outcome: undefined,
+    usage: undefined,
+    costNanos: undefined,
+    refused: undefined,
+  };
+}
+
+function flatTitle(raw: string): string {
+  const flat = raw.replace(/[\s\p{Cc}]+/gu, " ").trim();
+  return flat.length > titleLimit ? `${flat.slice(0, titleLimit - 1)}…` : flat;
+}
+
+const titleLimit = 60;
 
 function appendRun(state: SessionProjection, run: ToolRun): SessionProjection {
   const entry: ToolEntry = { kind: "tool", run };

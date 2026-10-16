@@ -1,0 +1,114 @@
+{
+  "parent": {
+    "status": 200,
+    "body": {
+      "id": "s1",
+      "title": "(untitled session)",
+      "createdAt": "2026-09-07T12:00:00.000Z",
+      "lastActivityAt": "2026-09-07T12:00:00.000Z",
+      "messageCount": 4,
+      "model": "mock/mock-model",
+      "thinking": false,
+      "cwd": "<cwd>",
+      "live": true,
+      "messages": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "type": "text",
+              "text": "have a researcher audit the trust rules"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "parts": [
+            {
+              "type": "tool-call",
+              "callId": "d1",
+              "name": "delegate",
+              "arguments": {
+                "title": "audit the trust rules",
+                "prompt": "read the trust rules and name any that allow more than they say",
+                "bot": "researcher"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "parts": [
+            {
+              "type": "tool-result",
+              "callId": "d1",
+              "output": "↳ child q1 · researcher · completed\n\nTwo rules allow more than they say.",
+              "isError": false
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "parts": [
+            {
+              "type": "text",
+              "text": "The researcher found two loose rules."
+            }
+          ]
+        }
+      ],
+      "asOf": 13
+    }
+  },
+  "child": {
+    "status": 200,
+    "body": {
+      "id": "q1",
+      "title": "audit the trust rules",
+      "createdAt": "2026-09-07T12:00:00.000Z",
+      "lastActivityAt": "2026-09-07T12:00:00.000Z",
+      "messageCount": 2,
+      "bot": "researcher",
+      "model": "mock/mock-model",
+      "cwd": "<cwd>",
+      "live": false,
+      "messages": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "type": "text",
+              "text": "read the trust rules and name any that allow more than they say"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "parts": [
+            {
+              "type": "text",
+              "text": "Two rules allow more than they say."
+            }
+          ]
+        }
+      ],
+      "asOf": 13
+    }
+  },
+  "sessions": {
+    "status": 200,
+    "body": {
+      "sessions": [
+        {
+          "id": "s1",
+          "title": "(untitled session)",
+          "createdAt": "2026-09-07T12:00:00.000Z",
+          "lastActivityAt": "2026-09-07T12:00:00.000Z",
+          "messageCount": 4,
+          "model": "mock/mock-model",
+          "thinking": false
+        }
+      ]
+    }
+  }
+}

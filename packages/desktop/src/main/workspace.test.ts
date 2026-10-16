@@ -384,7 +384,7 @@ describe("binary choice", () => {
   });
 
   it("reads keywork --version output and the ticket file shape", async () => {
-    expect(versionOfLine("keywork 0.1.1\n")).toBe("0.1.1");
+    expect(versionOfLine("keywork 0.2.0\n")).toBe("0.2.0");
     expect(versionOfLine("nope")).toBeUndefined();
     expect(await readTicket("/t", async () => '{"url":"http://x","token":"y"}')).toEqual({
       url: "http://x",

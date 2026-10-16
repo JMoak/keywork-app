@@ -19,6 +19,23 @@ export interface AskRefusal {
 
 export const onceOnlyTools: ReadonlySet<string> = new Set(["write", "edit"]);
 
+export const exactOnlyCommands: readonly string[] = [
+  "rm",
+  "rmdir",
+  "rd",
+  "del",
+  "erase",
+  "Remove-Item",
+  "git branch -D",
+];
+
+export const unrememberedCommands: readonly string[] = [
+  "git push --force",
+  "git reset --hard",
+  "git clean",
+  "git checkout --",
+];
+
 export interface PermissionsView {
   trusted: boolean;
   bundle: PermissionRule[];
@@ -41,12 +58,37 @@ export function isGrantRefusal(value: RevokeOutcome): value is GrantRefusal {
   return "refused" in value;
 }
 
+export interface GrantRecorded {
+  granted: PermissionRule;
+}
+
+export interface GrantAheadRefusal {
+  refused: "invalid" | "missing" | "declined";
+  detail: string;
+}
+
+export type GrantOutcome = GrantRecorded | GrantAheadRefusal;
+
+export function isGrantAheadRefusal(value: GrantOutcome): value is GrantAheadRefusal {
+  return "refused" in value;
+}
+
 export function isAskRefusal(value: unknown): value is AskRefusal {
   return typeof value === "object" && value !== null && "refused" in value;
 }
 
 export const permissionRoutes = [
   { method: "GET", path: "/permissions", operationId: "listPermissions" },
+  {
+    method: "POST",
+    path: "/permissions/workspace/grant",
+    operationId: "grantWorkspaceRule",
+  },
+  {
+    method: "POST",
+    path: "/permissions/session/{sessionId}/grant",
+    operationId: "grantSessionRule",
+  },
   {
     method: "POST",
     path: "/permissions/workspace/revoke",

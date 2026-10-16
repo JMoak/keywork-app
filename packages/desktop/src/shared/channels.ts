@@ -9,7 +9,7 @@ export const hostChannels = {
   switchWorkspace: "host:switch-workspace",
   openWorkspacesChanged: "host:open-workspaces-changed",
   openRequested: "host:open-requested",
-  setPendingAsks: "host:set-pending-asks",
+  setNeedsYou: "host:set-needs-you",
   notificationActivated: "host:notification-activated",
   openExternal: "host:open-external",
   notify: "host:notify",

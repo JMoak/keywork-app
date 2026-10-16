@@ -9,10 +9,10 @@ export interface TrayModel {
 }
 
 export function trayModel(open: readonly OpenWorkspace[]): TrayModel {
-  const pending = open.reduce((sum, entry) => sum + entry.pendingAsks, 0);
+  const waiting = open.reduce((sum, entry) => sum + entry.needsYou, 0);
   return {
-    tooltip: pending === 0 ? "keywork" : `keywork · ${askPhrase(pending)}`,
-    badge: pending === 0 ? undefined : askPhrase(pending),
+    tooltip: waiting === 0 ? "keywork" : `keywork · ${needsYouPhrase(waiting)}`,
+    badge: waiting === 0 ? undefined : needsYouPhrase(waiting),
     menu: [
       { kind: "action", label: "Open Folder…", action: "open-folder" },
       ...(open.length === 0 ? [] : [{ kind: "separator" } as const]),
@@ -84,8 +84,8 @@ export function decodePngHeader(png: Uint8Array): { width: number; height: numbe
   return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
-function askPhrase(pending: number): string {
-  return pending === 1 ? "1 ask waiting" : `${pending} asks waiting`;
+function needsYouPhrase(waiting: number): string {
+  return waiting === 1 ? "1 needs you" : `${waiting} need you`;
 }
 
 function workspaceLabel(entry: OpenWorkspace): string {
@@ -95,7 +95,7 @@ function workspaceLabel(entry: OpenWorkspace): string {
       .filter((part) => part !== "")
       .at(-1) ?? "";
   const base = name === "" ? entry.workspace : `${name}  (${entry.workspace})`;
-  return entry.pendingAsks === 0 ? base : `${base} · ${askPhrase(entry.pendingAsks)}`;
+  return entry.needsYou === 0 ? base : `${base} · ${needsYouPhrase(entry.needsYou)}`;
 }
 
 function markCovers(

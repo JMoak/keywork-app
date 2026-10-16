@@ -1,0 +1,57 @@
+.kw-needs-you {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  padding: 0.25rem 0.75rem 0.25rem 1.5rem;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  color: var(--kw-text-mid);
+  background: var(--kw-panel);
+  box-shadow: inset 0 1px 0 var(--kw-border);
+  user-select: none;
+}
+
+.kw-needs-you-stamp {
+  position: absolute;
+  left: 0.5rem;
+  color: var(--kw-density-full);
+}
+
+.kw-needs-you-count {
+  flex: none;
+  font-weight: 600;
+  color: var(--kw-text);
+}
+
+.kw-needs-you-gloss {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--kw-text);
+}
+.kw-needs-you-gloss::before {
+  content: "·";
+  margin: 0 1ch;
+  color: var(--kw-text-dim);
+}
+
+.kw-needs-you-where {
+  flex: 0 2 auto;
+  min-width: 0;
+  margin-left: 1ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--kw-text-dim);
+}
+
+.kw-needs-you-hint {
+  flex: none;
+  margin-left: auto;
+  padding-left: 3ch;
+  font: inherit;
+  color: var(--kw-text-dim);
+}

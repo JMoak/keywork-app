@@ -5,6 +5,10 @@
   container: tree / inline-size;
 }
 
+.kw-tree:focus {
+  outline: none;
+}
+
 .kw-tree-head {
   display: flex;
   align-items: baseline;
@@ -96,6 +100,45 @@
 .kw-tree-wears {
   flex: none;
   color: var(--kw-text-dim);
+}
+
+.kw-tree-folded {
+  flex: none;
+  color: var(--kw-text-dim);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-tree-lineage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kw-text-dim);
+}
+
+.kw-tree-session[data-child] .kw-tree-row {
+  padding-left: 1.5rem;
+}
+
+.kw-tree-session[data-child] .kw-tree-mark {
+  color: var(--kw-density-light);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-tree-state,
+.kw-tree-bot {
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-dim);
+}
+
+.kw-tree-state[data-state="completed"] {
+  color: var(--kw-success);
+}
+
+.kw-tree-state[data-state="interrupted"],
+.kw-tree-state[data-state="failed"],
+.kw-tree-state[data-state="denied"] {
+  color: var(--kw-error);
 }
 
 .kw-tree-name,

@@ -1,6 +1,6 @@
 import type { SessionSummary } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { arcHueRank, botTitle } from "./identity.ts";
+import { arcHueRank, titleBot } from "./identity.ts";
 
 const session = (extra: Partial<SessionSummary>): SessionSummary => ({
   id: "s1",
@@ -15,16 +15,16 @@ const bots = [{ name: "reviewer", sigil: "◆" }];
 
 describe("identity in the title row", () => {
   it("spells a bound bot as sigil and name, typographic and never a hue", () => {
-    expect(botTitle(session({ bot: "reviewer" }), bots)).toBe("◆ reviewer");
+    expect(titleBot(session({ bot: "reviewer" }), bots)).toEqual({ sigil: "◆", name: "reviewer" });
   });
 
   it("falls back to the bare name while the bots surface has not listed it", () => {
-    expect(botTitle(session({ bot: "scribe" }), bots)).toBe("scribe");
+    expect(titleBot(session({ bot: "scribe" }), bots)).toEqual({ name: "scribe" });
   });
 
   it("shows nothing for an unbound or unknown session", () => {
-    expect(botTitle(session({}), bots)).toBeUndefined();
-    expect(botTitle(undefined, bots)).toBeUndefined();
+    expect(titleBot(session({}), bots)).toBeUndefined();
+    expect(titleBot(undefined, bots)).toBeUndefined();
   });
 
   it("takes the arc hue from the arc's ordinal and leaves spawn rank to decide otherwise", () => {

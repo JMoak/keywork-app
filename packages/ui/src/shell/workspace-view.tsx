@@ -4,7 +4,7 @@ import {
   type ServerFeed,
   type SessionProjection,
 } from "@keywork-app/client";
-import { type AskScope, type AskVerdict, isSurfaceRefusal } from "@keywork-app/protocol";
+import { isSurfaceRefusal } from "@keywork-app/protocol";
 import {
   createEffect,
   createMemo,
@@ -20,6 +20,7 @@ import {
 import { Dynamic } from "solid-js/web";
 import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
+import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
 import { gapCells } from "../chrome/root-attributes.ts";
 import { StatusLine } from "../chrome/status-line.tsx";
@@ -47,7 +48,7 @@ import {
   seamZoneRect,
   type Verdict,
 } from "../layout/index.ts";
-import { rememberableRules } from "../page/ask-card.tsx";
+import type { AskPick } from "../page/ask-card.tsx";
 import { CommandRegistry } from "../palette/commands.ts";
 import { markCommands } from "../palette/mark-commands.ts";
 import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
@@ -60,10 +61,17 @@ import {
   type ShellSeams,
 } from "../panes/index.ts";
 import { returnKeyboardHome } from "../panes/keyboard-home.ts";
-import { attireStorageKey, createAttire } from "../theme/attire.ts";
+import { postureStorageKey } from "../posture/record.ts";
+import { createTrustSetup, followTrustArrival } from "../posture/trust-setup.ts";
+import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
+import { answerHeldAsk } from "./answer-ask.ts";
 import { createPaneMarks } from "./marks.ts";
+import { createJumps, type NeedsYouPlace } from "./needs-you-jumps.ts";
+import type { NeedsYouQueue } from "./needs-you-queue.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
+import { createQuietSessions, toggleSessionQuiet } from "./quiet.ts";
+import { createSessionReads } from "./session-reads.ts";
 import type { SessionStore } from "./session-store.ts";
 import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
 import { createTrustFlow, type TrustFlow } from "./trust.ts";
@@ -76,6 +84,7 @@ export interface WorkspaceViewProps {
   store: SessionStore;
   client: KeyworkClient;
   feed: ServerFeed;
+  needsYou: NeedsYouQueue;
   keymap?: Keymap | undefined;
   storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
 }
@@ -114,6 +123,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     onArcWorn: (slug, theme) => recordArcTheme(slug, theme),
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
+  const quiet = createQuietSessions();
+  const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
   createEffect(
@@ -153,19 +164,79 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     },
   });
   onCleanup(() => trust.dispose());
+  const trustSetup = createTrustSetup({
+    client: props.client,
+    storage,
+    storageKey: postureStorageKey(props.workspace),
+  });
+
+  const paneShowing = (sessionId: string): PaneId | undefined => {
+    tiler.version();
+    return tiler.findPane((spec) => spec.kind === "conversation" && spec.sessionId === sessionId);
+  };
+  const showPlace = (place: NeedsYouPlace): void => {
+    if (place.workspace !== props.workspace) {
+      void props.host.switchWorkspace(place.workspace);
+      return;
+    }
+    if (place.kind === "memory") {
+      act(tiler.summon({ kind: "memory" }, screen()));
+      return;
+    }
+    const showing = paneShowing(place.sessionId);
+    if (showing === undefined) shell.sessions.openSession(place.sessionId);
+    else act(tiler.focus(showing));
+  };
+  const jumps = createJumps({
+    items: () => props.needsYou.items(),
+    focused: () => tiler.focused(),
+    show: showPlace,
+    refocus: (pane) => tiler.spec(pane) !== undefined && tiler.focus(pane).ok,
+  });
+  const arcOutfit = (slug: string | undefined): Outfit | undefined => {
+    const name = slug === undefined ? undefined : attire.worn({ kind: "arc", slug });
+    const fitting = wardrobe.fittings().find((candidate) => candidate.name === name);
+    return fitting === undefined || !("theme" in fitting)
+      ? undefined
+      : { theme: fitting.theme, source: "arc", arc: slug };
+  };
+  const dressedSession = (sessionId: string): Outfit | undefined => {
+    const pane = paneShowing(sessionId);
+    const outfit =
+      pane === undefined ? arcOutfit(props.store.summary(sessionId)?.arc) : attire.outfit(pane);
+    return outfit?.source === "window" ? undefined : outfit;
+  };
+  const reads = createSessionReads();
+  createEffect(() => reads.sight(props.store.state.summaries));
+  createEffect(() => {
+    const looking = props.store.summary(focusedSession());
+    if (looking !== undefined) reads.read(looking);
+  });
 
   const shell: ShellSeams = {
     store: props.store,
     client: props.client,
     feed: props.feed,
     trust,
+    trustSetup,
     wardrobe,
     attire,
     marks,
+    quiet,
+    needsYou: {
+      queue: props.needsYou,
+      reads,
+      revealing: jumps.revealing,
+      jump: jumps.to,
+      visit: (sessionId) =>
+        jumps.toPlace({ kind: "session", workspace: props.workspace, sessionId }),
+      dressed: dressedSession,
+    },
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.summon(parsed, screen()));
     },
+    closePane: (paneId) => act(tiler.close(paneId)),
     openInEditor: (path, line) =>
       props.host.openExternal(fileUrlOf(props.workspace, path, line)).catch((cause: unknown) => {
         say(cause instanceof Error ? cause.message : String(cause));
@@ -218,19 +289,26 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     if (definition.summon === undefined) return;
     act(tiler.summon(await definition.summon.spec(shell, variant), screen()));
   };
-  const answerFocusedAsk = (verdict: AskVerdict, scope?: AskScope): void => {
-    const asking = props.store
-      .projection(focusedSession())
-      .entries.find((entry) => entry.kind === "tool" && entry.run.phase === "asking");
-    if (asking?.kind !== "tool") {
-      say("nothing is waiting for an answer here");
-      return;
-    }
-    if (scope !== undefined && rememberableRules(asking.run).length === 0) {
-      say(`this ask can only be answered once · ${shell.keys.chord("ask.approve")} approves it`);
-      return;
-    }
-    void props.store.answerAsk(asking.run.callId, verdict, scope);
+  followTrustArrival(trust.state, {
+    granted: () => void summon(definitionOf("posture")),
+    found: () =>
+      void trustSetup.launchNotice().then((line) => {
+        if (line !== undefined) say(line);
+      }),
+  });
+  const answerFocusedAsk = (pick: AskPick): void => {
+    const answering = { store: props.store, quiet, approveKey: shell.keys.chord("ask.approve") };
+    void answerHeldAsk(answering, { sessionId: focusedSession() }, pick).then((line) => {
+      if (line !== undefined) say(line);
+    });
+  };
+  const toggleFocusedQuiet = async (): Promise<void> => {
+    const chords = {
+      approve: shell.keys.chord("ask.approve"),
+      quiet: shell.keys.chord("session.quiet"),
+      permissions: shell.keys.chord("permissions.summon"),
+    };
+    say(await toggleSessionQuiet({ quiet, client: props.client, chords }, focusedSession()));
   };
   const toggleMark = (paneId: PaneId): string => {
     if (!marks.has(paneId) && !attire.dressable(paneId))
@@ -265,25 +343,29 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       if (id !== undefined) localHandlers.get(id)?.(action);
     },
     cycleMode: () => say("modes arrive with the server's mode route"),
-    approveAsk: (scope) => answerFocusedAsk("granted", scope),
-    denyAsk: () => answerFocusedAsk("denied"),
+    answerAsk: answerFocusedAsk,
+    toggleQuiet: () => void toggleFocusedQuiet(),
     toggleHelp: () =>
       setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
     openPalette: (query) => setOverlay({ kind: "palette", query }),
     trustWorkspace: () => void trust.accept(),
     toggleMark: toggleFocusedMark,
     clearMarks,
+    nextNeedsYou: () => {
+      if (jumps.next() === undefined) say("nothing needs you");
+    },
+    returnFromNeedsYou: () => {
+      if (!jumps.back()) say("no needs-you jump to go back from");
+    },
+    toggleNeedsYouStrip: () =>
+      say(
+        strip.toggle()
+          ? "needs-you strip shown"
+          : stripHiddenNotice(keymap.describe("needs-you.summon")),
+      ),
   };
 
-  onCleanup(
-    followActivations(props.host, {
-      workspace: props.workspace,
-      findPane: tiler.findPane,
-      focusPane: (id) => act(tiler.focus(id)),
-      openSession: shell.sessions.openSession,
-      summonMemory: () => void summon(definitionOf("memory")),
-    }),
-  );
+  onCleanup(followActivations(props.host, { workspace: props.workspace, show: jumps.toTrigger }));
 
   for (const [name, action] of Object.entries(appActions)) {
     if (action.command === undefined) continue;
@@ -384,6 +466,17 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     definitionOf(slot.spec.kind).lifecycle?.(slot, shell) ?? "idle";
   const adornmentsOf = (slot: PaneSlot) =>
     definitionOf(slot.spec.kind).adornments?.(slot.spec, shell) ?? {};
+  const showContext = (sessionId: string): void => {
+    const spec = { kind: "context", sessionId } as const;
+    act(tiler.summon(spec, screen()));
+    const shown = tiler.findPane((candidate) => candidate.kind === "context");
+    if (shown !== undefined) tiler.bind(shown, spec);
+  };
+  const gaugeOpener = (slot: PaneSlot): (() => void) | undefined => {
+    const sessionId = sessionOfPane(slot.id);
+    if (sessionId === undefined || slot.spec.kind === "context") return undefined;
+    return () => showContext(sessionId);
+  };
 
   const slots = createMemo(() => tiler.slots(screen()));
   const scene = createMemo(
@@ -404,6 +497,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const dropZones = () => Object.entries(dropZoneRects(scene())) as [DropZone, Rect][];
   const paneIds = createMemo(() => slots().map((slot) => slot.id));
   const slotOf = (id: PaneId): PaneSlot | undefined => slots().find((slot) => slot.id === id);
+  const needsYouPaneOpen = () => slots().some((slot) => slot.spec.kind === "needs-you");
   const focusedProjection = (): SessionProjection =>
     tiler.focusedSpec()?.kind === "conversation"
       ? props.store.projection(focusedSession())
@@ -421,11 +515,15 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           telemetry={adornmentsOf(slot()).telemetry}
           context={adornmentsOf(slot()).context}
           modeWord={adornmentsOf(slot()).modeWord}
+          arc={adornmentsOf(slot()).arc}
           bot={adornmentsOf(slot()).bot}
           inference={adornmentsOf(slot()).inference}
           hueRank={adornmentsOf(slot()).hueRank}
           outfit={attire.outfit(slot().id)}
           marked={marks.has(slot().id)}
+          quiet={adornmentsOf(slot()).quiet}
+          onGauge={gaugeOpener(slot())}
+          ribbon={adornmentsOf(slot()).ribbon}
         >
           <Dynamic
             component={definitionOf(slot().spec.kind).component}
@@ -492,6 +590,16 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         </Show>
       </div>
       <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
+      <NeedsYouStrip
+        line={stripLine({
+          shown: strip.shown(),
+          count: props.needsYou.count(),
+          head: props.needsYou.head(),
+          paneOpen: needsYouPaneOpen(),
+          hint: shell.keys.chord("needs-you.next"),
+          where: props.needsYou.where,
+        })}
+      />
       <StatusLine
         serverLabel={props.serverLabel}
         projection={focusedProjection()}
@@ -531,6 +639,12 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 function markedNotice(count: number): string {
   const carry = count === 1 ? "carries" : "carry";
   return `marked · ${paneCount(count)} ${carry} the mark · theme-marked dresses them`;
+}
+
+function stripHiddenNotice(paneChord: string | undefined): string {
+  return paneChord === undefined
+    ? "needs-you strip hidden"
+    : `needs-you strip hidden · ${paneChord} still lists everything`;
 }
 
 function paneCount(count: number): string {

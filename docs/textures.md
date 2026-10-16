@@ -19,7 +19,7 @@ DOM, fails a regression, and fails any value that loosened against `HEAD` withou
 | `T7.emptyStateMinWidthPx` | 127 | lower | `packages/ui/src/panes/registry.test.ts` |
 | `T8.eventsPerFrame` | 800 | higher | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 | `T8.reducerStepsPerFrame` | 15 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
-| `T8.firstPaintElements` | 185 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
+| `T8.firstPaintElements` | 207 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 
 ## T1: grapheme-correct editing
 

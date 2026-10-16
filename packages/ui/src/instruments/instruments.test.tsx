@@ -1,16 +1,21 @@
 import { emptyUsage, type UsageLedger } from "@keywork-app/client";
+import type { ContextReport } from "@keywork-app/protocol";
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import recordedAnswers from "../../../client/src/fixtures/controls.json";
 import { densityLevels } from "../theme/sections.ts";
 import {
   assumedContextLevel,
   assumedContextWindow,
   barCells,
   contextLevelOf,
+  contextLevelOfReport,
   gaugeCells,
   gaugeCount,
+  gaugeHover,
   gaugeReadout,
   reportedContextLevel,
+  sessionContextLevel,
 } from "./context.ts";
 import { costItem, tokensItem, usageLine } from "./cost.ts";
 import { formatCost, formatTokens } from "./format.ts";
@@ -167,6 +172,28 @@ describe("ContextGauge", () => {
     expect(cells.map((cell) => cell.textContent).join("")).toBe("░▒··");
     expect(container.querySelector(".kw-gauge-count")?.textContent).toBe("90k");
     for (const cell of cells) expect(cell.getAttribute("style")).toBeNull();
+  });
+
+  it("hovers the server's parts under the readout, tokens and basis only", () => {
+    const report = recordedAnswers.context.body as ContextReport;
+    const level = contextLevelOfReport(report);
+    if (level === undefined) throw new Error("the recorded reading is empty");
+    const { container } = render(() => <ContextGauge level={level} />);
+    const gauge = container.querySelector(".kw-gauge") as HTMLElement;
+    expect(gauge.getAttribute("aria-label")).toBe(gaugeReadout(level));
+    expect(gauge.getAttribute("title")).toBe(gaugeHover(level));
+    expect(gaugeHover(level).split("\n")).toEqual([
+      gaugeReadout(level),
+      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text keywork sends",
+    ]);
+    expect(gaugeHover(assumedContextLevel(90_000))).toBe(gaugeReadout(assumedContextLevel(90_000)));
+  });
+
+  it("reads a session from its report, else from the live usage", () => {
+    const report = recordedAnswers.context.body as ContextReport;
+    const live = ledger({ turns: 1, lastTurnContextTokens: 9_000 });
+    expect(sessionContextLevel(report, live)).toEqual(contextLevelOfReport(report));
+    expect(sessionContextLevel(undefined, live)).toEqual(contextLevelOf(live));
   });
 
   it("draws the cockpit bar when asked", () => {

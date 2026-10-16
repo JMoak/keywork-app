@@ -1,0 +1,216 @@
+.kw-desk {
+  height: 100%;
+  container: desk / inline-size;
+}
+
+.kw-desk-groups {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 0.5rem;
+}
+
+.kw-desk-group-name {
+  margin: 0;
+  padding: 0.75rem 0.75rem 0.25rem 2.25rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--kw-text-dim);
+}
+.kw-desk-group[data-group="needs you"] .kw-desk-group-name {
+  color: var(--kw-accent);
+}
+
+.kw-desk-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kw-desk-row {
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.1rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.5rem;
+  line-height: 1.25rem;
+  color: var(--kw-text-mid);
+}
+.kw-desk-row[data-cursor] {
+  background: var(--kw-panel);
+  box-shadow: inset 2px 0 0 var(--kw-arc-hue, var(--kw-accent));
+}
+
+.kw-desk-workspace {
+  padding: 0.15rem 0 0.25rem 2.25rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-desk-head {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  align-items: baseline;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.kw-desk-stamp {
+  text-align: center;
+  color: var(--kw-density-full);
+}
+.kw-desk-row[data-tone="airlock"] .kw-desk-stamp,
+.kw-desk-row[data-tone="working"] .kw-desk-stamp {
+  color: var(--kw-density-heavy);
+}
+.kw-desk-row[data-tone="inbox"] .kw-desk-stamp,
+.kw-desk-row[data-tone="finished-unseen"] .kw-desk-stamp {
+  color: var(--kw-density-medium);
+}
+.kw-desk-row[data-tone="failed"] .kw-desk-stamp {
+  color: var(--kw-error);
+}
+
+.kw-desk-title {
+  display: flex;
+  align-items: baseline;
+  gap: 1ch;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.kw-desk-quiet {
+  color: var(--kw-density-full);
+}
+
+.kw-desk-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--kw-text);
+}
+.kw-desk-row[data-tone="ask"] .kw-desk-name {
+  padding: 0 0.5ch;
+  margin-left: -0.5ch;
+  color: var(--kw-background);
+  background: var(--kw-arc-hue, var(--kw-accent));
+}
+.kw-desk-row[data-tone="failed"] .kw-desk-name {
+  color: var(--kw-error);
+}
+.kw-desk-row[data-tone="idle"] .kw-desk-name {
+  color: var(--kw-text-mid);
+}
+
+.kw-desk-where {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--kw-text-dim);
+  font-size: 0.875em;
+}
+.kw-desk-where > * + *::before {
+  content: "·";
+  margin: 0 1ch;
+  color: var(--kw-text-dim);
+}
+
+.kw-desk-arc .kw-ov-chip {
+  margin-right: 0.5ch;
+}
+
+.kw-desk-bot {
+  color: var(--kw-text-mid);
+}
+
+.kw-desk-strip {
+  display: inline-flex;
+  width: 3rem;
+  height: 0.55rem;
+  margin-right: 0.6ch;
+  vertical-align: baseline;
+  outline: 1px solid var(--kw-border);
+}
+.kw-desk-swatch {
+  flex: 1;
+}
+
+.kw-desk-facts {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25ch;
+  white-space: nowrap;
+  color: var(--kw-text-dim);
+  font-size: 0.875em;
+}
+.kw-desk-cost {
+  color: var(--kw-text-mid);
+}
+.kw-desk-row[data-tone="ask"] .kw-desk-age {
+  color: var(--kw-accent);
+}
+
+.kw-desk-tail {
+  display: flex;
+  align-items: baseline;
+  gap: 2ch;
+  min-width: 0;
+  padding-left: 2.25rem;
+  white-space: nowrap;
+}
+.kw-desk-line {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--kw-text-dim);
+}
+.kw-desk-row[data-tone="ask"] .kw-desk-line {
+  color: var(--kw-accent);
+}
+.kw-desk-row[data-tone="working"] .kw-desk-line {
+  color: var(--kw-text-mid);
+}
+.kw-desk-row[data-tone="failed"] .kw-desk-line {
+  color: var(--kw-error);
+}
+
+.kw-desk-answers {
+  display: flex;
+  gap: 1.5ch;
+  margin-left: auto;
+}
+.kw-desk-answer {
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.kw-desk-answer kbd {
+  font: inherit;
+}
+.kw-desk-answer[data-tone="grant"] {
+  color: var(--kw-success);
+}
+.kw-desk-answer[data-tone="deny"] {
+  color: var(--kw-error);
+}
+
+@container desk (max-width: 559.98px) {
+  .kw-desk-where,
+  .kw-desk-facts .kw-gauge,
+  .kw-desk-cost {
+    display: none;
+  }
+}

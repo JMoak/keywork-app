@@ -1,6 +1,7 @@
 import type { UsageLedger } from "@keywork-app/client";
-import type { ContextReport } from "@keywork-app/protocol";
+import type { ContextParts, ContextReport } from "@keywork-app/protocol";
 import type { DensityLevel } from "../theme/schema.ts";
+import { partsReadout } from "./context-map.ts";
 import { formatTokens } from "./format.ts";
 
 export type ContextBasis = "assumed" | "reported";
@@ -12,6 +13,7 @@ export interface ContextLevel {
   readonly compactAt: number;
   readonly basis: ContextBasis;
   readonly declared?: boolean | undefined;
+  readonly parts?: ContextParts | undefined;
 }
 
 export type GaugeStyle = "steps" | "bar";
@@ -38,7 +40,15 @@ export function contextLevelOfReport(report: ContextReport): ContextLevel | unde
     compactAt: report.compactAt,
     basis: "reported",
     declared: report.declared,
+    parts: report.parts,
   };
+}
+
+export function sessionContextLevel(
+  report: ContextReport | undefined,
+  ledger: UsageLedger,
+): ContextLevel | undefined {
+  return report === undefined ? contextLevelOf(ledger) : contextLevelOfReport(report);
 }
 
 export function assumedContextLevel(used: number): ContextLevel {
@@ -75,6 +85,11 @@ export function gaugeReadout(level: ContextLevel): string {
     `memory flush at ${formatTokens(level.flushAt)} · compaction at ${formatTokens(level.compactAt)}`,
     windowBasis(level),
   ].join(" · ");
+}
+
+export function gaugeHover(level: ContextLevel): string {
+  const readout = gaugeReadout(level);
+  return level.parts === undefined ? readout : `${readout}\n${partsReadout(level.parts)}`;
 }
 
 function windowBasis(level: ContextLevel): string {

@@ -71,8 +71,11 @@ function quietClient(): KeyworkClient {
     asks: async () => [],
     answerAsk: async () => "settled" as const,
     permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
+    grantWorkspaceRule: async (rule) => ({ granted: rule }),
+    grantSessionRule: async (_sessionId, rule) => ({ granted: rule }),
     revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
     revokeSessionGrant: async (_sessionId, rule) => ({ revoked: rule }),
+    restoreTurn: async () => "missing",
   };
 }
 

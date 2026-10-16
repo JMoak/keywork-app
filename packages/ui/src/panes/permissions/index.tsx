@@ -1,12 +1,13 @@
 import { isGrantRefusal, type PermissionRule, type PermissionsView } from "@keywork-app/protocol";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { z } from "zod";
+import { quietMark } from "../../chrome/title-row.tsx";
 import { ruleText } from "../../page/ask-card.tsx";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { ConfirmLine, createCursor, NoticeLine, OverviewRow } from "../overview/rows.tsx";
 import { definePane, type PaneProps } from "../registry.ts";
-import { createPermissionsStore } from "./store.ts";
+import { createPermissionsStore, type Grant } from "./store.ts";
 import "../overview/overview.css";
 import "./permissions.css";
 
@@ -36,20 +37,20 @@ export const permissionsPane = definePane<PermissionsSpec>({
   localActions: {
     "permissions.down": {
       chords: ["j", "down"],
-      help: "next workspace grant",
-      command: { name: "grant-next", description: "move to the next workspace grant" },
+      help: "next grant",
+      command: { name: "grant-next", description: "move to the next grant" },
     },
     "permissions.up": {
       chords: ["k", "up"],
-      help: "previous workspace grant",
-      command: { name: "grant-previous", description: "move to the previous workspace grant" },
+      help: "previous grant",
+      command: { name: "grant-previous", description: "move to the previous grant" },
     },
     "permissions.revoke": {
       chords: "x",
-      help: "revoke the workspace grant",
+      help: "revoke the grant",
       command: {
         name: "grant-revoke",
-        description: "revoke this workspace grant so the call asks again",
+        description: "revoke this workspace or session grant so the call asks again",
       },
     },
   },
@@ -59,15 +60,42 @@ export interface SessionGrants {
   readonly sessionId: string;
   readonly title: string;
   readonly rules: readonly PermissionRule[];
+  readonly firstRow: number;
 }
 
-export function sessionGrantGroups(
-  view: PermissionsView,
-  titleOf: (sessionId: string) => string | undefined,
-): SessionGrants[] {
-  return Object.entries(view.session)
-    .filter(([, rules]) => rules.length > 0)
-    .map(([sessionId, rules]) => ({ sessionId, title: titleOf(sessionId) ?? sessionId, rules }));
+export function grantRows(view: PermissionsView): Grant[] {
+  return [
+    ...view.workspace.map((rule): Grant => ({ layer: "workspace", rule })),
+    ...grantingSessions(view).flatMap(([sessionId, rules]) =>
+      rules.map((rule): Grant => ({ layer: "session", rule, sessionId })),
+    ),
+  ];
+}
+
+export type SessionTitles = (sessionId: string) => string | undefined;
+
+export function sessionGrantGroups(view: PermissionsView, titleOf: SessionTitles): SessionGrants[] {
+  const sessions = grantingSessions(view);
+  return sessions.map(([sessionId, rules], index) => ({
+    sessionId,
+    title: sessionNamed(sessionId, titleOf),
+    rules,
+    firstRow: view.workspace.length + rowsBefore(sessions, index),
+  }));
+}
+
+export function revokeQuestion(grant: Grant, titleOf: SessionTitles): string {
+  const reach =
+    grant.layer === "workspace" ? "every session" : sessionNamed(grant.sessionId, titleOf);
+  return `revoke ${ruleText(grant.rule)} for ${reach}`;
+}
+
+export function revokedNotice(grant: Grant, titleOf: SessionTitles): string {
+  const again =
+    grant.layer === "workspace"
+      ? "it asks again"
+      : `it asks again in ${sessionNamed(grant.sessionId, titleOf)}`;
+  return `revoked ${ruleText(grant.rule)} · ${again}`;
 }
 
 export function postureWord(view: PermissionsView): "trusted" | "untrusted" {
@@ -82,6 +110,18 @@ export function hasGrants(view: PermissionsView): boolean {
   return view.workspace.length > 0 || Object.values(view.session).some((rules) => rules.length > 0);
 }
 
+function grantingSessions(view: PermissionsView): Array<[string, PermissionRule[]]> {
+  return Object.entries(view.session).filter(([, rules]) => rules.length > 0);
+}
+
+function rowsBefore(sessions: Array<[string, PermissionRule[]]>, index: number): number {
+  return sessions.slice(0, index).reduce((rows, [, rules]) => rows + rules.length, 0);
+}
+
+function sessionNamed(sessionId: string, titleOf: SessionTitles): string {
+  return titleOf(sessionId) ?? sessionId;
+}
+
 function PermissionsList(props: PaneProps<PermissionsSpec>) {
   let root: HTMLElement | undefined;
   keepKeyboardHome(
@@ -93,18 +133,17 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
   onCleanup(() => store.dispose());
 
   const view = () => store.state.view;
-  const workspaceGrants = () => view().workspace;
-  const cursor = createCursor(() => workspaceGrants().length);
-  const [confirming, setConfirming] = createSignal<PermissionRule>();
+  const rows = createMemo(() => grantRows(view()));
+  const cursor = createCursor(() => rows().length);
+  const [confirming, setConfirming] = createSignal<Grant>();
   const [notice, setNotice] = createSignal<string>();
   const sessionTitle = (sessionId: string) => props.shell.store.summary(sessionId)?.title;
+  const quiet = (sessionId: string): boolean => props.shell.quiet?.has(sessionId) ?? false;
 
-  const revoke = async (rule: PermissionRule): Promise<void> => {
+  const revoke = async (grant: Grant): Promise<void> => {
     setConfirming(undefined);
-    const outcome = await store.revoke(rule);
-    setNotice(
-      isGrantRefusal(outcome) ? outcome.detail : `revoked ${ruleText(rule)} · it asks again`,
-    );
+    const outcome = await store.revoke(grant);
+    setNotice(isGrantRefusal(outcome) ? outcome.detail : revokedNotice(grant, sessionTitle));
   };
 
   props.onAction((action) => {
@@ -114,7 +153,7 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
       case "permissions.up":
         return cursor.move(-1);
       case "permissions.revoke":
-        return setConfirming(workspaceGrants()[cursor.index()]);
+        return setConfirming(rows()[cursor.index()]);
     }
   });
 
@@ -122,7 +161,7 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
     <section class="kw-ov kw-perm" aria-label="permissions" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
         <span>bundle · {postureWord(view())}</span>
-        <span class="kw-ov-head-detail">x revokes a workspace grant</span>
+        <span class="kw-ov-head-detail">x revokes a grant</span>
       </div>
       <Show
         when={view().bundle.length > 0}
@@ -144,7 +183,7 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
       >
         <h3 class="kw-perm-heading">workspace grants</h3>
         <ol class="kw-ov-list kw-perm-grants" aria-label="workspace grants">
-          <For each={workspaceGrants()}>
+          <For each={view().workspace}>
             {(rule, index) => (
               <OverviewRow
                 cursor={index() === cursor.index()}
@@ -160,21 +199,33 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
         <For each={sessionGrantGroups(view(), sessionTitle)}>
           {(group) => (
             <section class="kw-perm-session" aria-label={group.title}>
-              <p class="kw-perm-session-title">{group.title}</p>
-              <ul class="kw-perm-bundle">
+              <p class="kw-perm-session-title">
+                {group.title}
+                <Show when={quiet(group.sessionId)}>
+                  <span class="kw-perm-session-quiet">{quietMark} quiet</span>
+                </Show>
+              </p>
+              <ol class="kw-ov-list kw-perm-grants">
                 <For each={group.rules}>
-                  {(rule) => <li class="kw-perm-rule">{ruleText(rule)}</li>}
+                  {(rule, index) => (
+                    <OverviewRow
+                      cursor={group.firstRow + index() === cursor.index()}
+                      onClick={() => cursor.set(group.firstRow + index())}
+                    >
+                      {ruleText(rule)}
+                    </OverviewRow>
+                  )}
                 </For>
-              </ul>
+              </ol>
             </section>
           )}
         </For>
       </Show>
       <Show when={confirming()}>
-        {(rule) => (
+        {(grant) => (
           <ConfirmLine
-            question={`revoke ${ruleText(rule())} for every session`}
-            onConfirm={() => void revoke(rule())}
+            question={revokeQuestion(grant(), sessionTitle)}
+            onConfirm={() => void revoke(grant())}
             onCancel={() => setConfirming(undefined)}
           />
         )}

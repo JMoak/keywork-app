@@ -82,6 +82,11 @@ export function derivedDiff(tokens: ThemeTokens): Record<DiffKey, string> {
   };
 }
 
+export function derivedTextFaint(tokens: ThemeTokens): string {
+  const halfway = mixOklab(tokens.textDim, tokens.background, faintStep);
+  return clearingFloor(halfway, tokens.background, tokens.textDim, faintFloor);
+}
+
 export function derivedSelection(tokens: ThemeTokens): Theme["selection"] {
   return {
     background: groundKeepingInkReadable(
@@ -98,6 +103,8 @@ export const brightStep = 0.2;
 export const lineMix = 0.14;
 export const textSpanMix = 0.28;
 export const selectionMix = 0.3;
+export const faintStep = 0.5;
+export const faintFloor = 15;
 const mixStep = 0.01;
 
 type Hues = Pick<

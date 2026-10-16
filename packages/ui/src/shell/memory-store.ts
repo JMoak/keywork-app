@@ -11,6 +11,7 @@ import type {
   DiscardOutcome,
   InboxTally,
   MemoryAnswer,
+  MemoryDecision,
   MemoryGarden,
   MemoryNote,
   MemoryNoteDetail,
@@ -50,7 +51,10 @@ export interface MemoryState {
   readonly loaded: boolean;
   readonly revision: number;
   readonly inbox: InboxTally;
+  readonly entryDecisions: EntryDecisions;
 }
+
+export type EntryDecisions = Readonly<Record<string, MemoryDecision>>;
 
 export const inertGarden: MemoryGarden = {
   trusted: false,
@@ -86,17 +90,29 @@ export function inboxAfter(tally: InboxTally, envelopes: Iterable<BusEnvelope>):
   return latest;
 }
 
+export function entryDecisionsIn(envelopes: Iterable<BusEnvelope>): [string, MemoryDecision][] {
+  const decided: [string, MemoryDecision][] = [];
+  for (const envelope of envelopes) {
+    if (envelope.type !== "memory.decided") continue;
+    const { decision } = envelope.payload;
+    if (decision.about.kind === "entry") decided.push([decision.about.entryId, decision]);
+  }
+  return decided;
+}
+
 export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): MemoryStore {
   const [state, setState] = createStore<{
     garden: MemoryGarden;
     loaded: boolean;
     revision: number;
     inbox: InboxTally;
+    entryDecisions: Record<string, MemoryDecision>;
   }>({
     garden: structuredClone(inertGarden),
     loaded: false,
     revision: 0,
     inbox: { ...emptyInbox },
+    entryDecisions: {},
   });
   const listeners = new Set<(count: number) => void>();
 
@@ -122,6 +138,9 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
   const notRefused = (outcome: unknown): boolean => outcome !== "inert" && outcome !== "missing";
 
   const stopFollowing = feed.subscribe((envelopes) => {
+    for (const [entryId, decision] of entryDecisionsIn(envelopes)) {
+      setState("entryDecisions", entryId, reconcile(decision));
+    }
     const tally = inboxAfter(state.inbox, envelopes);
     if (tally === state.inbox) return;
     announce(tally);

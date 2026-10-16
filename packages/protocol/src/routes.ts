@@ -1,7 +1,7 @@
 import { lifecycleRoutes } from "./lifecycle.ts";
 import { permissionRoutes } from "./permissions.ts";
 
-export const protocolVersion = "0.1.1";
+export const protocolVersion = "0.2.0";
 
 export type HttpMethod = "GET" | "POST" | "DELETE";
 
@@ -32,6 +32,7 @@ export const routes = [
   { method: "POST", path: "/sessions/{id}/compact", operationId: "compactSession" },
   { method: "POST", path: "/sessions/{id}/undo", operationId: "undoSession" },
   { method: "POST", path: "/sessions/{id}/redo", operationId: "redoSession" },
+  { method: "POST", path: "/sessions/{id}/restore", operationId: "restoreSessionTurn" },
   { method: "GET", path: "/sessions/{id}/context", operationId: "readSessionContext" },
   { method: "GET", path: "/sessions/{id}/cost", operationId: "readSessionCost" },
   { method: "POST", path: "/sessions/{id}/export", operationId: "exportSession" },

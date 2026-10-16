@@ -20,6 +20,11 @@
   color: var(--kw-text-mid);
 }
 
+.kw-perm-session-quiet {
+  margin-left: 1ch;
+  color: var(--kw-density-full);
+}
+
 .kw-perm-bundle {
   display: flex;
   flex-wrap: wrap;

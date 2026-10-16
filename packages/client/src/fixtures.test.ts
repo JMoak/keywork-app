@@ -1,15 +1,20 @@
 import { readFile } from "node:fs/promises";
 import type {
   BusEnvelope,
+  ContextReport,
   CostReport,
+  Redone,
   SessionDetail,
+  SessionEntries,
   SessionSummary,
+  TurnRestored,
   Undone,
 } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { coalesceEnvelopes } from "./projection/coalesce.ts";
 import { sessionControls } from "./projection/controls.ts";
 import { historyEnvelopes } from "./projection/history.ts";
+import { childStateOf, lineageOfProjection } from "./projection/lineage.ts";
 import { projectAll } from "./projection/project.ts";
 import { toolRowText } from "./projection/tool-row.ts";
 import { emptyProjection, type SessionProjection, type ToolRun } from "./projection/types.ts";
@@ -85,6 +90,68 @@ describe("fixtures recorded from keywork serve", () => {
     });
     expect(toolRowText(run)).toBe("bash echo served · 1.3s · done");
     expect(state.running).toEqual({});
+  });
+
+  it("decided: recall decides after the grant and before it injects, and each decision rides its call", async () => {
+    const stream = await envelopes("decided");
+    const types = stream.map((envelope) => envelope.type);
+    const first = types.indexOf("memory.decided");
+    expect(types.slice(first - 1, first + 3)).toEqual([
+      "gate.permission",
+      "memory.decided",
+      "context.injected",
+      "tool.finished",
+    ]);
+    const state = projectAll(emptyProjection, stream);
+    expect(state.entries.map((entry) => entry.kind)).toEqual(["user", "tool", "tool", "assistant"]);
+    expect(state.memoryDecisions.map((decision) => decision.choice)).toEqual([
+      { kept: ["Layout Rects"], dropped: [] },
+      { kept: [], dropped: ["Layout Rects"] },
+    ]);
+    expect(state.memoryDecisions.every((decision) => decision.decider === "builtin")).toBe(true);
+    expect(toolRowText(toolRun(state, 1))).toBe(
+      'write src/layout/rects.ts · 1.0s · done · recalled [[Layout Rects]] · shares "layout", "rects" with the path',
+    );
+    expect(toolRun(state, 2).recall?.rule).toBe("[[Layout Rects]] was already surfaced");
+    expect(toolRowText(toolRun(state, 2))).not.toContain("recalled");
+  });
+
+  it("delegated: the child rides the parent's delegate call and its result names the child first", async () => {
+    const stream = await envelopes("delegated");
+    expect(stream.map((envelope) => envelope.type).slice(4, 9)).toEqual([
+      "tool.started",
+      "gate.permission",
+      "child.started",
+      "child.finished",
+      "tool.finished",
+    ]);
+    expect(stream.every((envelope) => envelope.sessionId === "s1")).toBe(true);
+    const working = toolRun(projectAll(emptyProjection, stream.slice(0, 7)), 1);
+    expect(working.child).toMatchObject({
+      title: "audit the trust rules",
+      sessionId: "q1",
+      bot: "researcher",
+      outcome: undefined,
+    });
+    expect(childStateOf(working)).toBe("running");
+    const state = projectAll(emptyProjection, stream);
+    const run = toolRun(state, 1);
+    expect(run).toMatchObject({
+      name: "delegate",
+      phase: "done",
+      reason: undefined,
+      detail: ["Two rules allow more than they say."],
+      child: {
+        sessionId: "q1",
+        bot: "researcher",
+        outcome: "completed",
+        usage: { inputTokens: 12, outputTokens: 5 },
+        costNanos: undefined,
+        refused: undefined,
+      },
+    });
+    expect(childStateOf(run)).toBe("completed");
+    expect(state.entries.at(-1)).toMatchObject({ text: "The researcher found two loose rules." });
   });
 
   it("denied: an unanswered ask arrives as tool.started, the ask, the timed-out denial, then an error result", async () => {
@@ -189,6 +256,9 @@ describe("fixtures recorded from keywork serve", () => {
       "queued",
       "injected",
       "controls",
+      "delegated",
+      "restored",
+      "decided",
     ]) {
       const stream = await envelopes(name);
       expect(projectAll(emptyProjection, coalesceEnvelopes(stream)), name).toEqual(
@@ -209,6 +279,9 @@ describe("fixtures recorded from keywork serve", () => {
       "queued",
       "injected",
       "controls",
+      "delegated",
+      "restored",
+      "decided",
     ]) {
       expect(await projected(name)).toMatchSnapshot(name);
     }
@@ -313,6 +386,102 @@ describe("controls recorded from K1's session verbs", () => {
       body: { window: 200_000, declared: false, basis: "estimated" },
     });
   });
+
+  it("splits the next request into parts that fill the window and draws both lines across them", async () => {
+    const context = ((await answers()).context as Answer<ContextReport>).body;
+    const { system, tools, injected, conversation, free } = context.parts;
+    const parts = [system, tools, injected, conversation, free];
+    expect(parts.reduce((sum, part) => sum + part.tokens, 0)).toBe(context.window);
+    expect([system, tools, injected].map((part) => part.basis)).toEqual([
+      "estimated",
+      "estimated",
+      "estimated",
+    ]);
+    const beyondConversation = system.tokens + tools.tokens + injected.tokens;
+    expect(context.thresholds).toEqual({
+      flushAt: context.flushAt + beyondConversation,
+      compactAt: context.compactAt + beyondConversation,
+    });
+  });
+});
+
+describe("a turn restore recorded from the server", () => {
+  interface Answer<Body> {
+    status: number;
+    body: Body;
+  }
+
+  interface Restore {
+    restored: Answer<TurnRestored>;
+    restoreUnknownTurn: Answer<{ error: string }>;
+    restoreMalformed: Answer<{ error: string }>;
+    redo: Answer<Redone>;
+    entries: Answer<SessionEntries>;
+  }
+
+  const restore = async (): Promise<Restore> =>
+    JSON.parse(await readFile(fixture("restored.json"), "utf8")) as Restore;
+
+  it("hands back the turn's prompt, the turns it took off the path, and every file it put back", async () => {
+    const { restored } = await restore();
+    expect(restored).toEqual({
+      status: 200,
+      body: {
+        turn: 1,
+        prompt: { entryId: "q5", text: "write two lines to notes.txt" },
+        leafId: "q3",
+        undoneTurns: 2,
+        files: [{ path: "notes.txt", added: 0, deleted: 2 }],
+        filesNote: "files put back",
+        undoable: true,
+        redoable: true,
+      },
+    });
+  });
+
+  it("moves the leaf to the recorded entry, then reports the files that moved", async () => {
+    const stream = await envelopes("restored");
+    const moved = stream.findIndex((envelope) => envelope.type === "session.tree");
+    expect(stream[moved]?.payload).toEqual({ reason: "leaf", entryId: "q3" });
+    expect(stream[moved - 1]).toMatchObject({
+      type: "session.state",
+      payload: { leafId: "q3", redoable: true },
+    });
+    expect(stream.slice(moved)).toContainEqual(
+      expect.objectContaining({
+        type: "changes.updated",
+        payload: { paths: ["notes.txt"], turn: 1 },
+      }),
+    );
+  });
+
+  it("refuses a turn off the path as 404 and a turn below one as 400, in the server's words", async () => {
+    const { restoreUnknownTurn, restoreMalformed } = await restore();
+    expect(restoreUnknownTurn).toEqual({
+      status: 404,
+      body: { error: "no turn 9 on this session's path" },
+    });
+    expect(restoreMalformed).toEqual({
+      status: 400,
+      body: { error: "the body must be { turn: a positive integer }" },
+    });
+  });
+
+  it("stages the restore like an undo: redo takes it back and the log keeps both entries", async () => {
+    const { redo, entries } = await restore();
+    expect(redo).toEqual({
+      status: 200,
+      body: { restored: true, undoable: true, redoable: false },
+    });
+    const custom = entries.body.entries.flatMap((entry) =>
+      entry.type === "custom" ? [[entry.id, entry.customType, entry.data]] : [],
+    );
+    expect(custom.slice(1)).toEqual([
+      ["q3", "restore", { turn: 1, from: "q2", files: expect.any(String) }],
+      ["q4", "restore-undone", { restore: "q3" }],
+    ]);
+    expect(entries.body.leafId).toBe("q4");
+  });
 });
 
 describe("the raw SSE capture", () => {
@@ -354,6 +523,58 @@ describe("stored history", () => {
       decision: undefined,
     });
     expect(replayed.usage.turns).toBe(0);
+  });
+});
+
+describe("lineage on the wire", () => {
+  interface Answer<Body> {
+    status: number;
+    body: Body;
+  }
+
+  interface Delegated {
+    parent: Answer<SessionDetail>;
+    child: Answer<SessionDetail>;
+    sessions: Answer<{ sessions: SessionSummary[] }>;
+  }
+
+  const delegated = async (): Promise<Delegated> =>
+    JSON.parse(await readFile(fixture("delegated.json"), "utf8")) as Delegated;
+
+  it("rebuilds the child row from the stored delegate result, since child events never replay", async () => {
+    const { parent } = await delegated();
+    const replayed = projectAll(emptyProjection, historyEnvelopes(parent.body));
+    expect(toolRun(replayed, 1)).toMatchObject({
+      replay: true,
+      phase: "done",
+      detail: ["Two rules allow more than they say."],
+      child: { title: "audit the trust rules", sessionId: "q1", bot: "researcher" },
+    });
+    expect(lineageOfProjection({}, "s1", replayed)).toEqual({
+      s1: [
+        {
+          sessionId: "q1",
+          parentId: "s1",
+          callId: "d1",
+          title: "audit the trust rules",
+          bot: "researcher",
+          state: "completed",
+          costNanos: undefined,
+        },
+      ],
+    });
+  });
+
+  it("reads the child by id but lists only the parent, and names no parent on the child", async () => {
+    const { child, sessions } = await delegated();
+    expect(child.status).toBe(200);
+    expect(child.body).toMatchObject({
+      id: "q1",
+      title: "audit the trust rules",
+      bot: "researcher",
+    });
+    expect(Object.keys(child.body)).not.toContain("spawnedBy");
+    expect(sessions.body.sessions.map((summary) => summary.id)).toEqual(["s1"]);
   });
 });
 

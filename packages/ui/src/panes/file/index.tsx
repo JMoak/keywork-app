@@ -9,6 +9,7 @@ import { z } from "zod";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
+import { bareFolderLine, folderOpening, pathTitle } from "./folder.ts";
 import {
   fileUrlOf,
   lineLabel,
@@ -18,7 +19,7 @@ import {
   sliceFacts,
   tailRange,
 } from "./range.ts";
-import { defaultFilePath, lastAgentFile } from "./recent.ts";
+import { pathToOpen } from "./recent.ts";
 import { mountTextView, type TextMount } from "./text-view.ts";
 import "./file.css";
 
@@ -40,6 +41,7 @@ export type FileState =
   | { kind: "loading" }
   | { kind: "loaded"; slice: TextSlice }
   | { kind: "refused"; reading: TextRefusal; spec: FileSpec }
+  | { kind: "bare-folder"; path: string }
   | { kind: "failed"; reason: string };
 
 export const filePane = definePane<FileSpec>({
@@ -47,15 +49,18 @@ export const filePane = definePane<FileSpec>({
   spec: fileSpec,
   home: "main",
   attire: "work",
-  title: (spec) => spec.path,
+  title: (spec) => pathTitle(spec.path),
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {
     action: "file.summon",
     chords: "none",
-    help: "open the agent's last file",
-    command: { name: "open", description: "open the file the agent touched last" },
-    spec: () => ({ kind: "file", path: lastAgentFile() ?? defaultFilePath }),
+    help: "open the agent's last file, else the README",
+    command: {
+      name: "open",
+      description: "open the file the agent touched last, else the workspace README",
+    },
+    spec: () => ({ kind: "file", path: pathToOpen() }),
   },
   localActions: {
     "file.top": {
@@ -137,6 +142,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
       const wanted = range === "tail" ? await tailOf(props.shell, props.spec) : range;
       const reading =
         wanted === undefined ? "missing" : await readSlice(props.shell, props.spec, wanted);
+      if (reading === "missing") return await openFolderInstead(props.spec);
       setState(
         typeof reading === "string"
           ? { kind: "refused", reading, spec: props.spec }
@@ -144,6 +150,21 @@ function FileSlot(props: PaneProps<FileSpec>) {
       );
     } catch (cause) {
       setState({ kind: "failed", reason: cause instanceof Error ? cause.message : String(cause) });
+    }
+  };
+
+  const openFolderInstead = async (spec: FileSpec): Promise<void> => {
+    const opening = await folderOpening(props.shell.client, spec.path);
+    switch (opening.kind) {
+      case "readme":
+        props.shell.rebind(props.id, { kind: "file", path: opening.path });
+        break;
+      case "bare-folder":
+        setState({ kind: "bare-folder", path: spec.path });
+        break;
+      case "not-a-folder":
+        setState({ kind: "refused", reading: "missing", spec });
+        break;
     }
   };
 
@@ -239,6 +260,13 @@ function FileSlot(props: PaneProps<FileSpec>) {
             </p>
           )}
         </Match>
+        <Match when={bareFolderOf(state())}>
+          {(folder) => (
+            <EmptyState
+              line={bareFolderLine(folder().path, props.shell.keys.chord("browser.summon"))}
+            />
+          )}
+        </Match>
         <Match when={state().kind === "failed"}>
           <p class="kw-file-note" data-level="error">
             {(state() as { reason: string }).reason}
@@ -267,6 +295,10 @@ async function tailOf(shell: ShellSeams, spec: FileSpec): Promise<FileRange | un
 
 function refusalOf(state: FileState): Extract<FileState, { kind: "refused" }> | undefined {
   return state.kind === "refused" ? state : undefined;
+}
+
+function bareFolderOf(state: FileState): Extract<FileState, { kind: "bare-folder" }> | undefined {
+  return state.kind === "bare-folder" ? state : undefined;
 }
 
 type Edge = "top" | "end";

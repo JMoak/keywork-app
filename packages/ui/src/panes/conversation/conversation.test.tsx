@@ -1,5 +1,8 @@
 import {
+  type ChildLineage,
+  emptyChangesState,
   emptyProjection,
+  emptyTreeState,
   projectAll,
   type SessionControls,
   type SessionProjection,
@@ -19,11 +22,14 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import recordedAnswers from "../../../../client/src/fixtures/controls.json";
+import delegatedStream from "../../../../client/src/fixtures/delegated.jsonl?raw";
+import { parseJsonl } from "../../dev/replay.ts";
 import { browserHost } from "../../host/browser.ts";
 import type { SaveOutcome } from "../../host/port.ts";
 import type { SessionReadings } from "../../shell/controls-store.ts";
 import type { ShellSeams } from "../registry.ts";
 import {
+  childAtWorkNotice,
   compactNotice,
   inferenceWords,
   looseningQuestion,
@@ -60,6 +66,7 @@ interface Fakes {
   title?: string;
   trashed?: boolean;
   live?: LiveSession;
+  child?: ChildLineage;
 }
 
 interface LiveSession {
@@ -77,6 +84,7 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
   const store = {
     projection: (): SessionProjection => fakes.live?.projection() ?? emptyProjection,
     summary: () => fakes.live?.summary(),
+    childOf: () => fakes.child,
     controlsOf: () => controls,
     prompt: async (id: string, text: string, behavior: PromptBehavior) => {
       sent.prompts.push([id, text, behavior]);
@@ -91,7 +99,11 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
     },
     abort: async () => undefined,
     answerAsk: async () => "settled",
-    surfaces: { state: { bots: [], ordinals: {} } },
+    tree: () => emptyTreeState,
+    openTree: async () => undefined,
+    changes: () => emptyChangesState,
+    openChanges: async () => undefined,
+    surfaces: { state: { bots: [{ name: "researcher", sigil: "◇" }], ordinals: {} } },
     controls: {
       state: { preset: fakes.preset },
       readings: () => fakes.readings ?? { context: undefined, cost: undefined },
@@ -133,7 +145,9 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
     store: store as unknown as ShellSeams["store"],
     keys: { chord: (action) => `ctrl+k ${action}`, leader: () => "ctrl+k" },
     sessions: {
-      openSession: () => {},
+      openSession: (id: string) => {
+        sent.verbs.push(`open ${id}`);
+      },
       newSession: async () => {},
       startSession: async (paneId: string, text: string) => {
         sent.verbs.push(`start ${paneId} ${text}`);
@@ -248,6 +262,37 @@ describe("the conversation pane's controls", () => {
       ["s1", "later", "queue"],
       ["s1", "now instead", "steer"],
     ]);
+  });
+
+  it("holds the draft while this pane's session is a child still working for its parent", () => {
+    const working: ChildLineage = {
+      sessionId: "s1",
+      parentId: "p1",
+      callId: "d1",
+      title: "audit the trust rules",
+      bot: undefined,
+      state: "running",
+      costNanos: undefined,
+    };
+    const { sent } = mount({ child: working });
+    const input = document.querySelector(".kw-composer-input") as HTMLTextAreaElement;
+    input.value = "also check the callers";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(sent.prompts).toEqual([]);
+    expect(input.value).toBe("also check the callers");
+    expect(document.querySelector(".kw-composer-hold")?.textContent).toBe(childAtWorkNotice);
+  });
+
+  it("opens a delegated child from its transcript row by the session-opening path", () => {
+    const delegated = projectAll(emptyProjection, parseJsonl(delegatedStream));
+    const { sent } = mount({
+      live: { summary: () => undefined, projection: () => delegated, trashed: () => false },
+    });
+    const row = document.querySelector(".kw-tool[data-child]") as HTMLElement;
+    expect(row.textContent).toContain('child "audit the trust rules" · ◇ researcher');
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(sent.verbs).toEqual(["open q1"]);
   });
 
   it("seeds the composer with an undone prompt", () => {
@@ -521,6 +566,28 @@ describe("the conversation pane's title row", () => {
       declared: false,
       flushAt: 175_424,
     });
+  });
+
+  it("carries the session's arc slug and its bot to the title row", () => {
+    const bound: SessionSummary = {
+      id: "s1",
+      title: "Lights",
+      createdAt: "t",
+      lastActivityAt: "t",
+      messageCount: 2,
+      arc: "pricing-v2",
+      bot: "reviewer",
+    };
+    const shell = shellOver(
+      { prompts: [], verbs: [] },
+      { live: { summary: () => bound, projection: () => emptyProjection, trashed: () => false } },
+    );
+    const adornments = conversationPane.adornments?.(
+      { kind: "conversation", sessionId: "s1" },
+      shell,
+    );
+    expect(adornments?.arc).toBe("pricing-v2");
+    expect(adornments?.bot).toEqual({ name: "reviewer" });
   });
 
   it("keeps the assumed basis until the first reading arrives", () => {

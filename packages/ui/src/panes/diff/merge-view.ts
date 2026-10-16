@@ -64,7 +64,7 @@ export const mergeTheme: Extension = [
     ".cm-deletedLineGutter": { background: "var(--kw-error)" },
     ".cm-collapsedLines": {
       color: "var(--kw-text-dim)",
-      backgroundColor: "var(--kw-panel-lift)",
+      background: "var(--kw-panel-lift)",
       borderTop: "1px solid var(--kw-border)",
       borderBottom: "1px solid var(--kw-border)",
       padding: "0.2rem 0.75rem",

@@ -9,11 +9,11 @@ import {
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { z } from "zod";
 import { FirstRun } from "../../chrome/first-run.tsx";
-import { arcHueRank, botTitle } from "../../chrome/identity.ts";
+import { arcHueRank, botNamed, titleBot } from "../../chrome/identity.ts";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { sessionName, telemetry } from "../../chrome/telemetry.ts";
 import { Composer } from "../../composer/composer.tsx";
-import { contextLevelOf, contextLevelOfReport } from "../../instruments/context.ts";
+import { sessionContextLevel } from "../../instruments/context.ts";
 import { costReadout } from "../../instruments/cost-report.ts";
 import { askChordsOf } from "../../page/ask-card.tsx";
 import { ConversationPane } from "../../page/pane.tsx";
@@ -23,6 +23,8 @@ import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { restoreNotice } from "../tree/trash.ts";
 import { type ControlAsk, ControlRow } from "./control-row.tsx";
 import {
+  childAtWorkNotice,
+  compactingNotice,
   compactNotice,
   effortNotice,
   exportedNotice,
@@ -45,6 +47,8 @@ import {
   undoneNotice,
   unsteppableNotice,
 } from "./controls.ts";
+import { revealWhatWaits } from "./reveal.ts";
+import { createTurnLedger, turnRibbon } from "./turn-ledger.ts";
 
 const conversationSpec = z.object({
   kind: z.literal("conversation"),
@@ -127,6 +131,22 @@ export const conversationPane = definePane<ConversationSpec>({
       help: "redo what undo took",
       command: { name: "redo", description: "bring back what the last undo took" },
     },
+    "conversation.restore-turn": {
+      chords: "none",
+      help: "restore to before a turn",
+      command: {
+        name: "restore-turn",
+        description: "put the session and its files back to before the focused turn, or the latest",
+      },
+    },
+    "conversation.fork-turn": {
+      chords: "none",
+      help: "fork at a turn",
+      command: {
+        name: "fork-turn",
+        description: "start a new session from the end of the focused turn, or the latest",
+      },
+    },
     "conversation.cost": {
       chords: "none",
       help: "cost per model",
@@ -164,13 +184,13 @@ export const conversationPane = definePane<ConversationSpec>({
     const readings = shell.store.controls.readings(spec.sessionId);
     return {
       telemetry: telemetry(projection, readings.cost),
-      context:
-        readings.context === undefined
-          ? contextLevelOf(projection.usage)
-          : contextLevelOfReport(readings.context),
-      bot: botTitle(summary, shell.store.surfaces.state.bots),
+      context: sessionContextLevel(readings.context, projection.usage),
+      arc: summary?.arc,
+      bot: titleBot(summary, shell.store.surfaces.state.bots),
       inference: inferenceWords(shell.store.controlsOf(spec.sessionId)),
       hueRank: arcHueRank(summary, shell.store.surfaces.state.ordinals),
+      quiet: shell.quiet?.has(spec.sessionId),
+      ribbon: turnRibbon(shell, spec.sessionId),
       modeWord: shell.trust.untrusted()
         ? "untrusted"
         : projection.mode === undefined || projection.mode === "agent"
@@ -203,10 +223,17 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   };
   const knownName = lastKnownName(props.shell, () => props.spec.sessionId);
   let composerInput: HTMLTextAreaElement | undefined;
+  let page: HTMLDivElement | undefined;
   keepKeyboardHome(
     () => composerInput,
     () => props.focused && pending() === undefined,
   );
+  revealWhatWaits({
+    pane: () => props.id,
+    root: () => page,
+    revealing: () => props.shell.needsYou?.revealing(),
+    painted: () => projection().entries.length,
+  });
 
   createEffect(() => {
     const id = props.spec.sessionId;
@@ -242,7 +269,11 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     if (id !== undefined) void props.shell.store.abort(id);
   };
 
-  const controls = sessionControlsOf(props.shell, () => props.spec.sessionId, say, setPending);
+  const turns = createTurnLedger(props.shell, () => props.spec.sessionId, say, setPending);
+  const controls = {
+    ...sessionControlsOf(props.shell, () => props.spec.sessionId, say, setPending),
+    ...turns.actions,
+  };
   props.onAction((action) => controls[action]?.());
 
   const answerPending = (reply: string | boolean): void => {
@@ -253,7 +284,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
 
   return (
     <>
-      <div class="kw-page">
+      <div class="kw-page" ref={page}>
         <Show
           when={props.spec.sessionId !== undefined}
           fallback={
@@ -271,6 +302,13 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
               props.shell.client.answerAsk(callId, verdict, scope)
             }
             askChords={askChordsOf(props.shell.keys)}
+            quiet={props.shell.quiet?.has(props.spec.sessionId)}
+            onOpenSession={props.shell.sessions.openSession}
+            botLabel={(name) => botNamed(name, props.shell.store.surfaces.state.bots)}
+            askAccepted={props.shell.trustSetup?.acceptedScopeOf}
+            ledger={turns.ledger()}
+            ledgerVerbs={turns.verbs}
+            redoable={props.shell.store.controlsOf(props.spec.sessionId).redoable}
           />
         </Show>
       </div>
@@ -285,6 +323,11 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         queue={projection().queue}
         busy={projection().turn !== undefined}
         seed={props.shell.store.controls.seed(props.spec.sessionId)}
+        hold={
+          props.shell.store.childOf(props.spec.sessionId)?.state === "running"
+            ? childAtWorkNotice
+            : undefined
+        }
         onSteer={(text) => void send("steer")(text)}
         onQueue={(text) => void send("queue")(text)}
         onInterrupt={interrupt}
@@ -368,7 +411,7 @@ function sessionControlsOf(
       report(await verbs.setEffort(id, level), (answer) => effortNotice(answer.effort));
     }),
     "conversation.compact": withSession(async (id) => {
-      say("compacting · folding the older conversation into a summary");
+      say(compactingNotice);
       report(await verbs.compact(id), compactNotice);
     }),
     "conversation.rename": withSession((id) =>

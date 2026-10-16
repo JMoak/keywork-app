@@ -37,6 +37,10 @@ import type {
   FocusedDir,
   ForkedSession,
   ForkOutcome,
+  GrantOutcome,
+  GrantRecorded,
+  GrantRefusal,
+  GrantRevoked,
   InjectOutcome,
   LabelOutcome,
   LeafOutcome,
@@ -77,6 +81,7 @@ import type {
   ThinkingReading,
   TreeReading,
   TrustOutcome,
+  TurnRestoreReading,
   UndoReading,
   WorkspaceChoice,
   WorkspaceUse,
@@ -118,6 +123,7 @@ export interface KeyworkClient {
   compact(id: string, focus?: string): Promise<CompactReading>;
   undo(id: string): Promise<UndoReading>;
   redo(id: string): Promise<RedoReading>;
+  restoreTurn(id: string, turn: number): Promise<TurnRestoreReading>;
   context(id: string): Promise<ContextReading>;
   cost(id: string): Promise<CostReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
@@ -126,6 +132,8 @@ export interface KeyworkClient {
   asks(): Promise<readonly PendingAsk[]>;
   answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
   permissions(): Promise<PermissionsView>;
+  grantWorkspaceRule(rule: PermissionRule): Promise<GrantOutcome>;
+  grantSessionRule(sessionId: string, rule: PermissionRule): Promise<GrantOutcome>;
   revokeWorkspaceGrant(rule: PermissionRule): Promise<RevokeOutcome>;
   revokeSessionGrant(sessionId: string, rule: PermissionRule): Promise<RevokeOutcome>;
   events(options?: EventStreamOptions): AsyncIterable<BusEnvelope>;
@@ -352,27 +360,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       await json(response);
       return "settled";
     },
-    permissions: () => request("GET", "/permissions").then(json<PermissionsView>),
-    revokeWorkspaceGrant: async (rule) => {
-      const response = await request("POST", "/permissions/workspace/revoke", { rule });
-      if (response.status === 400)
-        return { refused: "invalid", detail: await refusalDetail(response) };
-      if (response.status === 404)
-        return { refused: "missing", detail: await refusalDetail(response) };
-      return json<RevokeOutcome>(response);
-    },
-    revokeSessionGrant: async (sessionId, rule) => {
-      const response = await request(
-        "POST",
-        `/permissions/session/${encodeURIComponent(sessionId)}/revoke`,
-        { rule },
-      );
-      if (response.status === 400)
-        return { refused: "invalid", detail: await refusalDetail(response) };
-      if (response.status === 404)
-        return { refused: "missing", detail: await refusalDetail(response) };
-      return json<RevokeOutcome>(response);
-    },
+    ...grantRoutes(request),
     ...sessionVerbRoutes(request),
     ...memoryRoutes(request),
     ...workspaceRoutes(request),
@@ -401,6 +389,7 @@ type SessionVerbRoutes = Pick<
   | "compact"
   | "undo"
   | "redo"
+  | "restoreTurn"
   | "context"
   | "cost"
   | "exportSession"
@@ -424,6 +413,7 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
       answered(await verb(id, "compact", focus === undefined ? {} : { focus })),
     undo: async (id) => answered(await verb(id, "undo")),
     redo: async (id) => answered(await verb(id, "redo")),
+    restoreTurn: async (id, turn) => answered(await verb(id, "restore", { turn })),
     context: async (id) => {
       const response = await reading(id, "context");
       return response.status === 404 ? "missing" : json(response);
@@ -534,6 +524,55 @@ async function askRefusalOf(response: Response): Promise<AskRefusal> {
   const refused = askRefusalKinds.get(detail);
   if (refused === undefined) throw new ServerRefusal(400, detail);
   return { refused, detail };
+}
+
+type GrantRoutes = Pick<
+  KeyworkClient,
+  | "permissions"
+  | "grantWorkspaceRule"
+  | "grantSessionRule"
+  | "revokeWorkspaceGrant"
+  | "revokeSessionGrant"
+>;
+
+type GrantVerb = "grant" | "revoke";
+
+function grantRoutes(request: Request): GrantRoutes {
+  const workspaceGrants = (verb: GrantVerb): string => `/permissions/workspace/${verb}`;
+  const sessionGrants = (sessionId: string, verb: GrantVerb): string =>
+    `/permissions/session/${encodeURIComponent(sessionId)}/${verb}`;
+  return {
+    permissions: () => request("GET", "/permissions").then(json<PermissionsView>),
+    grantWorkspaceRule: async (rule) =>
+      grantRecorded(await request("POST", workspaceGrants("grant"), { rule })),
+    grantSessionRule: async (sessionId, rule) =>
+      grantRecorded(await request("POST", sessionGrants(sessionId, "grant"), { rule })),
+    revokeWorkspaceGrant: async (rule) =>
+      grantRevoked(await request("POST", workspaceGrants("revoke"), { rule })),
+    revokeSessionGrant: async (sessionId, rule) =>
+      grantRevoked(await request("POST", sessionGrants(sessionId, "revoke"), { rule })),
+  };
+}
+
+async function grantRecorded(response: Response): Promise<GrantOutcome> {
+  if (response.status === 409) {
+    return { refused: "declined", detail: await refusalDetail(response) };
+  }
+  return (await ruleRefusalOf(response)) ?? json<GrantRecorded>(response);
+}
+
+async function grantRevoked(response: Response): Promise<RevokeOutcome> {
+  return (await ruleRefusalOf(response)) ?? json<GrantRevoked>(response);
+}
+
+const ruleRefusalKinds: ReadonlyMap<number, GrantRefusal["refused"]> = new Map([
+  [400, "invalid"],
+  [404, "missing"],
+]);
+
+async function ruleRefusalOf(response: Response): Promise<GrantRefusal | undefined> {
+  const refused = ruleRefusalKinds.get(response.status);
+  return refused === undefined ? undefined : { refused, detail: await refusalDetail(response) };
 }
 
 function eventsPath(options: EventStreamOptions): string {

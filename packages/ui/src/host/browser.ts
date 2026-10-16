@@ -43,7 +43,7 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
         };
       }
       recents.unshift({ path, openedAt: new Date().toISOString() });
-      open.set(path, { workspace: path, windows: 1, pendingAsks: 0 });
+      open.set(path, { workspace: path, windows: 1, needsYou: 0 });
       announceOpen();
       return {
         ok: true,
@@ -88,8 +88,8 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       activationListeners.add(listener);
       return () => activationListeners.delete(listener);
     },
-    setPendingAsks: async (count) => {
-      for (const entry of open.values()) entry.pendingAsks = count;
+    setNeedsYou: async (count) => {
+      for (const entry of open.values()) entry.needsYou = count;
       document.title = count === 0 ? "keywork" : `(${count}) keywork`;
     },
     saveAs: async () => ({

@@ -1,12 +1,20 @@
 import {
   type ChangesState,
+  type ChildLineage,
   changesSnapshot,
   changesState,
+  childrenOf,
+  childrenTouchedBy,
   emptyChangesState,
+  emptyLineage,
   emptyProjection,
   emptyTreeState,
   historyEnvelopes,
   type KeyworkClient,
+  type LineageState,
+  lineageOf,
+  lineageOfProjection,
+  lineageState,
   projectAll,
   type ServerFeed,
   type SessionControls,
@@ -29,6 +37,7 @@ import type {
   PendingAsk,
   PromptBehavior,
   PromptOutcome,
+  PurgedTrash,
   RemoveOutcome,
   RestoreOutcome,
   SessionDetail,
@@ -44,6 +53,8 @@ export interface SessionStore {
   readonly state: SessionState;
   projection(id: string | undefined): SessionProjection;
   summary(id: string | undefined): SessionSummary | undefined;
+  childOf(id: string | undefined): ChildLineage | undefined;
+  children(parentId: string): readonly ChildLineage[];
   controlsOf(id: string | undefined): SessionControls;
   refresh(): Promise<void>;
   open(id: string): Promise<void>;
@@ -53,6 +64,7 @@ export interface SessionStore {
   remove(id: string): Promise<RemoveOutcome>;
   restore(id: string): Promise<RestoreOutcome>;
   discard(id: string): Promise<DiscardTrashedOutcome>;
+  purge(): Promise<PurgedTrash>;
   reload(id: string): Promise<void>;
   create(): Promise<string>;
   prompt(id: string, text: string, behavior: PromptBehavior): Promise<PromptOutcome>;
@@ -83,6 +95,7 @@ export interface SessionState {
   readonly loading: Readonly<Record<string, boolean>>;
   readonly trees: Readonly<Record<string, TreeState>>;
   readonly changes: Readonly<Record<string, ChangesState>>;
+  readonly lineage: LineageState;
   readonly gap: { from: number; to: number } | undefined;
   readonly lost: string | undefined;
 }
@@ -96,6 +109,8 @@ interface MutableSessionState {
   missing: Record<string, boolean>;
   trees: Record<string, TreeState>;
   changes: Record<string, ChangesState>;
+  lineage: LineageState;
+  unlisted: Record<string, SessionSummary>;
   gap: { from: number; to: number } | undefined;
   lost: string | undefined;
 }
@@ -110,10 +125,13 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     missing: {},
     trees: {},
     changes: {},
+    lineage: emptyLineage,
+    unlisted: {},
     gap: undefined,
     lost: undefined,
   });
   const arrivedWhileLoading = new Map<string, BusEnvelope[]>();
+  const reloadAfterLoading = new Set<string>();
   const treeFetches = new Map<string, Promise<void>>();
   const changeFetches = new Map<string, Promise<void>>();
   const memory = createMemoryStore(client, feed);
@@ -168,11 +186,20 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     }
     apply(batches);
     follow(envelopes);
+    followLineage(envelopes);
     const moves = trashMovesIn(envelopes);
     markTrashed(moves);
     if (moves.length > 0) void openTrash();
     if (envelopes.some(changesSummaries)) void refresh();
     for (const id of rewritten) void reload(id);
+  };
+
+  const followLineage = (envelopes: readonly BusEnvelope[]): void => {
+    const told = envelopes.filter(isChildEvent);
+    if (told.length > 0) setState("lineage", (lineage) => told.reduce(lineageState, lineage));
+    for (const child of childrenTouchedBy(state.lineage, envelopes)) {
+      if (state.projections[child] !== undefined) void reload(child);
+    }
   };
 
   const load = async (id: string): Promise<void> => {
@@ -189,14 +216,22 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
         const standing = draft.projections[id]?.standing;
         const loaded = projectAll(emptyProjection, [...history, ...asks, ...live]);
         draft.projections[id] = loaded.standing === undefined ? { ...loaded, standing } : loaded;
+        draft.lineage = lineageOfProjection(draft.lineage, id, loaded);
         draft.loading[id] = false;
         draft.missing[id] = detail === undefined;
+        if (detail !== undefined && !listed(draft.summaries, id)) {
+          draft.unlisted[id] = summaryOf(detail);
+        }
       }),
     );
+    if (reloadAfterLoading.delete(id)) await load(id);
   };
 
-  const reload = (id: string): Promise<void> =>
-    arrivedWhileLoading.has(id) ? Promise.resolve() : load(id);
+  const reload = (id: string): Promise<void> => {
+    if (!arrivedWhileLoading.has(id)) return load(id);
+    reloadAfterLoading.add(id);
+    return Promise.resolve();
+  };
 
   const refresh = async (): Promise<void> => {
     const summaries = await client.sessions();
@@ -229,7 +264,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
 
   const openTree = (id: string, options: RefetchOptions = {}): Promise<void> => {
     const current = state.trees[id];
-    if (current === undefined) setState("trees", id, emptyTreeState);
+    if (current === undefined) setState("trees", id, { ...emptyTreeState });
     if (current !== undefined && !current.stale && options.force !== true) return Promise.resolve();
     return dedupe(treeFetches, id, async () => {
       const entries = await client.entries(id);
@@ -240,13 +275,17 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
 
   const openChanges = (id: string, options: RefetchOptions = {}): Promise<void> => {
     const current = state.changes[id];
-    if (current === undefined) setState("changes", id, emptyChangesState);
+    if (current === undefined) setState("changes", id, { ...emptyChangesState });
     if (current !== undefined && !current.stale && options.force !== true) return Promise.resolve();
     return dedupe(changeFetches, id, async () => {
       const reading = await client.changes(id);
       setState("changes", id, (changes) => changesSnapshot(changes ?? emptyChangesState, reading));
     });
   };
+
+  const summary = (id: string | undefined): SessionSummary | undefined =>
+    state.summaries.find((item) => item.id === id) ??
+    (id === undefined ? undefined : state.unlisted[id]);
 
   const stops = [
     feed.subscribe(absorb),
@@ -260,12 +299,11 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     state,
     projection: (id) =>
       id === undefined ? emptyProjection : (state.projections[id] ?? emptyProjection),
-    summary: (id) => state.summaries.find((item) => item.id === id),
+    summary,
+    childOf: (id) => (id === undefined ? undefined : lineageOf(state.lineage, id)),
+    children: (parentId) => childrenOf(state.lineage, parentId),
     controlsOf: (id) =>
-      sessionControls(
-        state.summaries.find((item) => item.id === id),
-        id === undefined ? undefined : state.projections[id],
-      ),
+      sessionControls(summary(id), id === undefined ? undefined : state.projections[id]),
     refresh,
     open: async (id) => {
       if (state.projections[id] !== undefined || arrivedWhileLoading.has(id)) return;
@@ -284,6 +322,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
         outcome === "missing" ? undefined : { sessionId: id, trashed: false },
       ),
     discard: (id) => settleTrash(client.discardTrashedSession(id), () => undefined),
+    purge: () => settleTrash(client.purgeTrash(), () => undefined),
     reload,
     create: async () => {
       const summary = await client.createSession();
@@ -340,9 +379,23 @@ function askEnvelopes(detail: SessionDetail, pending: readonly PendingAsk[]): Bu
           arguments: ask.arguments,
           rule: "default" as const,
           rules: ask.rules ?? [],
+          ...(ask.preview === undefined ? {} : { preview: ask.preview }),
         },
       },
     }));
+}
+
+function isChildEvent(envelope: BusEnvelope): boolean {
+  return envelope.type === "child.started" || envelope.type === "child.finished";
+}
+
+function listed(summaries: readonly SessionSummary[], id: string): boolean {
+  return summaries.some((summary) => summary.id === id);
+}
+
+function summaryOf(detail: SessionDetail): SessionSummary {
+  const { messages: _, ...summary } = detail;
+  return summary;
 }
 
 function bySession(envelopes: readonly BusEnvelope[]): Map<string, BusEnvelope[]> {

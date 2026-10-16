@@ -5,11 +5,12 @@ import {
   serverFeed,
 } from "@keywork-app/client";
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
-import { reportPendingAsks } from "./host/pending-asks.ts";
+import { sessionName } from "./chrome/telemetry.ts";
+import { reportNeedsYou } from "./host/needs-you-report.ts";
 import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
 import { hostFetch } from "./host/transport.ts";
 import { frameTick } from "./shell/frame-tick.ts";
-import { notifyOnInbox } from "./shell/needs-you.ts";
+import { createNeedsYouQueue, createWaiting } from "./shell/needs-you-queue.ts";
 import { OpenScreen } from "./shell/open-screen.tsx";
 import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
 import { WorkspaceView } from "./shell/workspace-view.tsx";
@@ -26,11 +27,13 @@ interface Connected {
   client: KeyworkClient;
   feed: ServerFeed;
   store: SessionStore;
-  stopNotifying: () => void;
+  stopWaiting: () => void;
 }
 
 export function App(props: AppProps) {
   wearRememberedTheme({ storage: localStorageOrNone() });
+  const needsYou = createNeedsYouQueue();
+  onCleanup(reportNeedsYou(needsYou, props.host));
   const [connected, setConnected] = createSignal<Connected>();
   const [opening, setOpening] = createSignal<string>();
   const [failure, setFailure] = createSignal<string>();
@@ -60,28 +63,28 @@ export function App(props: AppProps) {
     const client = connect(props.host, result.opened.workspace);
     const feed = serverFeed(client, { tick: frameTick() });
     const store = createSessionStore(client, feed);
-    const stopInbox = notifyOnInbox(store.memory, props.host, result.opened.workspace);
-    const stopAsks = reportPendingAsks({
-      feed,
-      asks: () => client.asks(),
-      host: props.host,
-      workspace: result.opened.workspace,
-      titleOf: (sessionId) => store.summary(sessionId)?.title,
-    });
-    const stopNotifying = (): void => {
-      stopInbox();
-      stopAsks();
-    };
+    const stopWaiting = needsYou.attach(
+      createWaiting({
+        workspace: result.opened.workspace,
+        feed,
+        asks: () => client.asks(),
+        memory: store.memory,
+        sessionName: (sessionId) =>
+          sessionName(store.summary(sessionId), store.projection(sessionId)),
+      }),
+    );
     try {
       await store.refresh();
     } catch (cause) {
-      stopNotifying();
+      stopWaiting();
       store.dispose();
       feed.close();
       throw cause;
     }
     void store.surfaces.load();
-    setConnected({ opened: result.opened, client, feed, store, stopNotifying });
+    const previous = connected();
+    setConnected({ opened: result.opened, client, feed, store, stopWaiting });
+    previous?.stopWaiting();
   };
 
   const stopLoss = props.host.onServerLost((loss) => {
@@ -96,7 +99,7 @@ export function App(props: AppProps) {
     stopLoss();
     stopOpenRequests();
     const live = connected();
-    live?.stopNotifying();
+    live?.stopWaiting();
     live?.store.dispose();
     live?.feed.close();
   });
@@ -123,6 +126,7 @@ export function App(props: AppProps) {
             store={live().store}
             client={live().client}
             feed={live().feed}
+            needsYou={needsYou}
           />
         )}
       </Match>

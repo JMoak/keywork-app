@@ -4,6 +4,7 @@ import { tierOf, type WidthTier } from "../page/tiers.ts";
 import type { Outfit } from "../theme/attire.ts";
 import type { Theme } from "../theme/schema.ts";
 import { dressElement, undressElement } from "../theme/variables.ts";
+import type { TitleBot } from "./identity.ts";
 import { chromeWeight } from "./root-attributes.ts";
 import { createTileFillStep, type LifecycleState } from "./stamp.ts";
 import { type ThemeMark, TitleRow } from "./title-row.tsx";
@@ -19,12 +20,16 @@ export interface PaneFrameProps {
   telemetry?: string | undefined;
   context?: ContextLevel | undefined;
   modeWord?: string | undefined;
-  bot?: string | undefined;
+  arc?: string | undefined;
+  bot?: TitleBot | undefined;
   inference?: string | undefined;
   hueRank?: number | undefined;
   outfit?: Outfit | undefined;
   marked?: boolean | undefined;
+  quiet?: boolean | undefined;
+  ribbon?: string | undefined;
   onFocus?: (() => void) | undefined;
+  onGauge?: (() => void) | undefined;
   children: JSX.Element;
 }
 
@@ -73,14 +78,18 @@ export function PaneFrame(props: PaneFrameProps) {
         focused={props.focused}
         tier={tier()}
         weight={weight()}
+        arc={props.arc}
         bot={props.bot}
         inference={props.inference}
         modeWord={props.modeWord}
         telemetry={props.telemetry}
         context={props.context}
         marked={props.marked}
+        quiet={props.quiet}
+        ribbon={props.ribbon}
         themeMark={dressed()}
         instruments={worn()?.instruments}
+        onGauge={props.onGauge}
       />
       <div class="kw-frame-body">{props.children}</div>
     </section>

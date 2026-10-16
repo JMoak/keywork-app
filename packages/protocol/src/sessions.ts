@@ -1,5 +1,5 @@
 import type { EffortLevel } from "./controls.ts";
-import type { Message, MessagePart, Usage } from "./events.ts";
+import type { Message, MessagePart, ToolPreview, Usage } from "./events.ts";
 import type { AskRefusal, PermissionRule } from "./permissions.ts";
 
 export interface SessionSummary {
@@ -50,6 +50,7 @@ export interface PendingAsk {
   arguments: unknown;
   askedAt: string;
   rules?: readonly PermissionRule[];
+  preview?: ToolPreview;
 }
 
 export type AskVerdict = "granted" | "denied";

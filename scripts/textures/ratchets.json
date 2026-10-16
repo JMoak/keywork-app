@@ -245,8 +245,8 @@
     "why": "projection steps the reducer takes in the busiest frame of any fixture streamed one character per event; keywork serve now sends a session.state after every accepted and every persisted prompt, so the two-prompt queued and injected fixtures carry 15 envelopes the coalescer may not merge"
   },
   "T8.firstPaintElements": {
-    "value": 185,
+    "value": 207,
     "better": "lower",
-    "why": "DOM elements the conversation pane builds on first paint, summed over every recorded fixture"
+    "why": "DOM elements the conversation pane builds on first paint, summed over every recorded fixture; the delegated fixture's child row joined the sum in wave 7"
   }
 }

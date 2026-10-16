@@ -60,7 +60,8 @@
   .kw-masthead-tier {
     --kw-pad: 0.25rem;
   }
-  .kw-tool-span[data-part="facts"] {
+  .kw-tool-span[data-part="facts"],
+  .kw-tool-span[data-part="recall"] {
     display: none;
   }
 }
@@ -398,6 +399,48 @@ button.kw-tool {
   overflow-wrap: anywhere;
 }
 
+.kw-ledger {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  color: var(--kw-text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+button.kw-ledger {
+  cursor: pointer;
+}
+.kw-ledger:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+.kw-ledger-files {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0 0;
+  border-top: 1px solid var(--kw-border);
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: var(--kw-text-mid);
+}
+.kw-ledger-counts {
+  color: var(--kw-text-dim);
+}
+
+@container pane (max-width: 559.98px) {
+  .kw-ledger-hint {
+    display: none;
+  }
+}
+
 .kw-notice {
   margin: 0;
   font-family: var(--kw-font-mono);
@@ -454,6 +497,14 @@ button.kw-tool {
 .kw-ask-blanket {
   flex-basis: 100%;
   color: var(--kw-error);
+}
+.kw-ask-quiet {
+  flex-basis: 100%;
+  color: var(--kw-text-dim);
+}
+.kw-ask-accepted {
+  flex-basis: 100%;
+  color: var(--kw-accent);
 }
 .kw-ask-actions {
   display: flex;

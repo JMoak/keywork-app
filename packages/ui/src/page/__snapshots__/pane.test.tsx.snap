@@ -1,5 +1,13 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ConversationPane over the recorded fixtures > renders delegated 1`] = `
+[
+  "user have a researcher audit the trust rules",
+  "machine child "audit the trust rules" · researcher · 1.0s · 17 tokens · completed",
+  "agent The researcher found two loose rules.",
+]
+`;
+
 exports[`ConversationPane over the recorded fixtures > renders denied 1`] = `
 [
   "user run echo served",

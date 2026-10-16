@@ -55,7 +55,7 @@ export function changesByTurn(files: readonly ChangedPath[]): TurnGroup[] {
   return [...groups].map(([turn, grouped]) => ({ turn, files: grouped }));
 }
 
-export function countsOf(file: ChangedPath): string {
+export function countsOf(file: Pick<ChangedPath, "added" | "deleted">): string {
   return `+${file.added} −${file.deleted}`;
 }
 

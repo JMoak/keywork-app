@@ -1,7 +1,8 @@
-import { type TreeRow, treeRows } from "@keywork-app/client";
+import { type ChildLineage, type TreeRow, treeRows } from "@keywork-app/client";
 import type { SessionSummary } from "@keywork-app/protocol";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Match, Show, Switch } from "solid-js";
 import { z } from "zod";
+import { botNamed } from "../../chrome/identity.ts";
 import { relativeAge, sessionName } from "../../chrome/telemetry.ts";
 import { formatCost } from "../../instruments/format.ts";
 import { EmptyState } from "../empty-state.tsx";
@@ -10,14 +11,23 @@ import { ConfirmLine, NoticeLine } from "../overview/rows.tsx";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { arcWears } from "../themes/targets.ts";
 import {
+  type ChildRow,
+  type SessionRow,
+  type SessionsRow,
+  sessionIdOf,
+  sessionsRows,
+} from "./rows.ts";
+import { ChildRowView, SessionRowView } from "./session-rows.tsx";
+import {
+  alreadyEmptyNotice,
   discardNotice,
   emptyTrashLine,
   intentFor,
   type PendingTrash,
+  purgeIntent,
+  purgeNotice,
   removalNotice,
   restoreNotice,
-  type SessionsRow,
-  sessionsRows,
   type TrashIntent,
   trashHeading,
   trashQuestion,
@@ -103,6 +113,11 @@ export const treePane = definePane<TreeSpec>({
       help: "delete a trashed session for good",
       command: { name: "discard-session", description: "delete the selected trashed session" },
     },
+    "tree.purge": {
+      chords: "shift+d",
+      help: "empty the trash for good",
+      command: { name: "empty-trash", description: "delete every trashed session for good" },
+    },
     "tree.refresh": {
       chords: "r",
       help: "refresh",
@@ -138,17 +153,37 @@ function TreeSlot(props: PaneProps<TreeSpec>) {
 function SessionsLevel(props: PaneProps<TreeSpec>) {
   const [cursor, setCursor] = createSignal(0);
   const [showTrash, setShowTrash] = createSignal(false);
+  const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
   const [pending, setPending] = createSignal<PendingTrash>();
   const [notice, setNotice] = createSignal<string>();
   const store = props.shell.store;
   const keys = props.shell.keys;
   const sessions = createMemo(() => sessionsNewestFirst(store.state.summaries));
   const trash = () => store.state.trash;
-  const rows = createMemo(() => sessionsRows(sessions(), trash(), showTrash()));
-  const at = (): number => Math.min(cursor(), Math.max(rows().length - 1, 0));
-  const current = (): SessionsRow | undefined => rows()[at()];
   const nameOf = (summary: SessionSummary): string =>
     sessionName(summary, store.state.projections[summary.id]);
+  const knownName = (id: string): string | undefined => {
+    const summary = trash().find((item) => item.id === id) ?? store.summary(id);
+    return summary === undefined ? undefined : nameOf(summary);
+  };
+  const childName = (child: ChildLineage): string => knownName(child.sessionId) ?? child.title;
+  const rowName = (row: SessionsRow): string =>
+    row.kind === "child" ? childName(row.child) : nameOf(row.summary);
+  const rows = createMemo(() =>
+    sessionsRows({
+      sessions: sessions(),
+      trash: trash(),
+      showTrash: showTrash(),
+      folded: folded(),
+      children: (parentId) => store.children(parentId),
+      childOf: (id) => store.childOf(id),
+      trashed: (id) => store.trashed(id),
+      nameOf: knownName,
+    }),
+  );
+  const liveRows = createMemo(() => rows().filter((row) => row.kind !== "trashed"));
+  const at = (): number => Math.min(cursor(), Math.max(rows().length - 1, 0));
+  const current = (): SessionsRow | undefined => rows()[at()];
   const dive = (id: string): void => props.shell.rebind(props.id, { kind: "tree", sessionId: id });
   let root: HTMLElement | undefined;
   keepKeyboardHome(
@@ -158,22 +193,54 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
 
   const ask = (intent: TrashIntent): void => {
     setNotice(undefined);
-    setPending(intentFor(current(), intent, nameOf));
+    setPending(intentFor(current(), intent, rowName));
   };
   const toggleTrash = (): void => {
     setShowTrash((shown) => !shown);
     if (showTrash()) void store.openTrash();
   };
-  const settle = async ({ intent, summary, name }: PendingTrash): Promise<void> => {
-    setPending(undefined);
-    if (intent === "remove") {
-      const outcome = await store.remove(summary.id);
-      setNotice(removalNotice(outcome, name, keys.chord("tree.trash")));
-    } else if (intent === "restore") {
-      setNotice(restoreNotice(await store.restore(summary.id), name));
-    } else {
-      setNotice(discardNotice(await store.discard(summary.id), name));
+  const toggleFold = (parentId: string): void => {
+    setFolded((shut) => toggled(shut, parentId));
+  };
+  const open = (row: SessionsRow): void => {
+    if (row.kind === "trashed") ask("restore");
+    else props.shell.sessions.openSession(sessionIdOf(row));
+  };
+  const unfoldOrDive = (row: SessionsRow): void => {
+    if (row.kind === "session" && row.folded) toggleFold(row.summary.id);
+    else if (row.kind !== "trashed") dive(sessionIdOf(row));
+  };
+  const foldOrSurface = (row: SessionsRow): void => {
+    if (row.kind === "session" && row.children > 0 && !row.folded) toggleFold(row.summary.id);
+    if (row.kind === "child") setCursor(rows().findIndex((above) => isParentOf(above, row)));
+  };
+  const askPurge = async (): Promise<void> => {
+    setNotice(undefined);
+    setShowTrash(true);
+    await store.openTrash();
+    const asked = purgeIntent(trash());
+    if (asked === undefined) setNotice(alreadyEmptyNotice);
+    else setPending(asked);
+  };
+  const settledLine = async (asked: PendingTrash): Promise<string> => {
+    switch (asked.intent) {
+      case "remove":
+        return removalNotice(
+          await store.remove(asked.sessionId),
+          asked.name,
+          keys.chord("tree.trash"),
+        );
+      case "restore":
+        return restoreNotice(await store.restore(asked.sessionId), asked.name);
+      case "discard":
+        return discardNotice(await store.discard(asked.sessionId), asked.name);
+      case "purge":
+        return purgeNotice(await store.purge());
     }
+  };
+  const settle = async (asked: PendingTrash): Promise<void> => {
+    setPending(undefined);
+    setNotice(await settledLine(asked));
   };
 
   props.onAction((action) => {
@@ -186,11 +253,13 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
         setCursor(Math.max(at() - 1, 0));
         break;
       case "tree.open":
-        if (chosen?.kind === "session") props.shell.sessions.openSession(chosen.summary.id);
-        if (chosen?.kind === "trashed") ask("restore");
+        if (chosen !== undefined) open(chosen);
         break;
       case "tree.dive":
-        if (chosen?.kind === "session") dive(chosen.summary.id);
+        if (chosen !== undefined) unfoldOrDive(chosen);
+        break;
+      case "tree.surface":
+        if (chosen !== undefined) foldOrSurface(chosen);
         break;
       case "tree.remove":
         ask("remove");
@@ -200,6 +269,9 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
         break;
       case "tree.discard":
         ask("discard");
+        break;
+      case "tree.purge":
+        void askPurge();
         break;
       case "tree.refresh":
         void store.refresh();
@@ -220,53 +292,60 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
         </button>
       </div>
       <Show
-        when={sessions().length > 0}
+        when={liveRows().length > 0}
         fallback={<EmptyState line={treePane.emptyState(props.shell.keys)} />}
       >
         <ol class="kw-tree-list">
-          <For each={sessions()}>
-            {(item, index) => (
-              <li
-                class="kw-tree-session"
-                data-current={item.id === props.shell.currentSession() ? "" : undefined}
-                data-cursor={props.focused && index() === at() ? "" : undefined}
-              >
-                <button
-                  type="button"
-                  class="kw-tree-row"
-                  onClick={() => {
-                    setCursor(index());
-                    props.shell.sessions.openSession(item.id);
-                  }}
-                >
-                  <span class="kw-tree-mark" aria-hidden="true">
-                    {livenessMark(item.id, props.shell)}
-                  </span>
-                  <span class="kw-tree-title">
-                    <span class="kw-tree-name">{nameOf(item)}</span>
-                    <Show when={arcWears(props.shell.attire, item.arc)}>
-                      {(wears) => <span class="kw-tree-wears">· {wears()}</span>}
-                    </Show>
-                  </span>
-                  <span class="kw-tree-cost">{costOf(item)}</span>
-                  <span class="kw-tree-age">{relativeAge(item.lastActivityAt)}</span>
-                </button>
-                <button
-                  type="button"
-                  class="kw-tree-dive"
-                  aria-label={`tree of ${nameOf(item)}`}
-                  onClick={() => dive(item.id)}
-                >
-                  ›
-                </button>
-              </li>
-            )}
-          </For>
+          <Index each={liveRows()}>
+            {(row, index) => {
+              const chooseAndOpen = (): void => {
+                setCursor(index);
+                open(row());
+              };
+              const cursored = (): boolean => props.focused && index === at();
+              const isCurrent = (): boolean => sessionIdOf(row()) === props.shell.currentSession();
+              return (
+                <Switch>
+                  <Match when={sessionRowOf(row())}>
+                    {(session) => (
+                      <SessionRowView
+                        row={session()}
+                        name={nameOf(session().summary)}
+                        mark={livenessMark(session().summary.id, props.shell)}
+                        wears={arcWears(props.shell.attire, session().summary.arc)}
+                        cost={costOf(session().summary)}
+                        current={isCurrent()}
+                        cursor={cursored()}
+                        onOpen={chooseAndOpen}
+                        onDive={() => dive(session().summary.id)}
+                      />
+                    )}
+                  </Match>
+                  <Match when={childRowOf(row())}>
+                    {(child) => (
+                      <ChildRowView
+                        child={child().child}
+                        name={childName(child().child)}
+                        bot={botLabelOf(child().child.bot, props.shell)}
+                        current={isCurrent()}
+                        cursor={cursored()}
+                        onOpen={chooseAndOpen}
+                        onDive={() => dive(child().child.sessionId)}
+                      />
+                    )}
+                  </Match>
+                </Switch>
+              );
+            }}
+          </Index>
         </ol>
       </Show>
       <section class="kw-tree-trash" aria-label="trash" data-shown={showTrash() ? "" : undefined}>
         <button type="button" class="kw-tree-trash-head" onClick={toggleTrash}>
-          {trashHeading(showTrash(), trash().length, keys.chord("tree.trash"))}
+          {trashHeading(showTrash(), trash().length, {
+            show: keys.chord("tree.trash"),
+            empty: keys.chord("tree.purge"),
+          })}
         </button>
         <Show when={showTrash()}>
           <Show
@@ -280,13 +359,13 @@ function SessionsLevel(props: PaneProps<TreeSpec>) {
                     class="kw-tree-session"
                     data-trashed=""
                     data-cursor={
-                      props.focused && sessions().length + index() === at() ? "" : undefined
+                      props.focused && liveRows().length + index() === at() ? "" : undefined
                     }
                   >
                     <button
                       type="button"
                       class="kw-tree-row"
-                      onClick={() => setCursor(sessions().length + index())}
+                      onClick={() => setCursor(liveRows().length + index())}
                     >
                       <span class="kw-tree-mark" aria-hidden="true">
                         ·
@@ -333,11 +412,7 @@ function EntriesLevel(props: PaneProps<TreeSpec> & { sessionId: string }) {
     if (next !== undefined) setCursor(next.id);
   };
   const toggleFold = (id: string): void => {
-    setFolded((current) => {
-      const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+    setFolded((current) => toggled(current, id));
   };
   const fork = async (): Promise<void> => {
     const target = row();
@@ -492,6 +567,28 @@ function EntriesLevel(props: PaneProps<TreeSpec> & { sessionId: string }) {
 
 function livenessMark(sessionId: string, shell: ShellSeams): string {
   return shell.store.state.projections[sessionId]?.turn !== undefined ? "▓" : "░";
+}
+
+function botLabelOf(bot: string | undefined, shell: ShellSeams): string | undefined {
+  return bot === undefined ? undefined : botNamed(bot, shell.store.surfaces.state.bots);
+}
+
+function sessionRowOf(row: SessionsRow): SessionRow | undefined {
+  return row.kind === "session" ? row : undefined;
+}
+
+function childRowOf(row: SessionsRow): ChildRow | undefined {
+  return row.kind === "child" ? row : undefined;
+}
+
+function isParentOf(row: SessionsRow, child: ChildRow): boolean {
+  return row.kind === "session" && row.summary.id === child.child.parentId;
+}
+
+function toggled(set: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  const next = new Set(set);
+  if (!next.delete(key)) next.add(key);
+  return next;
 }
 
 function foldStamp(row: TreeRow): string {

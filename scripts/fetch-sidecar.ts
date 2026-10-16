@@ -38,7 +38,7 @@ export const usage = `fetch-sidecar: download the pinned keywork binary and veri
   bun scripts/fetch-sidecar.ts                        host platform into packages/desktop/sidecar/
   bun scripts/fetch-sidecar.ts --all                  every platform into packages/desktop/sidecar/<platform>-<arch>/
   bun scripts/fetch-sidecar.ts --platform linux --arch arm64
-  bun scripts/fetch-sidecar.ts --version 0.1.1        defaults to the protocol version (${protocolVersion})
+  bun scripts/fetch-sidecar.ts --version <x.y.z>      defaults to the protocol version (${protocolVersion})
 
 Nothing is written until the download matches the release's published .sha256.`;
 

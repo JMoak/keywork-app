@@ -8,9 +8,16 @@ import type {
 import { createStore } from "solid-js/store";
 import { onReconnected } from "../../shell/surfaces-store.ts";
 
-export type PermissionsClient = Pick<KeyworkClient, "permissions" | "revokeWorkspaceGrant">;
+export type PermissionsClient = Pick<
+  KeyworkClient,
+  "permissions" | "revokeWorkspaceGrant" | "revokeSessionGrant"
+>;
 
 export type PermissionsFeed = Pick<ServerFeed, "subscribe" | "onNotice">;
+
+export type Grant =
+  | { readonly layer: "workspace"; readonly rule: PermissionRule }
+  | { readonly layer: "session"; readonly rule: PermissionRule; readonly sessionId: string };
 
 export interface PermissionsState {
   readonly view: PermissionsView;
@@ -21,7 +28,7 @@ export interface PermissionsState {
 export interface PermissionsStore {
   readonly state: PermissionsState;
   refetch(): Promise<void>;
-  revoke(rule: PermissionRule): Promise<RevokeOutcome>;
+  revoke(grant: Grant): Promise<RevokeOutcome>;
   dispose(): void;
 }
 
@@ -51,14 +58,17 @@ export function createPermissionsStore(
     }
   };
 
-  const revoke = async (rule: PermissionRule): Promise<RevokeOutcome> => {
-    const outcome = await client.revokeWorkspaceGrant(rule);
+  const revoke = async (grant: Grant): Promise<RevokeOutcome> => {
+    const outcome =
+      grant.layer === "workspace"
+        ? await client.revokeWorkspaceGrant(grant.rule)
+        : await client.revokeSessionGrant(grant.sessionId, grant.rule);
     await refetch();
     return outcome;
   };
 
   const stopFollowing = feed.subscribe((envelopes) => {
-    if (envelopes.some(recordsGrant)) void refetch();
+    if (envelopes.some(changesPermissions)) void refetch();
   });
   const stopReloading = onReconnected(feed, () => void refetch());
 
@@ -71,6 +81,11 @@ export function createPermissionsStore(
       stopReloading();
     },
   };
+}
+
+export function changesPermissions(envelope: BusEnvelope): boolean {
+  if (envelope.type === "surface.changed") return envelope.payload.kind === "permissions";
+  return recordsGrant(envelope);
 }
 
 export function recordsGrant(envelope: BusEnvelope): boolean {

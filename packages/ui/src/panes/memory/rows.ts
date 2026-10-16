@@ -12,6 +12,9 @@ import type {
   StagedItem,
   StagedWrite,
 } from "@keywork-app/protocol";
+import type { EntryDecisions } from "../../shell/memory-store.ts";
+import type { NeedsYouItem } from "../../shell/needs-you.ts";
+import { triageOdds } from "./decisions.ts";
 
 export type MemoryRow =
   | { id: string; kind: "layer"; layer: MemoryLayer; tally: LayerTally }
@@ -44,6 +47,7 @@ export interface InboxView {
   readonly provenance: Provenance;
   readonly detail?: string;
   readonly note?: string;
+  readonly odds?: string;
 }
 
 export const inboxGroups: readonly InboxGroup[] = [
@@ -59,6 +63,7 @@ export interface GardenInputs {
   readonly notes: readonly MemoryNote[];
   readonly dates: readonly string[];
   readonly hits?: readonly MemoryQueryHit[] | undefined;
+  readonly entryDecisions?: EntryDecisions;
 }
 
 export function gardenSections(inputs: GardenInputs): MemorySection[] {
@@ -66,13 +71,27 @@ export function gardenSections(inputs: GardenInputs): MemorySection[] {
     ...hitSections(inputs.hits),
     ...layerSections(inputs.garden.layers, inputs.notes),
     ...dailySection(inputs.dates),
-    ...inboxSections(inputs.garden.inbox),
+    ...inboxSections(inputs.garden.inbox, inputs.entryDecisions ?? {}),
     ...airlockSections(inputs.garden.airlocks),
   ];
 }
 
 export function flatRows(sections: readonly MemorySection[]): MemoryRow[] {
   return sections.flatMap((section) => section.rows);
+}
+
+export function rowRevealing(rows: readonly MemoryRow[], item: NeedsYouItem): string | undefined {
+  switch (item.kind) {
+    case "inbox":
+      return rows.find((row) => row.kind === "inbox" && row.item.id === item.itemId)?.id;
+    case "airlock":
+      return (
+        rows.find((row) => undecidedIn(row, item.arc)) ??
+        rows.find((row) => row.kind === "finish" && row.arc === item.arc)
+      )?.id;
+    default:
+      return undefined;
+  }
 }
 
 export function layerTallyOf(notes: readonly MemoryNote[]): LayerTally {
@@ -98,6 +117,12 @@ export function newestFirst(ledger: readonly LedgerEntry[]): LedgerEntry[] {
 
 export function noteNameOf(path: string): string {
   return path.replace(/^entities\//, "").replace(/\.md$/, "");
+}
+
+function undecidedIn(row: MemoryRow, arc: string): boolean {
+  if (row.kind === "candidate") return row.arc === arc && row.candidate.choice === undefined;
+  if (row.kind === "question") return row.arc === arc && row.question.choice === undefined;
+  return false;
 }
 
 function hitSections(hits: readonly MemoryQueryHit[] | undefined): MemorySection[] {
@@ -141,13 +166,16 @@ function dailySection(dates: readonly string[]): MemorySection[] {
   ];
 }
 
-function inboxSections(inbox: readonly StagedItem[]): MemorySection[] {
+function inboxSections(
+  inbox: readonly StagedItem[],
+  entryDecisions: EntryDecisions,
+): MemorySection[] {
   const rows = inbox.map(
     (item): Extract<MemoryRow, { kind: "inbox" }> => ({
       id: `inbox:${item.id}`,
       kind: "inbox",
       item,
-      view: inboxView(item),
+      view: decidedView(item, entryDecisions),
     }),
   );
   return inboxGroups.flatMap((group) => {
@@ -261,6 +289,12 @@ export function inboxView(item: StagedItem): InboxView {
         detail: `${item.uses} uses, ${item.patches} patches, ${item.rewrites} rewrites`,
       };
   }
+}
+
+function decidedView(item: StagedItem, entryDecisions: EntryDecisions): InboxView {
+  const view = inboxView(item);
+  const odds = triageOdds(item, entryDecisions);
+  return odds === undefined ? view : { ...view, odds };
 }
 
 function stagedWriteView(item: StagedWrite): InboxView {

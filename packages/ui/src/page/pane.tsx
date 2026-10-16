@@ -1,17 +1,28 @@
 import {
   type AssistantEntry,
   type NoticeEntry,
+  type PathMark,
   type SessionProjection,
   type ThinkingEntry,
   type ToolEntry,
   type TranscriptEntry,
+  type TranscriptLedger,
+  type TurnLedger,
   toolRowSpans,
   type UserEntry,
 } from "@keywork-app/client";
-import type { AnswerOutcome, AskScope, AskVerdict } from "@keywork-app/protocol";
-import { For, type JSX, Match, Show, Switch } from "solid-js";
+import type {
+  AnswerOutcome,
+  AskScope,
+  AskVerdict,
+  PermissionAsk,
+  RememberedScope,
+} from "@keywork-app/protocol";
+import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { AskCard, type AskChords } from "./ask-card.tsx";
+import { type BotLabel, childRowSpans, openChildHint, plainBot } from "./child-row.ts";
+import { LedgerLine, type LedgerVerbs, ledgerFacts, markText } from "./ledger.tsx";
 import { Markdown } from "./markdown.tsx";
 import "./page.css";
 
@@ -21,11 +32,20 @@ export type AskAnswerHandler = (
   scope?: AskScope,
 ) => Promise<AnswerOutcome> | undefined;
 
+export type AskAcceptance = (ask: PermissionAsk) => RememberedScope | undefined;
+
 export interface ConversationPaneProps {
   projection: SessionProjection;
   title?: string | undefined;
   onAnswerAsk?: AskAnswerHandler | undefined;
   askChords?: AskChords | undefined;
+  quiet?: boolean | undefined;
+  onOpenSession?: ((sessionId: string) => void) | undefined;
+  botLabel?: BotLabel | undefined;
+  askAccepted?: AskAcceptance | undefined;
+  ledger?: TranscriptLedger | undefined;
+  ledgerVerbs?: LedgerVerbs | undefined;
+  redoable?: boolean | undefined;
 }
 
 export type Voice = "user" | "agent" | "machine" | "blank";
@@ -41,19 +61,43 @@ export function ConversationPane(props: ConversationPaneProps) {
   const [folds, setFolds] = createStore<Record<number, boolean>>({});
   const unfolded = (index: number): boolean => folds[index] === true;
   const toggle = (index: number): void => setFolds(index, !unfolded(index));
+  const [ledgerFolds, setLedgerFolds] = createStore<Record<number, boolean>>({});
+  const closingAt = createMemo(
+    () => new Map((props.ledger?.turns ?? []).map((turn) => [turn.end, turn])),
+  );
   return (
     <section class="kw-pane" aria-label="conversation">
       <ol class="kw-transcript">
+        <For each={props.ledger?.opening ?? []}>
+          {(mark) => <MarkRow mark={mark} redoable={props.redoable} />}
+        </For>
         <For each={props.projection.entries}>
           {(entry, index) => (
-            <Entry
-              entry={entry}
-              streaming={props.projection.streaming === index()}
-              unfolded={unfolded(index())}
-              onToggle={() => toggle(index())}
-              onAnswerAsk={props.onAnswerAsk}
-              askChords={props.askChords}
-            />
+            <>
+              <Entry
+                entry={entry}
+                streaming={props.projection.streaming === index()}
+                unfolded={unfolded(index())}
+                onToggle={() => toggle(index())}
+                onAnswerAsk={props.onAnswerAsk}
+                askChords={props.askChords}
+                quiet={props.quiet}
+                onOpenSession={props.onOpenSession}
+                botLabel={props.botLabel}
+                askAccepted={props.askAccepted}
+              />
+              <Show when={closingAt().get(index())}>
+                {(turn) => (
+                  <TurnClose
+                    turn={turn()}
+                    verbs={props.ledgerVerbs}
+                    redoable={props.redoable}
+                    unfolded={ledgerFolds[turn().head] === true}
+                    onToggle={() => setLedgerFolds(turn().head, (open) => !open)}
+                  />
+                )}
+              </Show>
+            </>
           )}
         </For>
       </ol>
@@ -81,6 +125,10 @@ interface EntryProps {
   onToggle: () => void;
   onAnswerAsk?: AskAnswerHandler | undefined;
   askChords?: AskChords | undefined;
+  quiet?: boolean | undefined;
+  onOpenSession?: ((sessionId: string) => void) | undefined;
+  botLabel?: BotLabel | undefined;
+  askAccepted?: AskAcceptance | undefined;
 }
 
 function Entry(props: EntryProps) {
@@ -137,6 +185,10 @@ function Entry(props: EntryProps) {
             onToggle={() => props.onToggle()}
             onAnswerAsk={props.onAnswerAsk}
             askChords={props.askChords}
+            quiet={props.quiet}
+            onOpenSession={props.onOpenSession}
+            botLabel={props.botLabel}
+            askAccepted={props.askAccepted}
           />
         )}
       </Match>
@@ -201,16 +253,34 @@ interface ToolRowProps {
   onToggle: () => void;
   onAnswerAsk?: AskAnswerHandler | undefined;
   askChords?: AskChords | undefined;
+  quiet?: boolean | undefined;
+  onOpenSession?: ((sessionId: string) => void) | undefined;
+  botLabel?: BotLabel | undefined;
+  askAccepted?: AskAcceptance | undefined;
 }
 
 function ToolRow(props: ToolRowProps) {
   const run = () => props.tool.run;
-  const spans = () => toolRowSpans(run());
+  const openableChild = (): string | undefined =>
+    props.onOpenSession === undefined ? undefined : run().child?.sessionId;
+  const spans = () => {
+    const child = run().child;
+    if (child === undefined) return toolRowSpans(run());
+    const row = childRowSpans(run(), child, props.botLabel ?? plainBot);
+    return openableChild() === undefined ? row : [...row, openChildHint];
+  };
   const disclosable = () => run().detail !== undefined && run().detail?.length !== 0;
+  const actionable = () => disclosable() || openableChild() !== undefined;
+  const activate = (): void => {
+    const child = openableChild();
+    if (child === undefined) props.onToggle();
+    else props.onOpenSession?.(child);
+  };
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    props.onToggle();
+    if (event.key === "Enter") activate();
+    else if (disclosable()) props.onToggle();
   };
   const spanElements = () => (
     <For each={spans()}>
@@ -229,7 +299,7 @@ function ToolRow(props: ToolRowProps) {
       onStamp={disclosable() ? props.onToggle : undefined}
     >
       <Show
-        when={disclosable()}
+        when={actionable()}
         fallback={
           <div class="kw-tool" data-phase={run().phase}>
             {spanElements()}
@@ -240,8 +310,9 @@ function ToolRow(props: ToolRowProps) {
           type="button"
           class="kw-tool"
           data-phase={run().phase}
-          aria-expanded={props.unfolded}
-          onClick={() => props.onToggle()}
+          data-child={run().child === undefined ? undefined : ""}
+          aria-expanded={disclosable() ? props.unfolded : undefined}
+          onClick={activate}
           onKeyDown={onKey}
         >
           {spanElements()}
@@ -252,6 +323,8 @@ function ToolRow(props: ToolRowProps) {
           run={run()}
           onAnswer={(verdict, scope) => props.onAnswerAsk?.(run().callId, verdict, scope)}
           chords={props.askChords}
+          quiet={props.quiet}
+          accepted={acceptedScopeOf(run(), props.askAccepted)}
         />
       </Show>
       <Show when={props.unfolded && disclosable()}>
@@ -259,6 +332,51 @@ function ToolRow(props: ToolRowProps) {
       </Show>
     </Row>
   );
+}
+
+interface TurnCloseProps {
+  turn: TurnLedger;
+  verbs?: LedgerVerbs | undefined;
+  redoable?: boolean | undefined;
+  unfolded: boolean;
+  onToggle: () => void;
+}
+
+function TurnClose(props: TurnCloseProps) {
+  return (
+    <>
+      <Show when={ledgerFacts(props.turn).length > 0}>
+        <Row voice="blank">
+          <LedgerLine
+            turn={props.turn}
+            verbs={props.verbs}
+            unfolded={props.unfolded}
+            onToggle={() => props.onToggle()}
+          />
+        </Row>
+      </Show>
+      <For each={props.turn.place?.marks ?? []}>
+        {(mark) => <MarkRow mark={mark} redoable={props.redoable} />}
+      </For>
+    </>
+  );
+}
+
+function MarkRow(props: { mark: PathMark; redoable?: boolean | undefined }) {
+  return (
+    <Row voice="blank">
+      <p class="kw-notice" data-mark={props.mark.kind}>
+        {markText(props.mark, props.redoable === true)}
+      </p>
+    </Row>
+  );
+}
+
+function acceptedScopeOf(
+  run: ToolEntry["run"],
+  accepted: AskAcceptance | undefined,
+): RememberedScope | undefined {
+  return run.ask === undefined ? undefined : accepted?.(run.ask);
 }
 
 function as<T extends TranscriptEntry>(entry: TranscriptEntry, kind: T["kind"]): T | undefined {

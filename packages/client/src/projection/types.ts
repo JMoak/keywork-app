@@ -1,11 +1,15 @@
 import type {
+  ChildOutcome,
   ContextInjection,
+  MemoryDecision,
   PermissionAsk,
   PermissionDecision,
   PromptOrigin,
   QueuedPrompt,
+  RefusedCall,
   SessionState,
   SpillReference,
+  Usage,
 } from "@keywork-app/protocol";
 
 export interface SessionProjection {
@@ -20,6 +24,7 @@ export interface SessionProjection {
   readonly standing: SessionState | undefined;
   readonly usage: UsageLedger;
   readonly injections: readonly ContextInjection[];
+  readonly memoryDecisions: readonly MemoryDecision[];
   readonly diagnostics: Readonly<Record<string, number>>;
   readonly lastError: string | undefined;
   readonly lastEventId: number | undefined;
@@ -96,7 +101,21 @@ export interface ToolRun {
   readonly spill: SpillReference | undefined;
   readonly decision: PermissionDecision | undefined;
   readonly ask: PermissionAsk | undefined;
+  readonly child: ChildMark | undefined;
+  readonly recall: MemoryDecision | undefined;
 }
+
+export interface ChildMark {
+  readonly title: string;
+  readonly sessionId: string | undefined;
+  readonly bot: string | undefined;
+  readonly outcome: ChildOutcome | undefined;
+  readonly usage: Usage | undefined;
+  readonly costNanos: number | undefined;
+  readonly refused: readonly RefusedCall[] | undefined;
+}
+
+export type ChildState = "running" | ChildOutcome;
 
 export const emptyUsage: UsageLedger = {
   inputTokens: 0,
@@ -121,6 +140,7 @@ export const emptyProjection: SessionProjection = {
   standing: undefined,
   usage: emptyUsage,
   injections: [],
+  memoryDecisions: [],
   diagnostics: {},
   lastError: undefined,
   lastEventId: undefined,

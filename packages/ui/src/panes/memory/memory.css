@@ -170,6 +170,36 @@
   padding: 0.1rem 0;
 }
 
+.kw-memory-fold {
+  padding: 0.1rem 0.75rem 0.35rem 2.75rem;
+  color: var(--kw-text-mid);
+}
+.kw-memory-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.kw-memory-candidate {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.kw-memory-verdict {
+  min-width: 7ch;
+  color: var(--kw-text-dim);
+}
+.kw-memory-candidate[data-verdict="kept"] > .kw-memory-verdict {
+  color: var(--kw-success);
+}
+.kw-memory-candidate > .kw-memory-fact,
+.kw-memory-rule {
+  color: var(--kw-text-dim);
+}
+.kw-memory-rule {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
 @container memory (max-width: 559.98px) {
   .kw-memory-facts {
     display: none;

@@ -69,4 +69,4 @@ export type TrustRefusal = "untrusted" | "home";
 
 export type TrustOutcome = TrustGrant | { refused: TrustRefusal; message: string };
 
-export type SurfaceKind = "mcp" | "arcs" | "bots" | "workspaces";
+export type SurfaceKind = "mcp" | "arcs" | "bots" | "workspaces" | "permissions";

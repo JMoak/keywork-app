@@ -103,7 +103,7 @@ const host = {
   openExternal: (url: string) => ipcRenderer.invoke(hostChannels.openExternal, url),
   notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
   onNotificationActivated: subscribe(hostChannels.notificationActivated),
-  setPendingAsks: (count: number) => ipcRenderer.invoke(hostChannels.setPendingAsks, count),
+  setNeedsYou: (count: number) => ipcRenderer.invoke(hostChannels.setNeedsYou, count),
   saveAs: (suggestedName: string, text: string) =>
     ipcRenderer.invoke(hostChannels.saveAs, { suggestedName, text }),
   onServerLost: subscribe(hostChannels.serverLost),

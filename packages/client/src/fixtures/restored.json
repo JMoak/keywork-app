@@ -1,0 +1,199 @@
+{
+  "restored": {
+    "status": 200,
+    "body": {
+      "turn": 1,
+      "prompt": {
+        "entryId": "q5",
+        "text": "write two lines to notes.txt"
+      },
+      "leafId": "q3",
+      "undoneTurns": 2,
+      "files": [
+        {
+          "path": "notes.txt",
+          "added": 0,
+          "deleted": 2
+        }
+      ],
+      "filesNote": "files put back",
+      "undoable": true,
+      "redoable": true
+    }
+  },
+  "restoreUnknownTurn": {
+    "status": 404,
+    "body": {
+      "error": "no turn 9 on this session's path"
+    }
+  },
+  "restoreMalformed": {
+    "status": 400,
+    "body": {
+      "error": "the body must be { turn: a positive integer }"
+    }
+  },
+  "redo": {
+    "status": 200,
+    "body": {
+      "restored": true,
+      "undoable": true,
+      "redoable": false
+    }
+  },
+  "entries": {
+    "status": 200,
+    "body": {
+      "sessionId": "s1",
+      "leafId": "q4",
+      "entries": [
+        {
+          "type": "custom",
+          "customType": "permission_decision",
+          "data": {
+            "decision": {
+              "tool": "write",
+              "callId": "w1",
+              "verdict": "granted",
+              "gate": "policy"
+            }
+          },
+          "id": "q6",
+          "parentId": null,
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "user",
+            "parts": [
+              {
+                "type": "text",
+                "text": "write two lines to notes.txt"
+              }
+            ]
+          },
+          "checkpoint": "<sha>",
+          "id": "q5",
+          "parentId": "q6",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "assistant",
+            "parts": [
+              {
+                "type": "tool-call",
+                "callId": "w1",
+                "name": "write",
+                "arguments": {
+                  "path": "notes.txt",
+                  "content": "one\ntwo\n"
+                }
+              }
+            ]
+          },
+          "id": "q7",
+          "parentId": "q5",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "tool",
+            "parts": [
+              {
+                "type": "tool-result",
+                "callId": "w1",
+                "output": "Wrote 8 characters to notes.txt",
+                "isError": false
+              }
+            ]
+          },
+          "id": "q8",
+          "parentId": "q7",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "assistant",
+            "parts": [
+              {
+                "type": "text",
+                "text": "Wrote notes.txt."
+              }
+            ]
+          },
+          "id": "q1",
+          "parentId": "q8",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "user",
+            "parts": [
+              {
+                "type": "text",
+                "text": "now say done"
+              }
+            ]
+          },
+          "id": "q9",
+          "parentId": "q1",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "message",
+          "message": {
+            "role": "assistant",
+            "parts": [
+              {
+                "type": "text",
+                "text": "Done."
+              }
+            ]
+          },
+          "id": "q2",
+          "parentId": "q9",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "custom",
+          "customType": "restore",
+          "data": {
+            "turn": 1,
+            "from": "q2",
+            "files": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+          },
+          "id": "q3",
+          "parentId": "q6",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "custom",
+          "customType": "restore-undone",
+          "data": {
+            "restore": "q3"
+          },
+          "id": "q4",
+          "parentId": "q2",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        }
+      ],
+      "labels": {},
+      "activePath": [
+        "q6",
+        "q5",
+        "q7",
+        "q8",
+        "q1",
+        "q9",
+        "q2",
+        "q4"
+      ]
+    }
+  }
+}

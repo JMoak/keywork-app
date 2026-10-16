@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type { BusEnvelope, PermissionRule } from "@keywork-app/protocol";
+import { type BusEnvelope, isGrantAheadRefusal, type PermissionRule } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { type Fetch, keyworkClient, ServerRefusal } from "./client.ts";
 import { projectAll } from "./projection/project.ts";
@@ -21,7 +21,14 @@ type GrantAnswers = Record<
   | "revoked"
   | "revokedAgain"
   | "revokeMalformed"
-  | "afterRevoke",
+  | "afterRevoke"
+  | "grantedWorkspace"
+  | "grantedSession"
+  | "grantWrite"
+  | "grantDelete"
+  | "grantMalformed"
+  | "grantUnknownSession"
+  | "afterGrant",
   Recorded
 >;
 
@@ -30,27 +37,40 @@ const fixture = (name: string): URL => new URL(`./fixtures/${name}`, import.meta
 const answers = async (): Promise<GrantAnswers> =>
   JSON.parse(await readFile(fixture("grants.json"), "utf8")) as GrantAnswers;
 
-async function grantRuns(): Promise<ToolRun[]> {
+async function grantEnvelopes(): Promise<BusEnvelope[]> {
   const text = await readFile(fixture("grants.jsonl"), "utf8");
-  const envelopes = text
+  return text
     .split("\n")
     .filter((line) => line !== "")
     .map((line) => JSON.parse(line) as BusEnvelope);
+}
+
+async function grantRuns(): Promise<ToolRun[]> {
+  return runsOf(await grantEnvelopes());
+}
+
+function runsOf(envelopes: readonly BusEnvelope[]): ToolRun[] {
   return projectAll(emptyProjection, envelopes).entries.flatMap((entry) =>
     entry.kind === "tool" ? [entry.run] : [],
   );
 }
 
-function answering(recorded: Recorded): { bodies: unknown[]; fetch: Fetch } {
+function answering(recorded: Recorded): { bodies: unknown[]; urls: string[]; fetch: Fetch } {
   const bodies: unknown[] = [];
-  const fetch: Fetch = async (_url, init = {}) => {
+  const urls: string[] = [];
+  const fetch: Fetch = async (url, init = {}) => {
+    urls.push(url);
     bodies.push(typeof init.body === "string" ? JSON.parse(init.body) : undefined);
     return new Response(JSON.stringify(recorded.body), { status: recorded.status });
   };
-  return { bodies, fetch };
+  return { bodies, urls, fetch };
 }
 
 const gitAdd: PermissionRule = { action: "bash", resource: "git add *", effect: "allow" };
+
+const npmRun: PermissionRule = { action: "bash", resource: "npm run *", effect: "allow" };
+
+const notesPreview = { path: "notes.txt", before: null, after: "one\ntwo\n" };
 
 describe("answering asks with a scope", () => {
   it("posts the scope beside the verdict and omits it when none is given", async () => {
@@ -90,6 +110,12 @@ describe("answering asks with a scope", () => {
     const [pending] = await keyworkClient(ticket, { fetch }).asks();
     expect(pending).toMatchObject({ callId: "g4", tool: "write", rules: [] });
   });
+
+  it("carries a write's preview on its pending ask: the file as it is and as the call would leave it", async () => {
+    const { fetch } = answering((await answers()).pendingWrite);
+    const [pending] = await keyworkClient(ticket, { fetch }).asks();
+    expect(pending?.preview).toEqual(notesPreview);
+  });
 });
 
 describe("the permissions routes", () => {
@@ -127,6 +153,78 @@ describe("the permissions routes", () => {
       refused: "invalid",
     });
   });
+
+  it("revokes a session grant on that session's own route and reads a 404 as missing", async () => {
+    const urls: string[] = [];
+    const missing = { error: "that session holds no grant matching that rule" };
+    const fetch: Fetch = async (url) => {
+      urls.push(String(url));
+      return urls.length === 1
+        ? new Response(JSON.stringify({ revoked: gitAdd }), { status: 200 })
+        : new Response(JSON.stringify(missing), { status: 404 });
+    };
+    const client = keyworkClient(ticket, { fetch });
+    expect(await client.revokeSessionGrant("s 1", gitAdd)).toEqual({ revoked: gitAdd });
+    expect(await client.revokeSessionGrant("s 1", gitAdd)).toEqual({
+      refused: "missing",
+      detail: "that session holds no grant matching that rule",
+    });
+    expect(urls[0]).toBe("http://127.0.0.1:4770/permissions/session/s%201/revoke");
+  });
+});
+
+describe("granting ahead of an ask", () => {
+  const clientAnswering = (recorded: Recorded) =>
+    keyworkClient(ticket, { fetch: answering(recorded).fetch });
+
+  it("records a workspace rule and a session rule on their own routes, posting the rule alone", async () => {
+    const recorded = await answers();
+    const workspace = answering(recorded.grantedWorkspace);
+    const session = answering(recorded.grantedSession);
+    expect(
+      await keyworkClient(ticket, { fetch: workspace.fetch }).grantWorkspaceRule(gitAdd),
+    ).toEqual({ granted: gitAdd });
+    expect(
+      await keyworkClient(ticket, { fetch: session.fetch }).grantSessionRule("s 1", npmRun),
+    ).toEqual({ granted: npmRun });
+    expect([...workspace.urls, ...session.urls]).toEqual([
+      "http://127.0.0.1:4770/permissions/workspace/grant",
+      "http://127.0.0.1:4770/permissions/session/s%201/grant",
+    ]);
+    expect([...workspace.bodies, ...session.bodies]).toEqual([{ rule: gitAdd }, { rule: npmRun }]);
+  });
+
+  it("reads a rule no answered ask would record as declined, in keywork's own words", async () => {
+    const recorded = await answers();
+    const writeAnything: PermissionRule = { action: "write", resource: "*", effect: "allow" };
+    const removeAnything: PermissionRule = { action: "bash", resource: "rm *", effect: "allow" };
+    expect(await clientAnswering(recorded.grantWrite).grantWorkspaceRule(writeAnything)).toEqual({
+      refused: "declined",
+      detail: "write and edit are approved once at a time",
+    });
+    expect(await clientAnswering(recorded.grantDelete).grantWorkspaceRule(removeAnything)).toEqual({
+      refused: "declined",
+      detail: "rm is remembered only as the exact command, never under a wildcard",
+    });
+  });
+
+  it("reads a malformed rule as invalid and an unknown session as missing", async () => {
+    const recorded = await answers();
+    const malformed = await clientAnswering(recorded.grantMalformed).grantWorkspaceRule(gitAdd);
+    expect(malformed).toMatchObject({ refused: "invalid" });
+    expect(isGrantAheadRefusal(malformed)).toBe(true);
+    expect(
+      await clientAnswering(recorded.grantUnknownSession).grantSessionRule("nobody", npmRun),
+    ).toEqual({ refused: "missing", detail: "no session has that id" });
+  });
+
+  it("lists a rule granted ahead exactly where an answered grant sits", async () => {
+    const view = await clientAnswering((await answers()).afterGrant).permissions();
+    expect(view.workspace).toEqual([gitAdd]);
+    expect(view.session).toEqual({
+      s1: [{ action: "bash", resource: "mkdir -p *", effect: "allow" }, npmRun],
+    });
+  });
 });
 
 describe("the grants fixture projected", () => {
@@ -155,5 +253,32 @@ describe("the grants fixture projected", () => {
       ["g4", []],
       ["g5", []],
     ]);
+  });
+
+  it("previews the write on its ask and on the asking run, and previews no bash call", async () => {
+    const stream = await grantEnvelopes();
+    const asks = stream.flatMap((envelope) =>
+      envelope.type === "gate.ask" ? [envelope.payload.ask] : [],
+    );
+    expect(asks.map((ask) => [ask.callId, ask.preview])).toEqual([
+      ["g1", undefined],
+      ["g3", undefined],
+      ["g4", notesPreview],
+      ["g5", undefined],
+    ]);
+    const asked = stream.findIndex(
+      (envelope) => envelope.type === "gate.ask" && envelope.payload.ask.callId === "g4",
+    );
+    const asking = runsOf(stream.slice(0, asked + 1)).find((run) => run.callId === "g4");
+    expect(asking).toMatchObject({ phase: "asking", ask: { preview: notesPreview } });
+  });
+
+  it("names permissions as changed after each remembered answer, the revoke and both grants ahead", async () => {
+    const changed = (await grantEnvelopes()).filter(
+      (envelope) => envelope.type === "surface.changed",
+    );
+    expect(changed.map((envelope) => [envelope.sessionId, envelope.payload])).toEqual(
+      Array.from({ length: 5 }, () => ["", { kind: "permissions" }]),
+    );
   });
 });

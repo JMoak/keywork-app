@@ -31,35 +31,35 @@ describe("windowRegistry", () => {
     expect(registry.placeFor("C:/b")).toEqual({ kind: "reuse", windowId: 2 });
   });
 
-  it("orders the list by activity and counts pending asks per workspace, not per window", () => {
+  it("orders the list by activity and counts what needs you per workspace, not per window", () => {
     const registry = windowRegistry();
     registry.add(1, "C:/a");
     registry.add(2, "C:/b");
     registry.add(3, "C:/a");
-    registry.setPendingAsks(1, 2);
-    registry.setPendingAsks(3, 2);
-    registry.setPendingAsks(2, 1);
+    registry.setNeedsYou(1, 2);
+    registry.setNeedsYou(3, 2);
+    registry.setNeedsYou(2, 1);
     expect(registry.list()).toEqual([
-      { workspace: "C:/a", windows: 2, pendingAsks: 2 },
-      { workspace: "C:/b", windows: 1, pendingAsks: 1 },
+      { workspace: "C:/a", windows: 2, needsYou: 2 },
+      { workspace: "C:/b", windows: 1, needsYou: 1 },
     ]);
-    expect(registry.pendingAsks()).toBe(3);
+    expect(registry.needsYou()).toBe(3);
     registry.focused(2);
     expect(registry.mostRecentlyActive()).toBe(2);
     expect(registry.list()[0]?.workspace).toBe("C:/b");
     registry.remove(2);
-    expect(registry.pendingAsks()).toBe(2);
+    expect(registry.needsYou()).toBe(2);
     expect(registry.mostRecentlyActive()).toBe(3);
   });
 
-  it("ignores asks from a window with no workspace and clamps negatives", () => {
+  it("ignores a count from a window with no workspace and clamps negatives", () => {
     const registry = windowRegistry();
     registry.add(1);
-    registry.setPendingAsks(1, 4);
-    expect(registry.pendingAsks()).toBe(0);
+    registry.setNeedsYou(1, 4);
+    expect(registry.needsYou()).toBe(0);
     registry.bind(1, "C:/a");
-    registry.setPendingAsks(1, -3);
-    expect(registry.pendingAsks()).toBe(0);
+    registry.setNeedsYou(1, -3);
+    expect(registry.needsYou()).toBe(0);
   });
 
   it("announces every change once", () => {
@@ -70,7 +70,7 @@ describe("windowRegistry", () => {
     });
     registry.add(1);
     registry.bind(1, "C:/a");
-    registry.setPendingAsks(1, 1);
+    registry.setNeedsYou(1, 1);
     registry.unbind(1);
     registry.unbind(1);
     stop();

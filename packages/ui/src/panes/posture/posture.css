@@ -1,0 +1,45 @@
+.kw-setup {
+  overflow: auto;
+}
+
+.kw-setup .kw-setup-offers {
+  flex: none;
+  overflow: visible;
+}
+
+.kw-setup-heading {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.15rem;
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+
+.kw-setup-reads,
+.kw-setup-quiet {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-setup-quiet {
+  color: var(--kw-text-dim);
+}
+
+.kw-setup-asks {
+  display: grid;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+}
+
+.kw-setup-ask,
+.kw-setup-rule {
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-setup-ask {
+  color: var(--kw-text-dim);
+}

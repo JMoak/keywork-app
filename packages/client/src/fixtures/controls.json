@@ -58,6 +58,32 @@
       "flushAt": 175424,
       "compactAt": 183616,
       "declared": false,
+      "parts": {
+        "system": {
+          "tokens": 137,
+          "basis": "estimated"
+        },
+        "tools": {
+          "tokens": 1728,
+          "basis": "estimated"
+        },
+        "injected": {
+          "tokens": 0,
+          "basis": "estimated"
+        },
+        "conversation": {
+          "tokens": 13,
+          "basis": "estimated"
+        },
+        "free": {
+          "tokens": 198122,
+          "basis": "estimated"
+        }
+      },
+      "thresholds": {
+        "flushAt": 177289,
+        "compactAt": 185481
+      },
       "fullness": 0.00007079993028929941,
       "flushDue": false,
       "compactionDue": false,

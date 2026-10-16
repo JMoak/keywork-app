@@ -1,5 +1,5 @@
 import type { Usage } from "./events.ts";
-import type { CompactionEntry } from "./sessions.ts";
+import type { ChangedPath, CompactionEntry } from "./sessions.ts";
 
 export const effortLevels = ["low", "medium", "high", "xhigh", "max"] as const;
 
@@ -83,6 +83,17 @@ export interface Redone {
   redoable: boolean;
 }
 
+export interface TurnRestored {
+  turn: number;
+  prompt: UndonePrompt;
+  leafId: string | null;
+  undoneTurns: number;
+  files: readonly ChangedPath[];
+  filesNote: string;
+  undoable: boolean;
+  redoable: boolean;
+}
+
 export interface ContextReport {
   used: number;
   window: number;
@@ -93,6 +104,28 @@ export interface ContextReport {
   flushDue: boolean;
   compactionDue: boolean;
   basis: "estimated";
+  parts: ContextParts;
+  thresholds: ContextThresholds;
+}
+
+export interface ContextParts {
+  system: ContextPart;
+  tools: ContextPart;
+  injected: ContextPart;
+  conversation: ContextPart;
+  free: ContextPart;
+}
+
+export interface ContextPart {
+  tokens: number;
+  basis: ContextBasis;
+}
+
+export type ContextBasis = "reported" | "estimated";
+
+export interface ContextThresholds {
+  flushAt: number;
+  compactAt: number;
 }
 
 export interface CostRollup {
@@ -164,6 +197,7 @@ export type EffortReading = SessionVerbReading<EffortSwitch>;
 export type CompactReading = SessionVerbReading<Compacted>;
 export type UndoReading = SessionVerbReading<Undone>;
 export type RedoReading = SessionVerbReading<Redone>;
+export type TurnRestoreReading = SessionVerbReading<TurnRestored>;
 export type ExportReading = SessionVerbReading<ExportedSession>;
 export type RenameReading = SessionVerbReading<Renamed>;
 export type ContextReading = ContextReport | "missing";

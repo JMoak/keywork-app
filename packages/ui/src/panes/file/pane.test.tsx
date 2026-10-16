@@ -1,15 +1,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { KeyworkClient } from "@keywork-app/client";
-import type { FileRange, FileReading, FileSlice } from "@keywork-app/protocol";
+import type { FileRange, FileReading, FileSlice, TreeEntry } from "@keywork-app/protocol";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fileWhole from "../../../../client/src/fixtures/file.json?raw";
 import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
 import { holdTypingFocus } from "../overview/rows.test.tsx";
-import type { ShellSeams } from "../registry.ts";
+import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { describeRefusal, type FileSpec, filePane } from "./index.tsx";
 
 interface FakeMount {
@@ -48,13 +49,22 @@ interface Harness {
   external: string[];
 }
 
-function harness(answer: (path: string, range?: FileRange) => FileReading): Harness {
+type Folders = Readonly<Record<string, readonly TreeEntry[]>>;
+
+function harness(
+  answer: (path: string, range?: FileRange) => FileReading,
+  folders: Folders = {},
+): Harness {
   const requests: Array<[string, FileRange | undefined]> = [];
   const external: string[] = [];
   const client = inertWorkspaceClient({
     file: async (path, range) => {
       requests.push([path, range]);
       return answer(path, range);
+    },
+    tree: async (path) => {
+      const entries = folders[path];
+      return entries === undefined ? "missing" : { path, entries };
     },
   }) as unknown as KeyworkClient;
   const host = browserHost();
@@ -179,6 +189,63 @@ describe("the file pane", () => {
     const { view } = mount(h, { kind: "file", path: "empty.txt" });
     await waitFor(() => expect(view.container.textContent).toContain("an empty file"));
     expect(filePane.title({ kind: "file", path: "src/a.ts" }, h.shell)).toBe("src/a.ts");
+  });
+});
+
+describe("the file pane given a folder", () => {
+  const file = (name: string): TreeEntry => ({ name, kind: "file", ignored: false, hidden: false });
+  const dir = (name: string): TreeEntry => ({ name, kind: "dir", ignored: false, hidden: false });
+  const readmeOnly = (path: string): FileReading =>
+    path.endsWith("README.md") ? whole : "missing";
+
+  function mountFollowingRebinds(h: Harness, spec: FileSpec) {
+    const [current, setCurrent] = createSignal(spec);
+    h.shell.rebind = (_id, next: PaneSpecBase) => setCurrent(next as FileSpec);
+    render(() => (
+      <filePane.component
+        id="p1"
+        spec={current()}
+        focused={true}
+        shell={h.shell}
+        onAction={() => {}}
+      />
+    ));
+    return current;
+  }
+
+  it("opens the workspace README when /open has no file the agent touched", async () => {
+    const h = harness(readmeOnly, { "": [dir("src"), file("README.md")] });
+    const opened = await filePane.summon?.spec(h.shell);
+    expect(opened).toEqual({ kind: "file", path: "" });
+    const spec = mountFollowingRebinds(h, opened as FileSpec);
+    await waitFor(() => expect(spec()).toEqual({ kind: "file", path: "README.md" }));
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    expect(h.requests.map(([path]) => path)).toEqual(["", "README.md"]);
+    expect(filePane.title({ kind: "file", path: "" }, h.shell)).toBe("workspace");
+  });
+
+  it("opens a folder's own README, preferring markdown, whatever its case", async () => {
+    const h = harness(readmeOnly, { docs: [file("readme.txt"), file("Readme.md")] });
+    const spec = mountFollowingRebinds(h, { kind: "file", path: "docs" });
+    await waitFor(() => expect(spec().path).toBe("docs/Readme.md"));
+  });
+
+  it("says a folder has no README and teaches the files pane instead of claiming a missing file", async () => {
+    const h = harness(readmeOnly, { "": [dir("src")], src: [file("index.ts")] });
+    mountFollowingRebinds(h, { kind: "file", path: "" });
+    await waitFor(() =>
+      expect(document.body.textContent).toContain(
+        "the workspace has no README · ctrl+k browser.summon browses the files",
+      ),
+    );
+    cleanup();
+    mountFollowingRebinds(h, { kind: "file", path: "src" });
+    await waitFor(() =>
+      expect(document.body.textContent).toContain(
+        "src has no README · ctrl+k browser.summon browses the files",
+      ),
+    );
+    expect(document.querySelector(".kw-file-note[data-level='error']")).toBeNull();
   });
 });
 

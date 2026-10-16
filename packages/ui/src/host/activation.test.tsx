@@ -1,15 +1,12 @@
 import type { KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
-import type { PaneSpec } from "../panes/index.ts";
 import { inertMemoryClient } from "../shell/memory-store.test.ts";
 import { emptySurfacesClient } from "../shell/surfaces-store.test.ts";
-import { createTiler, type Tiler } from "../shell/tiler.ts";
 import { inertWorkspaceClient } from "../shell/trust.test.ts";
-import { type ActivationSeams, followActivations, showWhatNeedsYou } from "./activation.ts";
+import { followActivations } from "./activation.ts";
 import { browserHost } from "./browser.ts";
 import type { HostPort, NeedsYouTrigger } from "./port.ts";
 
@@ -18,47 +15,27 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const screenSize = { width: 1600, height: 1000 };
-
-describe("showWhatNeedsYou", () => {
-  it("focuses the pane already showing the asking session", () => {
-    withTiler((tiler, seams) => {
-      tiler.open(conversation("s1"), screenSize);
-      tiler.open(conversation("s2"), screenSize);
-      showWhatNeedsYou(askFrom("s1"), seams);
-      expect(tiler.focusedSpec()).toEqual(conversation("s1"));
-      expect(seams.opened).toEqual([]);
-    });
-  });
-
-  it("opens the asking session when no pane shows it, and summons memory for the inbox", () => {
-    withTiler((tiler, seams) => {
-      tiler.open(conversation("s1"), screenSize);
-      showWhatNeedsYou(askFrom("s7"), seams);
-      showWhatNeedsYou({ kind: "memory-inbox", workspace: "/work", pending: 3 }, seams);
-      expect(seams.opened).toEqual(["s7"]);
-      expect(seams.memorySummons).toBe(1);
-    });
-  });
-
-  it("follows only activations for its own workspace", () => {
-    withTiler((tiler, seams) => {
-      let activate: (trigger: NeedsYouTrigger) => void = () => undefined;
-      const stop = followActivations(
-        {
-          onNotificationActivated: (listener) => {
-            activate = listener;
-            return () => undefined;
-          },
+describe("followActivations", () => {
+  it("shows only the activations for its own workspace", () => {
+    const shown: NeedsYouTrigger[] = [];
+    let activate: (trigger: NeedsYouTrigger) => void = () => undefined;
+    const stop = followActivations(
+      {
+        onNotificationActivated: (listener) => {
+          activate = listener;
+          return () => undefined;
         },
-        seams,
-      );
-      tiler.open(conversation("s1"), screenSize);
-      activate({ ...askFrom("s9"), workspace: "/elsewhere" });
-      activate(askFrom("s9"));
-      expect(seams.opened).toEqual(["s9"]);
-      stop();
-    });
+      },
+      { workspace: "/work", show: (trigger) => void shown.push(trigger) },
+    );
+    activate({ ...askFrom("s9"), workspace: "/elsewhere" });
+    activate(askFrom("s9"));
+    activate({ kind: "memory-inbox", workspace: "/work", pending: 3 });
+    expect(shown).toEqual([
+      askFrom("s9"),
+      { kind: "memory-inbox", workspace: "/work", pending: 3 },
+    ]);
+    stop();
   });
 });
 
@@ -77,6 +54,16 @@ describe("activation in the running app", () => {
     harness.activate(askFrom("s2"));
     await waitFor(() => expect(focusedName()).toBe("session 2"));
     expect(frameCount()).toBe(frames);
+  });
+
+  it("treats a toast click as a needs-you jump that leader shift+n walks back", async () => {
+    const harness = await openApp();
+    await screen.findByText("session 1", { selector: ".kw-frame-name" });
+    harness.activate(askFrom("s2"));
+    await waitFor(() => expect(focusedName()).toBe("session 2"));
+    fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: "N", shiftKey: true });
+    await waitFor(() => expect(focusedName()).toBe("session 1"));
   });
 
   it("says so in the status line when there is no pane to close", async () => {
@@ -145,36 +132,8 @@ function summary(id: string, title: string): SessionSummary {
   };
 }
 
-function withTiler(
-  body: (
-    tiler: Tiler,
-    seams: ActivationSeams & { opened: string[]; memorySummons: number },
-  ) => void,
-): void {
-  createRoot((dispose) => {
-    const tiler = createTiler();
-    const seams = {
-      workspace: "/work",
-      opened: [] as string[],
-      memorySummons: 0,
-      findPane: tiler.findPane,
-      focusPane: (id: string) => void tiler.focus(id),
-      openSession: (sessionId: string) => void seams.opened.push(sessionId),
-      summonMemory: () => {
-        seams.memorySummons += 1;
-      },
-    };
-    body(tiler, seams);
-    dispose();
-  });
-}
-
 function askFrom(sessionId: string): NeedsYouTrigger {
   return { kind: "ask", workspace: "/work", sessionId, callId: `call-${sessionId}` };
-}
-
-function conversation(sessionId: string): PaneSpec {
-  return { kind: "conversation", sessionId };
 }
 
 function closeFocused(): void {

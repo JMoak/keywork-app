@@ -4,6 +4,7 @@ import {
   type GaugeStyle,
   gaugeCells,
   gaugeCount,
+  gaugeHover,
   gaugeReadout,
 } from "./context.ts";
 import { currentInstrumentTier, gaugeStyleFor } from "./tier.ts";
@@ -21,7 +22,7 @@ export function ContextGauge(props: ContextGaugeProps) {
       class="kw-gauge"
       role="img"
       aria-label={gaugeReadout(props.level)}
-      title={gaugeReadout(props.level)}
+      title={gaugeHover(props.level)}
       data-style={style()}
       data-basis={props.level.basis}
     >

@@ -5,10 +5,12 @@ import type {
   CostReport,
   ResolutionFailure,
   SessionState,
+  TurnRestored,
 } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import recordedAnswers from "../../../client/src/fixtures/controls.json";
+import recordedRestore from "../../../client/src/fixtures/restored.json";
 import {
   activePresetOf,
   type ControlsClient,
@@ -29,6 +31,7 @@ export function idleControlsClient(): ControlsClient {
     compact: async () => "missing",
     undo: async () => "missing",
     redo: async () => "missing",
+    restoreTurn: async () => "missing",
     context: async () => "missing",
     cost: async () => "missing",
     exportSession: async () => "missing",
@@ -167,6 +170,23 @@ describe("the controls store", () => {
     await store.redo("s1");
     expect(store.seed("s1")).toBeUndefined();
     expect(reloads).toEqual(["s1", "s1"]);
+  });
+
+  it("stages a turn restore like an undo: the turn's prompt seeds the composer, the transcript reloads", async () => {
+    const restored = recordedRestore.restored.body as TurnRestored;
+    const { store, reloads } = storeOver({ restoreTurn: async () => restored });
+    expect(await store.restoreTurn("s1", 1)).toEqual(restored);
+    expect(store.seed("s1")).toEqual({ text: "write two lines to notes.txt" });
+    expect(reloads).toEqual(["s1"]);
+  });
+
+  it("neither seeds nor reloads when the server refuses a restore", async () => {
+    const { store, reloads } = storeOver({
+      restoreTurn: async () => ({ refused: "nothing", detail: "no turn 9 on this session's path" }),
+    });
+    expect(await store.restoreTurn("s1", 9)).toMatchObject({ refused: "nothing" });
+    expect(store.seed("s1")).toBeUndefined();
+    expect(reloads).toEqual([]);
   });
 
   it("neither seeds nor reloads when the server refuses an undo", async () => {

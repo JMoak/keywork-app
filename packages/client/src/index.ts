@@ -42,10 +42,45 @@ export {
   sessionControls,
   unknownControls,
 } from "./projection/controls.ts";
+export {
+  candidateReasons,
+  decisionOdds,
+  noteLink,
+  oddsText,
+  recallText,
+  selectionOf,
+  withDecision,
+} from "./projection/decisions.ts";
 export { historyEnvelopes } from "./projection/history.ts";
+export {
+  latestLedger,
+  type PathMark,
+  type PathMarkKind,
+  type PathReading,
+  type PathTurn,
+  pathReading,
+  type RestoreReach,
+  restoreReach,
+  type TranscriptLedger,
+  type TurnLedger,
+  transcriptLedger,
+} from "./projection/ledger.ts";
+export {
+  type ChildLineage,
+  childrenOf,
+  childrenTouchedBy,
+  childStateOf,
+  emptyLineage,
+  type LineageState,
+  lineageOf,
+  lineageOfProjection,
+  lineageState,
+} from "./projection/lineage.ts";
 export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {
   compactJson,
+  durationText,
+  elapsedText,
   grantWord,
   type RowSpan,
   type SpanPart,
@@ -53,6 +88,7 @@ export {
   toolRowSpans,
   toolRowText,
   toolSubject,
+  waitText,
 } from "./projection/tool-row.ts";
 export {
   emptyTreeState,
@@ -67,6 +103,8 @@ export {
 } from "./projection/tree.ts";
 export {
   type AssistantEntry,
+  type ChildMark,
+  type ChildState,
   emptyProjection,
   emptyUsage,
   type LiveTurn,

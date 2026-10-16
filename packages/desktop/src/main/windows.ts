@@ -1,7 +1,7 @@
 export interface OpenWorkspace {
   workspace: string;
   windows: number;
-  pendingAsks: number;
+  needsYou: number;
 }
 
 export type Placement =
@@ -20,19 +20,19 @@ export interface WindowRegistry {
   unbind(windowId: number): Release | undefined;
   remove(windowId: number): Release | undefined;
   focused(windowId: number): void;
-  setPendingAsks(windowId: number, count: number): void;
+  setNeedsYou(windowId: number, count: number): void;
   workspaceOf(windowId: number): string | undefined;
   windowsOf(workspace: string): readonly number[];
   mostRecentlyActive(): number | undefined;
   placeFor(workspace: string): Placement;
   list(): readonly OpenWorkspace[];
-  pendingAsks(): number;
+  needsYou(): number;
   onChange(listener: () => void): () => void;
 }
 
 export function windowRegistry(): WindowRegistry {
   const bound = new Map<number, string | undefined>();
-  const asks = new Map<string, number>();
+  const waiting = new Map<string, number>();
   const activity: number[] = [];
   const listeners = new Set<() => void>();
 
@@ -48,7 +48,7 @@ export function windowRegistry(): WindowRegistry {
     if (workspace === undefined) return undefined;
     bound.set(windowId, undefined);
     const lastWindow = windowsOf(workspace).length === 0;
-    if (lastWindow) asks.delete(workspace);
+    if (lastWindow) waiting.delete(workspace);
     return { workspace, lastWindow };
   };
 
@@ -79,10 +79,10 @@ export function windowRegistry(): WindowRegistry {
       forget(activity, windowId);
       activity.unshift(windowId);
     },
-    setPendingAsks: (windowId, count) => {
+    setNeedsYou: (windowId, count) => {
       const workspace = bound.get(windowId);
       if (workspace === undefined) return;
-      asks.set(workspace, Math.max(0, count));
+      waiting.set(workspace, Math.max(0, count));
       announce();
     },
     workspaceOf: (windowId) => bound.get(windowId),
@@ -104,10 +104,10 @@ export function windowRegistry(): WindowRegistry {
       return [...seen].map(([workspace, windows]) => ({
         workspace,
         windows,
-        pendingAsks: asks.get(workspace) ?? 0,
+        needsYou: waiting.get(workspace) ?? 0,
       }));
     },
-    pendingAsks: () => [...asks.values()].reduce((sum, count) => sum + count, 0),
+    needsYou: () => [...waiting.values()].reduce((sum, count) => sum + count, 0),
     onChange: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -128,9 +128,9 @@ rules survive the translation intact.
 
 **The house and the outfits.** The window wears one **house** theme; a pane wears an outfit
 resolved in one order: its own choice, else its arc's, else the house. Admin panes (tree,
-arcs, bots, mcp, memory, workspaces, themes, permissions) always wear the house; work panes
-(conversation, diff, terminal, file, browser) can be dressed, and a dressed pane takes its
-theme whole (tokens, sections, chrome weight, instruments) except `gap`, which belongs to
+arcs, bots, mcp, memory, workspaces, themes, permissions, trust setup) always wear the
+house; work panes (conversation, diff, terminal, file, browser) can be dressed, and a dressed
+pane takes its theme whole (tokens, sections, chrome weight, instruments) except `gap`, which belongs to
 the house because the gap lies between panes, not inside one. The themes pane wears onto a
 target (the window, the summoning pane, its arc, or the marked panes), and a pane or arc
 that drops its choice inherits again; `system` is a window-only choice. Choices live in the
@@ -172,6 +172,14 @@ permission asks as the needs-you state and answers them over the server's ask ro
 app cannot loosen anything: an answer is a user verdict the server records as
 `gate.permission{gate:"user"}`; policy lives in keywork's presets and rules; the app has no
 allowlist of its own. File changes are undoable per turn through the server's checkpoints.
+A session's quiet posture (N11) changes which scope the approve key sends, never whether a
+person answers: the app never answers an ask by itself, and a gate that grants without a
+person is the server's to build (S16).
+
+Trust setup (2026-10-15) proposes rules from what the server knows and records only the ones
+the person accepts, through a server grant route. Until keywork serves one (S23), an accepted
+rule waits for its first ask and the ask card names it; the app never answers an ask by
+itself, so what it remembers of an acceptance is a hint on a card, not an allowlist.
 
 ### AD9. Config: one typed surface, zero-config default (D9, P5)
 

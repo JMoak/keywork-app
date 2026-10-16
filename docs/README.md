@@ -11,6 +11,7 @@ assume the earlier ones.
 | [`plan.md`](plan.md) | Milestones M0–M5 with sized tasks and acceptance criteria, the wave ledgers that landed them, the outline of waves 7–11, the server lane that lives in the keywork repo, and the assumptions to confirm before building |
 | [`release.md`](release.md) | Cutting a release: the tag ritual, what `release.yml` produces on three runners, the sidecar pin fetched by checksum, the signing secrets, and how the updater behaves unsigned |
 | [`textures.md`](textures.md) | The M5.4 textures (grapheme corpus, paste flood, first-class light, empty states, latency): each ratchet, its number, where it lives and how to move it |
+| [`research/field-scan-2026-10.md`](research/field-scan-2026-10.md) | What the best agent surfaces do that the app does not (October 2026), ten ideas ranked with their server asks and mockups, the patterns refused and why, and the three prototyped in the chrome gallery |
 
 The keywork docs this plan derives from, in the keywork repo: `docs/vision.md` (D1–D10),
 `docs/events.md` (the wire), `docs/headless.md` (exit classes), `docs/design-language.md`,

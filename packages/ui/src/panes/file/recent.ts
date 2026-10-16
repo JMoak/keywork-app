@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { rootPath } from "../browser/tree.ts";
 
 const [lastAgentFile, setLastAgentFile] = createSignal<string>();
 
@@ -8,4 +9,6 @@ export function rememberAgentFile(path: string): void {
   setLastAgentFile(path);
 }
 
-export const defaultFilePath = "README.md";
+export function pathToOpen(): string {
+  return lastAgentFile() ?? rootPath;
+}

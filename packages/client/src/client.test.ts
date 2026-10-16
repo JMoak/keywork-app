@@ -174,7 +174,7 @@ describe("keyworkClient routes", () => {
   it("reads the server document and summarizes it", async () => {
     const { calls, fetch } = recordingFetch(() =>
       json(200, {
-        info: { version: "0.1.1" },
+        info: { version: "0.2.0" },
         paths: {
           "/doc": { get: { operationId: "getDocument" } },
           "/sessions": {
@@ -186,7 +186,7 @@ describe("keyworkClient routes", () => {
     );
     const doc = await keyworkClient(ticket, { fetch }).document();
     expect(doc).toEqual({
-      version: "0.1.1",
+      version: "0.2.0",
       operationIds: ["createSession", "getDocument", "listSessions"],
     });
     expect(calls[0]?.headers.authorization).toBe("Bearer t0k3n");

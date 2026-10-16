@@ -244,6 +244,16 @@ describe("the app's bindings", () => {
     expect(map.describeAll("help.toggle")).toEqual(["ctrl+k /", "f1"]);
   });
 
+  it("put quiet behind the leader and every way to answer an ask on the hot path", () => {
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
+    expect(map.describe("session.quiet")).toBe("ctrl+k shift+s");
+    expect(appActions["session.quiet"]?.command?.name).toBe("quiet");
+    expect(map.describe("ask.once")).toBe("alt+o");
+    for (const action of ["ask.approve", "ask.once", "ask.session", "ask.workspace", "ask.deny"]) {
+      expect(hotPathActions, action).toContain(action);
+    }
+  });
+
   it("give every action help text and a command where it is palette-reachable", () => {
     for (const [name, action] of Object.entries(appActions)) {
       expect(action.help, name).not.toBe("");
@@ -264,10 +274,10 @@ describe("keybindings config", () => {
   it("applies overrides, unbinds with none, and names an unknown action", () => {
     const map = keymapFromConfig({
       leader: "ctrl+b",
-      bindings: { "pane.zoom": "none", "pane.split": "leader n" },
+      bindings: { "pane.zoom": "none", "pane.split": "leader f2" },
     });
     expect(map.describe("pane.zoom")).toBeUndefined();
-    expect(map.describe("pane.split")).toBe("ctrl+b n");
+    expect(map.describe("pane.split")).toBe("ctrl+b f2");
     expect(() => keymapFromConfig({ bindings: { "pane.nope": "f2" } })).toThrow(
       'no action named "pane.nope"',
     );

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  type ChildLineage,
   emptyChangesState,
   emptyProjection,
   emptyTreeState,
@@ -53,10 +54,12 @@ function shellSeams(
   tree = treeSnapshot(emptyTreeState, entries),
   listed: readonly SessionSummary[] = summaries,
   projections: Record<string, SessionProjection> = {},
+  trashed: readonly SessionSummary[] = [],
+  lineage: readonly ChildLineage[] = [],
 ): ShellSeams {
   const [state, setState] = createStore({
     summaries: [...listed],
-    trash: [] as SessionSummary[],
+    trash: [...trashed],
     projections,
   });
   const moveTo = (id: string, from: "summaries" | "trash", to: "summaries" | "trash") => {
@@ -85,8 +88,18 @@ function shellSeams(
         setState("trash", (items) => items.filter((item) => item.id !== id));
         return held ? "discarded" : "missing";
       },
+      purge: async () => {
+        recorded.trashed.push("purge");
+        const purged = state.trash.length;
+        setState("trash", []);
+        return { purged };
+      },
       projection: () => emptyProjection,
       summary: (id: string | undefined) => summaries.find((item) => item.id === id),
+      children: (parentId: string) => lineage.filter((child) => child.parentId === parentId),
+      childOf: (id: string) => lineage.find((child) => child.sessionId === id),
+      trashed: (id: string) => state.trash.some((item) => item.id === id),
+      surfaces: { state: { bots: [{ name: "researcher", sigil: "◇" }] } },
       refresh: async () => {},
       tree: () => tree,
       openTree: async () => {
@@ -333,6 +346,44 @@ describe("the tree pane, the trash", () => {
     ]);
   });
 
+  it("empties the trash with shift+d only after a confirm that counts what goes", async () => {
+    const recorded = recording();
+    const shell = shellSeams(recorded, undefined, [], {}, summaries);
+    const act = mount({ kind: "tree" }, recorded, shell);
+    act("tree.purge");
+    await settle();
+    expect(screen.getByText("trash · 2 sessions · ctrl+k tree.purge empties it")).toBeTruthy();
+    expect(confirmLine().textContent).toBe(
+      "empty the trash? 2 sessions go for good, there is no undo · y confirms · any other key cancels",
+    );
+    fireEvent.keyDown(confirmLine(), { key: "n" });
+    expect(document.querySelectorAll(".kw-tree-session[data-trashed]")).toHaveLength(2);
+    act("tree.purge");
+    await settle();
+    fireEvent.keyDown(confirmLine(), { key: "y" });
+    await settle();
+    expect(recorded.trashed).toEqual(["open", "open", "purge"]);
+    expect(noticeLine()).toBe("deleted 2 sessions for good · the trash is empty");
+    expect(document.querySelectorAll(".kw-tree-session[data-trashed]")).toHaveLength(0);
+    expect(screen.getByText("trash")).toBeTruthy();
+    expect(
+      screen.getByText("the trash is empty · ctrl+k tree.remove sends a session here"),
+    ).toBeTruthy();
+  });
+
+  it("says the trash is already empty rather than asking to empty nothing", async () => {
+    const recorded = recording();
+    const act = mount({ kind: "tree" }, recorded);
+    act("tree.purge");
+    await settle();
+    expect(confirmLine()).toBeNull();
+    expect(noticeLine()).toBe("the trash is already empty");
+    expect(recorded.trashed).toEqual(["open"]);
+    expect(
+      screen.getByText("the trash is empty · ctrl+k tree.remove sends a session here"),
+    ).toBeTruthy();
+  });
+
   it("says a running turn keeps a session out of the trash, in keywork's words", async () => {
     const busy = { ...(summaries[0] as SessionSummary), id: "busy", title: "busy one" };
     const recorded = recording();
@@ -431,6 +482,125 @@ describe("the tree pane, level two", () => {
     const recorded = recording();
     mount({ kind: "tree", sessionId: "s1" }, recorded, shellSeams(recorded, emptyTreeState));
     expect(screen.getByText("reading the tree…")).toBeTruthy();
+  });
+});
+
+describe("the tree pane, children", () => {
+  const child = (sessionId: string, extra: Partial<ChildLineage> = {}): ChildLineage => ({
+    sessionId,
+    parentId: "s1",
+    callId: `call-${sessionId}`,
+    title: sessionId,
+    bot: undefined,
+    state: "running",
+    costNanos: undefined,
+    ...extra,
+  });
+  const family = [
+    child("k1", { title: "audit the trust rules", bot: "researcher" }),
+    child("k2", { title: "count the callers", state: "completed", bot: "drafter" }),
+  ];
+  const withFamily = (recorded: Recorded, listed = summaries) =>
+    shellSeams(recorded, undefined, listed, {}, [], family);
+  const rowTexts = () =>
+    [...document.querySelectorAll(".kw-tree-session")].map((row) =>
+      [...row.querySelectorAll(".kw-tree-row > span")]
+        .map((cell) => cell.textContent?.trim())
+        .filter((text) => text !== "")
+        .join(" | "),
+    );
+  const cursorName = () =>
+    document.querySelector(".kw-tree-session[data-cursor] .kw-tree-name")?.textContent;
+
+  it("nests each child under its parent with its own state and the bot by sigil", () => {
+    mount({ kind: "tree" }, recording(), withFamily(recording()));
+    const rows = rowTexts();
+    expect(rows.slice(1)).toEqual([
+      expect.stringMatching(/^░ \| which way\? \| \$0\.0125 \| /),
+      "└ | audit the trust rules | running | ◇ researcher",
+      "└ | count the callers | completed | drafter",
+    ]);
+    const states = [...document.querySelectorAll(".kw-tree-state")].map((state) =>
+      state.getAttribute("data-state"),
+    );
+    expect(states).toEqual(["running", "completed"]);
+  });
+
+  it("opens and dives into a child with the same keys and clicks as any session row", () => {
+    const recorded = recording();
+    const act = mount({ kind: "tree" }, recorded, withFamily(recorded));
+    act("tree.down");
+    act("tree.down");
+    expect(cursorName()).toBe("audit the trust rules");
+    act("tree.open");
+    act("tree.dive");
+    fireEvent.click(screen.getByText("count the callers"));
+    fireEvent.click(screen.getByLabelText("tree of count the callers"));
+    expect(recorded.opened).toEqual(["k1", "k2"]);
+    expect(recorded.rebound).toEqual([
+      { kind: "tree", sessionId: "k1" },
+      { kind: "tree", sessionId: "k2" },
+    ]);
+  });
+
+  it("folds with h and unfolds with l as the entry tree does, h on a child going up first", () => {
+    const recorded = recording();
+    const act = mount({ kind: "tree" }, recorded, withFamily(recorded));
+    act("tree.down");
+    act("tree.down");
+    act("tree.surface");
+    expect(cursorName()).toBe("which way?");
+    act("tree.surface");
+    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(0);
+    expect(document.querySelector(".kw-tree-folded")?.textContent).toBe("▸ 2 children");
+    act("tree.dive");
+    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(2);
+    expect(recorded.rebound).toEqual([]);
+    act("tree.dive");
+    expect(recorded.rebound).toEqual([{ kind: "tree", sessionId: "s1" }]);
+  });
+
+  it("moves a child to the trash with x like any session", async () => {
+    const recorded = recording();
+    const act = mount({ kind: "tree" }, recorded, withFamily(recorded));
+    act("tree.down");
+    act("tree.down");
+    act("tree.remove");
+    const confirm = document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement;
+    expect(confirm.textContent).toContain('remove "audit the trust rules"?');
+    fireEvent.keyDown(confirm, { key: "y" });
+    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+    expect(recorded.trashed).toEqual(["remove k1"]);
+  });
+
+  it("lists a child flat with a quiet lineage fact once its parent is in the trash", async () => {
+    const recorded = recording();
+    const restoredAlone: SessionSummary = {
+      id: "k1",
+      title: "audit the trust rules",
+      createdAt: "2026-09-07T14:00:00.000Z",
+      lastActivityAt: "2026-09-07T14:00:00.000Z",
+      messageCount: 2,
+    };
+    const act = mount(
+      { kind: "tree" },
+      recorded,
+      withFamily(recorded, [...summaries, restoredAlone]),
+    );
+    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(2);
+    expect(document.querySelector(".kw-tree-lineage")).toBeNull();
+    act("tree.down");
+    act("tree.remove");
+    fireEvent.keyDown(document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement, {
+      key: "y",
+    });
+    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(0);
+    const flat = document.querySelector(".kw-tree-session") as HTMLElement;
+    expect(flat.querySelector(".kw-tree-name")?.textContent).toBe("audit the trust rules");
+    expect(flat.querySelector(".kw-tree-lineage")?.textContent).toBe(
+      "↳ child of which way? · trashed",
+    );
   });
 });
 

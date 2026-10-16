@@ -6,7 +6,9 @@ import {
   curingRampCells,
   curingReadout,
   curingWord,
+  oddsCell,
   provenanceCell,
+  ruleCell,
 } from "./density.ts";
 
 const glyphs = (cells: readonly { glyph: string }[]): string =>
@@ -50,6 +52,14 @@ describe("provenance as density", () => {
     expect(provenanceCell("user")).toEqual({ glyph: "█", level: "full" });
     expect(provenanceCell("agent")).toEqual({ glyph: "▓", level: "heavy" });
     expect(provenanceCell("untrusted")).toEqual({ glyph: "░", level: "light" });
+  });
+});
+
+describe("a decision's odds as density", () => {
+  it("steps the ramp by quarters of odds, a sure answer full and a coin toss light", () => {
+    expect(glyphs([0, 0.3, 0.6, 0.8, 0.94, 1].map(oddsCell))).toBe("░▒▓███");
+    expect(oddsCell(-1)).toEqual(oddsCell(0));
+    expect(ruleCell()).toEqual({ glyph: "▓", level: "heavy" });
   });
 });
 

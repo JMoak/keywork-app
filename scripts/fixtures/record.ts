@@ -124,6 +124,32 @@ const writeCall = {
   arguments: { path: "notes.txt", content: "one\ntwo\n" },
 } as const;
 
+const recalledWrites = [
+  {
+    type: "tool-call",
+    callId: "r1",
+    name: "write",
+    arguments: { path: "src/layout/rects.ts", content: "export const rects = [];\n" },
+  },
+  {
+    type: "tool-call",
+    callId: "r2",
+    name: "write",
+    arguments: { path: "src/layout/rects.test.ts", content: "import { rects } from './rects';\n" },
+  },
+] as const;
+
+const delegateCall = {
+  type: "tool-call",
+  callId: "d1",
+  name: "delegate",
+  arguments: {
+    title: "audit the trust rules",
+    prompt: "read the trust rules and name any that allow more than they say",
+    bot: "researcher",
+  },
+} as const;
+
 const grantCalls = {
   sessionGrant: bashCallOf("g1", "mkdir -p build"),
   coveredBySession: bashCallOf("g2", "mkdir -p build"),
@@ -168,6 +194,44 @@ async function driveGrants(stage: Stage): Promise<void> {
   await remember("revokedAgain", post(stage, "/permissions/workspace/revoke", { rule: granted }));
   await remember("revokeMalformed", post(stage, "/permissions/workspace/revoke", { rule: {} }));
   await remember("afterRevoke", get(stage, "/permissions"));
+  await driveGrantsAhead(stage, granted, remember);
+}
+
+type Remember = (name: string, reading: Promise<unknown>) => Promise<void>;
+
+async function driveGrantsAhead(stage: Stage, revoked: object, remember: Remember): Promise<void> {
+  const npmRun = { action: "bash", resource: "npm run *", effect: "allow" };
+  const workspace = (rule: unknown) => post(stage, "/permissions/workspace/grant", { rule });
+  const session = (id: string, rule: unknown) =>
+    post(stage, `/permissions/session/${id}/grant`, { rule });
+  await remember("grantedWorkspace", workspace(revoked));
+  await remember("grantedSession", session(stage.sessionId, npmRun));
+  await remember("grantWrite", workspace({ action: "write", resource: "*", effect: "allow" }));
+  await remember("grantDelete", workspace({ action: "bash", resource: "rm *", effect: "allow" }));
+  await remember("grantMalformed", workspace({}));
+  await remember("grantUnknownSession", session("nobody", npmRun));
+  await remember("afterGrant", get(stage, "/permissions"));
+}
+
+const restoreAnswers = new Map<string, unknown>();
+
+async function driveRestore(stage: Stage): Promise<void> {
+  const session = `/sessions/${stage.sessionId}`;
+  const answer = async (name: string, reading: Promise<unknown>) => {
+    restoreAnswers.set(name, await reading);
+  };
+  await stage.prompt("write two lines to notes.txt");
+  await stage.until("turn.completed");
+  await persisted(stage);
+  await stage.prompt("now say done");
+  await stage.until("turn.completed", 2);
+  await persisted(stage);
+  await answer("restored", post(stage, `${session}/restore`, { turn: 1 }));
+  await stage.until("session.tree");
+  await answer("restoreUnknownTurn", post(stage, `${session}/restore`, { turn: 9 }));
+  await answer("restoreMalformed", post(stage, `${session}/restore`, { turn: 0 }));
+  await answer("redo", post(stage, `${session}/redo`));
+  await answer("entries", get(stage, `${session}/entries`));
 }
 
 async function initGitRepository(cwd: string): Promise<void> {
@@ -220,6 +284,41 @@ async function driveTrash(stage: Stage): Promise<void> {
   await answer("removeMissing", remove(stage, session));
   await answer("trashAfterDiscard", get(stage, "/trash"));
   await answer("purged", remove(stage, "/trash"));
+}
+
+const delegationAnswers = new Map<string, unknown>();
+
+async function driveDelegation(stage: Stage): Promise<void> {
+  const answer = async (name: string, reading: Promise<unknown>) => {
+    delegationAnswers.set(name, await reading);
+  };
+  await stage.prompt("have a researcher audit the trust rules");
+  await stage.until("turn.completed");
+  await persisted(stage);
+  const childId = childSessionOf(stage.seen);
+  await answer("parent", get(stage, `/sessions/${stage.sessionId}`));
+  await answer("child", get(stage, `/sessions/${childId}`));
+  await answer("sessions", get(stage, "/sessions"));
+}
+
+function childSessionOf(seen: readonly BusEnvelope[]): string | undefined {
+  const started = seen.find((envelope) => envelope.type === "child.started");
+  return started?.type === "child.started" ? started.payload.sessionId : undefined;
+}
+
+const researcherBot = [
+  "---",
+  "description: reads widely and reports back",
+  "sigil: ◇",
+  "---",
+  "Read before you answer, and answer in one paragraph.",
+  "",
+].join("\n");
+
+async function plantResearcher(cwd: string): Promise<void> {
+  const dir = join(cwd, ".keywork", "bots", "researcher");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "bot.md"), researcherBot);
 }
 
 const controlAnswers = new Map<string, unknown>();
@@ -361,6 +460,22 @@ export const scenarios: readonly Scenario[] = [
       await stage.prompt("run echo served");
       await stage.until("turn.completed");
     },
+  },
+  {
+    name: "delegated",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [
+          engine.toolCallTurn(delegateCall),
+          engine.textTurn("Two rules allow more than they say.", usage),
+          engine.textTurn("The researcher found two loose rules.", usage),
+        ],
+        "mock-model",
+      ),
+    permissions: "allow",
+    trusted: true,
+    prepare: plantResearcher,
+    drive: driveDelegation,
   },
   {
     name: "denied",
@@ -536,6 +651,21 @@ export const scenarios: readonly Scenario[] = [
     drive: driveTrash,
   },
   {
+    name: "restored",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [
+          engine.toolCallTurn(writeCall),
+          engine.textTurn("Wrote notes.txt.", usage),
+          engine.textTurn("Done.", usage),
+        ],
+        "mock-model",
+      ),
+    permissions: "allow",
+    trusted: true,
+    drive: driveRestore,
+  },
+  {
     name: "memory",
     provider: (engine) => new engine.MockProvider([], "mock-model"),
     permissions: "allow",
@@ -557,6 +687,24 @@ export const scenarios: readonly Scenario[] = [
       const approved = ledger.entries.find((entry) => entry.op === "approve");
       await stage.call(`/memory/ledger/${approved?.id}/revert`, { method: "POST" });
       await stage.until("memory.inbox", 3);
+    },
+  },
+  {
+    name: "decided",
+    provider: (engine) =>
+      new engine.MockProvider(
+        [
+          ...recalledWrites.map((call) => engine.toolCallTurn(call)),
+          engine.textTurn("Wrote the rects module and its test.", usage),
+        ],
+        "mock-model",
+      ),
+    permissions: "allow",
+    trusted: true,
+    prepare: seedVault,
+    drive: async (stage) => {
+      await stage.prompt("write the layout rects module");
+      await stage.until("turn.completed");
     },
   },
 ];
@@ -808,6 +956,14 @@ async function extrasFor(
   }
   if (scenario.name === "trash") {
     return { "trash.json": `${JSON.stringify(Object.fromEntries(trashAnswers), null, 2)}\n` };
+  }
+  if (scenario.name === "restored") {
+    return { "restored.json": `${JSON.stringify(Object.fromEntries(restoreAnswers), null, 2)}\n` };
+  }
+  if (scenario.name === "delegated") {
+    return {
+      "delegated.json": `${JSON.stringify(Object.fromEntries(delegationAnswers), null, 2)}\n`,
+    };
   }
   if (scenario.name === "grants") {
     return { "grants.json": `${JSON.stringify(Object.fromEntries(grantAnswers), null, 2)}\n` };

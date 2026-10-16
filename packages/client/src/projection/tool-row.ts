@@ -1,8 +1,19 @@
+import { recallText } from "./decisions.ts";
 import type { ToolRun } from "./types.ts";
 
 export type SpanTone = "body" | "meta" | "ok" | "bad";
 
-export type SpanPart = "head" | "live" | "facts" | "separator" | "outcome" | "grant" | "reason";
+export type SpanPart =
+  | "head"
+  | "bot"
+  | "live"
+  | "facts"
+  | "separator"
+  | "outcome"
+  | "grant"
+  | "recall"
+  | "reason"
+  | "hint";
 
 export interface RowSpan {
   text: string;
@@ -25,6 +36,7 @@ export function toolRowSpans(run: ToolRun): RowSpan[] {
     span(" · ", "meta", "separator"),
     span(run.phase, run.phase === "done" ? "ok" : "bad", "outcome"),
     ...grantSpans(run),
+    ...recallSpans(run),
     ...(run.reason === undefined || run.reason === ""
       ? []
       : [span(` · ${run.reason}`, "meta", "reason")]),
@@ -84,21 +96,26 @@ function grantSpans(run: ToolRun): RowSpan[] {
   return word === undefined ? [] : [span(` · ${word}`, "meta", "grant")];
 }
 
+function recallSpans(run: ToolRun): RowSpan[] {
+  const text = run.recall === undefined ? undefined : recallText(run.recall);
+  return text === undefined ? [] : [span(` · ${text}`, "meta", "recall")];
+}
+
 function span(text: string, tone: SpanTone, part: SpanPart): RowSpan {
   return { text, tone, part };
 }
 
-function durationText(run: ToolRun): string | undefined {
+export function durationText(run: ToolRun): string | undefined {
   if (run.replay || run.durationMs === undefined) return undefined;
-  return spanOf(run.durationMs);
+  return elapsedText(run.durationMs);
 }
 
-function waitText(run: ToolRun): string | undefined {
+export function waitText(run: ToolRun): string | undefined {
   if (run.replay || run.phase === "refused" || !run.waitedMs) return undefined;
-  return `waited ${spanOf(run.waitedMs)}`;
+  return `waited ${elapsedText(run.waitedMs)}`;
 }
 
-function spanOf(ms: number): string {
+export function elapsedText(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.round(ms / 60_000)}m`;
