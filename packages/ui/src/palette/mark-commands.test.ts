@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CommandRegistry } from "./commands.ts";
-import { commandSlug, markCommands, markDescriptions } from "./mark-commands.ts";
+import { commandSlug, markChoices, markCommand, markDescriptions } from "./mark-commands.ts";
 
 describe("mark commands", () => {
   const panes = [
@@ -10,35 +10,27 @@ describe("mark commands", () => {
     { id: "w4", title: "run echo served-2" },
   ];
 
-  it("slugs every pane title into a name the registry can hold, never twice", () => {
+  it("offers every pane as one value of /mark, slugged and never twice", () => {
     const toggled: string[] = [];
-    const commands = markCommands(panes, {
-      marked: (id) => id === "w2",
-      toggle: (id) => void toggled.push(id),
-    });
-    expect(commands.map((command) => command.name)).toEqual([
-      "mark-run-echo-served",
-      "mark-run-echo-served-2",
-      "mark-w3",
-      "mark-run-echo-served-2-2",
-    ]);
-    expect(new Set(commands.map((command) => command.name)).size).toBe(commands.length);
-    expect(commands.map((command) => command.label)).toEqual([
-      "mark run echo served",
-      "mark Run: echo, served!",
-      "mark …",
-      "mark run echo served-2",
-    ]);
-    expect(commands.map((command) => command.description)).toEqual([
-      markDescriptions.mark,
-      markDescriptions.unmark,
-      markDescriptions.mark,
-      markDescriptions.mark,
+    const seams = {
+      panes: () => panes,
+      marked: (id: string) => id === "w2",
+      toggle: (id: string) => void toggled.push(id),
+      toggleFocused: () => void toggled.push("focused"),
+      shortcut: () => "ctrl+k b",
+      say: () => {},
+    };
+    expect(markChoices(seams)).toEqual([
+      { value: "run-echo-served", description: markDescriptions.mark },
+      { value: "run-echo-served-2", description: markDescriptions.unmark },
+      { value: "w3", description: markDescriptions.mark },
+      { value: "run-echo-served-2-2", description: markDescriptions.mark },
     ]);
     const registry = new CommandRegistry();
-    registry.addSource(() => commands);
-    expect(registry.run("mark-run-echo-served-2")).toBe(true);
-    expect(toggled).toEqual(["w2"]);
+    registry.register(markCommand(seams));
+    expect(registry.run("mark run-echo-served-2")).toBe(true);
+    expect(registry.run("mark")).toBe(true);
+    expect(toggled).toEqual(["w2", "focused"]);
   });
 
   it("falls back to the pane id when the title has nothing to slug", () => {

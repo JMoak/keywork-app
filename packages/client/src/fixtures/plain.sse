@@ -1,12 +1,12 @@
 : connected
 
 id: 1
-event: turn.started
-data: {"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"say hello"}}
+event: session.state
+data: {"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"quiet":false,"undoable":false,"redoable":false}}
 
 id: 2
-event: session.state
-data: {"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+event: turn.started
+data: {"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"say hello","entryId":"q1"}}
 
 id: 3
 event: turn.delta
@@ -22,5 +22,5 @@ data: {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.comp
 
 id: 6
 event: session.state
-data: {"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","undoable":true,"redoable":false}}
+data: {"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","quiet":false,"undoable":true,"redoable":false}}
 

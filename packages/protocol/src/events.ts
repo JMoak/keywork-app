@@ -1,7 +1,7 @@
 import type { ChildFinished, ChildStarted } from "./children.ts";
-import type { SessionState } from "./controls.ts";
+import type { CacheMiss, SendBehavior, SessionState } from "./controls.ts";
 import type { MemoryDecision } from "./decisions.ts";
-import type { AskScope, PermissionRule } from "./permissions.ts";
+import type { AskScope, DenyReason, PermissionRule } from "./permissions.ts";
 import type { CompactionEntry } from "./sessions.ts";
 import type { SurfaceKind } from "./workspace.ts";
 
@@ -149,9 +149,23 @@ export interface ExtensionNotice {
 export type TurnDelta =
   | { type: "text"; text: string }
   | { type: "visible-thinking"; text: string }
-  | { type: "redacted-thinking"; part: unknown }
+  | { type: "redacted-thinking"; part: RedactedThinkingPart }
   | { type: "tool-call"; call: ToolCallPart }
-  | { type: "done"; usage: Usage };
+  | { type: "progress"; text: string }
+  | DoneDelta;
+
+export interface DoneDelta {
+  type: "done";
+  usage: Usage;
+  responseId?: string;
+  cacheMiss?: CacheMiss;
+}
+
+export interface RedactedThinkingPart {
+  type: "redacted-thinking";
+  data: string;
+  owner?: { provider: string; model: string };
+}
 
 export interface ToolCallPart {
   type: "tool-call";
@@ -194,7 +208,7 @@ export interface PromptOrigin {
 export interface QueuedPrompt {
   id: string;
   text: string;
-  behavior: "steer" | "queue";
+  behavior: SendBehavior;
   origin?: PromptOrigin;
 }
 
@@ -205,7 +219,7 @@ export interface SpillReference {
   elidedTo: number;
 }
 
-export type PermissionGate = "policy" | "default" | "user" | "headless" | "trusted";
+export type PermissionGate = "policy" | "default" | "user" | "headless" | "trusted" | "quiet";
 
 export interface PermissionDecision {
   tool: string;
@@ -213,6 +227,9 @@ export interface PermissionDecision {
   verdict: "granted" | "denied";
   gate: PermissionGate;
   scope?: AskScope;
+  asked?: boolean;
+  reason?: DenyReason;
+  note?: string;
 }
 
 export interface PermissionAsk {

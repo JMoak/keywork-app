@@ -1,3 +1,7 @@
+.kw-conversation {
+  display: contents;
+}
+
 .kw-controls:empty {
   display: none;
 }
@@ -63,6 +67,61 @@
   flex-direction: column;
   padding: 0.25rem 0.75rem;
   color: var(--kw-text-dim);
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kw-controls-pick {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0 0.25rem;
+}
+
+.kw-controls-pick:focus {
+  outline: none;
+}
+
+.kw-controls-options {
+  max-height: 12.5rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.kw-controls-option {
+  display: flex;
+  gap: 1ch;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.1rem 0.75rem 0.1rem 1.25rem;
+  font: inherit;
+  text-align: left;
+  color: var(--kw-text-mid);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.kw-controls-option[data-picked] {
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
+.kw-controls-option-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kw-controls-option-note {
+  flex: none;
+  color: var(--kw-text-dim);
+}
+
+.kw-controls-hint {
+  padding: 0.25rem 0.75rem 0;
+  color: var(--kw-text-dim);
 }

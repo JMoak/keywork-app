@@ -110,6 +110,11 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
     changes: async () => "missing",
     ...inertMemoryClient(),
     ...idleControlsClient(),
+    sendNow: async () => "missing",
+    moveQueued: async () => "missing",
+    cancelQueued: async () => "missing",
+    setQuiet: async () => "missing",
+    spill: async () => "missing",
     ...inertWorkspaceClient(),
     ...emptySurfacesClient(),
     changedFile: async () => "missing",
@@ -143,6 +148,7 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
     revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
     revokeSessionGrant: async (_sessionId, rule) => ({ revoked: rule }),
     restoreTurn: async () => "missing",
+    previewRestore: async () => "missing",
     events: async function* (options) {
       options?.onOpen?.();
       for (;;) {

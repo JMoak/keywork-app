@@ -1,41 +1,64 @@
 export interface CommandSpec {
   readonly name: string;
   readonly description: string;
-  readonly aliases?: readonly string[];
+  readonly aliases?: readonly string[] | undefined;
   readonly shortcut?: string | undefined;
+  readonly scope?: string | undefined;
+  readonly argument?: CommandArgument | undefined;
+  readonly claimant?: string | undefined;
   readonly jump?: true;
   readonly label?: string;
-  readonly run: () => void;
+  readonly run: (argument?: string) => void;
 }
 
-export type Registration =
-  | { kind: "registered" }
-  | { kind: "collision"; name: string; claimedBy: string };
+export interface CommandArgument {
+  readonly hint: string;
+  readonly required?: boolean | undefined;
+  readonly choices?: (() => readonly ArgumentChoice[]) | undefined;
+}
+
+export interface ArgumentChoice {
+  readonly value: string;
+  readonly description?: string | undefined;
+}
+
+export class CommandCollision extends Error {
+  override readonly name = "CommandCollision";
+}
 
 export class CommandRegistry {
   private readonly commands: CommandSpec[] = [];
   private readonly sources: Array<() => CommandSpec[]> = [];
 
-  register(command: CommandSpec): Registration {
+  register(command: CommandSpec): void {
     for (const name of namesOf(command)) {
-      const owner = findByName(this.commands, name);
-      if (owner !== undefined) return { kind: "collision", name, claimedBy: owner.name };
+      const rival = this.commands.find((held) => contends(held, command) && answersTo(held, name));
+      if (rival !== undefined) throw new CommandCollision(collisionLine(name, rival, command));
     }
     this.commands.push(command);
-    return { kind: "registered" };
   }
 
   addSource(source: () => CommandSpec[]): void {
     this.sources.push(source);
   }
 
-  all(): CommandSpec[] {
-    return [...this.commands, ...this.sources.flatMap((source) => source())];
+  all(scope?: string): CommandSpec[] {
+    const fixed = this.commands.filter((command) => visibleIn(command, scope));
+    const shadowed = (drawn: CommandSpec): boolean =>
+      fixed.some((held) => held.jump === drawn.jump && sharesAName(held, drawn));
+    const drawn = this.sources
+      .flatMap((source) => source())
+      .filter((command) => visibleIn(command, scope) && !shadowed(command));
+    return [...fixed, ...drawn];
   }
 
-  search(query: string): CommandSpec[] {
+  ownedBy(scope: string): CommandSpec[] {
+    return this.commands.filter((command) => command.scope === scope);
+  }
+
+  search(query: string, scope?: string): CommandSpec[] {
     const trimmed = query.trim().toLowerCase();
-    const commands = this.all();
+    const commands = this.all(scope);
     if (trimmed === "") return commands;
     return commands
       .map((command) => ({ command, score: bestScore(command, trimmed) }))
@@ -46,10 +69,23 @@ export class CommandRegistry {
       .map((match) => match.command);
   }
 
-  run(name: string): boolean {
-    const found = findByName(this.all(), name.trim());
-    if (found === undefined) return false;
-    found.run();
+  find(name: string, scope?: string): CommandSpec | undefined {
+    const wanted = name.trim();
+    if (wanted === "") return undefined;
+    return this.all(scope).find((command) => answersTo(command, wanted));
+  }
+
+  run(input: string, scope?: string): boolean {
+    const trimmed = input.trim();
+    const whole = this.find(trimmed, scope);
+    if (whole !== undefined) {
+      whole.run();
+      return true;
+    }
+    const space = trimmed.search(/\s/);
+    const named = space === -1 ? undefined : this.find(trimmed.slice(0, space), scope);
+    if (named === undefined) return false;
+    named.run(trimmed.slice(space).trim());
     return true;
   }
 }
@@ -88,12 +124,30 @@ function namesOf(command: CommandSpec): string[] {
   return [command.name, ...(command.aliases ?? [])];
 }
 
-function findByName(commands: readonly CommandSpec[], raw: string): CommandSpec | undefined {
-  const name = raw.toLowerCase();
-  if (name === "") return undefined;
-  return commands.find((command) =>
-    namesOf(command).some((candidate) => candidate.toLowerCase() === name),
-  );
+function answersTo(command: CommandSpec, name: string): boolean {
+  const wanted = name.toLowerCase();
+  return namesOf(command).some((candidate) => candidate.toLowerCase() === wanted);
+}
+
+function sharesAName(left: CommandSpec, right: CommandSpec): boolean {
+  return namesOf(right).some((name) => answersTo(left, name));
+}
+
+function visibleIn(command: CommandSpec, scope: string | undefined): boolean {
+  return command.scope === undefined || command.scope === scope;
+}
+
+function contends(held: CommandSpec, claimant: CommandSpec): boolean {
+  return held.scope === undefined || claimant.scope === undefined || held.scope === claimant.scope;
+}
+
+function collisionLine(name: string, held: CommandSpec, claimant: CommandSpec): string {
+  return `palette name "${name}" is claimed by both ${claimantOf(held)} and ${claimantOf(claimant)}`;
+}
+
+function claimantOf(command: CommandSpec): string {
+  const owner = command.claimant ?? command.name;
+  return command.scope === undefined ? owner : `${owner} in the ${command.scope} pane`;
 }
 
 function bestScore(command: CommandSpec, query: string): number | undefined {

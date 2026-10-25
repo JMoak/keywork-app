@@ -4,7 +4,16 @@ import {
   type FileSlice,
   sliceReachesEnd,
 } from "@keywork-app/protocol";
-import { createEffect, createSignal, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { z } from "zod";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
@@ -20,7 +29,8 @@ import {
   tailRange,
 } from "./range.ts";
 import { pathToOpen } from "./recent.ts";
-import { mountTextView, type TextMount } from "./text-view.ts";
+import { type SpillSource, spillEditorRefusal, spillRefusal, spillTitle } from "./spill.ts";
+import { type FindReading, type FindStep, mountTextView, type TextMount } from "./text-view.ts";
 import "./file.css";
 
 const fileSpec = z.object({
@@ -29,6 +39,7 @@ const fileSpec = z.object({
   from: z.number().int().nonnegative().optional(),
   to: z.number().int().nonnegative().optional(),
   atEnd: z.boolean().optional(),
+  spill: z.object({ sessionId: z.string(), spillId: z.string() }).optional(),
 });
 
 export type FileSpec = z.output<typeof fileSpec>;
@@ -49,7 +60,7 @@ export const filePane = definePane<FileSpec>({
   spec: fileSpec,
   home: "main",
   attire: "work",
-  title: (spec) => pathTitle(spec.path),
+  title: (spec) => (spec.spill === undefined ? pathTitle(spec.path) : spillTitle(spec.path)),
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {
@@ -58,9 +69,11 @@ export const filePane = definePane<FileSpec>({
     help: "open the agent's last file, else the README",
     command: {
       name: "open",
-      description: "open the file the agent touched last, else the workspace README",
+      aliases: ["view"],
+      description: "open a file, else the one the agent touched last, else the README",
+      argument: { hint: "[path]" },
     },
-    spec: () => ({ kind: "file", path: pathToOpen() }),
+    spec: (_shell, path) => ({ kind: "file", path: path ?? pathToOpen() }),
   },
   localActions: {
     "file.top": {
@@ -98,6 +111,21 @@ export const filePane = definePane<FileSpec>({
       help: "open in your editor",
       command: { name: "file-editor", description: "open this file in the system editor" },
     },
+    "file.find": {
+      chords: "ctrl+f",
+      help: "find in what is shown",
+      command: { name: "file-find", description: "find text in the slice this pane shows" },
+    },
+    "file.find-next": {
+      chords: "n",
+      help: "the next match",
+      command: { name: "file-find-next", description: "go to the next match of the find" },
+    },
+    "file.find-previous": {
+      chords: "shift+n",
+      help: "the previous match",
+      command: { name: "file-find-previous", description: "go back to the previous match" },
+    },
   },
 });
 
@@ -123,7 +151,11 @@ function FileSlot(props: PaneProps<FileSpec>) {
   const [state, setState] = createSignal<FileState>({ kind: "loading" });
   const [mount, setMount] = createSignal<TextMount>();
   const [editorRefusal, setEditorRefusal] = createSignal<string>();
+  const [finding, setFinding] = createSignal(false);
+  const [query, setQuery] = createSignal("");
+  const [found, setFound] = createSignal<FindReading>();
   let holder: HTMLDivElement | undefined;
+  let findInput: HTMLInputElement | undefined;
 
   const slice = (): TextSlice | undefined => {
     const current = state();
@@ -142,7 +174,9 @@ function FileSlot(props: PaneProps<FileSpec>) {
       const wanted = range === "tail" ? await tailOf(props.shell, props.spec) : range;
       const reading =
         wanted === undefined ? "missing" : await readSlice(props.shell, props.spec, wanted);
-      if (reading === "missing") return await openFolderInstead(props.spec);
+      if (reading === "missing" && props.spec.spill === undefined) {
+        return await openFolderInstead(props.spec);
+      }
       setState(
         typeof reading === "string"
           ? { kind: "refused", reading, spec: props.spec }
@@ -188,10 +222,33 @@ function FileSlot(props: PaneProps<FileSpec>) {
     if (existing === undefined) setMount(shown);
     else existing.replace(loaded.text, numbering, props.spec.path);
     if (landing === "end") shown.scrollTo("end");
+    if (untrack(query) !== "") setFound(shown.find(untrack(query)));
   });
   onCleanup(() => mount()?.destroy());
 
+  const openFind = (): void => {
+    setFinding(true);
+    findInput?.focus();
+    findInput?.select();
+  };
+  const findText = (text: string): void => {
+    setQuery(text);
+    setFound(mount()?.find(text));
+  };
+  const stepFind = (step: FindStep): void => {
+    if (query() !== "") setFound(mount()?.findStep(step));
+  };
+  const closeFind = (): void => {
+    setFinding(false);
+    findText("");
+    root?.focus({ preventScroll: true });
+  };
+
   const openInEditor = (): void => {
+    if (props.spec.spill !== undefined) {
+      setEditorRefusal(spillEditorRefusal);
+      return;
+    }
     const line = mount()?.lineAtTop();
     const path = props.spec.path;
     setEditorRefusal(undefined);
@@ -224,6 +281,12 @@ function FileSlot(props: PaneProps<FileSpec>) {
         return mount()?.scrollBy(-1);
       case "file.editor":
         return openInEditor();
+      case "file.find":
+        return openFind();
+      case "file.find-next":
+        return stepFind(1);
+      case "file.find-previous":
+        return stepFind(-1);
     }
   });
 
@@ -241,6 +304,27 @@ function FileSlot(props: PaneProps<FileSpec>) {
           </div>
         )}
       </Show>
+      <Show when={finding() || query() !== ""}>
+        <div class="kw-file-find">
+          <Show when={finding()} fallback={<span class="kw-file-find-query">{query()}</span>}>
+            <FindInput
+              ref={(input) => {
+                findInput = input;
+              }}
+              query={query()}
+              onQuery={findText}
+              onStep={stepFind}
+              onClose={closeFind}
+            />
+          </Show>
+          <span class="kw-file-find-count">
+            {findLine(found(), slice(), finding(), {
+              next: props.shell.keys.chord("file.find-next"),
+              previous: props.shell.keys.chord("file.find-previous"),
+            })}
+          </span>
+        </div>
+      </Show>
       <Show when={editorRefusal()}>
         {(refusal) => (
           <p class="kw-file-note" data-level="error">
@@ -256,7 +340,9 @@ function FileSlot(props: PaneProps<FileSpec>) {
         <Match when={refusalOf(state())}>
           {(refused) => (
             <p class="kw-file-note" data-level="error">
-              {describeRefusal(refused().reading, refused().spec.path)}
+              {refused().spec.spill === undefined
+                ? describeRefusal(refused().reading, refused().spec.path)
+                : spillRefusal(refused().reading === "binary" ? "binary" : "missing")}
             </p>
           )}
         </Match>
@@ -280,12 +366,82 @@ function FileSlot(props: PaneProps<FileSpec>) {
   );
 }
 
+interface FindInputProps {
+  ref: (input: HTMLInputElement) => void;
+  query: string;
+  onQuery: (text: string) => void;
+  onStep: (step: FindStep) => void;
+  onClose: () => void;
+}
+
+function FindInput(props: FindInputProps) {
+  let input: HTMLInputElement | undefined;
+  onMount(() => input?.focus());
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Enter") props.onStep(event.shiftKey ? -1 : 1);
+    else if (event.key === "Escape") props.onClose();
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  return (
+    <input
+      ref={(element) => {
+        input = element;
+        props.ref(element);
+      }}
+      class="kw-file-find-input"
+      type="text"
+      aria-label="find in this pane"
+      placeholder="find"
+      value={props.query}
+      onInput={(event) => props.onQuery(event.currentTarget.value)}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
+export interface FindKeys {
+  readonly next: string;
+  readonly previous: string;
+}
+
+export function findLine(
+  found: FindReading | undefined,
+  slice: TextSlice | undefined,
+  typing: boolean,
+  keys: FindKeys,
+): string {
+  const scope = slice === undefined || isWholeSlice(slice) ? "" : " in this slice";
+  if (found === undefined || found.at === undefined) return `no match${scope}`;
+  const steps = typing
+    ? "enter next · shift+enter back · esc done"
+    : `${keys.next} next · ${keys.previous} back`;
+  return `${found.at + 1} of ${found.hits}${scope} · ${steps}`;
+}
+
+function isWholeSlice(slice: TextSlice): boolean {
+  return slice.from === 0 && sliceReachesEnd(slice);
+}
+
 function readSlice(
   shell: ShellSeams,
   spec: FileSpec,
   range: FileRange,
 ): Promise<TextSlice | TextRefusal> {
-  return shell.client.file(spec.path, range);
+  return spec.spill === undefined
+    ? shell.client.file(spec.path, range)
+    : readSpill(shell, spec.spill, range);
+}
+
+async function readSpill(
+  shell: ShellSeams,
+  source: SpillSource,
+  range: FileRange,
+): Promise<TextSlice | TextRefusal> {
+  const asked = range.from === undefined && range.to === undefined ? { from: 0 } : range;
+  const reading = await shell.client.spill(source.sessionId, source.spillId, asked);
+  return reading === "gone" ? "missing" : reading;
 }
 
 async function tailOf(shell: ShellSeams, spec: FileSpec): Promise<FileRange | undefined> {

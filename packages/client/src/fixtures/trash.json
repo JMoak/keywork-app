@@ -54,7 +54,13 @@
           "title": "say hello",
           "createdAt": "2026-09-07T12:00:00.000Z",
           "lastActivityAt": "2026-09-07T12:00:00.000Z",
-          "messageCount": 2
+          "messageCount": 2,
+          "live": false,
+          "working": false,
+          "waiting": {
+            "asks": 0,
+            "tools": []
+          }
         }
       ]
     }

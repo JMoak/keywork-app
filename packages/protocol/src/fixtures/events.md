@@ -35,7 +35,7 @@ a version of its own, separate from the keywork release. `info.version` in `/doc
 release (`packages/cli/package.json`, or the build-time version in a release binary).
 `info.x-keywork-contract` is the contract version, `major.minor`, and the same string rides
 `/doc` as the `x-keywork-contract` response header so a client can read it before parsing
-anything. The constant lives in `packages/server/src/contract.ts` and is `1.2` today.
+anything. The constant lives in `packages/server/src/contract.ts` and is `1.5` today.
 
 Within a major, changes are additive. A route, an operation id, a response field or an event
 name that exists in `1.x` keeps existing and keeps its meaning through every later `1.y`.
@@ -148,6 +148,12 @@ Fires whenever the list of prompts waiting behind the active turn changes.
 |---|---|---|
 | `queued` | `QueuedPrompt[]` | Each `{ id, text, behavior, origin? }`; `behavior` is `steer` or `queue`, and `origin` is the same as on `turn.started`. |
 
+Steered prompts always come before queued ones. Besides a prompt joining or leaving for its
+turn, the list changes on `POST /sessions/{id}/queue/{itemId}/move` (a new order),
+`DELETE /sessions/{id}/queue/{itemId}` (one prompt dropped) and a prompt sent with
+`behavior: "now"` (every waiting prompt set aside, the terminal's ctrl+enter). The `id` here is
+the `itemId` those routes take.
+
 ## Tool lifecycle
 
 `tool.started` fires before the gate decides, so a refused call still announces itself: the
@@ -184,7 +190,7 @@ Fires when a tool returns or throws.
 | `callId` | `string` | Matches the `tool.started` call. |
 | `output` | `string` | The result text, bounded to the tool output budget. |
 | `isError` | `boolean` | True when the tool threw or was refused. |
-| `spill` | `SpillReference`, optional | Present when the output was clipped: `{ id, bytes, elidedFrom, elidedTo }` names the spill file beside the session. |
+| `spill` | `SpillReference`, optional | Present when the output was clipped: `{ id, bytes, elidedFrom, elidedTo }` names the spill file beside the session. Over `keywork serve`, `GET /sessions/{id}/spills/{spill.id}` reads it, by default exactly the clipped `[elidedFrom, elidedTo)`. |
 
 ## Child sessions
 
@@ -229,14 +235,18 @@ reaches the parent.
 Fires when the active policy would ask about a tool call and a guard exists to answer. The
 turn waits on the answer; over `keywork serve` a client answers with `POST /asks/{callId}`
 and an unanswered ask times out as a headless denial. Never fired when no guard can answer,
-and never replayed.
+and never replayed. The session journal keeps each ask as a `permission_ask` entry holding
+`{ tool, callId, rule, rules, change? }`, where `change` is `{ creates, linesBefore,
+linesAfter }` from the preview; the arguments already ride the assistant message, and the
+preview's text is never journaled ([`backlog/122`](backlog/122-tool-decision-evidence.md)).
 
 | Field | Type | Meaning |
 |---|---|---|
 | `ask` | `PermissionAsk` | `{ tool, callId, arguments, rule, rules, preview? }`. |
 
 `rule` says why the gate is asking: `policy` (a configured rule says ask) or `default` (the
-tool mutates and no rule covers it).
+tool mutates and no rule covers it). A session left quiet (`POST /sessions/{id}/quiet`) raises
+no ask for a call its quiet posture grants; see `gate.permission`.
 
 `rule` can also be `trusted`: the trusted read posture allows a command but asks for its
 write-capable form (`find … -delete`, `rg --pre`, `git log --output=…`). `rules` is the list
@@ -270,19 +280,48 @@ Fires when the trust gate decides on a tool call.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `decision` | `PermissionDecision` | `{ tool, callId, verdict, gate, scope? }`. |
+| `decision` | `PermissionDecision` | `{ tool, callId, verdict, gate, scope?, asked?, reason? }`. |
 
 `verdict` is `granted` or `denied`. `gate` says who decided: `policy` (a preset rule),
 `default` (the preset's fallback), `user` (an interactive answer) or `headless` (no one to
 ask; the answer is no and `keywork run` flags it).
 
 `gate` can also be `trusted`: the fixed read-only posture a trusted workspace gets decided it.
+
+`gate` is `quiet` when a quiet session's posture granted the call instead of a person
+(`POST /sessions/{id}/quiet { on: true }`, since contract 1.5), always with `scope: "session"`
+and `asked: false`, and no `gate.ask` before it. Quiet grants a call only when a `session`
+answer to its ask would record rules (`gate.ask`'s `rules`), none of them blanket (a bare
+`<program> *`), no part of the command destructive in the sense above (deletes, `git branch -D`,
+force pushes, `git reset --hard`, `git clean`, a discarding `git checkout`), the rules together
+covering every part of the command, and the ask not coming from the trusted posture's
+write-capable forms (`rule: "trusted"`). Those rules join the session's grants as a `session`
+answer's would. `write`, `edit` and anything else still fire `gate.ask`. It is a new origin on
+purpose: a client that tallies a person's answers, and `keywork sessions decisions`, never count
+a quiet grant as one. Turning quiet off revokes nothing it granted, and `keywork run` and every
+other headless gate never go quiet.
 The decision carries an optional `scope` when a person's grant decided it: `once`,
 `session` or `workspace` on the answer to an ask (`POST /asks/{callId}`), and `session` or
 `workspace` with `gate: "user"` on a later call an earlier grant covered without asking, whether
 an answer recorded it or it was granted ahead of an ask (`POST /permissions/workspace/grant` and
 `POST /permissions/session/{sessionId}/grant`, which also take every tool of one MCP server as
 the one rule `{ action: "mcp", resource: "<server>__*" }`). A denial carries no `scope`.
+
+`asked` says whether this verdict answered an ask: `true` when a guard was asked (a person,
+or the headless guard saying no), `false` when a rule, the trusted posture, the preset's
+fallback or a standing grant decided without asking. It is what tells a person's fresh
+`session` answer apart from the later calls that answer covers, which otherwise carry the same
+`gate: "user"` and `scope`. keywork sets it on every decision since contract 1.3; a decision
+journaled before then has none.
+
+`reason` says why a person denied: `unsafe` (the call should not run), `not-now` (the moment,
+not the call: stop, not that, later) or `other`. The TUI asks for it with one more key after
+`n` (`[u] unsafe  [n] not now  [o] other`; escape and enter answer `other`), and a client sends
+it as `reason` on `POST /asks/{callId}`. A grant never carries one, nor does a denial by a rule
+or the headless guard; a pane closing or an agent swap answers its pending asks `not-now`. A
+denial without `reason` was answered by a client that does not send one. Since contract 1.4.
+The distinction exists for evidence: a decider scored against the person's answers must not
+count a `not-now` as a judgment of the call.
 
 ### gate.preset
 
@@ -457,9 +496,10 @@ theme worn or taken off through `POST /arcs/{slug}/theme`, whose `theme` then ri
 `GET /arcs` so every client dresses the arc alike); `bots` after a bot is created or a session is bound to one; `workspaces` after the workspace is trusted
 and declared, a named workspace is created or chosen, and a focus dir is linked or unlinked;
 `permissions` after a grant ahead of an ask (`POST /permissions/workspace/grant`,
-`POST /permissions/session/{sessionId}/grant`), after either revoke, and after an ask is
-answered `granted` with a `session` or `workspace` scope. A verb that changed nothing fires
-nothing. The payload carries no detail on purpose: the family's
+`POST /permissions/session/{sessionId}/grant`), after either revoke, after an ask is
+answered `granted` with a `session` or `workspace` scope, when a session's quiet posture is
+turned on or off, and when a quiet grant adds a rule the session did not hold. A verb that
+changed nothing fires nothing. The payload carries no detail on purpose: the family's
 `GET` is the source of truth.
 
 ### session.removed
@@ -486,7 +526,7 @@ Fires after `POST /trash/{id}/restore` moves a session back from the trash. It a
 
 The one server event that belongs to a session: its `sessionId` is the session's id, not the
 empty string. Fires after every session verb (`prompt`, `model`, `thinking`, `effort`,
-`compact`, `undo`, `redo`, `restore`, `rename`) and again once a turn's messages are persisted, carrying
+`compact`, `undo`, `redo`, `restore`, `rename`, `quiet`, `flush`, `forget`) and again once a turn's messages are persisted, carrying
 the whole current state rather than what changed, so a client replaces its copy. It replaces
 nothing in the engine vocabulary: `turn.started` still opens a turn and `queue.changed` still
 announces the queue.
@@ -500,6 +540,7 @@ announces the queue.
 | `leafId` | `string \| null` | The session entry the next message will follow; `null` for an empty session. |
 | `arc` | `string`, optional | The arc the session is bound to; absent when unbound. |
 | `bot` | `string`, optional | The bot the session runs as; absent when it runs as no bot. |
+| `quiet` | `boolean` | Whether the session is quiet: its gate grants on its own what a `session` answer would cover (`POST /sessions/{id}/quiet`; see `gate.permission`). Since contract 1.5. |
 | `undoable` | `boolean` | Whether `POST /sessions/{id}/undo` has a prompt or a file checkpoint to take back. |
 | `redoable` | `boolean` | Whether `POST /sessions/{id}/redo` has a staged undo or restore, or a file checkpoint, to take back. |
 
@@ -517,7 +558,7 @@ settle fires nothing. Carries the session's id.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `phase` | `"after-turn" \| "between-tool-batches" \| "requested"` | When it ran: after the turn, between two tool batches of a running turn, or on `POST /sessions/{id}/compact`. |
+| `phase` | `"after-turn" \| "between-tool-batches" \| "requested"` | When it ran: after the turn, between two tool batches of a running turn, or on `POST /sessions/{id}/compact` or `POST /sessions/{id}/flush`. |
 | `flushed` | `number` | How many messages the memory flush exchanged with the model (0 when no flush ran). |
 | `compacted` | `CompactionEntry \| null` | The compaction entry written, or `null` when nothing was compacted. |
 | `notices` | `string[]` | What the pane would have shown: the compaction line, or why a flush or compaction failed. |
@@ -529,11 +570,12 @@ Fires after a verb changes the shape of a session's entry tree, so a client re-f
 `session.state`. `POST /sessions/{id}/leaf` also records a `session.state` envelope (the host
 writes it as part of the move, so it arrives first) because the leaf is part of the state.
 `POST /sessions/{id}/restore` moves the leaf too, so it records `leaf` the same way, naming the
-`restore` entry it wrote, which is the new leaf.
+`restore` entry it wrote, which is the new leaf. `POST /sessions/{id}/forget` does the same with
+the `context_edit` entry it wrote.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `reason` | `"fork" \| "label" \| "leaf"` | Which verb changed the tree: `POST /sessions/{id}/fork`, `/label`, or `/leaf` and `/restore`. |
+| `reason` | `"fork" \| "label" \| "leaf"` | Which verb changed the tree: `POST /sessions/{id}/fork`, `/label`, or `/leaf`, `/restore` and `/forget`. |
 | `entryId` | `string \| null` | The entry the verb named (on a restore, the entry it recorded); `null` only for a leaf move to the empty root. |
 | `forkedTo` | `string`, optional | On `fork`, the new session's id. The event rides the session that was forked, not the new one. |
 
@@ -552,6 +594,10 @@ fires on a server started with `--no-checkpoints`, where there is no baseline to
 |---|---|---|
 | `paths` | `string[]` | Every path that differs from the session-start baseline, relative to the workspace root, as `changedSince` lists it. |
 | `turn` | `number`, optional | The highest 1-based turn ordinal attributed to those paths, which is the turn that just touched them; absent when nothing differs or nothing is attributed. |
+
+`GET /sessions` sums the last listing announced for each session as its row's `changes`
+(`{ files, added, deleted }`), so a desk can show a session's changes before it opens any
+stream; a session with no announcement in this server process has no `changes` on its row.
 
 ## SSE framing
 

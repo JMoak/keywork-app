@@ -108,6 +108,9 @@
 .kw-stamp[data-voice="machine"] {
   color: var(--kw-density-light);
 }
+.kw-stamp[data-voice="summary"] {
+  color: var(--kw-text-faint);
+}
 .kw-stamp[data-voice="blank"] {
   color: transparent;
 }
@@ -154,6 +157,15 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-width: var(--kw-measure);
+}
+.kw-user[data-forgotten] {
+  font-weight: 400;
+  color: var(--kw-text-dim);
+}
+.kw-forgotten {
+  margin-left: 1ch;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-faint);
 }
 
 .kw-origin {
@@ -329,7 +341,8 @@ ol.kw-list {
   font-weight: 600;
 }
 
-.kw-thinking {
+.kw-thinking,
+.kw-flush {
   display: block;
   padding: 0;
   border: 0;
@@ -340,9 +353,43 @@ ol.kw-list {
   cursor: pointer;
   text-align: left;
 }
-.kw-thinking:focus-visible {
+.kw-thinking:focus-visible,
+.kw-flush:focus-visible {
   outline: 1px solid var(--kw-border-focus);
   outline-offset: 2px;
+}
+.kw-flush-facts {
+  margin: var(--kw-half) 0 0;
+  padding-left: 2ch;
+  border-left: 1px solid var(--kw-text-faint);
+  list-style: none;
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+.kw-summary {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-dim);
+  cursor: pointer;
+  text-align: left;
+}
+.kw-summary:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+.kw-summary-text {
+  margin: var(--kw-half) 0 0;
+  padding-left: 2ch;
+  border-left: 1px solid var(--kw-text-faint);
+  font-family: var(--kw-font-prose);
+  font-size: 1rem;
+  color: var(--kw-text-mid);
+  white-space: pre-wrap;
+  max-width: var(--kw-measure);
 }
 .kw-thinking-text {
   margin: var(--kw-half) 0 0;

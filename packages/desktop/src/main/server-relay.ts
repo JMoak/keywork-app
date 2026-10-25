@@ -4,6 +4,7 @@ import type { RelayEnd, RelayHead, RelayRequest } from "../shared/channels.ts";
 export interface RelaySeams {
   ticketFor(workspace: string): ServerTicket | undefined;
   fetch(input: string, init: RequestInit): Promise<Response>;
+  suspect?: ((workspace: string) => void) | undefined;
 }
 
 export interface RelaySink {
@@ -22,7 +23,9 @@ export function serverRelay(seams: RelaySeams): ServerRelay {
   return {
     start: async (request, sink) => {
       const ticket = seams.ticketFor(request.workspace);
-      if (ticket === undefined) return refused(`no server is open for ${request.workspace}`);
+      if (ticket === undefined) {
+        return refused(request, sink, `no server is open for ${request.workspace}`);
+      }
       const controller = new AbortController();
       inFlight.set(request.requestId, controller);
       let response: Response;
@@ -35,9 +38,15 @@ export function serverRelay(seams: RelaySeams): ServerRelay {
         });
       } catch (cause) {
         inFlight.delete(request.requestId);
-        return unreachable(cause);
+        if (!controller.signal.aborted) seams.suspect?.(request.workspace);
+        return refused(request, sink, `the server did not answer: ${messageOf(cause)}`);
       }
-      void pump(response, request.requestId, sink, () => inFlight.delete(request.requestId));
+      const broken = (): void => {
+        if (!controller.signal.aborted) seams.suspect?.(request.workspace);
+      };
+      void pump(response, request.requestId, sink, broken, () =>
+        inFlight.delete(request.requestId),
+      );
       return {
         status: response.status,
         statusText: response.statusText,
@@ -61,6 +70,7 @@ async function pump(
   response: Response,
   requestId: number,
   sink: RelaySink,
+  broken: () => void,
   done: () => void,
 ): Promise<void> {
   const body = response.body;
@@ -78,21 +88,27 @@ async function pump(
     }
     sink.end({ requestId });
   } catch (cause) {
-    sink.end({ requestId, error: cause instanceof Error ? cause.message : String(cause) });
+    broken();
+    sink.end({ requestId, error: messageOf(cause) });
   } finally {
     done();
   }
 }
 
-function refused(detail: string): RelayHead {
-  return { status: relayRefusedStatus, statusText: detail, headers: [] };
-}
-
-function unreachable(cause: unknown): RelayHead {
-  const detail = cause instanceof Error ? cause.message : String(cause);
+function refused(request: RelayRequest, sink: RelaySink, detail: string): RelayHead {
+  sink.chunk(request.requestId, refusalBody(detail));
+  sink.end({ requestId: request.requestId });
   return {
     status: relayRefusedStatus,
-    statusText: `the server did not answer: ${detail}`,
-    headers: [],
+    statusText: detail,
+    headers: [["content-type", "application/json"]],
   };
+}
+
+function refusalBody(detail: string): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify({ error: detail }));
+}
+
+function messageOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
 }

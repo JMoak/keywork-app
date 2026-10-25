@@ -156,6 +156,9 @@
 .kw-desk-cost {
   color: var(--kw-text-mid);
 }
+.kw-desk-changes {
+  font-family: var(--kw-font-mono);
+}
 .kw-desk-row[data-tone="ask"] .kw-desk-age {
   color: var(--kw-accent);
 }
@@ -206,11 +209,20 @@
 .kw-desk-answer[data-tone="deny"] {
   color: var(--kw-error);
 }
+.kw-desk-reason-prompt {
+  color: var(--kw-text-mid);
+}
+
+.kw-desk-words {
+  display: flex;
+  padding-left: 2.25rem;
+}
 
 @container desk (max-width: 559.98px) {
   .kw-desk-where,
   .kw-desk-facts .kw-gauge,
-  .kw-desk-cost {
+  .kw-desk-cost,
+  .kw-desk-changes {
     display: none;
   }
 }

@@ -1,0 +1,27 @@
+.kw-ask-reason-prompt {
+  color: var(--kw-text-mid);
+}
+
+.kw-ask-note {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1ch;
+}
+
+.kw-ask-note-input {
+  flex: 1 1 24ch;
+  min-width: 0;
+  padding: 0.125rem 0.5ch;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  border: none;
+  box-shadow: inset 0 -1px 0 var(--kw-border-focus);
+  outline: none;
+}
+
+.kw-ask-note-keys {
+  color: var(--kw-text-dim);
+}

@@ -1,3 +1,4 @@
+import type { AskScope, PermissionDecision } from "@keywork-app/protocol";
 import { recallText } from "./decisions.ts";
 import type { ToolRun } from "./types.ts";
 
@@ -13,7 +14,8 @@ export type SpanPart =
   | "grant"
   | "recall"
   | "reason"
-  | "hint";
+  | "hint"
+  | "spill";
 
 export interface RowSpan {
   text: string;
@@ -53,10 +55,9 @@ export function grantWord(run: ToolRun): string | undefined {
   const decision = run.decision;
   if (decision?.verdict !== "granted") return undefined;
   if (decision.gate === "trusted") return "trusted";
-  if (decision.scope === "session" || decision.scope === "workspace") {
-    return `${decision.scope} grant`;
-  }
-  return undefined;
+  return answeredByYou(decision)
+    ? approvalWords[decision.scope ?? "once"]
+    : standingGrant(decision);
 }
 
 export function compactJson(value: unknown): string {
@@ -86,6 +87,21 @@ const favoredSubjectKeys = [
   "name",
   "pattern",
 ];
+
+const approvalWords: Readonly<Record<AskScope, string>> = {
+  once: "approved",
+  session: "approved for this session",
+  workspace: "approved for this workspace",
+};
+
+function answeredByYou(decision: PermissionDecision): boolean {
+  return decision.gate === "user" && decision.asked === true;
+}
+
+function standingGrant(decision: PermissionDecision): string | undefined {
+  const { scope } = decision;
+  return scope === "session" || scope === "workspace" ? `${scope} grant` : undefined;
+}
 
 function headText(run: ToolRun): string {
   return run.subject === "" ? run.name : `${run.name} ${run.subject}`;

@@ -42,6 +42,12 @@
   color: var(--kw-text-mid);
 }
 
+.kw-tree-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .kw-tree-list {
   list-style: none;
   margin: 0;
@@ -89,6 +95,18 @@
 .kw-tree-mark {
   text-align: center;
   color: var(--kw-density-medium);
+}
+.kw-tree-mark[data-liveness="working"] {
+  color: var(--kw-density-heavy);
+}
+.kw-tree-mark[data-liveness="waiting"] {
+  color: var(--kw-accent);
+}
+
+.kw-tree-changes {
+  flex: none;
+  color: var(--kw-text-dim);
+  font-family: var(--kw-font-mono);
 }
 
 .kw-tree-title {
@@ -238,7 +256,8 @@
 @container tree (max-width: 559.98px) {
   .kw-tree-age,
   .kw-tree-cost,
-  .kw-tree-wears {
+  .kw-tree-wears,
+  .kw-tree-files {
     display: none;
   }
 }

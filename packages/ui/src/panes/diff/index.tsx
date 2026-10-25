@@ -2,11 +2,13 @@ import { type ChangesState, changesByTurn, countsOf, type TurnGroup } from "@key
 import type { ChangedFileReading, ChangedPath } from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { z } from "zod";
+import type { HostPort } from "../../host/port.ts";
 import { tierOf, type WidthTier } from "../../page/tiers.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps } from "../registry.ts";
 import { type MergeMount, mergeLayoutFor, mountMergeView } from "./merge-view.ts";
+import { unifiedPatch } from "./patch.ts";
 import { createTurnVerbs, TurnVerbRow, type TurnVerbs } from "./turn-verbs.tsx";
 import "./diff.css";
 
@@ -85,11 +87,38 @@ export const diffPane = definePane<DiffSpec>({
       help: "redo what undo took",
       command: { name: "redo-turn", description: "bring back the turn and files the undo took" },
     },
+    "diff.copy": {
+      chords: "none",
+      help: "copy the diff as a patch",
+      command: {
+        name: "copy-diff",
+        aliases: ["copy-hunk"],
+        description: "copy the open file's diff, or the one under the cursor, as a patch",
+      },
+    },
   },
   onRestore: (spec, shell) => {
     if (spec.sessionId !== undefined) void shell.store.openChanges(spec.sessionId);
   },
 });
+
+export async function copiedPatchLine(
+  host: Pick<HostPort, "writeClipboard">,
+  reading: ChangedFileReading | undefined,
+): Promise<string> {
+  if (reading === undefined || typeof reading === "string") {
+    return "nothing to copy · this file has no diff to read";
+  }
+  if (reading.note === "binary") return "nothing to copy · a binary file has no text diff";
+  const patch = unifiedPatch(reading);
+  if (patch === "") return "nothing to copy · the file reads the same before and after";
+  try {
+    await host.writeClipboard(patch);
+  } catch {
+    return "the clipboard refused it";
+  }
+  return `copied the diff of ${reading.path} · ${patch.length} chars`;
+}
 
 export function availabilityLine(state: ChangesState): string | undefined {
   return state.availability === "no-baseline" ? noBaselineLine : undefined;
@@ -118,7 +147,7 @@ function DiffSlot(props: PaneProps<DiffSpec>) {
 }
 
 function SessionDiff(props: PaneProps<DiffSpec> & { sessionId: string }) {
-  const verbs = createTurnVerbs(props.shell, () => props.sessionId);
+  const verbs = createTurnVerbs(props.shell, () => props.sessionId, props.shell.keys);
   return (
     <Show keyed when={props.spec.path} fallback={<FilesLevel {...props} verbs={verbs} />}>
       {(path) => <FileLevel {...props} path={path} verbs={verbs} />}
@@ -131,6 +160,13 @@ type LevelProps = PaneProps<DiffSpec> & { sessionId: string; verbs: TurnVerbs };
 function turnVerb(action: string, verbs: TurnVerbs): void {
   if (action === "diff.undo") void verbs.undo();
   if (action === "diff.redo") void verbs.redo();
+}
+
+function answeringFirst(verbs: TurnVerbs, act: (action: string) => void) {
+  return (action: string): void => {
+    if (verbs.asking() === undefined) act(action);
+    else verbs.answer(false);
+  };
 }
 
 function FilesLevel(props: LevelProps) {
@@ -146,35 +182,52 @@ function FilesLevel(props: LevelProps) {
   let root: HTMLElement | undefined;
   keepKeyboardHome(
     () => root,
-    () => props.focused,
+    () => props.focused && props.verbs.asking() === undefined,
   );
 
   createEffect(() => {
     void props.shell.store.openChanges(props.sessionId);
   });
 
-  props.onAction((action) => {
-    switch (action) {
-      case "diff.down":
-        setCursor((at) => Math.min(at + 1, Math.max(files().length - 1, 0)));
-        break;
-      case "diff.up":
-        setCursor((at) => Math.max(at - 1, 0));
-        break;
-      case "diff.open":
-        open(files()[cursor()]);
-        break;
-      case "diff.refresh":
-        void props.shell.store.openChanges(props.sessionId, { force: true });
-        break;
-      default:
-        turnVerb(action, props.verbs);
+  const [copied, setCopied] = createSignal<string>();
+  const copyAtCursor = async (): Promise<void> => {
+    const file = files()[cursor()];
+    if (file === undefined) {
+      setCopied("nothing to copy · no changed file here");
+      return;
     }
-  });
+    const reading = await props.shell.store.changedFile(props.sessionId, file.path);
+    setCopied(await copiedPatchLine(props.shell.host, reading));
+  };
+
+  props.onAction(
+    answeringFirst(props.verbs, (action) => {
+      switch (action) {
+        case "diff.down":
+          setCursor((at) => Math.min(at + 1, Math.max(files().length - 1, 0)));
+          break;
+        case "diff.up":
+          setCursor((at) => Math.max(at - 1, 0));
+          break;
+        case "diff.open":
+          open(files()[cursor()]);
+          break;
+        case "diff.refresh":
+          void props.shell.store.openChanges(props.sessionId, { force: true });
+          break;
+        case "diff.copy":
+          void copyAtCursor();
+          break;
+        default:
+          turnVerb(action, props.verbs);
+      }
+    }),
+  );
 
   return (
     <section class="kw-diff" aria-label="changed files" tabIndex={-1} ref={root}>
       <TurnVerbRow verbs={props.verbs} keys={props.shell.keys} />
+      <Show when={copied()}>{(line) => <p class="kw-diff-note">{line()}</p>}</Show>
       <Show when={availabilityLine(changes())}>
         {(line) => <p class="kw-diff-unavailable">{line()}</p>}
       </Show>
@@ -227,7 +280,7 @@ function FileLevel(props: LevelProps & { path: string }) {
   let mounted: MergeMount | undefined;
   keepKeyboardHome(
     () => root,
-    () => props.focused,
+    () => props.focused && props.verbs.asking() === undefined,
   );
   const back = (): void =>
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId });
@@ -273,28 +326,36 @@ function FileLevel(props: LevelProps & { path: string }) {
   });
   onCleanup(() => mounted?.destroy());
 
-  props.onAction((action) => {
-    switch (action) {
-      case "diff.back":
-        back();
-        break;
-      case "diff.next":
-        mounted?.nextHunk();
-        break;
-      case "diff.prev":
-        mounted?.previousHunk();
-        break;
-      case "diff.refresh":
-        void props.shell.store.changedFile(props.sessionId, props.path).then(setReading);
-        break;
-      default:
-        turnVerb(action, props.verbs);
-    }
-  });
+  const [copied, setCopied] = createSignal<string>();
+
+  props.onAction(
+    answeringFirst(props.verbs, (action) => {
+      switch (action) {
+        case "diff.back":
+          back();
+          break;
+        case "diff.next":
+          mounted?.nextHunk();
+          break;
+        case "diff.prev":
+          mounted?.previousHunk();
+          break;
+        case "diff.refresh":
+          void props.shell.store.changedFile(props.sessionId, props.path).then(setReading);
+          break;
+        case "diff.copy":
+          void copiedPatchLine(props.shell.host, reading()).then(setCopied);
+          break;
+        default:
+          turnVerb(action, props.verbs);
+      }
+    }),
+  );
 
   return (
     <section class="kw-diff" aria-label="file diff" tabIndex={-1} ref={root}>
       <TurnVerbRow verbs={props.verbs} keys={props.shell.keys} />
+      <Show when={copied()}>{(line) => <p class="kw-diff-note">{line()}</p>}</Show>
       <div class="kw-diff-head">
         <button type="button" class="kw-diff-back" onClick={back}>
           ‹ changes

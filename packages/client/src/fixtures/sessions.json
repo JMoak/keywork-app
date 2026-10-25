@@ -7,7 +7,18 @@
       "lastActivityAt": "2026-09-07T12:00:00.000Z",
       "messageCount": 4,
       "model": "mock/mock-model",
-      "thinking": false
+      "thinking": false,
+      "live": true,
+      "working": false,
+      "waiting": {
+        "asks": 0,
+        "tools": []
+      },
+      "changes": {
+        "files": 0,
+        "added": 0,
+        "deleted": 0
+      }
     }
   ]
 }

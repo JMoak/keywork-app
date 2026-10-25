@@ -12,8 +12,14 @@ export const hostChannels = {
   setNeedsYou: "host:set-needs-you",
   notificationActivated: "host:notification-activated",
   openExternal: "host:open-external",
+  openInEditor: "host:open-in-editor",
+  writeClipboard: "host:write-clipboard",
+  watchKeybindings: "host:watch-keybindings",
+  unwatchKeybindings: "host:unwatch-keybindings",
+  keybindingsRead: "host:keybindings-read",
   notify: "host:notify",
   serverLost: "host:server-lost",
+  serverRegained: "host:server-regained",
   serverFetch: "host:server-fetch",
   serverAbort: "host:server-abort",
   serverChunk: "host:server-chunk",
@@ -22,6 +28,25 @@ export const hostChannels = {
   acceptUpdate: "host:accept-update",
   saveAs: "host:save-as",
 } as const;
+
+export interface KeybindingsWatch {
+  id: number;
+  workspace?: string | undefined;
+  projectTrusted: boolean;
+}
+
+export type KeybindingsReading =
+  | { kind: "read"; layers: readonly { file: string; keybindings: unknown }[] }
+  | { kind: "unreadable"; problem: string };
+
+export interface EditorTarget {
+  path: string;
+  line?: number | undefined;
+}
+
+export type EditorOpened =
+  | { via: "editor"; editor: string }
+  | { via: "revealed"; because: string; shownIn: string };
 
 export interface RelayRequest {
   requestId: number;

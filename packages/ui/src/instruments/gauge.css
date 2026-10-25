@@ -29,3 +29,8 @@
 .kw-gauge-count {
   color: var(--kw-text-dim);
 }
+
+.kw-gauge-counted,
+.kw-gauge-unit {
+  color: var(--kw-text-faint);
+}

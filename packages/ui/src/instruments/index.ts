@@ -6,6 +6,7 @@ export {
   type ContextLevel,
   contextLevelOf,
   contextLevelOfReport,
+  estimatedWord,
   type GaugeCell,
   type GaugeStyle,
   gaugeCells,

@@ -15,7 +15,7 @@ import { keymapFromConfig } from "../../keys/index.ts";
 import { type NeedsYouItem, orderNeedsYou } from "../../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../../shell/needs-you-queue.ts";
 import { airlockItem, askItem, failedItem, inboxItem } from "../../shell/needs-you-testing.ts";
-import { createQuietSessions } from "../../shell/quiet.ts";
+import type { QuietPosture } from "../../shell/quiet.ts";
 import { createSessionReads } from "../../shell/session-reads.ts";
 import { keyworkNight, themeNamed } from "../../theme/index.ts";
 import { mountPane, overviewShell } from "../overview/rows.test.tsx";
@@ -303,8 +303,8 @@ function deskHarness(staging: DeskStaging) {
     const visited: string[] = [];
     const opened: string[] = [];
     const answered: [string, AskVerdict, AskScope | undefined][] = [];
-    const quiet = createQuietSessions();
-    for (const id of staging.quiet ?? []) quiet.toggle(id);
+    const quietIds = staging.quiet ?? [];
+    const quiet: QuietPosture = { has: (id) => id !== undefined && quietIds.includes(id) };
     const base = overviewShell({ summaries }).shell;
     const queue: NeedsYouQueue = {
       items,

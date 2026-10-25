@@ -1,5 +1,13 @@
 import { Match, Show, Switch } from "solid-js";
-import { reopeningNotice, type TrustFlow, trustPrompt, trustStaysOff } from "./trust.ts";
+import {
+  reopeningNotice,
+  staleServeNotice,
+  type TrustFlow,
+  type TrustState,
+  trustPrompt,
+  trustStaysOff,
+  waitingOnServeNotice,
+} from "./trust.ts";
 import "./trust.css";
 
 export interface TrustCardProps {
@@ -34,7 +42,20 @@ export function TrustCard(props: TrustCardProps) {
             <p class="kw-trust-refusal">{messageOf(state())}</p>
           </Match>
           <Match when={state().kind === "restarting"}>
-            <p class="kw-trust-restarting">{reopeningNotice(rootOf(state()))}</p>
+            <p class="kw-trust-restarting">{restartingLine(state())}</p>
+          </Match>
+          <Match when={state().kind === "stale"}>
+            <p class="kw-trust-restarting">{staleServeNotice(rootOf(state()))}</p>
+            <p class="kw-trust-keys">
+              <button
+                type="button"
+                class="kw-trust-accept"
+                onClick={() => void props.trust.accept()}
+              >
+                check again
+              </button>
+              <kbd>{props.chord}</kbd>
+            </p>
           </Match>
         </Switch>
       </aside>
@@ -42,10 +63,17 @@ export function TrustCard(props: TrustCardProps) {
   );
 }
 
-function rootOf(state: ReturnType<TrustFlow["state"]>): string {
+function restartingLine(state: TrustState): string {
+  const root = rootOf(state);
+  return state.kind === "restarting" && state.attached === true
+    ? waitingOnServeNotice(root)
+    : reopeningNotice(root);
+}
+
+function rootOf(state: TrustState): string {
   return "root" in state ? state.root : "";
 }
 
-function messageOf(state: ReturnType<TrustFlow["state"]>): string | undefined {
+function messageOf(state: TrustState): string | undefined {
   return "message" in state ? state.message : undefined;
 }

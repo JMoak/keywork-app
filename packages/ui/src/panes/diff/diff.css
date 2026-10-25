@@ -125,3 +125,9 @@
 .kw-diff-verb-notice {
   color: var(--kw-text-dim);
 }
+
+.kw-diff-verbs .kw-ov-line {
+  flex-basis: 100%;
+  padding: 0;
+  border-top: none;
+}

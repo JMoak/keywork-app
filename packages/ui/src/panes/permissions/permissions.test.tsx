@@ -12,7 +12,7 @@ import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import grantAnswers from "../../../../client/src/fixtures/grants.json";
 import { quietMark } from "../../chrome/title-row.tsx";
-import { createQuietSessions } from "../../shell/quiet.ts";
+import type { QuietPosture } from "../../shell/quiet.ts";
 import { inertFeed } from "../../shell/trust.test.ts";
 import { mountPane, overviewShell, settle } from "../overview/rows.test.tsx";
 import type { ShellSeams } from "../registry.ts";
@@ -187,8 +187,7 @@ describe("the permissions pane", () => {
 
   it("marks the grants of a session that is quiet", async () => {
     const harness = permissionsShell([recordedView]);
-    const quiet = createQuietSessions();
-    quiet.toggle("s1");
+    const quiet: QuietPosture = { has: (id) => id === "s1" };
     const { container } = mountPane(
       permissionsPane.component,
       { kind: "permissions" },

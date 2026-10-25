@@ -104,18 +104,23 @@ export function createTrustSetup(seams: TrustSetupSeams): TrustSetup {
       standing.kind === "recorded" ? [standing.rule] : [],
     );
 
+  let reads = 0;
   const read = async (): Promise<PostureFacts | undefined> => {
+    const mine = ++reads;
     try {
       const facts = await readPostureFacts(seams.client);
+      if (mine !== reads) return undefined;
       setReading({ phase: "read", facts, proposal: proposalOf(facts, recordedHere()) });
       const awaiting = stillAwaitingTheirAsk(record().accepted, facts);
       if (awaiting.length !== record().accepted.length) remember({ accepted: awaiting });
       return facts;
     } catch (error) {
-      setReading({
-        phase: "failed",
-        reason: `could not read the permissions · ${messageOf(error)}`,
-      });
+      if (mine === reads) {
+        setReading({
+          phase: "failed",
+          reason: `could not read the permissions · ${messageOf(error)}`,
+        });
+      }
       return undefined;
     }
   };

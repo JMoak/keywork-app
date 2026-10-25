@@ -38,11 +38,28 @@ export function freePort(): Promise<number> {
   });
 }
 
-export async function commandOutput(command: string, args: readonly string[]): Promise<string> {
+export const commandPatienceMs = 5000;
+
+export async function commandOutput(
+  command: string,
+  args: readonly string[],
+  patienceMs = commandPatienceMs,
+): Promise<string> {
   const child = spawnChild(command, args, ".");
   let text = "";
-  for await (const chunk of child.stdout) text += chunk;
-  await child.exited;
+  const read = (async () => {
+    for await (const chunk of child.stdout) text += chunk;
+    await child.exited;
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const gaveUp = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      child.signal("SIGKILL");
+      resolve();
+    }, patienceMs);
+  });
+  await Promise.race([read, gaveUp]);
+  clearTimeout(timer);
   return text;
 }
 

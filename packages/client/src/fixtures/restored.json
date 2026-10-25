@@ -4,10 +4,10 @@
     "body": {
       "turn": 1,
       "prompt": {
-        "entryId": "q5",
+        "entryId": "q1",
         "text": "write two lines to notes.txt"
       },
-      "leafId": "q3",
+      "leafId": "q5",
       "undoneTurns": 2,
       "files": [
         {
@@ -45,23 +45,8 @@
     "status": 200,
     "body": {
       "sessionId": "s1",
-      "leafId": "q4",
+      "leafId": "q6",
       "entries": [
-        {
-          "type": "custom",
-          "customType": "permission_decision",
-          "data": {
-            "decision": {
-              "tool": "write",
-              "callId": "w1",
-              "verdict": "granted",
-              "gate": "policy"
-            }
-          },
-          "id": "q6",
-          "parentId": null,
-          "timestamp": "2026-09-07T12:00:00.000Z"
-        },
         {
           "type": "message",
           "message": {
@@ -73,9 +58,25 @@
               }
             ]
           },
-          "checkpoint": "<sha>",
-          "id": "q5",
-          "parentId": "q6",
+          "id": "q1",
+          "parentId": null,
+          "timestamp": "2026-09-07T12:00:00.000Z",
+          "checkpoint": "<sha>"
+        },
+        {
+          "type": "custom",
+          "customType": "permission_decision",
+          "data": {
+            "decision": {
+              "tool": "write",
+              "callId": "w1",
+              "verdict": "granted",
+              "gate": "policy",
+              "asked": false
+            }
+          },
+          "id": "q7",
+          "parentId": "q1",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -94,8 +95,12 @@
               }
             ]
           },
-          "id": "q7",
-          "parentId": "q5",
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          },
+          "id": "q8",
+          "parentId": "q7",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -111,8 +116,8 @@
               }
             ]
           },
-          "id": "q8",
-          "parentId": "q7",
+          "id": "q9",
+          "parentId": "q8",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -126,8 +131,36 @@
               }
             ]
           },
-          "id": "q1",
-          "parentId": "q8",
+          "usage": {
+            "inputTokens": 12,
+            "outputTokens": 5
+          },
+          "id": "q10",
+          "parentId": "q9",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "custom",
+          "customType": "turn_facts",
+          "data": {
+            "prompt": "q1",
+            "checkpoint": "<sha>",
+            "settled": "b8aec9de5833d1454488f7d3616a6408879f522b",
+            "files": [
+              {
+                "path": "notes.txt",
+                "added": 2,
+                "deleted": 0
+              }
+            ],
+            "session": {
+              "files": 1,
+              "added": 2,
+              "deleted": 0
+            }
+          },
+          "id": "q2",
+          "parentId": "q10",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -141,8 +174,8 @@
               }
             ]
           },
-          "id": "q9",
-          "parentId": "q1",
+          "id": "q3",
+          "parentId": "q2",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -156,8 +189,23 @@
               }
             ]
           },
-          "id": "q2",
-          "parentId": "q9",
+          "usage": {
+            "inputTokens": 12,
+            "outputTokens": 5
+          },
+          "id": "q11",
+          "parentId": "q3",
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
+        {
+          "type": "custom",
+          "customType": "turn_facts",
+          "data": {
+            "prompt": "q3",
+            "files": []
+          },
+          "id": "q4",
+          "parentId": "q11",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -165,32 +213,40 @@
           "customType": "restore",
           "data": {
             "turn": 1,
-            "from": "q2",
-            "files": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+            "from": "q4",
+            "files": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "redo": "b8aec9de5833d1454488f7d3616a6408879f522b"
           },
-          "id": "q3",
-          "parentId": "q6",
+          "id": "q5",
+          "parentId": null,
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
           "type": "custom",
           "customType": "restore-undone",
           "data": {
-            "restore": "q3"
+            "restore": "q5"
           },
-          "id": "q4",
-          "parentId": "q2",
+          "id": "q6",
+          "parentId": "q4",
           "timestamp": "2026-09-07T12:00:00.000Z"
         }
       ],
       "labels": {},
       "activePath": [
-        "q6",
-        "q5",
+        "q1",
         "q7",
         "q8",
-        "q1",
         "q9",
+        "q10",
+        "q2",
+        "q3",
+        "q11",
+        "q4",
+        "q6"
+      ],
+      "journal": [
+        "q7",
         "q2",
         "q4"
       ]

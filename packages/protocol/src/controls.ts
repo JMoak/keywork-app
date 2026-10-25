@@ -1,5 +1,5 @@
 import type { Usage } from "./events.ts";
-import type { ChangedPath, CompactionEntry } from "./sessions.ts";
+import type { ChangedPath, CompactionEntry, ContextEditEntry } from "./sessions.ts";
 
 export const effortLevels = ["low", "medium", "high", "xhigh", "max"] as const;
 
@@ -11,7 +11,9 @@ export type PresetName = (typeof presetOrder)[number];
 
 export type ActivePreset = PresetName | "custom";
 
-export type PromptBehavior = "steer" | "queue";
+export type SendBehavior = "steer" | "queue";
+
+export type PromptBehavior = SendBehavior | "now";
 
 export interface SessionState {
   model?: string;
@@ -21,6 +23,7 @@ export interface SessionState {
   leafId: string | null;
   arc?: string;
   bot?: string;
+  quiet?: boolean;
   undoable: boolean;
   redoable: boolean;
 }
@@ -94,6 +97,22 @@ export interface TurnRestored {
   redoable: boolean;
 }
 
+export interface RestorePreview {
+  turn: number;
+  prompt: UndonePrompt;
+  undoneTurns: number;
+  files: readonly ChangedPath[];
+  others: readonly OtherSessionFiles[];
+}
+
+export interface OtherSessionFiles {
+  sessionId: string;
+  title: string;
+  paths: readonly string[];
+}
+
+export type RestorePreviewReading = RestorePreview | "missing" | "unknown-turn";
+
 export interface ContextReport {
   used: number;
   window: number;
@@ -103,7 +122,7 @@ export interface ContextReport {
   fullness: number;
   flushDue: boolean;
   compactionDue: boolean;
-  basis: "estimated";
+  basis: ContextBasis;
   parts: ContextParts;
   thresholds: ContextThresholds;
 }
@@ -169,6 +188,19 @@ export interface Renamed {
   title: string;
 }
 
+export interface QuietSwitch {
+  quiet: boolean;
+}
+
+export interface Flushed {
+  flushed: number;
+  notices: readonly string[];
+}
+
+export interface Forgotten {
+  edit: ContextEditEntry;
+}
+
 export interface PresetSwitch {
   from: ActivePreset;
   to: PresetName;
@@ -200,6 +232,9 @@ export type RedoReading = SessionVerbReading<Redone>;
 export type TurnRestoreReading = SessionVerbReading<TurnRestored>;
 export type ExportReading = SessionVerbReading<ExportedSession>;
 export type RenameReading = SessionVerbReading<Renamed>;
+export type QuietReading = QuietSwitch | "missing";
+export type FlushReading = SessionVerbReading<Flushed>;
+export type ForgetReading = SessionVerbReading<Forgotten>;
 export type ContextReading = ContextReport | "missing";
 export type CostReading = CostReport | "missing";
 export type PresetReading = PresetSwitch | ControlRefusal;

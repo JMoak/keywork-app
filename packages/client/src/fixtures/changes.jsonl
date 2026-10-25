@@ -1,12 +1,12 @@
-{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"write two lines to notes.txt"}}
-{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"quiet":false,"undoable":false,"redoable":false}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"write two lines to notes.txt","entryId":"q1"}}
 {"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"tool-call","call":{"type":"tool-call","callId":"w1","name":"write","arguments":{"path":"notes.txt","content":"one\ntwo\n"}}}}}
 {"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":0,"outputTokens":0}}}}
 {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"tool.started","payload":{"call":{"type":"tool-call","callId":"w1","name":"write","arguments":{"path":"notes.txt","content":"one\ntwo\n"}}}}
-{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"gate.permission","payload":{"decision":{"tool":"write","callId":"w1","verdict":"granted","gate":"policy"}}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"gate.permission","payload":{"decision":{"tool":"write","callId":"w1","verdict":"granted","gate":"policy","asked":false}}}
 {"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"tool.finished","payload":{"callId":"w1","output":"Wrote 8 characters to notes.txt","isError":false}}
 {"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Wrote notes.txt."}}}
 {"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Wrote notes.txt."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
-{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","undoable":true,"redoable":false}}
-{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"changes.updated","payload":{"paths":["notes.txt"],"turn":1}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"changes.updated","payload":{"paths":["notes.txt"],"turn":1}}
+{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","quiet":false,"undoable":true,"redoable":false}}

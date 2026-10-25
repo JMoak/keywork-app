@@ -68,3 +68,27 @@
 .kw-status-gap {
   color: var(--kw-accent-soft);
 }
+.kw-status-update {
+  color: var(--kw-text-dim);
+}
+.kw-status-update-accept {
+  font: inherit;
+  color: var(--kw-text-mid);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.kw-status-update-accept::before {
+  content: "·";
+  margin: 0 1ch;
+  color: var(--kw-text-dim);
+}
+.kw-status-update-accept:hover,
+.kw-status-update-accept:focus-visible {
+  color: var(--kw-text);
+}
+.kw-status-update-accept:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}

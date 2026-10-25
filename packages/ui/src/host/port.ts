@@ -10,9 +10,16 @@ export interface HostPort {
   onOpenWorkspacesChanged(listener: (open: readonly OpenWorkspaceEntry[]) => void): () => void;
   onOpenRequested(listener: (path: string) => void): () => void;
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
+  onServerRegained(listener: (regained: ServerRegained) => void): () => void;
   onUpdateReady(listener: (update: UpdateReady) => void): () => void;
   acceptUpdate(): Promise<void>;
   openExternal(url: string): Promise<void>;
+  openInEditor(target: EditorTarget): Promise<EditorOpened>;
+  writeClipboard(text: string): Promise<void>;
+  watchKeybindings(
+    scope: KeybindingsScope,
+    listener: (reading: KeybindingsReading) => void,
+  ): () => void;
   notify(notice: HostNotice): Promise<void>;
   onNotificationActivated(listener: (trigger: NeedsYouTrigger) => void): () => void;
   setNeedsYou(count: number): Promise<void>;
@@ -95,7 +102,9 @@ export type WorkspaceFailure =
   | { kind: "failed"; exitCode: number | null; detail: string }
   | { kind: "unreachable"; ticket: { url: string }; detail: string }
   | { kind: "version-mismatch"; expected: string; actual: string }
-  | { kind: "no-ticket"; detail: string };
+  | { kind: "no-ticket"; detail: string }
+  | { kind: "silent"; waitedMs: number; detail: string }
+  | { kind: "gone"; url: string };
 
 export type WorkspaceOpen =
   | { ok: true; opened: OpenedWorkspace }
@@ -108,6 +117,12 @@ export interface UpdateReady {
 export interface ServerLoss {
   workspace: string;
   failure: WorkspaceFailure;
+  reattaching?: boolean | undefined;
+}
+
+export interface ServerRegained {
+  workspace: string;
+  opened: OpenedWorkspace;
 }
 
 export interface OpenWorkspaceEntry {
@@ -131,6 +146,29 @@ export interface HostNotice {
   trigger: NeedsYouTrigger;
 }
 
+export interface EditorTarget {
+  path: string;
+  line?: number | undefined;
+}
+
+export type EditorOpened =
+  | { via: "editor"; editor: string }
+  | { via: "revealed"; because: string; shownIn: string };
+
+export interface KeybindingsScope {
+  workspace?: string | undefined;
+  projectTrusted: boolean;
+}
+
+export type KeybindingsReading =
+  | { kind: "read"; layers: readonly KeybindingsLayer[] }
+  | { kind: "unreadable"; problem: string };
+
+export interface KeybindingsLayer {
+  file: string;
+  keybindings: unknown;
+}
+
 export const hostGlobal = "keyworkHost";
 
 export function hostFromWindow(): HostPort | undefined {
@@ -150,11 +188,27 @@ export function describeFailure(failure: WorkspaceFailure): string {
       return `port ${failure.port} is taken`;
     case "unreachable":
       return `keywork serve started but did not answer: ${failure.detail}`;
+    case "silent":
+      return silentLine(failure.waitedMs, failure.detail);
+    case "gone":
+      return `the keywork serve at ${hostOf(failure.url)} stopped answering`;
     case "no-ticket":
     case "usage":
     case "failed":
       return failure.detail === "" ? "keywork serve stopped without saying why" : failure.detail;
   }
+}
+
+function silentLine(waitedMs: number, stderr: string): string {
+  const said = `keywork serve gave no address in ${Math.round(waitedMs / 1000)}s`;
+  const lastWords = stderr.split("\n").findLast((line) => line.trim() !== "");
+  return lastWords === undefined
+    ? `${said} and was stopped`
+    : `${said} · it last said ${lastWords.trim()}`;
+}
+
+function hostOf(url: string): string {
+  return url.replace(/^https?:\/\//, "");
 }
 
 function isHostPort(candidate: unknown): candidate is HostPort {

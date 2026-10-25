@@ -7,7 +7,8 @@ import {
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { z } from "zod";
 import { hueStop } from "../../chrome/pane-frame.tsx";
-import { relativeAge, sessionName } from "../../chrome/telemetry.ts";
+import { sessionName } from "../../chrome/session-name.ts";
+import { relativeAge } from "../../chrome/telemetry.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import {
@@ -70,37 +71,37 @@ export const arcsPane = definePane<ArcsSpec>({
     "arcs.new": {
       chords: "n",
       help: "open a new arc",
-      command: { name: "arc-new", description: "open a new arc" },
+      command: { name: "arcs-new", description: "open a new arc" },
     },
     "arcs.close": {
       chords: "c",
       help: "close the arc through the airlock",
-      command: { name: "arc-close", description: "close this arc through the airlock" },
+      command: { name: "arcs-close", description: "close this arc through the airlock" },
     },
     "arcs.abandon": {
       chords: "shift+a",
       help: "abandon the arc (confirm)",
-      command: { name: "arc-abandon", description: "archive this arc without distilling" },
+      command: { name: "arcs-abandon", description: "archive this arc without distilling" },
     },
     "arcs.bind": {
       chords: "b",
       help: "bind the current session to the arc",
-      command: { name: "arc-bind", description: "bind the focused session to this arc" },
+      command: { name: "arcs-bind", description: "bind the focused session to this arc" },
     },
     "arcs.release": {
       chords: "u",
       help: "release the current session from its arc",
-      command: { name: "arc-release", description: "release the focused session from its arc" },
+      command: { name: "arcs-release", description: "release the focused session from its arc" },
     },
     "arcs.wear": {
       chords: "w",
       help: "wear a theme on this arc",
-      command: { name: "arc-theme", description: "open the themes pane on this arc" },
+      command: { name: "arcs-theme", description: "open the themes pane on this arc" },
     },
     "arcs.undress": {
       chords: "shift+w",
       help: "let this arc inherit the house theme again",
-      command: { name: "arc-inherit", description: "drop this arc's theme so it inherits again" },
+      command: { name: "arcs-inherit", description: "drop this arc's theme so it inherits again" },
     },
   },
 });
@@ -203,6 +204,12 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
     else toggle(row.kind === "arc" ? row.arc.slug : unboundGroup);
   };
 
+  const reveal = (slug: string): void => {
+    setOpened((current) => new Set([...current, slug]));
+    const at = rows().findIndex((row) => row.kind === "arc" && row.arc.slug === slug);
+    if (at !== -1) cursor.set(at);
+  };
+
   const create = async (slug: string): Promise<void> => {
     setPrompt(undefined);
     if (slug === "") {
@@ -257,7 +264,7 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
     setNotice(arcInheritsLine(slug));
   };
 
-  props.onAction((action) => {
+  props.onAction((action, argument) => {
     if (prompt() !== undefined) {
       setPrompt(undefined);
       return;
@@ -269,7 +276,7 @@ function ArcsList(props: PaneProps<ArcsSpec>) {
       case "arcs.up":
         return cursor.move(-1);
       case "arcs.open":
-        return open(atCursor());
+        return argument === undefined ? open(atCursor()) : reveal(argument);
       case "arcs.new":
         return setPrompt({ kind: "name" });
       case "arcs.close":

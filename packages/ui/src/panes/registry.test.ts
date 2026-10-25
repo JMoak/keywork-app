@@ -18,7 +18,15 @@ function paletteOf(): CommandRegistry {
   const registry = new CommandRegistry();
   for (const [name, action] of Object.entries(appActions)) {
     if (action.command === undefined) continue;
-    registry.register({ ...action.command, shortcut: keymap.describe(name), run: () => undefined });
+    const { name: commandName, description, aliases } = action.command;
+    registry.register({
+      name: commandName,
+      description,
+      aliases,
+      scope: action.scope,
+      shortcut: keymap.describe(name),
+      run: () => undefined,
+    });
   }
   return registry;
 }

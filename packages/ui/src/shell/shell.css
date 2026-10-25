@@ -123,6 +123,10 @@
   padding-left: 1.5rem;
   color: var(--kw-error);
 }
+.kw-open-waited {
+  margin-left: 1ch;
+  color: var(--kw-text-dim);
+}
 .kw-open-stamp {
   flex: none;
   width: 1.5rem;

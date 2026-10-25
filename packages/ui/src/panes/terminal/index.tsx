@@ -1,7 +1,8 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { z } from "zod";
-import { sessionName } from "../../chrome/telemetry.ts";
+import { sessionName } from "../../chrome/session-name.ts";
 import type { PtyExit } from "../../host/port.ts";
+import type { ArgumentChoice } from "../../palette/commands.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { bridgeArgs, connectPty, mirrorPainter, type TerminalSurface } from "./session.ts";
@@ -11,6 +12,12 @@ import "@xterm/xterm/css/xterm.css";
 import "./terminal.css";
 
 export const terminalModes = ["shell", "mirror", "bridge"] as const;
+
+const modeChoices: readonly ArgumentChoice[] = [
+  { value: "shell", description: "a shell in the workspace" },
+  { value: "mirror", description: "tail the current session's bash calls" },
+  { value: "bridge", description: "the keywork TUI attached to this server" },
+];
 
 const terminalSpec = z.object({
   kind: z.literal("terminal"),
@@ -36,7 +43,12 @@ export const terminalPane = definePane<TerminalSpec>({
     action: "terminal.summon",
     chords: "leader shift+t",
     help: "terminal pane",
-    command: { name: "terminal", description: "open a shell in the workspace", aliases: ["sh"] },
+    command: {
+      name: "terminal",
+      aliases: ["sh", "term"],
+      description: "open a terminal in the workspace, a shell by default",
+      argument: { hint: "[shell|mirror|bridge]", choices: () => modeChoices },
+    },
     variants: {
       mirror: {
         help: "mirror the agent's bash calls",

@@ -1,10 +1,11 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createResource, createSignal, For, onCleanup, Show } from "solid-js";
 import { FirstRun } from "../chrome/first-run.tsx";
 import { themeName } from "../chrome/root-attributes.ts";
 import { createTileFillStep, stampGlyph } from "../chrome/stamp.ts";
 import { relativeAge } from "../chrome/telemetry.ts";
 import type { HostPort } from "../host/port.ts";
 import { keymapFromConfig } from "../keys/config.ts";
+import { createLiveKeymap, followKeybindings } from "../keys/live.ts";
 
 export interface OpenScreenProps {
   host: HostPort;
@@ -16,8 +17,9 @@ export interface OpenScreenProps {
 export function OpenScreen(props: OpenScreenProps) {
   const [recents] = createResource(() => props.host.recentWorkspaces());
   const [about] = createResource(() => props.host.about());
-  const keymap = keymapFromConfig();
-  const keys = { chord: (action: string) => keymap.describe(action) ?? "an unbound key" };
+  const live = createLiveKeymap(keymapFromConfig());
+  onCleanup(followKeybindings(props.host, { projectTrusted: false }, live, () => undefined));
+  const keys = { chord: (action: string) => live.keys.describe(action) ?? "an unbound key" };
   const neverOpened = () => recents.state === "ready" && (recents() ?? []).length === 0;
   const pick = async (): Promise<void> => {
     const chosen = await props.host.pickFolder();
@@ -95,12 +97,26 @@ function TypedWorkspace(props: { onOpen: (path: string) => void }) {
 
 function OpeningNote(props: { path: string }) {
   const step = createTileFillStep(() => true);
+  const waited = createWaitedSeconds();
   return (
     <p class="kw-open-note">
       <span class="kw-open-stamp" aria-hidden="true">
         {stampGlyph("working", step())}
       </span>
       starting keywork in {props.path}
+      <Show when={waited() >= patientAfterSeconds}>
+        <span class="kw-open-waited">· {waited()}s</span>
+      </Show>
     </p>
   );
+}
+
+const patientAfterSeconds = 3;
+
+function createWaitedSeconds(): () => number {
+  const started = Date.now();
+  const [seconds, setSeconds] = createSignal(0);
+  const timer = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+  onCleanup(() => clearInterval(timer));
+  return seconds;
 }

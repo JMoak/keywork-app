@@ -31,6 +31,50 @@
   color: var(--kw-text-dim);
 }
 
+.kw-file-find {
+  display: flex;
+  gap: 1ch;
+  align-items: baseline;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+  white-space: nowrap;
+}
+
+.kw-file-find-input {
+  flex: 0 1 18rem;
+  min-width: 6rem;
+  padding: 0.125rem 0.5ch;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+}
+
+.kw-file-find-input:focus {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
+.kw-file-find-query {
+  color: var(--kw-text-mid);
+}
+
+.kw-file-find-count {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kw-file-text .kw-find-hit {
+  background: var(--kw-selection);
+}
+
+.kw-file-text .kw-find-current {
+  color: var(--kw-selection-text);
+  background: var(--kw-accent-soft);
+  outline: 1px solid var(--kw-accent);
+}
+
 .kw-file-text {
   flex: 1;
   min-height: 0;

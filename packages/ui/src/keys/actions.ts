@@ -2,7 +2,8 @@ import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
 import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
-import type { BindingSpec } from "./keymap.ts";
+import type { ActionCommand } from "../panes/registry.ts";
+import { type BindingSpec, everyPane } from "./keymap.ts";
 
 export type FocusContext = "pane" | "composer" | "overlay";
 
@@ -17,8 +18,9 @@ export interface ActionTarget {
   dockPane(side: DockSide): void;
   resizeDock(delta: number): void;
   resizePane(delta: number): void;
-  summon(kind: PaneKind, variant?: string): void;
-  paneAction(action: string): void;
+  summon(kind: PaneKind, argument?: string): void;
+  paneAction(action: string, argument?: string): void;
+  openPaneCommands(): void;
   cycleMode(): void;
   answerAsk(pick: AskPick): void;
   toggleQuiet(): void;
@@ -37,14 +39,9 @@ export interface AppAction {
   readonly help: string;
   readonly hotPath?: true;
   readonly scope?: PaneKind;
+  readonly inEveryPane?: true;
   readonly command?: ActionCommand;
-  readonly invoke: (target: ActionTarget) => void;
-}
-
-export interface ActionCommand {
-  readonly name: string;
-  readonly description: string;
-  readonly aliases?: readonly string[];
+  readonly invoke: (target: ActionTarget, argument?: string) => void;
 }
 
 export const coreActions: Record<string, AppAction> = {
@@ -171,12 +168,12 @@ export const coreActions: Record<string, AppAction> = {
   },
   "ask.approve": {
     chords: "ctrl+y",
-    help: "approve the pending ask · for the session when quiet",
+    help: "approve the pending ask once",
     hotPath: true,
     invoke: (target) => target.answerAsk("approve"),
     command: {
       name: "approve",
-      description: "approve the pending tool call: once, or for the session when it is quiet",
+      description: "approve the pending tool call this one time",
     },
   },
   "ask.once": {
@@ -186,7 +183,7 @@ export const coreActions: Record<string, AppAction> = {
     invoke: (target) => target.answerAsk("once"),
     command: {
       name: "approve-once",
-      description: "approve the pending tool call this one time, even in a quiet session",
+      description: "approve the pending tool call this one time",
     },
   },
   "ask.session": {
@@ -211,10 +208,13 @@ export const coreActions: Record<string, AppAction> = {
   },
   "ask.deny": {
     chords: "ctrl+n",
-    help: "deny the pending ask",
+    help: "deny the pending ask · then u unsafe, n not now, o other",
     hotPath: true,
     invoke: (target) => target.answerAsk("deny"),
-    command: { name: "deny", description: "deny the pending tool call" },
+    command: {
+      name: "deny",
+      description: "deny the pending tool call; the next key says why: unsafe, not now or other",
+    },
   },
   "session.quiet": {
     chords: "leader shift+s",
@@ -223,7 +223,7 @@ export const coreActions: Record<string, AppAction> = {
     command: {
       name: "quiet",
       description:
-        "let the focused session run: approving an ask grants it for the session; again to end it",
+        "let the focused session run: the gate grants what this session already covers; again to end it",
       aliases: ["let-it-run"],
     },
   },
@@ -248,11 +248,21 @@ export const coreActions: Record<string, AppAction> = {
     invoke: (target) => target.openPalette("/"),
     command: { name: "palette", description: "open the command palette", aliases: ["commands"] },
   },
+  "pane.commands": {
+    chords: [":", "/"],
+    help: "this pane's own commands",
+    inEveryPane: true,
+    invoke: (target) => target.openPaneCommands(),
+    command: {
+      name: "pane-commands",
+      description: "list the focused pane's own commands in a tray at its foot",
+      aliases: ["tray"],
+    },
+  },
   "pane.mark": {
     chords: "leader b",
     help: "mark this pane for a shared theme",
     invoke: (target) => target.toggleMark(),
-    command: { name: "mark", description: "mark or unmark this pane" },
   },
   "pane.unmark-all": {
     chords: "none",
@@ -312,10 +322,11 @@ export const bindingHelp: Record<string, string> = Object.fromEntries(
 
 export const exclusiveScopes: readonly PaneKind[] = keyboardOwners;
 
-export const actionScopes: Record<string, PaneKind> = Object.fromEntries(
-  Object.entries(appActions).flatMap(([name, action]) =>
-    action.scope === undefined ? [] : [[name, action.scope]],
-  ),
+export const actionScopes: Record<string, PaneKind | typeof everyPane> = Object.fromEntries(
+  Object.entries(appActions).flatMap(([name, action]) => {
+    const scope = action.inEveryPane ? everyPane : action.scope;
+    return scope === undefined ? [] : [[name, scope]];
+  }),
 );
 
 export const hotPathActions: readonly string[] = Object.entries(appActions)

@@ -1,5 +1,5 @@
 import type { BusEnvelope } from "@keywork-app/protocol";
-import type { KeyworkClient } from "./client.ts";
+import type { Delay, KeyworkClient } from "./client.ts";
 import { batchPerFrame, type TickScheduler } from "./projection/coalesce.ts";
 import type { StreamNotice } from "./sse.ts";
 
@@ -17,6 +17,12 @@ export interface ServerFeed {
 export interface FeedOptions {
   tick?: TickScheduler | undefined;
   since?: number | undefined;
+  retry?: RetryWaker | undefined;
+}
+
+export interface RetryWaker {
+  readonly wait: Delay;
+  wake(): void;
 }
 
 export const nextFrame: TickScheduler = (flush) => {
@@ -48,6 +54,7 @@ export function serverFeed(client: KeyworkClient, options: FeedOptions = {}): Se
       const events = client.events({
         signal: stops.signal,
         since: options.since,
+        pause: options.retry?.wait,
         onOpen,
         onNotice: (notice) => {
           for (const listener of [...noticeListeners]) listener(notice);
@@ -101,6 +108,27 @@ export function serverFeed(client: KeyworkClient, options: FeedOptions = {}): Se
     close: () => {
       stops.abort();
       batcher.flush();
+    },
+  };
+}
+
+export function retryWaker(): RetryWaker {
+  const sleepers = new Set<() => void>();
+  return {
+    wait: (ms, signal) =>
+      new Promise<void>((resolve) => {
+        const finish = (): void => {
+          clearTimeout(timer);
+          sleepers.delete(finish);
+          signal?.removeEventListener("abort", finish);
+          resolve();
+        };
+        const timer = setTimeout(finish, ms);
+        sleepers.add(finish);
+        signal?.addEventListener("abort", finish, { once: true });
+      }),
+    wake: () => {
+      for (const finish of [...sleepers]) finish();
     },
   };
 }

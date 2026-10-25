@@ -1,9 +1,10 @@
 import type { SessionProjection, ToolRun } from "@keywork-app/client";
+import type { DenyReason } from "@keywork-app/protocol";
 import { createMemo, For, Show } from "solid-js";
 import { arcHueRank, botNamed } from "../../chrome/identity.ts";
 import { hueStop } from "../../chrome/pane-frame.tsx";
+import { sessionName } from "../../chrome/session-name.ts";
 import { stampGlyph } from "../../chrome/stamp.ts";
-import { sessionName } from "../../chrome/telemetry.ts";
 import {
   type ContextLevel,
   contextLevelOf,
@@ -11,6 +12,8 @@ import {
 } from "../../instruments/context.ts";
 import { ContextGauge } from "../../instruments/gauge.tsx";
 import { type AskChords, type AskPick, answerLabel, askOffers } from "../../page/ask-card.tsx";
+import { askingWhy, reasonOffers, whyPrompt } from "../../page/ask-card-why.ts";
+import { NoteLine } from "../../page/note-line.tsx";
 import { askingRun } from "../../shell/answer-ask.ts";
 import { glossOf, kindMarks, type NeedsYouItem } from "../../shell/needs-you.ts";
 import type { Theme } from "../../theme/schema.ts";
@@ -18,7 +21,8 @@ import { keepInView } from "../overview/rows.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { swatchesOf } from "../themes/index.tsx";
 import { costOf } from "../tree/index.tsx";
-import { currentStep, type DeskRow, rowAge, sessionOfRow } from "./desk.ts";
+import { changesLine } from "../tree/rows.ts";
+import { type DeskRow, rowAge, sessionOfRow, stepOf } from "./desk.ts";
 
 export interface DeskRowProps {
   row: DeskRow;
@@ -28,6 +32,9 @@ export interface DeskRowProps {
   keys: AskChords;
   onPick(): void;
   onAnswer(pick: AskPick): void;
+  onReason(reason: DenyReason): void;
+  wording: boolean;
+  onWords(note: string): void;
 }
 
 export function DeskRowView(props: DeskRowProps) {
@@ -62,6 +69,9 @@ export function DeskRowView(props: DeskRowProps) {
           </Show>
         </span>
         <span class="kw-desk-facts">
+          <Show when={facts()?.changes}>
+            {(changes) => <span class="kw-desk-changes">{changes()}</span>}
+          </Show>
           <Show when={facts()?.context}>
             {(level) => <ContextGauge level={level()} style="steps" />}
           </Show>
@@ -73,18 +83,23 @@ export function DeskRowView(props: DeskRowProps) {
         {(line) => (
           <span class="kw-desk-tail">
             <span class="kw-desk-line">{line()}</span>
-            <Show when={asking()}>
+            <Show when={!props.wording && asking()}>
               {(run) => (
                 <Answers
                   run={run()}
-                  quiet={quiet()}
                   keys={props.keys}
                   onAnswer={(pick) => props.onAnswer(pick)}
+                  onReason={(reason) => props.onReason(reason)}
                 />
               )}
             </Show>
           </span>
         )}
+      </Show>
+      <Show when={props.wording && asking()}>
+        <span class="kw-desk-words">
+          <NoteLine onSend={(note) => props.onWords(note)} />
+        </span>
       </Show>
     </li>
   );
@@ -99,6 +114,7 @@ interface SessionFacts {
   readonly wears: Theme | undefined;
   readonly context: ContextLevel | undefined;
   readonly cost: string | undefined;
+  readonly changes: string | undefined;
   readonly step: string | undefined;
 }
 
@@ -146,26 +162,45 @@ function Wears(props: { theme: Theme }) {
 
 interface AnswersProps {
   run: ToolRun;
-  quiet: boolean;
   keys: AskChords;
   onAnswer(pick: AskPick): void;
+  onReason(reason: DenyReason): void;
 }
 
 function Answers(props: AnswersProps) {
   return (
     <span class="kw-desk-answers">
-      <For each={askOffers(props.run, props.quiet)}>
-        {(offer) => (
-          <button
-            type="button"
-            class="kw-desk-answer"
-            data-tone={offer.choice.verdict === "denied" ? "deny" : "grant"}
-            onClick={() => props.onAnswer(offer.pick)}
-          >
-            {answerLabel(offer.choice)} <kbd>{props.keys[offer.pick]}</kbd>
-          </button>
-        )}
-      </For>
+      <Show
+        when={askingWhy(props.run.callId)}
+        fallback={
+          <For each={askOffers(props.run)}>
+            {(offer) => (
+              <button
+                type="button"
+                class="kw-desk-answer"
+                data-tone={offer.choice.verdict === "denied" ? "deny" : "grant"}
+                onClick={() => props.onAnswer(offer.pick)}
+              >
+                {answerLabel(offer.choice)} <kbd>{props.keys[offer.pick]}</kbd>
+              </button>
+            )}
+          </For>
+        }
+      >
+        <span class="kw-desk-reason-prompt">{whyPrompt}</span>
+        <For each={reasonOffers}>
+          {(offer) => (
+            <button
+              type="button"
+              class="kw-desk-answer"
+              data-tone="deny"
+              onClick={() => props.onReason(offer.reason)}
+            >
+              {offer.label} <kbd>{offer.key}</kbd>
+            </button>
+          )}
+        </For>
+      </Show>
     </span>
   );
 }
@@ -176,6 +211,7 @@ function sessionFacts(shell: ShellSeams, sessionId: string | undefined): Session
   const summary = shell.store.summary(sessionId);
   if (summary === undefined) return undefined;
   const projection = shell.store.projection(summary.id);
+  const followed = shell.store.state.projections[summary.id];
   const surfaces = shell.store.surfaces.state;
   return {
     id: summary.id,
@@ -186,7 +222,8 @@ function sessionFacts(shell: ShellSeams, sessionId: string | undefined): Session
     wears: shell.needsYou?.dressed(summary.id)?.theme,
     context: contextOf(shell, summary.id, projection),
     cost: costOf(summary),
-    step: projection.turn === undefined ? undefined : currentStep(projection),
+    changes: changesLine(summary.changes),
+    step: stepOf(followed, summary),
   };
 }
 
@@ -211,7 +248,7 @@ function askOnRow(row: DeskRow, shell: ShellSeams): ToolRun | undefined {
 
 function nameOf(row: DeskRow, facts: SessionFacts | undefined, shell: ShellSeams): string {
   if (facts !== undefined) return facts.name;
-  if (row.kind === "session") return row.summary.title;
+  if (row.kind === "session") return sessionName(row.summary, undefined);
   const memory = memoryItemOf(row);
   return memory === undefined ? (shell.needsYou?.queue.where(row.item) ?? "") : glossOf(memory);
 }

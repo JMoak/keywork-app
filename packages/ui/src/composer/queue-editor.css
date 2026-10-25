@@ -1,0 +1,9 @@
+.kw-queue-item[data-selected] {
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
+.kw-queue-item[data-selected] .kw-queue-mark {
+  color: var(--kw-accent);
+}

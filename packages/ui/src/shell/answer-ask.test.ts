@@ -70,14 +70,13 @@ type Sent = [string, AskVerdict, AskScope | undefined];
 
 function answering(
   projection: SessionProjection,
-  quiet: string[] = [],
+  _quiet: string[] = [],
   reply: AnswerOutcome | Error = "settled",
 ): AskAnswering & { sent: Sent[] } {
   const sent: Sent[] = [];
   return {
     sent,
     approveKey: "y",
-    quiet: { has: (sessionId) => sessionId !== undefined && quiet.includes(sessionId) },
     store: {
       projection: (sessionId) => (sessionId === "s1" ? projection : emptyProjection),
       answerAsk: async (callId, verdict, scope) => {

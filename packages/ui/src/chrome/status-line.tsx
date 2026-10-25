@@ -1,9 +1,11 @@
 import type { SessionProjection } from "@keywork-app/client";
 import { For, Show } from "solid-js";
+import { acceptLabel, type UpdateOffer, updateLine } from "./update-offer.ts";
 import "./status-line.css";
 
 export interface StatusLineProps {
   serverLabel: string;
+  serverLost?: boolean | undefined;
   projection: SessionProjection;
   usage: string;
   preset: string | undefined;
@@ -12,6 +14,7 @@ export interface StatusLineProps {
   notice: string | undefined;
   gap: { from: number; to: number } | undefined;
   lost: string | undefined;
+  update?: UpdateOffer | undefined;
 }
 
 export type StatusTone = "mark" | "where" | "warn" | "word" | "quiet";
@@ -24,7 +27,7 @@ export interface StatusItem {
 export function statusItems(props: StatusLineProps): StatusItem[] {
   const candidates: { tone: StatusTone; text: string | undefined }[] = [
     { tone: "mark", text: "keywork" },
-    { tone: "where", text: props.serverLabel },
+    { tone: props.serverLost ? "warn" : "where", text: props.serverLabel },
     { tone: "warn", text: props.trust },
     { tone: "word", text: props.preset },
     { tone: "word", text: props.projection.mode },
@@ -51,7 +54,13 @@ export function StatusLine(props: StatusLineProps) {
         <Show when={props.leader}>
           {(leader) => <kbd class="kw-status-leader">{leader()} …</kbd>}
         </Show>
-        <Show when={props.notice}>{(text) => <span class="kw-status-notice">{text()}</span>}</Show>
+        <Show when={props.notice}>
+          {(text) => (
+            <span class="kw-status-notice" title={text()}>
+              {text()}
+            </span>
+          )}
+        </Show>
         <Show when={props.lost}>{(reason) => <span class="kw-status-lost">{reason()}</span>}</Show>
         <Show when={props.gap}>
           {(gap) => (
@@ -60,7 +69,29 @@ export function StatusLine(props: StatusLineProps) {
             </span>
           )}
         </Show>
+        <Show when={props.update}>{(offer) => <UpdateNotice offer={offer()} />}</Show>
       </span>
     </footer>
+  );
+}
+
+function UpdateNotice(props: { offer: UpdateOffer }) {
+  return (
+    <Show when={props.offer.waiting()}>
+      {(update) => (
+        <span class="kw-status-update">
+          {updateLine(update(), props.offer.accepted())}
+          <Show when={!props.offer.accepted()}>
+            <button
+              type="button"
+              class="kw-status-update-accept"
+              onClick={() => props.offer.accept()}
+            >
+              {acceptLabel}
+            </button>
+          </Show>
+        </span>
+      )}
+    </Show>
   );
 }

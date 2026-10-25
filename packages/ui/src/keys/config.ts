@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { actionScopes, appBindings, exclusiveScopes } from "./actions.ts";
-import { defaultLeader, defaultLeaderTimeoutMs, Keymap, KeymapError } from "./keymap.ts";
+import {
+  defaultLeader,
+  defaultLeaderTimeoutMs,
+  Keymap,
+  KeymapError,
+  type KeymapOptions,
+} from "./keymap.ts";
 
 const bindingSpec = z.union([z.string(), z.array(z.string())]);
 
@@ -34,16 +40,28 @@ export const keybindingsSchema = z
 
 export type KeybindingsConfig = z.infer<typeof keybindingsSchema>;
 
+export const keybindingsSection = z
+  .record(z.string(), bindingSpec)
+  .describe(
+    'The keybindings section of keywork.json, read from ~/.keywork and from a trusted project\'s .keywork: action id to a chord, a list of chords, or "none" to unbind. Exists so the terminal and the app share one file and one muscle memory.',
+  );
+
+export type KeybindingsSection = z.infer<typeof keybindingsSection>;
+
 export function keymapFromConfig(config: Partial<KeybindingsConfig> = {}): Keymap {
+  return new Keymap(keymapOptionsFrom(config));
+}
+
+export function keymapOptionsFrom(config: Partial<KeybindingsConfig> = {}): KeymapOptions {
   const parsed = keybindingsSchema.parse(config);
   for (const action of Object.keys(parsed.bindings)) {
     if (!(action in appBindings)) throw new KeymapError(`no action named "${action}"`);
   }
-  return new Keymap({
+  return {
     leader: parsed.leader,
     timeoutMs: parsed.timeoutMs,
     bindings: { ...appBindings, ...parsed.bindings },
     scopes: actionScopes,
     exclusiveScopes,
-  });
+  };
 }

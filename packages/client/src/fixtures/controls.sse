@@ -1,12 +1,12 @@
 : connected
 
 id: 1
-event: turn.started
-data: {"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"turn on the lights"}}
+event: session.state
+data: {"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/alpha","thinking":false,"title":"(untitled session)","leafId":null,"quiet":false,"undoable":false,"redoable":false}}
 
 id: 2
-event: session.state
-data: {"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/alpha","thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+event: turn.started
+data: {"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"turn on the lights","entryId":"q1"}}
 
 id: 3
 event: turn.delta
@@ -22,27 +22,27 @@ data: {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.comp
 
 id: 6
 event: session.state
-data: {"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/alpha","thinking":false,"title":"(untitled session)","leafId":"q1","undoable":true,"redoable":false}}
+data: {"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/alpha","thinking":false,"title":"(untitled session)","leafId":"q2","quiet":false,"undoable":true,"redoable":false}}
 
 id: 7
 event: session.state
-data: {"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":false,"title":"(untitled session)","leafId":"q2","undoable":true,"redoable":false}}
+data: {"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":false,"title":"(untitled session)","leafId":"q3","quiet":false,"undoable":true,"redoable":false}}
 
 id: 8
 event: session.state
-data: {"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"title":"(untitled session)","leafId":"q3","undoable":true,"redoable":false}}
+data: {"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"title":"(untitled session)","leafId":"q4","quiet":false,"undoable":true,"redoable":false}}
 
 id: 9
 event: session.state
-data: {"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"(untitled session)","leafId":"q4","undoable":true,"redoable":false}}
+data: {"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"(untitled session)","leafId":"q5","quiet":false,"undoable":true,"redoable":false}}
 
 id: 10
 event: session.state
-data: {"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":"q5","undoable":true,"redoable":false}}
+data: {"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":"q6","quiet":false,"undoable":true,"redoable":false}}
 
 id: 11
 event: session.state
-data: {"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":null,"undoable":false,"redoable":true}}
+data: {"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/beta","thinking":true,"effort":"high","title":"Lights","leafId":"q7","quiet":false,"undoable":false,"redoable":true}}
 
 id: 12
 event: gate.preset

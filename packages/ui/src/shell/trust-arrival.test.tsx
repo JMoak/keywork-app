@@ -53,6 +53,11 @@ function servedWorkspace(options: { trusted: boolean; mcp: string[] }): Served {
     changes: async () => "missing",
     ...inertMemoryClient(),
     ...idleControlsClient(),
+    sendNow: async () => "missing",
+    moveQueued: async () => "missing",
+    cancelQueued: async () => "missing",
+    setQuiet: async () => "missing",
+    spill: async () => "missing",
     ...emptySurfacesClient(),
     ...inertWorkspaceClient(),
     workspace: async () => view(),
@@ -115,6 +120,7 @@ function servedWorkspace(options: { trusted: boolean; mcp: string[] }): Served {
       return { revoked: rule };
     },
     restoreTurn: async () => "missing",
+    previewRestore: async () => "missing",
   };
   return { client, answers, writes };
 }

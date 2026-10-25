@@ -3,6 +3,12 @@ import { permissionRoutes } from "./permissions.ts";
 
 export const protocolVersion = "0.2.0";
 
+export const contractVersion = "1.7";
+
+export function contractMajorOf(contract: string): number {
+  return Number.parseInt(contract.split(".")[0] ?? "", 10);
+}
+
 export type HttpMethod = "GET" | "POST" | "DELETE";
 
 export interface RouteShape {
@@ -33,10 +39,17 @@ export const routes = [
   { method: "POST", path: "/sessions/{id}/undo", operationId: "undoSession" },
   { method: "POST", path: "/sessions/{id}/redo", operationId: "redoSession" },
   { method: "POST", path: "/sessions/{id}/restore", operationId: "restoreSessionTurn" },
+  { method: "GET", path: "/sessions/{id}/restore", operationId: "previewSessionRestore" },
   { method: "GET", path: "/sessions/{id}/context", operationId: "readSessionContext" },
   { method: "GET", path: "/sessions/{id}/cost", operationId: "readSessionCost" },
   { method: "POST", path: "/sessions/{id}/export", operationId: "exportSession" },
   { method: "POST", path: "/sessions/{id}/rename", operationId: "renameSession" },
+  { method: "POST", path: "/sessions/{id}/quiet", operationId: "setSessionQuiet" },
+  { method: "POST", path: "/sessions/{id}/flush", operationId: "flushSessionMemory" },
+  { method: "POST", path: "/sessions/{id}/forget", operationId: "forgetSessionEntry" },
+  { method: "POST", path: "/sessions/{id}/queue/{itemId}/move", operationId: "moveQueuedPrompt" },
+  { method: "DELETE", path: "/sessions/{id}/queue/{itemId}", operationId: "cancelQueuedPrompt" },
+  { method: "GET", path: "/sessions/{id}/spills/{spillId}", operationId: "readSessionSpill" },
   { method: "POST", path: "/preset", operationId: "applyPreset" },
   { method: "GET", path: "/asks", operationId: "listAsks" },
   { method: "POST", path: "/asks/{callId}", operationId: "answerAsk" },

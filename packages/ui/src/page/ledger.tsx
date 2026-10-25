@@ -43,6 +43,7 @@ export function LedgerLine(props: LedgerLineProps) {
         <button
           type="button"
           class="kw-ledger"
+          data-walk=""
           data-turn={props.turn.place?.turn}
           aria-expanded={files().length > 0 ? props.unfolded : undefined}
           onClick={() => act("unfold")}

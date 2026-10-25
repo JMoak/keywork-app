@@ -1,7 +1,7 @@
 import type { SessionProjection, ToolRun } from "@keywork-app/client";
-import { isAskRefusal } from "@keywork-app/protocol";
+import { type DenyReason, isAskRefusal } from "@keywork-app/protocol";
 import { type AskPick, askChoiceFor } from "../page/ask-card.tsx";
-import type { QuietSessions } from "./quiet.ts";
+import { askWhy, stopAskingWhy } from "../page/ask-card-why.ts";
 import type { SessionStore } from "./session-store.ts";
 
 export interface HeldAsk {
@@ -11,7 +11,6 @@ export interface HeldAsk {
 
 export interface AskAnswering {
   readonly store: Pick<SessionStore, "projection" | "answerAsk">;
-  readonly quiet: Pick<QuietSessions, "has"> | undefined;
   readonly approveKey: string;
 }
 
@@ -21,14 +20,28 @@ export async function answerHeldAsk(
   answering: AskAnswering,
   held: HeldAsk,
   pick: AskPick,
+  reason?: DenyReason,
+  note?: string,
 ): Promise<string | undefined> {
   const run = askingRun(answering.store.projection(held.sessionId), held.callId);
   if (run === undefined) return nothingAsking;
-  const choice = askChoiceFor(pick, run, answering.quiet?.has(held.sessionId) === true);
+  const choice = askChoiceFor(pick, run);
   if (choice === undefined) return onceOnlyNotice(answering.approveKey);
+  if (choice.verdict === "denied" && reason === undefined) {
+    askWhy(run.callId);
+    return undefined;
+  }
   try {
-    const outcome = await answering.store.answerAsk(run.callId, choice.verdict, choice.scope);
-    return isAskRefusal(outcome) ? outcome.detail : undefined;
+    const outcome = await answering.store.answerAsk(
+      run.callId,
+      choice.verdict,
+      choice.scope,
+      reason,
+      note,
+    );
+    if (isAskRefusal(outcome)) return outcome.detail;
+    stopAskingWhy(run.callId);
+    return undefined;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }

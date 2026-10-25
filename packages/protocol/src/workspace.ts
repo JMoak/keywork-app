@@ -63,6 +63,7 @@ export interface TrustGrant {
   root: string;
   vault: string;
   reopens: boolean;
+  recomposed?: boolean;
 }
 
 export type TrustRefusal = "untrusted" | "home";

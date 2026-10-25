@@ -10,6 +10,7 @@ assume the earlier ones.
 | [`stack.md`](stack.md) | Every component with its exact pin and why it won, the alternatives considered, the repository layout |
 | [`plan.md`](plan.md) | Milestones M0–M5 with sized tasks and acceptance criteria, the wave ledgers that landed them, the outline of waves 7–11, the server lane that lives in the keywork repo, and the assumptions to confirm before building |
 | [`release.md`](release.md) | Cutting a release: the tag ritual, what `release.yml` produces on three runners, the sidecar pin fetched by checksum, the signing secrets, and how the updater behaves unsigned |
+| [`parity.md`](parity.md) | The capability gap between the TUI and the app as of 2026-10-25: wire drift the route check misses, what each client has that the other lacks, defects found, and the server-first order to close it |
 | [`textures.md`](textures.md) | The M5.4 textures (grapheme corpus, paste flood, first-class light, empty states, latency): each ratchet, its number, where it lives and how to move it |
 | [`research/field-scan-2026-10.md`](research/field-scan-2026-10.md) | What the best agent surfaces do that the app does not (October 2026), ten ideas ranked with their server asks and mockups, the patterns refused and why, and the three prototyped in the chrome gallery |
 

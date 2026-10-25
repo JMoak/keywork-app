@@ -1,6 +1,6 @@
 {
   "sessionId": "s1",
-  "leafId": "q4",
+  "leafId": "q6",
   "entries": [
     {
       "type": "message",
@@ -13,7 +13,7 @@
           }
         ]
       },
-      "id": "q2",
+      "id": "q1",
       "parentId": null,
       "timestamp": "2026-09-07T12:00:00.000Z"
     },
@@ -28,16 +28,31 @@
           }
         ]
       },
-      "id": "q1",
-      "parentId": "q2",
+      "usage": {
+        "inputTokens": 12,
+        "outputTokens": 5
+      },
+      "id": "q4",
+      "parentId": "q1",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "custom",
+      "customType": "turn_facts",
+      "data": {
+        "prompt": "q1",
+        "files": []
+      },
+      "id": "q2",
+      "parentId": "q4",
       "timestamp": "2026-09-07T12:00:00.000Z"
     },
     {
       "type": "label",
-      "targetId": "q1",
+      "targetId": "q4",
       "label": "went left",
-      "id": "q5",
-      "parentId": "q1",
+      "id": "q7",
+      "parentId": "q2",
       "timestamp": "2026-09-07T12:00:00.000Z"
     },
     {
@@ -51,8 +66,8 @@
           }
         ]
       },
-      "id": "q6",
-      "parentId": "q2",
+      "id": "q5",
+      "parentId": "q1",
       "timestamp": "2026-09-07T12:00:00.000Z"
     },
     {
@@ -66,17 +81,37 @@
           }
         ]
       },
-      "id": "q4",
-      "parentId": "q6",
+      "usage": {
+        "inputTokens": 12,
+        "outputTokens": 5
+      },
+      "id": "q8",
+      "parentId": "q5",
+      "timestamp": "2026-09-07T12:00:00.000Z"
+    },
+    {
+      "type": "custom",
+      "customType": "turn_facts",
+      "data": {
+        "prompt": "q5",
+        "files": []
+      },
+      "id": "q6",
+      "parentId": "q8",
       "timestamp": "2026-09-07T12:00:00.000Z"
     }
   ],
   "labels": {
-    "q1": "went left"
+    "q4": "went left"
   },
   "activePath": [
+    "q1",
+    "q5",
+    "q8",
+    "q6"
+  ],
+  "journal": [
     "q2",
-    "q6",
-    "q4"
+    "q6"
   ]
 }

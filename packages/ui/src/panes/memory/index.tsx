@@ -16,7 +16,7 @@ import {
 } from "solid-js";
 import { z } from "zod";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
-import { sessionName } from "../../chrome/telemetry.ts";
+import { sessionName } from "../../chrome/session-name.ts";
 import type { MemoryStore } from "../../shell/memory-store.ts";
 import { inboxNeedsYouAt } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
@@ -75,7 +75,7 @@ export const memoryPane = definePane<MemorySpec>({
     "memory.approve": {
       chords: "a",
       help: "approve the focused item",
-      command: { name: "approve", description: "approve the focused inbox item" },
+      command: { name: "memory-approve", description: "approve the focused inbox item" },
     },
     "memory.discard": {
       chords: "d",
@@ -123,10 +123,15 @@ export const memoryPane = definePane<MemorySpec>({
         description: "open the focused note or day, or unfold the focused decision",
       },
     },
+    "memory.editor": {
+      chords: "o",
+      help: "open the note's file in your editor",
+      command: { name: "note-editor", description: "open the focused note's file in your editor" },
+    },
     "memory.back": {
       chords: "escape",
       help: "back to the garden",
-      command: { name: "garden", description: "back to the memory garden" },
+      command: { name: "memory-garden", description: "back to the memory garden" },
     },
     "memory.next": {
       chords: ["j", "down"],
@@ -407,10 +412,36 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
       else say(word);
     };
 
+  const noteFileNamed = (name: string, layer?: string): string | undefined =>
+    (notes() ?? []).find(
+      (note) => note.name === name && (layer === undefined || note.layer === layer),
+    )?.file;
+
+  const focusedNoteFile = (): string | undefined => {
+    const current = lens();
+    if (current.kind === "note") {
+      return openedNote()?.file ?? noteFileNamed(current.name, current.layer);
+    }
+    if (current.kind !== "garden") return undefined;
+    const row = focusedRow();
+    if (row?.kind === "note") return row.note.file;
+    if (row?.kind === "hit") return noteFileNamed(row.hit.note, row.hit.layer);
+    if (row?.kind === "inbox" && row.view.note !== undefined) return noteFileNamed(row.view.note);
+    return undefined;
+  };
+
+  const openNoteFile = (): void => {
+    const file = focusedNoteFile();
+    if (file === undefined) say("nothing to open here · focus a note first");
+    else void props.shell.openInEditor?.(file).catch(() => undefined);
+  };
+
   props.onAction((action) => {
     switch (action) {
       case "memory.ask":
         return ask();
+      case "memory.editor":
+        return openNoteFile();
       case "memory.approve":
         return approve(focusedRow());
       case "memory.discard":

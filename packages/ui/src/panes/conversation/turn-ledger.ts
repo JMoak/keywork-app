@@ -10,7 +10,12 @@ import {
   type TurnLedger,
   transcriptLedger,
 } from "@keywork-app/client";
-import type { EntryRefusal, TurnRestored } from "@keywork-app/protocol";
+import type {
+  EntryRefusal,
+  OtherSessionFiles,
+  RestorePreviewReading,
+  TurnRestored,
+} from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { counted, type LedgerVerbs, ribbonText } from "../../page/ledger.tsx";
 import type { ShellSeams } from "../registry.ts";
@@ -57,9 +62,10 @@ export function createTurnLedger(
     const place = await placeNow(id, turn);
     const reading = path();
     if (place === undefined || reading === undefined) return say(unplacedNotice);
-    const reach = restoreReach(reading, store.changes(id), place.turn);
+    const preview = await restorePreview(shell, id, place.turn);
+    const reach = previewReach(preview) ?? restoreReach(reading, store.changes(id), place.turn);
     confirm({
-      ask: { kind: "confirm", question: restoreQuestion(place, reach) },
+      ask: { kind: "confirm", question: restoreQuestion(place, reach, othersIn(preview)) },
       answer: async (agreed) => {
         if (agreed !== true) return say(leftUnchanged);
         const restored = await store.controls.restoreTurn(id, place.turn);
@@ -116,8 +122,31 @@ export function turnRibbon(shell: ShellSeams, sessionId: string | undefined): st
   );
 }
 
-export function restoreQuestion(place: PathTurn, reach: RestoreReach): string {
-  return `restore to before turn ${place.turn}, "${excerpt(place.text)}"? ${goingBack(reach)} · redo brings them back · y/n`;
+export function restoreQuestion(
+  place: PathTurn,
+  reach: RestoreReach,
+  others: readonly OtherSessionFiles[] = [],
+): string {
+  const theirs = others.length === 0 ? "" : ` · ${othersClause(others)}`;
+  return `restore to before turn ${place.turn}, "${promptExcerpt(place.text)}"? ${goingBack(reach)}${theirs} · redo brings them back · y/n`;
+}
+
+export function restorePreview(
+  shell: Pick<ShellSeams, "client">,
+  id: string,
+  turn: number,
+): Promise<RestorePreviewReading | undefined> {
+  return Promise.resolve()
+    .then(() => shell.client.previewRestore(id, turn))
+    .catch(() => undefined);
+}
+
+export function othersClause(others: readonly OtherSessionFiles[]): string {
+  const [only] = others;
+  if (others.length === 1 && only !== undefined) {
+    return `it also undoes ${counted(only.paths.length, "file")} "${promptExcerpt(only.title)}" changed`;
+  }
+  return `it also undoes files ${others.length} other sessions changed`;
 }
 
 export function restoredNotice(restored: TurnRestored): string {
@@ -146,6 +175,15 @@ export const unplacedNotice =
 
 export const noSettledTurnNotice = "no turn has settled here yet";
 
+function previewReach(preview: RestorePreviewReading | undefined): RestoreReach | undefined {
+  if (preview === undefined || typeof preview === "string") return undefined;
+  return { turns: preview.undoneTurns, files: preview.files.length };
+}
+
+function othersIn(preview: RestorePreviewReading | undefined): readonly OtherSessionFiles[] {
+  return preview === undefined || typeof preview === "string" ? [] : preview.others;
+}
+
 function chosenTurn(ledger: TranscriptLedger, chosen: number | undefined): TurnLedger | undefined {
   const placed = ledger.turns.filter((turn) => turn.place !== undefined);
   return placed.find((turn) => turn.head === chosen) ?? placed.at(-1);
@@ -163,7 +201,7 @@ function goingBack(reach: RestoreReach): string {
   return `${turns} and ${counted(reach.files, "file")} go back`;
 }
 
-function excerpt(text: string): string {
+export function promptExcerpt(text: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > excerptLimit ? `${flat.slice(0, excerptLimit - 1)}…` : flat;
 }

@@ -1,5 +1,5 @@
 import { type SessionProjection, toolRowText } from "@keywork-app/client";
-import type { SessionSummary } from "@keywork-app/protocol";
+import type { SessionRow as ListedSession } from "@keywork-app/protocol";
 import type { LifecycleState } from "../../chrome/stamp.ts";
 import { relativeAge } from "../../chrome/telemetry.ts";
 import { formatCost } from "../../instruments/format.ts";
@@ -22,7 +22,7 @@ export interface WaitingRow {
 export interface SessionRow {
   readonly kind: "session";
   readonly key: string;
-  readonly summary: SessionSummary;
+  readonly summary: ListedSession;
   readonly state: LifecycleState;
 }
 
@@ -34,9 +34,9 @@ export interface DeskGroup {
 
 export interface DeskSources {
   readonly waiting: readonly NeedsYouItem[];
-  readonly sessions: readonly SessionSummary[];
+  readonly sessions: readonly ListedSession[];
   working(sessionId: string): boolean;
-  unread(summary: SessionSummary): boolean;
+  unread(summary: ListedSession): boolean;
   quiet(sessionId: string): boolean;
 }
 
@@ -107,6 +107,16 @@ export function sessionOfRow(row: DeskRow): string | undefined {
   return row.kind === "session" ? row.summary.id : sessionOfItem(row.item);
 }
 
+export const unfollowedTurn = "a turn is running";
+
+export function stepOf(
+  projection: SessionProjection | undefined,
+  listed: Pick<ListedSession, "working">,
+): string | undefined {
+  if (projection === undefined) return listed.working === true ? unfollowedTurn : undefined;
+  return projection.turn === undefined ? undefined : currentStep(projection);
+}
+
 export function currentStep(projection: SessionProjection): string {
   const step = projection.entries.findLast(
     (entry) =>
@@ -147,7 +157,7 @@ interface Placement {
   readonly row: SessionRow;
 }
 
-function placementsOf(summary: SessionSummary, sources: DeskSources): Placement[] {
+function placementsOf(summary: ListedSession, sources: DeskSources): Placement[] {
   const working = sources.working(summary.id);
   const unread = !working && sources.unread(summary);
   const state: LifecycleState = working ? "working" : unread ? "finished-unseen" : "idle";
@@ -162,7 +172,7 @@ function groupOf(quiet: boolean, working: boolean, unread: boolean): SessionGrou
   return unread ? "back" : undefined;
 }
 
-function sessionsOffTheQueue(sources: DeskSources): SessionSummary[] {
+function sessionsOffTheQueue(sources: DeskSources): ListedSession[] {
   const waiting = new Set(sources.waiting.flatMap((item) => sessionOfItem(item) ?? []));
   return [...sources.sessions]
     .filter((summary) => !waiting.has(summary.id))

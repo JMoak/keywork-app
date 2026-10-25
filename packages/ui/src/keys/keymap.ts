@@ -33,6 +33,7 @@ export class KeymapError extends Error {
 
 export const defaultLeader = "ctrl+k";
 export const defaultLeaderTimeoutMs = 2000;
+export const everyPane = "*";
 
 export class Keymap {
   private table: BindingTable;
@@ -155,13 +156,17 @@ export class Keymap {
     activeScope: string | undefined,
     scopedOnly = false,
   ): string | undefined {
-    for (const [action, bindings] of this.table.bindings) {
-      const scope = this.table.scopes.get(action);
-      if (scope !== undefined && scope !== activeScope) continue;
-      if (scope === undefined && scopedOnly) continue;
-      if (bindings.some(matches)) return action;
-    }
-    return undefined;
+    const hits = [...this.table.bindings.entries()]
+      .filter(([, bindings]) => bindings.some(matches))
+      .map(([action]) => action);
+    const own = hits.find((action) => this.reaches(action, activeScope, scopedOnly));
+    if (own !== undefined || activeScope === undefined || scopedOnly) return own;
+    return hits.find((action) => this.table.scopes.get(action) === everyPane);
+  }
+
+  private reaches(action: string, activeScope: string | undefined, scopedOnly: boolean): boolean {
+    const scope = this.table.scopes.get(action);
+    return scope === undefined ? !scopedOnly : scope === activeScope;
   }
 }
 

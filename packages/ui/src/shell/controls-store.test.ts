@@ -36,6 +36,8 @@ export function idleControlsClient(): ControlsClient {
     cost: async () => "missing",
     exportSession: async () => "missing",
     rename: async () => "missing",
+    flush: async () => "missing",
+    forget: async () => "missing",
     applyPreset: async () => ({
       refused: "unavailable",
       detail: "this process has no preset switch",

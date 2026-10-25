@@ -16,6 +16,7 @@ import {
   lineageOfProjection,
   lineageState,
   projectAll,
+  replayBase,
   type ServerFeed,
   type SessionControls,
   type SessionProjection,
@@ -30,29 +31,35 @@ import type {
   AskVerdict,
   BusEnvelope,
   ChangedFileReading,
+  DenyReason,
   DiscardTrashedOutcome,
   ForkOutcome,
   LabelOutcome,
   LeafOutcome,
   PendingAsk,
-  PromptBehavior,
   PromptOutcome,
   PurgedTrash,
+  QueueCancelReading,
+  QueueMoveReading,
   RemoveOutcome,
   RestoreOutcome,
+  SendBehavior,
   SessionDetail,
+  SessionRow,
   SessionState as SessionStanding,
   SessionSummary,
+  SetAsideReading,
 } from "@keywork-app/protocol";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { type ControlsStore, createControlsStore } from "./controls-store.ts";
 import { createMemoryStore, type MemoryStore } from "./memory-store.ts";
-import { createSurfacesStore, type SurfacesStore } from "./surfaces-store.ts";
+import { createQuietSessions, type QuietSessions } from "./quiet.ts";
+import { createSurfacesStore, onReconnected, type SurfacesStore } from "./surfaces-store.ts";
 
 export interface SessionStore {
   readonly state: SessionState;
   projection(id: string | undefined): SessionProjection;
-  summary(id: string | undefined): SessionSummary | undefined;
+  summary(id: string | undefined): SessionRow | undefined;
   childOf(id: string | undefined): ChildLineage | undefined;
   children(parentId: string): readonly ChildLineage[];
   controlsOf(id: string | undefined): SessionControls;
@@ -67,9 +74,18 @@ export interface SessionStore {
   purge(): Promise<PurgedTrash>;
   reload(id: string): Promise<void>;
   create(): Promise<string>;
-  prompt(id: string, text: string, behavior: PromptBehavior): Promise<PromptOutcome>;
+  prompt(id: string, text: string, behavior: SendBehavior): Promise<PromptOutcome>;
+  sendNow(id: string, text: string): Promise<SetAsideReading>;
+  moveQueued(id: string, itemId: string, to: number): Promise<QueueMoveReading>;
+  cancelQueued(id: string, itemId: string): Promise<QueueCancelReading>;
   abort(id: string): Promise<void>;
-  answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
+  answerAsk(
+    callId: string,
+    verdict: AskVerdict,
+    scope?: AskScope,
+    reason?: DenyReason,
+    note?: string,
+  ): Promise<AnswerOutcome>;
   tree(id: string | undefined): TreeState;
   openTree(id: string, options?: RefetchOptions): Promise<void>;
   fork(id: string, entryId: string): Promise<ForkOutcome>;
@@ -81,6 +97,7 @@ export interface SessionStore {
   readonly memory: MemoryStore;
   readonly surfaces: SurfacesStore;
   readonly controls: ControlsStore;
+  readonly quiet: QuietSessions;
   dispose(): void;
 }
 
@@ -89,7 +106,7 @@ export interface RefetchOptions {
 }
 
 export interface SessionState {
-  readonly summaries: readonly SessionSummary[];
+  readonly summaries: readonly SessionRow[];
   readonly trash: readonly SessionSummary[];
   readonly projections: Readonly<Record<string, SessionProjection>>;
   readonly loading: Readonly<Record<string, boolean>>;
@@ -101,7 +118,7 @@ export interface SessionState {
 }
 
 interface MutableSessionState {
-  summaries: SessionSummary[];
+  summaries: SessionRow[];
   trash: SessionSummary[];
   trashed: Record<string, boolean>;
   projections: Record<string, SessionProjection>;
@@ -110,7 +127,7 @@ interface MutableSessionState {
   trees: Record<string, TreeState>;
   changes: Record<string, ChangesState>;
   lineage: LineageState;
-  unlisted: Record<string, SessionSummary>;
+  unlisted: Record<string, SessionRow>;
   gap: { from: number; to: number } | undefined;
   lost: string | undefined;
 }
@@ -142,6 +159,11 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       ...Object.values(state.projections).map((projection) => projection.standing?.model),
       ...state.summaries.map((summary) => summary.model),
     ],
+  });
+  const quiet = createQuietSessions({
+    client,
+    feed,
+    standing: (id) => state.projections[id]?.standing,
   });
 
   const apply = (batches: Map<string, BusEnvelope[]>): void => {
@@ -190,7 +212,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     const moves = trashMovesIn(envelopes);
     markTrashed(moves);
     if (moves.length > 0) void openTrash();
-    if (envelopes.some(changesSummaries)) void refresh();
+    if (envelopes.some(changesRows)) void refresh();
     for (const id of rewritten) void reload(id);
   };
 
@@ -205,16 +227,24 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const load = async (id: string): Promise<void> => {
     arrivedWhileLoading.set(id, []);
     setState("loading", id, true);
-    const [detail, pendingAsks] = await Promise.all([client.session(id), client.asks()]);
-    const history = detail === undefined ? [] : historyEnvelopes(detail);
+    const [detail, pendingAsks] = await Promise.all([
+      client.session(id),
+      client.asks(),
+      openTree(id, { force: true }).catch(() => undefined),
+    ]);
+    const journal = state.trees[id]?.snapshot;
+    const history = detail === undefined ? [] : historyEnvelopes(detail, journal);
     const asOf = detail?.asOf ?? -1;
     const asks = detail === undefined ? [] : askEnvelopes(detail, pendingAsks);
-    const live = (arrivedWhileLoading.get(id) ?? []).filter((envelope) => envelope.id > asOf);
+    const live = (arrivedWhileLoading.get(id) ?? []).filter(
+      (envelope) => envelope.id > asOf || carriesStanding(envelope),
+    );
     arrivedWhileLoading.delete(id);
+    const base = replayBase(detail);
     setState(
       produce((draft) => {
         const standing = draft.projections[id]?.standing;
-        const loaded = projectAll(emptyProjection, [...history, ...asks, ...live]);
+        const loaded = projectAll(base, [...history, ...asks, ...live]);
         draft.projections[id] = loaded.standing === undefined ? { ...loaded, standing } : loaded;
         draft.lineage = lineageOfProjection(draft.lineage, id, loaded);
         draft.loading[id] = false;
@@ -233,10 +263,10 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     return Promise.resolve();
   };
 
-  const refresh = async (): Promise<void> => {
-    const summaries = await client.sessions();
-    setState("summaries", reconcile([...summaries], { key: "id" }));
-  };
+  const refresh = coalesced(async (): Promise<void> => {
+    const rows = await client.sessions();
+    setState("summaries", reconcile([...rows], { key: "id" }));
+  });
 
   const openTrash = async (): Promise<void> => {
     const trash = await client.listTrash();
@@ -283,12 +313,20 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     });
   };
 
-  const summary = (id: string | undefined): SessionSummary | undefined =>
+  const summary = (id: string | undefined): SessionRow | undefined =>
     state.summaries.find((item) => item.id === id) ??
     (id === undefined ? undefined : state.unlisted[id]);
 
+  const resync = (): void => {
+    void refresh();
+    for (const id of Object.keys(state.projections)) void reload(id);
+    for (const id of Object.keys(state.trees)) void openTree(id, { force: true });
+    for (const id of Object.keys(state.changes)) void openChanges(id, { force: true });
+  };
+
   const stops = [
     feed.subscribe(absorb),
+    onReconnected(feed, resync),
     feed.onNotice((notice) => {
       if (notice.kind === "gap") setState("gap", { from: notice.from, to: notice.to });
     }),
@@ -335,10 +373,19 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       if (outcome === "missing") setState("missing", id, true);
       return outcome;
     },
+    sendNow: async (id, text) => {
+      controls.forgetSeed(id);
+      const setAside = await client.sendNow(id, text);
+      if (setAside === "missing") setState("missing", id, true);
+      return setAside;
+    },
+    moveQueued: (id, itemId, to) => client.moveQueued(id, itemId, to),
+    cancelQueued: (id, itemId) => client.cancelQueued(id, itemId),
     abort: async (id) => {
       await client.abort(id);
     },
-    answerAsk: (callId, verdict, scope) => client.answerAsk(callId, verdict, scope),
+    answerAsk: (callId, verdict, scope, reason, note) =>
+      client.answerAsk(callId, verdict, scope, reason, note),
     tree: (id) => (id === undefined ? emptyTreeState : (state.trees[id] ?? emptyTreeState)),
     openTree,
     fork: async (id, entryId) => {
@@ -355,10 +402,12 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     memory,
     surfaces,
     controls,
+    quiet,
     dispose: () => {
       memory.dispose();
       surfaces.dispose();
       controls.dispose();
+      quiet.dispose();
       for (const stop of stops) stop();
     },
   };
@@ -385,11 +434,15 @@ function askEnvelopes(detail: SessionDetail, pending: readonly PendingAsk[]): Bu
     }));
 }
 
+function carriesStanding(envelope: BusEnvelope): boolean {
+  return envelope.type === "session.state";
+}
+
 function isChildEvent(envelope: BusEnvelope): boolean {
   return envelope.type === "child.started" || envelope.type === "child.finished";
 }
 
-function listed(summaries: readonly SessionSummary[], id: string): boolean {
+function listed(summaries: readonly SessionRow[], id: string): boolean {
   return summaries.some((summary) => summary.id === id);
 }
 
@@ -408,14 +461,21 @@ function bySession(envelopes: readonly BusEnvelope[]): Map<string, BusEnvelope[]
   return grouped;
 }
 
-function changesSummaries(envelope: BusEnvelope): boolean {
-  return (
-    envelope.type === "turn.started" ||
-    envelope.type === "turn.completed" ||
-    envelope.type === "session.state" ||
-    envelope.type === "session.removed" ||
-    envelope.type === "session.restored"
-  );
+const rowChangingEvents: ReadonlySet<BusEnvelope["type"]> = new Set([
+  "turn.started",
+  "turn.completed",
+  "turn.interrupted",
+  "engine.error",
+  "gate.ask",
+  "changes.updated",
+  "session.state",
+  "session.removed",
+  "session.restored",
+]);
+
+function changesRows(envelope: BusEnvelope): boolean {
+  if (envelope.type === "gate.permission") return envelope.payload.decision.asked === true;
+  return rowChangingEvents.has(envelope.type);
 }
 
 interface TrashMove {
@@ -452,6 +512,27 @@ export function sessionsRewrittenBy(
     latest.set(id, envelope.payload);
   }
   return rewritten;
+}
+
+function coalesced(fetch: () => Promise<void>): () => Promise<void> {
+  let running: Promise<void> | undefined;
+  let following: Promise<void> | undefined;
+  const call = (): Promise<void> => {
+    if (running === undefined) {
+      running = fetch().finally(() => {
+        running = undefined;
+      });
+      return running;
+    }
+    following ??= running
+      .catch(() => undefined)
+      .then(() => {
+        following = undefined;
+        return call();
+      });
+    return following;
+  };
+  return call;
 }
 
 function dedupe(

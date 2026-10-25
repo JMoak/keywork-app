@@ -1,4 +1,9 @@
-import { type BotScope, type BotSummary, isSurfaceRefusal } from "@keywork-app/protocol";
+import {
+  type BotScope,
+  type BotSummary,
+  isSurfaceRefusal,
+  surfaceSlug,
+} from "@keywork-app/protocol";
 import { createSignal, For, Show } from "solid-js";
 import { z } from "zod";
 import { relativeAge } from "../../chrome/telemetry.ts";
@@ -35,7 +40,7 @@ export const botsPane = definePane<BotsSpec>({
     action: "bots.summon",
     chords: "none",
     help: "bots pane",
-    command: { name: "bots", description: "open the bots pane", aliases: ["bot"] },
+    command: { name: "bots", description: "open the bots pane" },
     spec: (shell) => ({ kind: "bots", ...summonedFrom(shell) }),
   },
   localActions: {
@@ -52,17 +57,21 @@ export const botsPane = definePane<BotsSpec>({
     "bots.switch": {
       chords: "enter",
       help: "run the current session as this bot",
-      command: { name: "bot-switch", description: "switch the focused session to this bot" },
+      command: { name: "bots-switch", description: "switch the focused session to this bot" },
     },
     "bots.new": {
       chords: "n",
-      help: "define a bot",
-      command: { name: "bot-new", description: "define a new bot by slug and scope" },
+      help: "define a bot: purpose, slug, scope",
+      command: {
+        name: "bots-new",
+        description: "define a bot: what it is for, its slug, and where it lives",
+        argument: { hint: "[slug]" },
+      },
     },
     "bots.release": {
       chords: "u",
       help: "run the current session as no bot",
-      command: { name: "bot-release", description: "release the focused session from its bot" },
+      command: { name: "bots-release", description: "release the focused session from its bot" },
     },
   },
 });
@@ -83,9 +92,16 @@ export function botAside(bot: BotSummary): string {
     .join(" · ");
 }
 
-const scopeChoices: Readonly<Record<string, string>> = { p: "project", u: "user" };
+const scopeChoices: Readonly<Record<string, string>> = { p: "project", g: "global" };
 
-type Prompt = { kind: "slug" } | { kind: "scope"; slug: string };
+const scopeOfChoice: Readonly<Record<string, BotScope>> = { p: "project", g: "user" };
+
+export const unnamedBotLine = "a bot needs a slug · lowercase letters, digits, hyphens";
+
+type Prompt =
+  | { kind: "purpose"; seed: string | undefined }
+  | { kind: "slug"; purpose: string | undefined; seed: string | undefined }
+  | { kind: "scope"; purpose: string | undefined; slug: string };
 
 function BotsList(props: PaneProps<BotsSpec>) {
   const session = workingSession(props.shell, props.spec.sessionId);
@@ -100,9 +116,27 @@ function BotsList(props: PaneProps<BotsSpec>) {
   const [prompt, setPrompt] = createSignal<Prompt>();
   const [notice, setNotice] = createSignal<string>();
   const atCursor = (): BotSummary | undefined => bots()[cursor.index()];
-  const scopeFor = (): string | undefined => {
+  const asking = <Kind extends Prompt["kind"]>(kind: Kind) => {
     const pending = prompt();
-    return pending?.kind === "scope" ? pending.slug : undefined;
+    return pending?.kind === kind ? (pending as Extract<Prompt, { kind: Kind }>) : undefined;
+  };
+  const define = (seed?: string): void => {
+    setPrompt({ kind: "purpose", seed });
+  };
+  const slugProblem = (slug: string): string | undefined => {
+    if (!surfaceSlug.test(slug)) return unnamedBotLine;
+    return bots().some((bot) => bot.name === slug)
+      ? `a bot named ${slug} already exists`
+      : undefined;
+  };
+  const named = (purpose: string | undefined, slug: string): void => {
+    const problem = slugProblem(slug);
+    if (problem === undefined) {
+      setPrompt({ kind: "scope", purpose, slug });
+      return;
+    }
+    setNotice(problem);
+    setPrompt({ kind: "slug", purpose, seed: slug });
   };
 
   const switchTo = async (name: string | null): Promise<void> => {
@@ -123,14 +157,20 @@ function BotsList(props: PaneProps<BotsSpec>) {
     await surfaces().refetch("bots");
   };
 
-  const create = async (slug: string, scope: BotScope): Promise<void> => {
+  const create = async (
+    slug: string,
+    scope: BotScope,
+    purpose: string | undefined,
+  ): Promise<void> => {
     setPrompt(undefined);
-    const created = await surfaces().verbs.createBot({ slug, scope });
+    const draft = { slug, scope, ...(purpose !== undefined && { purpose }) };
+    const created = await surfaces().verbs.createBot(draft);
     setNotice(isSurfaceRefusal(created) ? created.detail : `${botLabel(created)} defined`);
     await surfaces().refetch("bots");
   };
 
-  props.onAction((action) => {
+  props.onAction((action, argument) => {
+    if (action === "bots.new") return define(argument);
     if (prompt() !== undefined) {
       setPrompt(undefined);
       return;
@@ -144,8 +184,6 @@ function BotsList(props: PaneProps<BotsSpec>) {
       case "bots.switch":
         if (bot !== undefined) void switchTo(bot.name);
         return;
-      case "bots.new":
-        return setPrompt({ kind: "slug" });
       case "bots.release":
         return void switchTo(null);
     }
@@ -154,7 +192,7 @@ function BotsList(props: PaneProps<BotsSpec>) {
   return (
     <section class="kw-ov kw-bots" aria-label="bots" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
-        <button type="button" class="kw-ov-new" onClick={() => setPrompt({ kind: "slug" })}>
+        <button type="button" class="kw-ov-new" onClick={() => define()}>
           + new bot
         </button>
         <span class="kw-ov-head-detail">enter switches · u releases</span>
@@ -184,21 +222,41 @@ function BotsList(props: PaneProps<BotsSpec>) {
           </For>
         </ol>
       </Show>
-      <Show when={prompt()?.kind === "slug"}>
-        <DraftLine
-          label="bot slug"
-          onSubmit={(slug) => {
-            if (slug !== "") setPrompt({ kind: "scope", slug });
-          }}
-          onCancel={() => setPrompt(undefined)}
-        />
+      <Show when={asking("purpose")} keyed>
+        {(asked) => (
+          <DraftLine
+            label="bot purpose"
+            placeholder="what is this bot for? optional · enter skips"
+            onSubmit={(purpose) =>
+              setPrompt({
+                kind: "slug",
+                purpose: purpose === "" ? undefined : purpose,
+                seed: asked.seed,
+              })
+            }
+            onCancel={() => setPrompt(undefined)}
+          />
+        )}
       </Show>
-      <Show when={scopeFor()}>
-        {(slug) => (
+      <Show when={asking("slug")} keyed>
+        {(asked) => (
+          <DraftLine
+            label="bot slug"
+            initial={asked.seed}
+            placeholder="slug · lowercase letters, digits, hyphens"
+            onSubmit={(slug) => named(asked.purpose, slug)}
+            onCancel={() => setPrompt(undefined)}
+          />
+        )}
+      </Show>
+      <Show when={asking("scope")} keyed>
+        {(asked) => (
           <ChoiceLine
-            question={`scope for ${slug()}`}
+            question={`scope for ${asked.slug}`}
             choices={scopeChoices}
-            onChoose={(key) => void create(slug(), scopeChoices[key] as BotScope)}
+            onChoose={(key) =>
+              void create(asked.slug, scopeOfChoice[key] ?? "project", asked.purpose)
+            }
             onCancel={() => setPrompt(undefined)}
           />
         )}

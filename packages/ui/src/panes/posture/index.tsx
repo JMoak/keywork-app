@@ -10,6 +10,8 @@ import type {
   SetupReading,
   TrustSetup,
 } from "../../posture/trust-setup.ts";
+import { onReconnected } from "../../shell/surfaces-store.ts";
+import type { TrustState } from "../../shell/trust.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { createCursor, NoticeLine, OverviewRow, SubLine } from "../overview/rows.tsx";
@@ -124,13 +126,22 @@ export function reviewLead(setup: TrustSetup, version: string | undefined): stri
   return version === undefined ? "the whole posture" : `the whole posture · keywork ${version}`;
 }
 
+export function postureWaitLine(state: TrustState): string | undefined {
+  if (state.kind === "unknown") return "reading whether this workspace is trusted";
+  if (state.kind === "restarting")
+    return "keywork is picking up the trust · the posture reads once it has";
+  return undefined;
+}
+
 function TrustSetupPane(props: PaneProps<PostureSpec>) {
-  const setup = (): TrustSetup | undefined =>
-    props.shell.trust.untrusted() ? undefined : props.shell.trustSetup;
+  const trusted = () => props.shell.trust.state().kind === "trusted";
+  const setup = (): TrustSetup | undefined => (trusted() ? props.shell.trustSetup : undefined);
+  const waiting = () => postureWaitLine(props.shell.trust.state());
   return (
-    <Show when={setup()} fallback={<EmptyState line={posturePane.emptyState(props.shell.keys)} />}>
-      {(trustSetup) => <Review {...props} setup={trustSetup()} />}
-    </Show>
+    <Switch fallback={<EmptyState line={posturePane.emptyState(props.shell.keys)} />}>
+      <Match when={setup()}>{(trustSetup) => <Review {...props} setup={trustSetup()} />}</Match>
+      <Match when={waiting()}>{(line) => <EmptyState line={line()} />}</Match>
+    </Switch>
   );
 }
 
@@ -151,6 +162,7 @@ function Review(props: PaneProps<PostureSpec> & { setup: TrustSetup }) {
       if (envelopes.some(changesThePosture)) void props.setup.refresh();
     }),
   );
+  onCleanup(onReconnected(props.shell.feed, () => void props.setup.begin()));
 
   const said = (offer: Offer, outcome: DecisionOutcome): string =>
     props.setup.allDecided()

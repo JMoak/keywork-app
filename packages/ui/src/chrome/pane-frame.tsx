@@ -7,6 +7,7 @@ import { dressElement, undressElement } from "../theme/variables.ts";
 import type { TitleBot } from "./identity.ts";
 import { chromeWeight } from "./root-attributes.ts";
 import { createTileFillStep, type LifecycleState } from "./stamp.ts";
+import { keepTabWithin } from "./tab-trap.ts";
 import { type ThemeMark, TitleRow } from "./title-row.tsx";
 import "./pane-frame.css";
 
@@ -91,7 +92,9 @@ export function PaneFrame(props: PaneFrameProps) {
         instruments={worn()?.instruments}
         onGauge={props.onGauge}
       />
-      <div class="kw-frame-body">{props.children}</div>
+      <div class="kw-frame-body" ref={(body) => onCleanup(keepTabWithin(body))}>
+        {props.children}
+      </div>
     </section>
   );
 }

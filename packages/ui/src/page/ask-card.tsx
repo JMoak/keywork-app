@@ -3,19 +3,32 @@ import {
   type AnswerOutcome,
   type AskScope,
   type AskVerdict,
+  type DenyReason,
   isAskRefusal,
   onceOnlyTools,
   type PermissionRule,
   type RememberedScope,
 } from "@keywork-app/protocol";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { returnKeyboardHome } from "../panes/keyboard-home.ts";
+import {
+  askingWhy,
+  askWhy,
+  readWhyKeys,
+  reasonOffers,
+  stopAskingWhy,
+  whyPrompt,
+} from "./ask-card-why.ts";
 import { coverageLines } from "./consequence.ts";
 import { AskConsequence } from "./consequence-view.tsx";
+import { NoteLine } from "./note-line.tsx";
+import "./ask-card.css";
 
 export type AskAnswerer = (
   verdict: AskVerdict,
   scope?: AskScope,
+  reason?: DenyReason,
+  note?: string,
 ) => Promise<AnswerOutcome> | undefined;
 
 export interface AskChords {
@@ -31,6 +44,8 @@ export type AskPick = keyof AskChords;
 export interface AskChoice {
   verdict: AskVerdict;
   scope?: AskScope;
+  reason?: DenyReason;
+  note?: string;
 }
 
 export const cardKeys: AskChords = {
@@ -72,37 +87,66 @@ export function AskCard(props: AskCardProps) {
   const quiet = () => props.quiet === true;
   const rules = () => rememberableRules(props.run);
   const chords = (): AskChords => props.chords ?? cardKeys;
-  const offers = () => askOffers(props.run, quiet());
+  const offers = () => askOffers(props.run);
   const remembering = () => rememberingOffers(offers());
   const rememberingChords = () => remembering().map((offer) => chords()[offer.pick]);
   const coverage = () =>
     props.run.ask?.tool === "bash" ? coverageOf(remembering(), rules(), chords()) : [];
-  const exemption = () => (quiet() ? quietExemption(props.run) : undefined);
+  const stillAsks = () => (quiet() ? quietStillAsks(props.run) : undefined);
+  const sayingWhy = () => askingWhy(props.run.callId);
+  const [noting, setNoting] = createSignal(false);
 
   const answer = async (choice: AskChoice): Promise<void> => {
     if (answering()) return;
     setAnswering(true);
     setRefusal(undefined);
     try {
-      const outcome = await props.onAnswer(choice.verdict, choice.scope);
+      const outcome = await props.onAnswer(
+        choice.verdict,
+        choice.scope,
+        choice.reason,
+        choice.note,
+      );
       if (isAskRefusal(outcome)) setRefusal(outcome.detail);
-      else returnKeyboardHome();
+      else settle();
     } catch (error) {
       setRefusal(error instanceof Error ? error.message : String(error));
     } finally {
       setAnswering(false);
     }
   };
+  const settle = (): void => {
+    setNoting(false);
+    stopAskingWhy(props.run.callId);
+    returnKeyboardHome();
+  };
+  const giveReason = (reason: DenyReason): void => {
+    if (reason === "other") setNoting(true);
+    else void answer(denialFor(reason));
+  };
+  const choose = (choice: AskChoice): void => {
+    if (isBareDenial(choice)) askWhy(props.run.callId);
+    else void answer(choice);
+  };
 
   const onKeyDown = (event: KeyboardEvent): void => {
+    if (sayingWhy()) return;
     const pick = askKeyPick(event);
-    const choice = pick === undefined ? undefined : askChoiceFor(pick, props.run, quiet());
+    const choice = pick === undefined ? undefined : askChoiceFor(pick, props.run);
     if (choice === undefined) return;
     event.preventDefault();
     event.stopPropagation();
-    void answer(choice);
+    choose(choice);
   };
 
+  readWhyKeys(
+    () => card,
+    () => (noting() ? undefined : props.run.callId),
+    (reason, words) => (words ? setNoting(true) : void answer(denialFor(reason))),
+  );
+  createEffect(() => {
+    if (sayingWhy() && card !== undefined && focusRestsNear(card)) card.focus();
+  });
   onMount(() => {
     if (card !== undefined && mayClaimFocus(card)) card.focus({ preventScroll: true });
   });
@@ -120,10 +164,11 @@ export function AskCard(props: AskCardProps) {
       onKeyDown={onKeyDown}
       data-answering={answering() ? "" : undefined}
       data-quiet={quiet() ? "" : undefined}
+      data-saying-why={sayingWhy() ? "" : undefined}
     >
       <span class="kw-ask-why">{askReason(props.run.ask?.rule)}</span>
       <AskConsequence run={props.run} />
-      <Show when={rules().length > 0}>
+      <Show when={rules().length > 0 && !sayingWhy()}>
         <span class="kw-ask-rules">
           <span class="kw-ask-rules-label">{rememberingChords().join(" or ")} would allow</span>
           <For each={rules()}>{(rule) => <code class="kw-ask-rule">{ruleText(rule)}</code>}</For>
@@ -142,17 +187,46 @@ export function AskCard(props: AskCardProps) {
           {(scope) => <span class="kw-ask-accepted">{acceptedLine(scope(), chords())}</span>}
         </Show>
       </Show>
-      <Show when={exemption()}>{(reason) => <span class="kw-ask-quiet">{reason()}</span>}</Show>
+      <Show when={!sayingWhy() && stillAsks()}>
+        {(reason) => <span class="kw-ask-quiet">{reason()}</span>}
+      </Show>
       <span class="kw-ask-actions">
-        <For each={offers()}>
-          {(offer) => (
-            <AskButton
-              choice={offer.choice}
-              chord={chords()[offer.pick]}
-              onPress={() => void answer(offer.choice)}
-            />
-          )}
-        </For>
+        <Show
+          when={sayingWhy()}
+          fallback={
+            <For each={offers()}>
+              {(offer) => (
+                <AnswerButton
+                  label={answerLabel(offer.choice)}
+                  chord={chords()[offer.pick]}
+                  tone={toneOf(offer.choice)}
+                  onPress={() => choose(offer.choice)}
+                />
+              )}
+            </For>
+          }
+        >
+          <Show
+            when={noting()}
+            fallback={
+              <>
+                <span class="kw-ask-reason-prompt">{whyPrompt}</span>
+                <For each={reasonOffers}>
+                  {(offer) => (
+                    <AnswerButton
+                      label={offer.label}
+                      chord={offer.key}
+                      tone="deny"
+                      onPress={() => giveReason(offer.reason)}
+                    />
+                  )}
+                </For>
+              </>
+            }
+          >
+            <NoteLine onSend={(note) => void answer(denialFor("other", note))} />
+          </Show>
+        </Show>
       </span>
       <Show when={refusal()}>
         {(detail) => (
@@ -165,11 +239,10 @@ export function AskCard(props: AskCardProps) {
   );
 }
 
-export function askChoiceFor(pick: AskPick, run: ToolRun, quiet: boolean): AskChoice | undefined {
+export function askChoiceFor(pick: AskPick, run: ToolRun): AskChoice | undefined {
   const rememberable = rememberableRules(run).length > 0;
   switch (pick) {
     case "approve":
-      return approvesForSession(run, quiet) ? sessionGrant : onceGrant;
     case "once":
       return onceGrant;
     case "session":
@@ -181,20 +254,15 @@ export function askChoiceFor(pick: AskPick, run: ToolRun, quiet: boolean): AskCh
   }
 }
 
-export function quietExemption(run: ToolRun): string | undefined {
+export function quietStillAsks(run: ToolRun): string {
   const tool = run.ask?.tool;
-  if (tool !== undefined && onceOnlyTools.has(tool)) {
-    return "quiet · write and edit are approved once at a time";
-  }
+  if (tool !== undefined && onceOnlyTools.has(tool)) return "quiet · write and edit still ask";
   if (run.ask?.rule === "trusted") return "quiet · trusted reads ask before this form on purpose";
   const rules = rememberableRules(run);
   if (rules.length === 0) return "quiet · this call has nothing a grant could remember";
-  if (rules.some(remembersExactCommand)) {
-    return "quiet · a destructive command is never the quiet default";
-  }
-  return rules.some((rule) => blanketProgram(rule) !== undefined)
-    ? "quiet · a blanket grant is never the quiet default"
-    : undefined;
+  if (rules.some(remembersExactCommand)) return "quiet · a destructive command still asks";
+  if (rules.some(isBareProgram)) return "quiet · a blanket grant still asks";
+  return "quiet · this one still needs you";
 }
 
 export function rememberableRules(run: ToolRun): readonly PermissionRule[] {
@@ -236,11 +304,20 @@ export interface AskOffer {
   readonly choice: AskChoice;
 }
 
-export function askOffers(run: ToolRun, quiet: boolean): AskOffer[] {
-  return offeredPicks(run, quiet).flatMap((pick) => {
-    const choice = askChoiceFor(pick, run, quiet);
+export function askOffers(run: ToolRun): AskOffer[] {
+  return offeredPicks.flatMap((pick) => {
+    const choice = askChoiceFor(pick, run);
     return choice === undefined ? [] : [{ pick, choice }];
   });
+}
+
+export function denialFor(reason: DenyReason, note?: string): AskChoice {
+  const said = note?.trim() ?? "";
+  return said === "" ? { verdict: "denied", reason } : { verdict: "denied", reason, note: said };
+}
+
+export function isBareDenial(choice: AskChoice): boolean {
+  return choice.verdict === "denied" && choice.reason === undefined;
 }
 
 export function answerLabel(choice: AskChoice): string {
@@ -268,18 +345,14 @@ function askKeyPick(event: KeyboardEvent): AskPick | undefined {
   return askPicks.find((pick) => cardKeys[pick] === key);
 }
 
-function approvesForSession(run: ToolRun, quiet: boolean): boolean {
-  return quiet && quietExemption(run) === undefined;
-}
-
-function offeredPicks(run: ToolRun, quiet: boolean): readonly AskPick[] {
-  return approvesForSession(run, quiet)
-    ? ["approve", "once", "workspace", "deny"]
-    : ["approve", "session", "workspace", "deny"];
-}
+const offeredPicks: readonly AskPick[] = ["approve", "session", "workspace", "deny"];
 
 function remembersExactCommand(rule: PermissionRule): boolean {
   return rule.action === "bash" && !rule.resource.includes("*");
+}
+
+function isBareProgram(rule: PermissionRule): boolean {
+  return rule.action === "bash" && /^\S+ \*$/.test(rule.resource);
 }
 
 interface RememberingOffer {
@@ -332,29 +405,41 @@ const codeRunners: ReadonlySet<string> = new Set([
   "php",
 ]);
 
-interface AskButtonProps {
-  choice: AskChoice;
+type AnswerTone = "grant" | "deny";
+
+interface AnswerButtonProps {
+  label: string;
   chord: string;
+  tone: AnswerTone;
   onPress: () => void;
 }
 
-function AskButton(props: AskButtonProps) {
+function AnswerButton(props: AnswerButtonProps) {
   return (
     <button
       type="button"
       class="kw-ask-answer"
-      data-tone={props.choice.verdict === "denied" ? "deny" : "grant"}
+      data-tone={props.tone}
       onClick={() => props.onPress()}
     >
-      <span class="kw-ask-label">{answerLabel(props.choice)}</span> <kbd>{props.chord}</kbd>
+      <span class="kw-ask-label">{props.label}</span> <kbd>{props.chord}</kbd>
     </button>
   );
 }
 
+function toneOf(choice: AskChoice): AnswerTone {
+  return choice.verdict === "denied" ? "deny" : "grant";
+}
+
 function mayClaimFocus(card: HTMLElement): boolean {
   const active = document.activeElement;
+  return focusRestsNear(card) && (active === null || !holdsDraft(active));
+}
+
+function focusRestsNear(card: HTMLElement): boolean {
+  const active = document.activeElement;
   if (active === null || active === document.body) return true;
-  return (paneOf(card)?.contains(active) ?? false) && !holdsDraft(active);
+  return paneOf(card)?.contains(active) ?? false;
 }
 
 function paneOf(card: HTMLElement): Element | null {

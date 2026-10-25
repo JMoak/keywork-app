@@ -1,16 +1,16 @@
-{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"which way?"}}
-{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"quiet":false,"undoable":false,"redoable":false}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"which way?","entryId":"q1"}}
 {"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Left it is."}}}
 {"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Left it is."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
-{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","undoable":true,"redoable":false}}
-{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.tree","payload":{"reason":"fork","entryId":"q2","forkedTo":"q3"}}
-{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.tree","payload":{"reason":"label","entryId":"q1"}}
-{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","undoable":true,"redoable":false}}
-{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"session.tree","payload":{"reason":"leaf","entryId":"q2"}}
-{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"turn.started","payload":{"userText":"no, the other way"}}
-{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","undoable":true,"redoable":false}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","quiet":false,"undoable":true,"redoable":false}}
+{"id":7,"ts":"2026-09-07T12:00:01.750Z","sessionId":"s1","type":"session.tree","payload":{"reason":"fork","entryId":"q1","forkedTo":"q3"}}
+{"id":8,"ts":"2026-09-07T12:00:02.000Z","sessionId":"s1","type":"session.tree","payload":{"reason":"label","entryId":"q4"}}
+{"id":9,"ts":"2026-09-07T12:00:02.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","quiet":false,"undoable":true,"redoable":false}}
+{"id":10,"ts":"2026-09-07T12:00:02.500Z","sessionId":"s1","type":"session.tree","payload":{"reason":"leaf","entryId":"q1"}}
+{"id":11,"ts":"2026-09-07T12:00:02.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","quiet":false,"undoable":true,"redoable":false}}
+{"id":12,"ts":"2026-09-07T12:00:03.000Z","sessionId":"s1","type":"turn.started","payload":{"userText":"no, the other way","entryId":"q5"}}
 {"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"Right, then."}}}
 {"id":14,"ts":"2026-09-07T12:00:03.500Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":15,"ts":"2026-09-07T12:00:03.750Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"Right, then."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
-{"id":16,"ts":"2026-09-07T12:00:04.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q4","undoable":true,"redoable":false}}
+{"id":16,"ts":"2026-09-07T12:00:04.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q6","quiet":false,"undoable":true,"redoable":false}}

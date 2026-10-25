@@ -17,7 +17,7 @@ import {
   askChoiceFor,
   blanketWarning,
   cardKeys,
-  quietExemption,
+  quietStillAsks,
   rememberableRules,
   ruleText,
 } from "./ask-card.tsx";
@@ -436,9 +436,9 @@ describe("the ask card in a quiet session", () => {
 
 describe("askChoiceFor", () => {
   const picks: readonly AskPick[] = ["approve", "once", "session", "workspace", "deny"];
-  const scopes = (run: ToolRun, quiet: boolean) =>
+  const scopes = (run: ToolRun, _quiet: boolean) =>
     picks.map((pick) => {
-      const choice = askChoiceFor(pick, run, quiet);
+      const choice = askChoiceFor(pick, run);
       return choice === undefined ? "refused" : `${choice.verdict}:${choice.scope ?? "once"}`;
     });
 
@@ -469,7 +469,7 @@ describe("askChoiceFor", () => {
         "denied:once",
       ]);
     }
-    expect(quietExemption(askingRun("g1"))).toBeUndefined();
+    expect(quietStillAsks(askingRun("g1"))).toBeUndefined();
   });
 });
 

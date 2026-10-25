@@ -11,7 +11,6 @@ import {
   type ContextSpec,
   contextHints,
   contextPane,
-  flushNotice,
   noSessionNotice,
   unreadLine,
 } from "./index.tsx";
@@ -230,18 +229,6 @@ describe("the context pane's keys", () => {
     act("context.compact");
     expect(recorded.compacted).toEqual([]);
     expect(text(container, ".kw-ov-line")[0]).toBe(noSessionNotice);
-  });
-
-  it("says with f where memory flushes, since keywork has no route to flush on demand", () => {
-    const { shell } = harness();
-    const { container, act } = mount(shell);
-    act("context.flush");
-    expect(text(container, ".kw-ov-line")[0]).toBe(
-      "memory flushes when a turn settles past 187k · keywork has no route to flush now",
-    );
-    expect(flushNotice(undefined)).toBe(
-      "memory flushes when a turn settles past the flush line · keywork has no route to flush now",
-    );
   });
 
   it("closes itself on escape", () => {
