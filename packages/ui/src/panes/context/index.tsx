@@ -205,25 +205,31 @@ function followTheFocusedConversation(props: PaneProps<ContextSpec>): void {
 
 function contextKeys(props: PaneProps<ContextSpec>, say: Say): Record<string, () => void> {
   const verbs = props.shell.store.controls;
-  const withSession = (run: (id: string) => Promise<void>) => (): void => {
+  const withSession = (run: (id: string, say: Say) => Promise<void>) => (): void => {
     const id = props.spec.sessionId;
     if (id === undefined) say(noSessionNotice);
-    else void run(id);
+    else void run(id, whileMapped(props, id, say));
   };
   return {
-    "context.compact": withSession(async (id) => {
+    "context.compact": withSession(async (id, say) => {
       say(compactingNotice);
       const reading = await verbs.compact(id);
       if (!isSettled(reading)) return say(refusalNotice(reading));
       say(compactNotice(reading));
       await verbs.watchReadings(id);
     }),
-    "context.flush": withSession(async (id) => {
+    "context.flush": withSession(async (id, say) => {
       say(flushingNotice);
       const reading = await verbs.flush(id);
       say(isSettled(reading) ? flushedNotice(reading) : refusalNotice(reading));
     }),
     "context.close": () => props.shell.closePane?.(props.id),
+  };
+}
+
+function whileMapped(props: PaneProps<ContextSpec>, id: string, say: Say): Say {
+  return (line) => {
+    if (props.spec.sessionId === id) say(line);
   };
 }
 

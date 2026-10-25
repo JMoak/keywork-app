@@ -24,13 +24,13 @@ describe("the tree reducer over the recorded fork, label and leaf move", () => {
     expect(changes.map((envelope) => envelope.payload.reason)).toEqual(["fork", "label", "leaf"]);
     const afterFork = changes.slice(0, 1).reduce(treeState, emptyTreeState);
     expect(afterFork.stale).toBe(true);
-    expect(afterFork.lastChange).toMatchObject({ reason: "fork", entryId: "q2", forkedTo: "q3" });
+    expect(afterFork.lastChange).toMatchObject({ reason: "fork", entryId: "q1", forkedTo: "q3" });
     const settled = treeSnapshot(afterFork, await snapshot());
     expect(settled.stale).toBe(false);
-    expect(settled.leafId).toBe("q4");
+    expect(settled.leafId).toBe("q6");
     const moved = changes.slice(1).reduce(treeState, settled);
     expect(moved.stale).toBe(true);
-    expect(moved.leafId).toBe("q2");
+    expect(moved.leafId).toBe("q1");
   });
 
   it("goes stale when session.state moves the leaf past the snapshot, and not when it stays", async () => {
@@ -40,7 +40,7 @@ describe("the tree reducer over the recorded fork, label and leaf move", () => {
     const last = states.at(-1) as BusEnvelope;
     expect(treeState(settled, last)).toBe(settled);
     const earlier = treeState(settled, states[1] as BusEnvelope);
-    expect(earlier).toMatchObject({ stale: true, leafId: "q1" });
+    expect(earlier).toMatchObject({ stale: true, leafId: "q2" });
   });
 
   it("ignores every other event and replayed tree changes", async () => {
@@ -68,8 +68,8 @@ describe("the tree reducer over the recorded fork, label and leaf move", () => {
   });
 
   it("folds a branch away and keeps the fold stamp on its row", async () => {
-    const rows = treeRows(await snapshot(), new Set(["q1"]));
-    expect(rows.map((row) => row.id)).toEqual(["q2", "q1", "q6", "q4"]);
+    const rows = treeRows(await snapshot(), new Set(["q4"]));
+    expect(rows.map((row) => row.id)).toEqual(["q1", "q4", "q5", "q8"]);
     expect(rows[1]).toMatchObject({ folded: true, hasChildren: true });
   });
 

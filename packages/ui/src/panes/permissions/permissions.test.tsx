@@ -12,7 +12,6 @@ import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import grantAnswers from "../../../../client/src/fixtures/grants.json";
 import { quietMark } from "../../chrome/title-row.tsx";
-import type { QuietPosture } from "../../shell/quiet.ts";
 import { inertFeed } from "../../shell/trust.test.ts";
 import { mountPane, overviewShell, settle } from "../overview/rows.test.tsx";
 import type { ShellSeams } from "../registry.ts";
@@ -22,6 +21,7 @@ import {
   hasGrants,
   permissionsPane,
   postureWord,
+  quietGrantedNothing,
   revokedNotice,
   revokeQuestion,
   sessionGrantGroups,
@@ -134,10 +134,15 @@ function permissionDecision(scope: "once" | "session" | "workspace" | undefined)
 }
 
 describe("the permissions pane", () => {
-  it("lists the trusted bundle read-only, the workspace grants, and session grants by title", async () => {
-    const { container } = mount(permissionsShell([recordedView]));
+  it("lists the trusted bundle folded until b, the workspace grants, and session grants by title", async () => {
+    const { container, act } = mount(permissionsShell([recordedView]));
     await settle();
-    expect(container.querySelector(".kw-ov-head")?.textContent).toContain("bundle · trusted");
+    const head = container.querySelector(".kw-ov-head") as HTMLElement;
+    expect(head.textContent).toContain("bundle · trusted");
+    expect(head.textContent).toContain("read rules · ctrl+k permissions.bundle shows them");
+    expect(container.querySelector("[aria-label='bundle']")).toBeNull();
+    act("permissions.bundle");
+    expect(head.textContent).toContain("ctrl+k permissions.bundle folds them");
     expect(texts(container, "[aria-label='bundle'] .kw-perm-rule")).toContain("git status*");
     expect(texts(container, "[aria-label='bundle'] .kw-perm-rule")).toContain(
       "find *-delete* asks",
@@ -185,17 +190,23 @@ describe("the permissions pane", () => {
     );
   });
 
-  it("marks the grants of a session that is quiet", async () => {
-    const harness = permissionsShell([recordedView]);
-    const quiet: QuietPosture = { has: (id) => id === "s1" };
-    const { container } = mountPane(
-      permissionsPane.component,
-      { kind: "permissions" },
-      { ...harness.shell, quiet },
-    );
+  it("marks the grants of a session the server lists as quiet", async () => {
+    const { container } = mount(permissionsShell([{ ...recordedView, quiet: ["s1"] }]));
     await settle();
     expect(container.querySelector(".kw-perm-session-quiet")?.textContent).toBe(
       `${quietMark} quiet`,
+    );
+  });
+
+  it("shows a quiet session that holds no grants yet, so the mark has a home", async () => {
+    const quietOnly: PermissionsView = { ...recordedView, session: {}, quiet: ["s1"] };
+    const { container } = mount(permissionsShell([quietOnly]));
+    await settle();
+    expect(texts(container, ".kw-perm-session-title")).toEqual([
+      `Build and stage${quietMark} quiet`,
+    ]);
+    expect(container.querySelector(".kw-perm-session .kw-perm-quiet")?.textContent).toBe(
+      quietGrantedNothing,
     );
   });
 
@@ -274,8 +285,11 @@ describe("the permissions readings", () => {
     expect(hasGrants(recordedView)).toBe(true);
     expect(hasGrants({ ...untrustedView, session: { s2: [] } })).toBe(false);
     expect(sessionGrantGroups(recordedView, () => undefined)).toEqual([
-      { sessionId: "s1", title: "s1", rules: [mkdir], firstRow: 1 },
+      { sessionId: "s1", title: "session s1", rules: [mkdir], quiet: false, firstRow: 1 },
     ]);
+    expect(sessionGrantGroups({ ...recordedView, quiet: ["s1"] }, () => "Build and stage")).toEqual(
+      [{ sessionId: "s1", title: "Build and stage", rules: [mkdir], quiet: true, firstRow: 1 }],
+    );
   });
 
   it("lays every grant on one cursor, the workspace's first, each session's after", () => {
@@ -303,7 +317,9 @@ describe("the permissions readings", () => {
       "revoke mkdir -p * for Build and stage",
     );
     expect(revokedNotice(workspaceGrant, titleOf)).toBe("revoked git add * · it asks again");
-    expect(revokedNotice(sessionGrant, titleOf)).toBe("revoked mkdir -p * · it asks again in s9");
+    expect(revokedNotice(sessionGrant, titleOf)).toBe(
+      "revoked mkdir -p * · it asks again in session s9",
+    );
   });
 
   it("recognises only the decisions that record a grant", () => {

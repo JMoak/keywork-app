@@ -30,8 +30,8 @@ describe("the changes reducer over the recorded write turn", () => {
     expect(updated).toHaveLength(1);
     expect(stream.map((envelope) => envelope.type).slice(-3)).toEqual([
       "turn.completed",
-      "session.state",
       "changes.updated",
+      "session.state",
     ]);
     const state = stream.reduce(changesState, emptyChangesState);
     expect(state).toEqual({

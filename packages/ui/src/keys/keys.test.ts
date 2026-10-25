@@ -255,9 +255,11 @@ describe("the app's bindings", () => {
   });
 
   it("give every action help text and a command where it is palette-reachable", () => {
+    const commandedElsewhere = new Set(["pane.mark"]);
     for (const [name, action] of Object.entries(appActions)) {
       expect(action.help, name).not.toBe("");
-      if (!name.startsWith("focus.pane")) expect(action.command, name).toBeDefined();
+      if (name.startsWith("focus.pane") || commandedElsewhere.has(name)) continue;
+      expect(action.command, name).toBeDefined();
     }
   });
 });

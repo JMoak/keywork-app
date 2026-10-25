@@ -150,7 +150,7 @@ describe("a delegated child on the parent's transcript", () => {
     ]);
     fireEvent.keyDown(row, { key: "Enter" });
     fireEvent.click(row);
-    expect(opened).toEqual(["q1", "q1"]);
+    expect(opened).toEqual(["q2", "q2"]);
     expect(container.querySelector(".kw-tool-detail")).toBeNull();
     fireEvent.click(container.querySelector(".kw-stamp-fold") as HTMLElement);
     expect(container.querySelector(".kw-tool-detail")?.textContent).toBe(

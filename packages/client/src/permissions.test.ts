@@ -231,11 +231,11 @@ describe("the grants fixture projected", () => {
   it("folds scope and the trusted gate into quiet row words, never into an ask", async () => {
     const runs = await grantRuns();
     expect(runs.map((run) => [run.callId, run.phase, grantWord(run)])).toEqual([
-      ["g1", "done", "session grant"],
+      ["g1", "done", "approved for this session"],
       ["g2", "done", "session grant"],
-      ["g3", "done", "workspace grant"],
-      ["g4", "done", undefined],
-      ["g5", "done", undefined],
+      ["g3", "done", "approved for this workspace"],
+      ["g4", "done", "approved"],
+      ["g5", "done", "approved"],
       ["g6", "done", "trusted"],
     ]);
     expect(toolRowText(runs[5] as ToolRun)).toMatch(/^bash git status · .*done · trusted$/);

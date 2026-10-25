@@ -44,7 +44,7 @@ describe("fixtures recorded from keywork serve", () => {
   it("plain: one prompt, one settled answer, priced usage counted once", async () => {
     const state = await projected("plain");
     expect(state.entries).toEqual([
-      { kind: "user", text: "say hello", replay: false },
+      { kind: "user", text: "say hello", entryId: "q1", replay: false },
       { kind: "assistant", text: "Hello from keywork.", replay: false, settled: true },
     ]);
     expect(state.usage).toMatchObject({
@@ -129,7 +129,7 @@ describe("fixtures recorded from keywork serve", () => {
     const working = toolRun(projectAll(emptyProjection, stream.slice(0, 7)), 1);
     expect(working.child).toMatchObject({
       title: "audit the trust rules",
-      sessionId: "q1",
+      sessionId: "q2",
       bot: "researcher",
       outcome: undefined,
     });
@@ -142,7 +142,7 @@ describe("fixtures recorded from keywork serve", () => {
       reason: undefined,
       detail: ["Two rules allow more than they say."],
       child: {
-        sessionId: "q1",
+        sessionId: "q2",
         bot: "researcher",
         outcome: "completed",
         usage: { inputTokens: 12, outputTokens: 5 },
@@ -173,10 +173,12 @@ describe("fixtures recorded from keywork serve", () => {
       callId: "c1",
       verdict: "denied",
       gate: "headless",
+      asked: true,
     });
     expect(toolRowText(run)).toBe("bash echo served · refused · no one answered");
     expect(run.detail).toEqual([
-      "not approved: this run has no one to ask, so the call was refused",
+      "not approved: nobody answered the ask in time, so the person probably stepped away and the call was refused",
+      "The call did not run, so nothing it would have changed was changed. Do not retry it or a variant of it unless the user asks you to, and never report it as done.",
     ]);
     expect(state.entries.at(-1)).toMatchObject({ kind: "assistant", text: "I could not run it." });
   });
@@ -192,7 +194,7 @@ describe("fixtures recorded from keywork serve", () => {
       waitedMs: 250,
       askedAt: undefined,
     });
-    expect(toolRowText(run)).toBe("bash echo served · 1.3s · waited 250ms · done");
+    expect(toolRowText(run)).toBe("bash echo served · 1.3s · waited 250ms · done · approved");
   });
 
   it("asked-denied: answering no refuses the call with the user's reason", async () => {
@@ -210,7 +212,7 @@ describe("fixtures recorded from keywork serve", () => {
   it("interrupt: the partial answer stays and the turn ends with a notice", async () => {
     const state = await projected("interrupt");
     expect(state.entries).toEqual([
-      { kind: "user", text: "wait forever", replay: false },
+      { kind: "user", text: "wait forever", entryId: "q1", replay: false },
       { kind: "assistant", text: "Working on it", replay: false, settled: true },
       { kind: "notice", level: "info", text: "· interrupted" },
     ]);
@@ -221,7 +223,7 @@ describe("fixtures recorded from keywork serve", () => {
   it("queued: a second prompt waits in the queue and runs as its own turn afterwards", async () => {
     const stream = await envelopes("queued");
     const midway = projectAll(emptyProjection, stream.slice(0, 4));
-    expect(midway.queue).toEqual([{ id: "q1", text: "second", behavior: "queue" }]);
+    expect(midway.queue).toEqual([{ id: "q2", text: "second", behavior: "queue" }]);
     expect(midway.turn?.userText).toBe("first");
     const state = projectAll(midway, stream.slice(4));
     expect(state.queue).toEqual([]);
@@ -235,12 +237,18 @@ describe("fixtures recorded from keywork serve", () => {
     const stream = await envelopes("injected");
     const origin = { kind: "external", client: "wispr-flow" };
     const midway = projectAll(emptyProjection, stream.slice(0, 4));
-    expect(midway.queue).toEqual([{ id: "q1", text: "second", behavior: "queue", origin }]);
+    expect(midway.queue).toEqual([{ id: "q2", text: "second", behavior: "queue", origin }]);
     expect(midway.turn).toMatchObject({ userText: "first" });
     expect(midway.turn?.origin).toBeUndefined();
     const state = projectAll(midway, stream.slice(4));
     expect(state.queue).toEqual([]);
-    expect(state.entries[2]).toEqual({ kind: "user", text: "second", origin, replay: false });
+    expect(state.entries[2]).toEqual({
+      kind: "user",
+      text: "second",
+      entryId: "q4",
+      origin,
+      replay: false,
+    });
     expect(state.usage.turns).toBe(2);
   });
 
@@ -306,14 +314,15 @@ describe("controls recorded from K1's session verbs", () => {
     expect(afterThinking.standing).toMatchObject({ model: "mock/beta", thinking: true });
     expect(afterThinking.standing?.effort).toBeUndefined();
     const undone = projectAll(emptyProjection, stream.slice(0, 11));
-    expect(undone.standing).toMatchObject({ leafId: null, undoable: false, redoable: true });
+    expect(undone.standing).toMatchObject({ leafId: "q7", undoable: false, redoable: true });
     const state = await projected("controls");
     expect(state.standing).toEqual({
       model: "mock/beta",
       thinking: true,
       effort: "high",
       title: "Lights",
-      leafId: null,
+      leafId: "q7",
+      quiet: false,
       undoable: false,
       redoable: true,
     });
@@ -373,13 +382,10 @@ describe("controls recorded from K1's session verbs", () => {
     expect(recorded.preset).toEqual({ status: 200, body: { from: "standard", to: "open" } });
   });
 
-  it("reports cost per model and a context reading with its basis", async () => {
+  it("reports cost only for the models that took a turn, and a context reading with its basis", async () => {
     const recorded = await answers();
     const cost = (recorded.cost as Answer<CostReport>).body;
-    expect(cost.models.map((row) => [row.reference, row.turns])).toEqual([
-      ["mock/alpha", 1],
-      ["mock/beta", 0],
-    ]);
+    expect(cost.models.map((row) => [row.reference, row.turns])).toEqual([["mock/alpha", 1]]);
     expect(cost.rollup.unpricedTurns).toBe(1);
     expect(recorded.context).toMatchObject({
       status: 200,
@@ -387,7 +393,7 @@ describe("controls recorded from K1's session verbs", () => {
     });
   });
 
-  it("splits the next request into parts that fill the window and draws both lines across them", async () => {
+  it("splits the next request into parts that fill the window and draws both lines on the used axis", async () => {
     const context = ((await answers()).context as Answer<ContextReport>).body;
     const { system, tools, injected, conversation, free } = context.parts;
     const parts = [system, tools, injected, conversation, free];
@@ -397,11 +403,13 @@ describe("controls recorded from K1's session verbs", () => {
       "estimated",
       "estimated",
     ]);
-    const beyondConversation = system.tokens + tools.tokens + injected.tokens;
+    expect(context.used).toBe(context.window - free.tokens);
     expect(context.thresholds).toEqual({
-      flushAt: context.flushAt + beyondConversation,
-      compactAt: context.compactAt + beyondConversation,
+      flushAt: context.flushAt,
+      compactAt: context.compactAt,
     });
+    expect(context.used).toBeLessThan(context.flushAt);
+    expect(context.flushAt).toBeLessThan(context.compactAt);
   });
 });
 
@@ -428,8 +436,8 @@ describe("a turn restore recorded from the server", () => {
       status: 200,
       body: {
         turn: 1,
-        prompt: { entryId: "q5", text: "write two lines to notes.txt" },
-        leafId: "q3",
+        prompt: { entryId: "q1", text: "write two lines to notes.txt" },
+        leafId: "q5",
         undoneTurns: 2,
         files: [{ path: "notes.txt", added: 0, deleted: 2 }],
         filesNote: "files put back",
@@ -439,19 +447,16 @@ describe("a turn restore recorded from the server", () => {
     });
   });
 
-  it("moves the leaf to the recorded entry, then reports the files that moved", async () => {
+  it("moves the leaf to the recorded entry, then reports nothing left differing once the files are put back", async () => {
     const stream = await envelopes("restored");
     const moved = stream.findIndex((envelope) => envelope.type === "session.tree");
-    expect(stream[moved]?.payload).toEqual({ reason: "leaf", entryId: "q3" });
+    expect(stream[moved]?.payload).toEqual({ reason: "leaf", entryId: "q5" });
     expect(stream[moved - 1]).toMatchObject({
       type: "session.state",
-      payload: { leafId: "q3", redoable: true },
+      payload: { leafId: "q5", redoable: true },
     });
     expect(stream.slice(moved)).toContainEqual(
-      expect.objectContaining({
-        type: "changes.updated",
-        payload: { paths: ["notes.txt"], turn: 1 },
-      }),
+      expect.objectContaining({ type: "changes.updated", payload: { paths: [] } }),
     );
   });
 
@@ -473,14 +478,20 @@ describe("a turn restore recorded from the server", () => {
       status: 200,
       body: { restored: true, undoable: true, redoable: false },
     });
-    const custom = entries.body.entries.flatMap((entry) =>
-      entry.type === "custom" ? [[entry.id, entry.customType, entry.data]] : [],
+    const restores = entries.body.entries.flatMap((entry) =>
+      entry.type === "custom" && entry.customType.startsWith("restore")
+        ? [[entry.id, entry.customType, entry.data]]
+        : [],
     );
-    expect(custom.slice(1)).toEqual([
-      ["q3", "restore", { turn: 1, from: "q2", files: expect.any(String) }],
-      ["q4", "restore-undone", { restore: "q3" }],
+    expect(restores).toEqual([
+      [
+        "q5",
+        "restore",
+        { turn: 1, from: "q4", files: expect.any(String), redo: expect.any(String) },
+      ],
+      ["q6", "restore-undone", { restore: "q5" }],
     ]);
-    expect(entries.body.leafId).toBe("q4");
+    expect(entries.body.leafId).toBe("q6");
   });
 });
 
@@ -548,12 +559,12 @@ describe("lineage on the wire", () => {
       replay: true,
       phase: "done",
       detail: ["Two rules allow more than they say."],
-      child: { title: "audit the trust rules", sessionId: "q1", bot: "researcher" },
+      child: { title: "audit the trust rules", sessionId: "q2", bot: "researcher" },
     });
     expect(lineageOfProjection({}, "s1", replayed)).toEqual({
       s1: [
         {
-          sessionId: "q1",
+          sessionId: "q2",
           parentId: "s1",
           callId: "d1",
           title: "audit the trust rules",
@@ -569,7 +580,7 @@ describe("lineage on the wire", () => {
     const { child, sessions } = await delegated();
     expect(child.status).toBe(200);
     expect(child.body).toMatchObject({
-      id: "q1",
+      id: "q2",
       title: "audit the trust rules",
       bot: "researcher",
     });

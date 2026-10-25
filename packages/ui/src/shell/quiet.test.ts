@@ -25,9 +25,9 @@ function answering(view: PermissionsView | Error) {
 describe("the quiet notices", () => {
   it("word the way in and every way back", () => {
     expect(quietOnNotice(chords)).toBe(
-      "quiet · ctrl+y now grants an ask for the rest of this session · ctrl+k shift+s ends it",
+      "quiet · the gate now grants what this session already covers · ctrl+k shift+s ends it",
     );
-    expect(quietOffNotice(0, chords)).toBe("quiet off · ctrl+y answers once again");
+    expect(quietOffNotice(0, chords)).toBe("quiet off · asks come to you again");
     expect(quietOffNotice(1, chords)).toBe(
       "quiet off · 1 session grant still holds · ctrl+k shift+p revokes it",
     );

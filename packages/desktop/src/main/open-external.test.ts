@@ -17,6 +17,7 @@ describe("openExternal's allowlist", () => {
       ok: true,
       url: "file:///C:/work/app/src/index.ts#L12",
       path: expect.stringMatching(/index\.ts$/),
+      line: 12,
     });
     expect(externalVerdict("file:///C:/work/app", roots)).toMatchObject({ ok: true });
     expect(externalVerdict("file:///C:/work/app-evil/secret.txt", roots)).toMatchObject({

@@ -39,7 +39,8 @@ describe("intentOf", () => {
       });
     expect(key({})).toBe("queue");
     expect(key({ altKey: true })).toBe("steer");
-    expect(key({ ctrlKey: true })).toBe("queue");
+    expect(key({ ctrlKey: true })).toBe("now");
+    expect(key({ metaKey: true })).toBe("now");
     expect(key({ shiftKey: true })).toBe("newline");
     expect(key({ key: "Escape" })).toBe("interrupt");
     expect(key({ key: "a" })).toBe("none");

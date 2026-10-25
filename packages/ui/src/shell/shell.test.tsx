@@ -77,6 +77,12 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
   ];
   let push: ((envelope: BusEnvelope) => void) | undefined;
   const queue: BusEnvelope[] = [];
+  const emit = (envelopes: BusEnvelope[]): void => {
+    for (const envelope of envelopes) {
+      if (push === undefined) queue.push(envelope);
+      else push(envelope);
+    }
+  };
   const client: KeyworkClient = {
     url: "http://127.0.0.1:4770",
     document: async () => ({ version: "0.0.1", operationIds: [] }),
@@ -113,7 +119,11 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
     sendNow: async () => "missing",
     moveQueued: async () => "missing",
     cancelQueued: async () => "missing",
-    setQuiet: async () => "missing",
+    setQuiet: async (id, on) => {
+      if (!summaries.some((summary) => summary.id === id)) return "missing";
+      emit([quietSwitched(id, on)]);
+      return { quiet: on };
+    },
     spill: async () => "missing",
     ...inertWorkspaceClient(),
     ...emptySurfacesClient(),
@@ -167,18 +177,7 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
       }
     },
   };
-  return {
-    client,
-    prompts,
-    aborts,
-    answers,
-    emit: (envelopes) => {
-      for (const envelope of envelopes) {
-        if (push === undefined) queue.push(envelope);
-        else push(envelope);
-      }
-    },
-  };
+  return { client, prompts, aborts, answers, emit };
 }
 
 async function openTyped(path: string): Promise<void> {
@@ -430,7 +429,7 @@ describe("the app shell", () => {
     expect(frameNamed("sessions")?.querySelector(".kw-frame-mark")).toBeNull();
   });
 
-  it("quiets the focused session with the leader, marks its title row, and approves for the session", async () => {
+  it("quiets the focused session with the leader, marks its title row, and keeps approve to once", async () => {
     const fake = fakeClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
     render(() => <App host={hostWithServer()} connect={() => fake.client} />);
     await openTyped("C:/work");
@@ -438,17 +437,20 @@ describe("the app shell", () => {
     expect(card.textContent).toContain("once ctrl+y");
     pressLeader("S", { shiftKey: true });
     await screen.findByText(
-      "quiet · ctrl+y now grants an ask for the rest of this session · ctrl+k shift+s ends it",
+      "quiet · the gate now grants what this session already covers · ctrl+k shift+s ends it",
     );
-    expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")?.textContent).toBe(
-      quietMark,
+    await waitFor(() =>
+      expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")?.textContent).toBe(
+        quietMark,
+      ),
     );
     expect(frameNamed("sessions")?.querySelector(".kw-frame-quiet")).toBeNull();
-    expect(card.textContent).toContain("this session ctrl+y");
-    expect(card.textContent).toContain("once alt+o");
+    expect(card.textContent).toContain("once ctrl+y");
+    expect(card.textContent).toContain("this session alt+s");
+    expect(card.textContent).toContain("quiet · this one still needs you");
     expect(frameNamed("run echo served")?.dataset.state).toBe("needs-you");
     fireEvent.keyDown(document, { key: "y", ctrlKey: true });
-    await waitFor(() => expect(fake.answers).toEqual(["c9:granted:session"]));
+    await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
   });
 
   it("still approves once from anywhere in a quiet session", async () => {
@@ -471,9 +473,7 @@ describe("the app shell", () => {
     const card = await screen.findByRole("group", { name: "permission ask" });
     pressLeader("S", { shiftKey: true });
     await waitFor(() =>
-      expect(card.textContent).toContain(
-        "quiet · a destructive command is never the quiet default",
-      ),
+      expect(card.textContent).toContain("quiet · a destructive command still asks"),
     );
     expect(frameNamed("run echo served")?.dataset.state).toBe("needs-you");
     fireEvent.keyDown(document, { key: "y", ctrlKey: true });
@@ -506,7 +506,9 @@ describe("the app shell", () => {
     );
     pressLeader("S", { shiftKey: true });
     await screen.findByText("quiet off · 1 session grant still holds · ctrl+k shift+p revokes it");
-    expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")).toBeNull();
+    await waitFor(() =>
+      expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")).toBeNull(),
+    );
     expect(revoked).toEqual([]);
 
     pressLeader("P", { shiftKey: true });
@@ -724,7 +726,9 @@ describe("the context map", () => {
     await waitFor(() => expect(frameNamed("context")?.dataset.focused).toBe(""));
     const map = frameNamed("context") as HTMLElement;
     await waitFor(() =>
-      expect(map.querySelector(".kw-context-map-total")?.textContent).toBe("1.9k of 200k · 1%"),
+      expect(map.querySelector(".kw-context-map-total")?.textContent).toBe(
+        "1.9k of 200k · 1% estimated",
+      ),
     );
     expect(map.querySelector(".kw-ov-head-lead")?.textContent).toBe("run echo served");
     expect(slotLeft(map)).toBeGreaterThan(slotLeft(frameNamed("run echo served")));
@@ -788,6 +792,23 @@ function answered(callId: string): BusEnvelope {
     sessionId: "s1",
     type: "gate.permission",
     payload: { decision: { tool: "bash", callId, verdict: "granted", gate: "user" } },
+  };
+}
+
+function quietSwitched(sessionId: string, quiet: boolean): BusEnvelope {
+  return {
+    id: 902,
+    ts: new Date().toISOString(),
+    sessionId,
+    type: "session.state",
+    payload: {
+      thinking: false,
+      title: "run echo served",
+      leafId: null,
+      quiet,
+      undoable: false,
+      redoable: false,
+    },
   };
 }
 

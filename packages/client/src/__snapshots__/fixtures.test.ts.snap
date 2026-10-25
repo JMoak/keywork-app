@@ -4,6 +4,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "c1": {
+      "asked": true,
       "callId": "c1",
       "gate": "user",
       "tool": "bash",
@@ -13,6 +14,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "run echo served",
@@ -26,6 +28,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "c1",
         "child": undefined,
         "decision": {
+          "asked": true,
           "callId": "c1",
           "gate": "user",
           "tool": "bash",
@@ -33,11 +36,12 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         },
         "detail": [
           "declined by user",
+          "The call did not run, so nothing it would have changed was changed. Do not retry it or a variant of it unless the user asks you to, and never report it as done.",
         ],
         "durationMs": undefined,
         "live": undefined,
         "name": "bash",
-        "outputChars": 16,
+        "outputChars": 177,
         "phase": "refused",
         "reason": "you said no",
         "recall": undefined,
@@ -55,6 +59,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Understood, I will not.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 12,
@@ -64,14 +69,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -90,6 +97,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "c1": {
+      "asked": true,
       "callId": "c1",
       "gate": "user",
       "scope": "once",
@@ -100,6 +108,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "run echo served",
@@ -113,6 +122,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "c1",
         "child": undefined,
         "decision": {
+          "asked": true,
           "callId": "c1",
           "gate": "user",
           "scope": "once",
@@ -143,23 +153,26 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "It printed served.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
-  "lastEventId": 15,
+  "lastEventId": 16,
   "memoryDecisions": [],
   "mode": undefined,
   "preset": undefined,
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -180,6 +193,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "turn on the lights",
@@ -191,6 +205,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Lights on.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 12,
@@ -201,14 +216,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "running": {},
   "standing": {
     "effort": "high",
-    "leafId": null,
+    "leafId": "q7",
     "model": "mock/beta",
+    "quiet": false,
     "redoable": true,
     "thinking": true,
     "title": "Lights",
     "undoable": false,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -227,12 +244,14 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "r1": {
+      "asked": false,
       "callId": "r1",
       "gate": "policy",
       "tool": "write",
       "verdict": "granted",
     },
     "r2": {
+      "asked": false,
       "callId": "r2",
       "gate": "policy",
       "tool": "write",
@@ -242,6 +261,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "write the layout rects module",
@@ -255,6 +275,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "r1",
         "child": undefined,
         "decision": {
+          "asked": false,
           "callId": "r1",
           "gate": "policy",
           "tool": "write",
@@ -292,7 +313,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
             ],
           },
           "decider": "builtin",
-          "id": "q1",
+          "id": "q2",
           "latencyMs": 0,
           "question": "action-relevance@1",
           "rule": "[[Layout Rects]] shares "layout", "rects" with the path",
@@ -313,6 +334,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "r2",
         "child": undefined,
         "decision": {
+          "asked": false,
           "callId": "r2",
           "gate": "policy",
           "tool": "write",
@@ -342,7 +364,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
             "kept": [],
           },
           "decider": "builtin",
-          "id": "q2",
+          "id": "q3",
           "latencyMs": 0,
           "question": "action-relevance@1",
           "rule": "[[Layout Rects]] was already surfaced",
@@ -361,6 +383,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Wrote the rects module and its test.",
     },
   ],
+  "flushes": {},
   "injections": [
     {
       "id": "Layout Rects",
@@ -369,7 +392,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
     },
   ],
   "lastError": undefined,
-  "lastEventId": 19,
+  "lastEventId": 20,
   "memoryDecisions": [
     {
       "about": {
@@ -386,7 +409,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         ],
       },
       "decider": "builtin",
-      "id": "q1",
+      "id": "q2",
       "latencyMs": 0,
       "question": "action-relevance@1",
       "rule": "[[Layout Rects]] shares "layout", "rects" with the path",
@@ -406,7 +429,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "kept": [],
       },
       "decider": "builtin",
-      "id": "q2",
+      "id": "q3",
       "latencyMs": 0,
       "question": "action-relevance@1",
       "rule": "[[Layout Rects]] was already surfaced",
@@ -417,14 +440,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q3",
+    "leafId": "q4",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -443,6 +468,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "d1": {
+      "asked": false,
       "callId": "d1",
       "gate": "policy",
       "tool": "delegate",
@@ -452,6 +478,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "have a researcher audit the trust rules",
@@ -468,7 +495,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
           "costNanos": undefined,
           "outcome": "completed",
           "refused": undefined,
-          "sessionId": "q1",
+          "sessionId": "q2",
           "title": "audit the trust rules",
           "usage": {
             "inputTokens": 12,
@@ -476,6 +503,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
           },
         },
         "decision": {
+          "asked": false,
           "callId": "d1",
           "gate": "policy",
           "tool": "delegate",
@@ -505,6 +533,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "The researcher found two loose rules.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 13,
@@ -514,14 +543,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q2",
+    "leafId": "q3",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -540,6 +571,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "c1": {
+      "asked": true,
       "callId": "c1",
       "gate": "headless",
       "tool": "bash",
@@ -549,6 +581,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "run echo served",
@@ -562,18 +595,20 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "c1",
         "child": undefined,
         "decision": {
+          "asked": true,
           "callId": "c1",
           "gate": "headless",
           "tool": "bash",
           "verdict": "denied",
         },
         "detail": [
-          "not approved: this run has no one to ask, so the call was refused",
+          "not approved: nobody answered the ask in time, so the person probably stepped away and the call was refused",
+          "The call did not run, so nothing it would have changed was changed. Do not retry it or a variant of it unless the user asks you to, and never report it as done.",
         ],
         "durationMs": undefined,
         "live": undefined,
         "name": "bash",
-        "outputChars": 65,
+        "outputChars": 268,
         "phase": "refused",
         "reason": "no one answered",
         "recall": undefined,
@@ -591,6 +626,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "I could not run it.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 12,
@@ -600,14 +636,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -628,6 +666,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "first",
@@ -639,6 +678,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "First answer, finished.",
     },
     {
+      "entryId": "q4",
       "kind": "user",
       "origin": {
         "client": "wispr-flow",
@@ -654,6 +694,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Second answer.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 15,
@@ -663,14 +704,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q3",
+    "leafId": "q5",
     "model": "releasing/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -691,6 +734,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "wait forever",
@@ -707,6 +751,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "· interrupted",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 4,
@@ -717,12 +762,14 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "running": {},
   "standing": {
     "leafId": null,
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": false,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -743,6 +790,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "say hello",
@@ -754,6 +802,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Hello from keywork.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 6,
@@ -763,14 +812,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -791,6 +842,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "first",
@@ -802,6 +854,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "First answer, finished.",
     },
     {
+      "entryId": "q4",
       "kind": "user",
       "replay": false,
       "text": "second",
@@ -813,6 +866,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Second answer.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 15,
@@ -822,14 +876,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q3",
+    "leafId": "q5",
     "model": "releasing/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -848,6 +904,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "w1": {
+      "asked": false,
       "callId": "w1",
       "gate": "policy",
       "tool": "write",
@@ -857,6 +914,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "write two lines to notes.txt",
@@ -870,6 +928,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "w1",
         "child": undefined,
         "decision": {
+          "asked": false,
           "callId": "w1",
           "gate": "policy",
           "tool": "write",
@@ -899,6 +958,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Wrote notes.txt.",
     },
     {
+      "entryId": "q3",
       "kind": "user",
       "replay": false,
       "text": "now say done",
@@ -910,6 +970,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "Done.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 23,
@@ -919,14 +980,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q4",
+    "leafId": "q6",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -947,6 +1010,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "what changed?",
@@ -963,6 +1027,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "The change is in \`layout.ts\`.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
   "lastEventId": 9,
@@ -972,14 +1037,16 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,
@@ -998,6 +1065,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
 {
   "decisions": {
     "c1": {
+      "asked": false,
       "callId": "c1",
       "gate": "policy",
       "tool": "bash",
@@ -1007,6 +1075,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
   "diagnostics": {},
   "entries": [
     {
+      "entryId": "q1",
       "kind": "user",
       "replay": false,
       "text": "run echo served",
@@ -1020,6 +1089,7 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
         "callId": "c1",
         "child": undefined,
         "decision": {
+          "asked": false,
           "callId": "c1",
           "gate": "policy",
           "tool": "bash",
@@ -1049,23 +1119,26 @@ exports[`fixtures recorded from keywork serve > every fixture snapshot stays sta
       "text": "It printed served.",
     },
   ],
+  "flushes": {},
   "injections": [],
   "lastError": undefined,
-  "lastEventId": 14,
+  "lastEventId": 15,
   "memoryDecisions": [],
   "mode": undefined,
   "preset": undefined,
   "queue": [],
   "running": {},
   "standing": {
-    "leafId": "q1",
+    "leafId": "q2",
     "model": "mock/mock-model",
+    "quiet": false,
     "redoable": false,
     "thinking": false,
     "title": "(untitled session)",
     "undoable": true,
   },
   "streaming": undefined,
+  "summaries": {},
   "turn": undefined,
   "usage": {
     "cacheCreationInputTokens": 0,

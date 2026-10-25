@@ -295,7 +295,11 @@ describe("extension notices and session state", () => {
     expect(state.entries).toEqual([
       { kind: "notice", level: "info", text: "░ counter · counted 3" },
       { kind: "notice", level: "info", text: "▒ lint · slow" },
-      { kind: "notice", level: "info", text: "█ lint · quarantined in activate: boom" },
+      {
+        kind: "notice",
+        level: "info",
+        text: "█ lint · quarantined in activate: boom · phase activate",
+      },
     ]);
     expect(state.lastError).toBeUndefined();
   });

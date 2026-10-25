@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { protocolVersion, routes } from "@keywork-app/protocol";
+import { contractVersion, protocolVersion, routes } from "@keywork-app/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   contractViolations,
@@ -28,7 +28,10 @@ describe("check:contract", () => {
       paths[route.path] = { ...paths[route.path], [method]: { operationId: route.operationId } };
     }
     paths["/sessions/{id}/mode"] = { post: { operationId: "setSessionMode" } };
-    const document = documentOfOpenApi({ info: { version: "9.9.9" }, paths }, "drifted");
+    const document = documentOfOpenApi(
+      { info: { version: "9.9.9", "x-keywork-contract": contractVersion }, paths },
+      "drifted",
+    );
     expect(contractViolations(document)).toEqual([
       `the server reports version 9.9.9; the app pins ${protocolVersion}`,
       "the server no longer serves abortSession",
@@ -73,11 +76,12 @@ async function writeDriftedCheckout(root: string): Promise<void> {
     join(root, "packages/server/src/openapi.ts"),
     [
       "export function openApiDocument(serverUrl: string, version: string) {",
+      `  const contract = ${JSON.stringify(contractVersion)};`,
       "  const paths: Record<string, Record<string, { operationId: string }>> = {};",
       `  for (const route of ${JSON.stringify(served)}) {`,
       "    paths[route.path] = { ...paths[route.path], [route.method.toLowerCase()]: { operationId: route.operationId } };",
       "  }",
-      '  return { openapi: "3.1.0", info: { title: "keywork", version }, servers: [{ url: serverUrl }], paths };',
+      '  return { openapi: "3.1.0", info: { title: "keywork", version, "x-keywork-contract": contract }, servers: [{ url: serverUrl }], paths };',
       "}",
       "",
     ].join("\n"),

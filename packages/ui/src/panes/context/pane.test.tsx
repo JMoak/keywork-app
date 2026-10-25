@@ -1,5 +1,10 @@
 import { emptyProjection, type SessionProjection } from "@keywork-app/client";
-import type { CompactReading, ContextReport, SessionSummary } from "@keywork-app/protocol";
+import type {
+  CompactReading,
+  ContextReport,
+  FlushReading,
+  SessionSummary,
+} from "@keywork-app/protocol";
 import { cleanup, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,6 +16,8 @@ import {
   type ContextSpec,
   contextHints,
   contextPane,
+  flushedNotice,
+  flushingNotice,
   noSessionNotice,
   unreadLine,
 } from "./index.tsx";
@@ -24,18 +31,26 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 interface Fakes {
   readings?: Record<string, ContextReport>;
   compact?: CompactReading;
+  flush?: FlushReading;
   projection?: SessionProjection;
 }
 
 interface Recorded {
   watched: string[];
   compacted: string[];
+  flushed: string[];
   rebound: ContextSpec[];
   closed: string[];
 }
 
 function harness(fakes: Fakes = {}) {
-  const recordedCalls: Recorded = { watched: [], compacted: [], rebound: [], closed: [] };
+  const recordedCalls: Recorded = {
+    watched: [],
+    compacted: [],
+    flushed: [],
+    rebound: [],
+    closed: [],
+  };
   const [focusedSession, setFocusedSession] = createSignal<string>();
   const readings = fakes.readings ?? { s1: pageGrammar() };
   const summary = (id: string | undefined): SessionSummary | undefined =>
@@ -56,6 +71,10 @@ function harness(fakes: Fakes = {}) {
       compact: async (id: string) => {
         recordedCalls.compacted.push(id);
         return fakes.compact ?? { compacted: null, notices: [] };
+      },
+      flush: async (id: string) => {
+        recordedCalls.flushed.push(id);
+        return fakes.flush ?? { flushed: 0, notices: [] };
       },
     },
   };
@@ -122,7 +141,7 @@ describe("the context pane", () => {
     const { shell } = harness();
     const { container } = mount(shell);
     expect(text(container, ".kw-ov-head-lead")).toEqual(["session s1"]);
-    expect(text(container, ".kw-context-map-total")).toEqual(["128k of 200k · 64%"]);
+    expect(text(container, ".kw-context-map-total")).toEqual(["128k of 200k · 64% estimated"]);
     const cells = inks(container);
     expect(cells).toHaveLength(100);
     expect(cells.filter((cell) => cell === "conversation")).toHaveLength(58);
@@ -172,7 +191,7 @@ describe("the context pane", () => {
     setSpec({ kind: "context", sessionId: "s2" });
     await settle();
     expect(recorded.watched).toEqual(["s1", "s2"]);
-    expect(text(container, ".kw-context-map-total")).toEqual(["1.9k of 200k · 1%"]);
+    expect(text(container, ".kw-context-map-total")).toEqual(["1.9k of 200k · 1% estimated"]);
   });
 
   it("names the next step with no session and waits honestly for a first reading", () => {
@@ -210,6 +229,20 @@ describe("the context pane's keys", () => {
     expect(recorded.compacted).toEqual(["s1"]);
     expect(text(container, ".kw-ov-line")[0]).toBe("folded 116300 tokens into a summary");
     expect(recorded.watched).toEqual(["s1", "s1"]);
+  });
+
+  it("flushes memory with f through the controls, saying what the model kept", async () => {
+    const flushed = { flushed: 2, notices: ["kept the trust rules"] };
+    const { shell, recorded } = harness({ flush: flushed });
+    const { container, act } = mount(shell);
+    act("context.flush");
+    expect(text(container, ".kw-ov-line")).toEqual([flushingNotice, contextHints]);
+    await settle();
+    expect(recorded.flushed).toEqual(["s1"]);
+    expect(text(container, ".kw-ov-line")[0]).toBe(flushedNotice(flushed));
+    expect(flushedNotice(flushed)).toBe(
+      "kept the trust rules · 2 messages joined the conversation",
+    );
   });
 
   it("shows the server's refusal and rereads nothing", async () => {

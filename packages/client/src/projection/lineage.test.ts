@@ -50,7 +50,7 @@ describe("the lineage ledger", () => {
     const started = stream.findIndex((envelope) => envelope.type === "child.started");
     const running = fold(stream.slice(0, started + 1));
     const child: ChildLineage = {
-      sessionId: "q1",
+      sessionId: "q2",
       parentId: "s1",
       callId: "d1",
       title: "audit the trust rules",
@@ -60,9 +60,9 @@ describe("the lineage ledger", () => {
     };
     expect(childrenOf(running, "s1")).toEqual([child]);
     expect(childrenOf(fold(stream), "s1")).toEqual([{ ...child, state: "completed" }]);
-    expect(lineageOf(fold(stream), "q1")?.parentId).toBe("s1");
+    expect(lineageOf(fold(stream), "q2")?.parentId).toBe("s1");
     expect(lineageOf(fold(stream), "s1")).toBeUndefined();
-    expect(childrenOf(fold(stream), "q1")).toEqual([]);
+    expect(childrenOf(fold(stream), "q2")).toEqual([]);
   });
 
   it("keeps children in the order they started and settles each in place", () => {

@@ -493,8 +493,9 @@ function EntriesLevel(props: PaneProps<TreeSpec> & { sessionId: string }) {
     void props.shell.store.openTree(props.sessionId);
   });
   createEffect(() => {
-    const leaf = tree().snapshot?.leafId;
-    if (cursor() === undefined && leaf !== undefined) setCursor(leaf ?? rows()[0]?.id);
+    if (cursor() !== undefined || tree().snapshot === undefined) return;
+    const seat = rows().find((shown) => shown.isLeaf) ?? rows()[0];
+    if (seat !== undefined) setCursor(seat.id);
   });
 
   const surface = (): void => {
