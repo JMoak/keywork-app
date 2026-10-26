@@ -501,7 +501,9 @@ against the app's GitHub releases, a check 30 s after launch then every 6 h, dow
 silently, surface `onUpdateReady`, install on quit only after `acceptUpdate`, off in dev.
 Parity scaffold: Playwright 1.63.0 captures the transcript scenarios per theme and width
 tier on three runners; `scripts/compare-shots.ts` diffs across OS with a 5% tolerance for
-font fallback, advisory until the first baselines exist. `docs/release.md` records the ritual.
+font fallback, advisory until the first baselines exist. The capture lives in its own
+`screenshots.yml`, run on pushes to `main` and by hand, never blocking a PR; `ci.yml` is the
+required gate. `docs/release.md` records the ritual.
 Decision for Jordan: `productName: keywork` makes the deb executable `keywork`, shadowing
 the CLI on PATH; `executableName: keywork-app` would avoid it.
 
