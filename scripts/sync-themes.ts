@@ -18,14 +18,17 @@ export const houseThemeNames = ["keywork-night", "keywork-day"] as const;
 export interface GallerySource {
   readonly origin: string;
   readonly themes: readonly unknown[];
+  readonly complete: boolean;
 }
 
 export type KeyworkCompletion = (theme: unknown) => unknown;
 
 export async function gallerySource(root = keyworkRepo): Promise<GallerySource> {
   const served = await keyworkGallery(root);
-  if (served !== undefined) return { origin: join(root, keyworkGalleryModule), themes: served };
-  return { origin: houseFile, themes: await recordedThemes(houseFile) };
+  if (served !== undefined) {
+    return { origin: join(root, keyworkGalleryModule), themes: served, complete: true };
+  }
+  return { origin: houseFile, themes: await recordedThemes(houseFile), complete: false };
 }
 
 export async function keyworkCompletionOf(
@@ -70,15 +73,23 @@ export function galleryDrift(recorded: readonly unknown[], source: GallerySource
     ...[...sourceByName.keys()]
       .filter((name) => !recordedByName.has(name))
       .map((name) => `${name} is in ${source.origin} but not the app gallery`),
-    ...[...recordedByName.keys()]
-      .filter((name) => !sourceByName.has(name))
-      .map((name) => `${name} is in the app gallery but not ${source.origin}`),
     ...[...sourceByName.entries()]
       .filter(([name, theme]) => {
         const mine = recordedByName.get(name);
         return mine !== undefined && canonical(mine) !== canonical(theme);
       })
       .map(([name]) => `${name} differs from ${source.origin}`),
+    ...(source.complete ? beyondTheSource(recorded, source) : []),
+  ];
+}
+
+function beyondTheSource(recorded: readonly unknown[], source: GallerySource): string[] {
+  const sourceNames = new Set(source.themes.map(nameOf));
+  return [
+    ...recorded
+      .map(nameOf)
+      .filter((name) => !sourceNames.has(name))
+      .map((name) => `${name} is in the app gallery but not ${source.origin}`),
     ...(sameOrder(recorded, source.themes)
       ? []
       : [`the gallery order differs from ${source.origin}`]),
@@ -98,8 +109,9 @@ export async function recordedThemes(file = galleryFile): Promise<unknown[]> {
 export async function syncThemes(source: GallerySource): Promise<void> {
   const violations = galleryViolations(source.themes);
   if (violations.length > 0) throw new Error(violations.join("\n"));
-  await writeFile(galleryFile, `${JSON.stringify({ themes: source.themes }, null, 2)}\n`);
-  execFileSync(process.execPath, ["x", "biome", "format", "--write", galleryFile], {
+  await writeFile(galleryFile, galleryJson(source.themes));
+  if (source.complete) await writeFile(houseFile, galleryJson(source.themes.filter(isHouse)));
+  execFileSync(process.execPath, ["x", "biome", "format", "--write", galleryFile, houseFile], {
     cwd: repoRoot,
     stdio: "ignore",
   });
@@ -152,6 +164,14 @@ function canonical(value: unknown): string {
       ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => a.localeCompare(b)))
       : inner,
   );
+}
+
+function galleryJson(themes: readonly unknown[]): string {
+  return `${JSON.stringify({ themes }, null, 2)}\n`;
+}
+
+function isHouse(theme: unknown): boolean {
+  return (houseThemeNames as readonly string[]).includes(nameOf(theme));
 }
 
 function isDefault(theme: Theme): boolean {
