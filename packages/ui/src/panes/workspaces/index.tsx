@@ -50,22 +50,25 @@ export const workspacesPane = definePane<WorkspacesSpec>({
     "workspaces.use": {
       chords: "enter",
       help: "open this workspace (the server reopens)",
-      command: { name: "workspace-use", description: "reopen keywork on this workspace" },
+      command: { name: "workspaces-use", description: "reopen keywork on this workspace" },
     },
     "workspaces.new": {
       chords: "n",
       help: "declare a named workspace",
-      command: { name: "workspace-new", description: "declare a named workspace over this root" },
+      command: { name: "workspaces-new", description: "declare a named workspace over this root" },
     },
     "workspaces.focus": {
       chords: "f",
       help: "add a focus dir",
-      command: { name: "workspace-focus", description: "add a focus dir to this workspace" },
+      command: { name: "workspaces-focus", description: "add a focus dir to this workspace" },
     },
     "workspaces.unfocus": {
       chords: "shift+f",
       help: "remove a focus dir",
-      command: { name: "workspace-unfocus", description: "remove a focus dir from this workspace" },
+      command: {
+        name: "workspaces-unfocus",
+        description: "remove a focus dir from this workspace",
+      },
     },
   },
 });

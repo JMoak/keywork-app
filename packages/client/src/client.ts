@@ -24,6 +24,7 @@ import type {
   ControlRefusal,
   ControlRefusalKind,
   CostReading,
+  DenyReason,
   DiscardOutcome,
   DiscardTrashedOutcome,
   EffortLevel,
@@ -34,7 +35,9 @@ import type {
   ExportRequest,
   FileRange,
   FileReading,
+  FlushReading,
   FocusedDir,
+  ForgetReading,
   ForkedSession,
   ForkOutcome,
   GrantOutcome,
@@ -60,22 +63,32 @@ import type {
   PermissionsView,
   PresetName,
   PresetReading,
-  PromptBehavior,
   PromptInjection,
   PromptOutcome,
   PurgedTrash,
   QuestionChoice,
+  QueueCancelReading,
+  QueuedPrompt,
+  QueueMoveReading,
+  QueueReport,
+  QuietReading,
   RedoReading,
   RemoveOutcome,
   RenameReading,
   ResolutionFailure,
   RestoreOutcome,
+  RestorePreviewReading,
   RevertReply,
   RevokeOutcome,
+  SendBehavior,
   SessionBinding,
   SessionDetail,
   SessionEntries,
+  SessionRow,
   SessionSummary,
+  SetAsideReading,
+  SpillReading,
+  SpillSlice,
   SurfaceRefusal,
   ThemesView,
   ThinkingReading,
@@ -100,10 +113,13 @@ import {
 export interface KeyworkClient {
   readonly url: string;
   document(): Promise<ServerDocument>;
-  sessions(): Promise<readonly SessionSummary[]>;
+  sessions(): Promise<readonly SessionRow[]>;
   session(id: string): Promise<SessionDetail | undefined>;
   createSession(): Promise<SessionSummary>;
-  prompt(id: string, text: string, behavior: PromptBehavior): Promise<PromptOutcome>;
+  prompt(id: string, text: string, behavior: SendBehavior): Promise<PromptOutcome>;
+  sendNow(id: string, text: string): Promise<SetAsideReading>;
+  moveQueued(id: string, itemId: string, to: number): Promise<QueueMoveReading>;
+  cancelQueued(id: string, itemId: string): Promise<QueueCancelReading>;
   inject(id: string, injection: PromptInjection): Promise<InjectOutcome>;
   abort(id: string): Promise<AbortOutcome>;
   entries(id: string): Promise<SessionEntries | undefined>;
@@ -124,13 +140,24 @@ export interface KeyworkClient {
   undo(id: string): Promise<UndoReading>;
   redo(id: string): Promise<RedoReading>;
   restoreTurn(id: string, turn: number): Promise<TurnRestoreReading>;
+  previewRestore(id: string, turn: number): Promise<RestorePreviewReading>;
   context(id: string): Promise<ContextReading>;
   cost(id: string): Promise<CostReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
   rename(id: string, title: string): Promise<RenameReading>;
+  setQuiet(id: string, on: boolean): Promise<QuietReading>;
+  flush(id: string): Promise<FlushReading>;
+  forget(id: string, entryId: string, replacement?: string): Promise<ForgetReading>;
+  spill(id: string, spillId: string, range?: FileRange): Promise<SpillReading>;
   applyPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
   asks(): Promise<readonly PendingAsk[]>;
-  answerAsk(callId: string, verdict: AskVerdict, scope?: AskScope): Promise<AnswerOutcome>;
+  answerAsk(
+    callId: string,
+    verdict: AskVerdict,
+    scope?: AskScope,
+    reason?: DenyReason,
+    note?: string,
+  ): Promise<AnswerOutcome>;
   permissions(): Promise<PermissionsView>;
   grantWorkspaceRule(rule: PermissionRule): Promise<GrantOutcome>;
   grantSessionRule(sessionId: string, rule: PermissionRule): Promise<GrantOutcome>;
@@ -188,6 +215,7 @@ export interface KeyworkClient {
 
 export interface ServerDocument {
   version: string;
+  contract?: string | undefined;
   operationIds: string[];
 }
 
@@ -202,6 +230,7 @@ export interface EventStreamOptions {
   signal?: AbortSignal | undefined;
   onOpen?: (() => void) | undefined;
   onNotice?: ((notice: StreamNotice) => void) | undefined;
+  pause?: Delay | undefined;
 }
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -223,6 +252,8 @@ export class ServerRefusal extends Error {
     this.status = status;
   }
 }
+
+export const maxDenialNote = 1000;
 
 export const reconnectDelaysMs = { first: 250, ceiling: 5000 } as const;
 
@@ -267,7 +298,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
     url,
     document: async () => documentOf(await json<OpenApiShape>(await request("GET", "/doc"))),
     sessions: async () => {
-      const listed = await json<{ sessions: SessionSummary[] }>(await request("GET", "/sessions"));
+      const listed = await json<{ sessions: SessionRow[] }>(await request("GET", "/sessions"));
       return listed.sessions;
     },
     session: async (id) => {
@@ -284,6 +315,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       const outcome = await json<{ queued: boolean }>(response);
       return outcome.queued ? "queued" : "started";
     },
+    ...queueRoutes(request),
     inject: async (id, injection) => {
       const response = await request(
         "POST",
@@ -349,10 +381,14 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       const listed = await json<{ asks: PendingAsk[] }>(await request("GET", "/asks"));
       return listed.asks;
     },
-    answerAsk: async (callId, verdict, scope) => {
+    answerAsk: async (callId, verdict, scope, reason, note) => {
+      const denied = verdict === "denied";
+      const said = note?.trim() ?? "";
       const response = await request("POST", `/asks/${encodeURIComponent(callId)}`, {
         verdict,
         ...(scope !== undefined && { scope }),
+        ...(denied && reason !== undefined && { reason }),
+        ...(denied && said !== "" && { note: said.slice(0, maxDenialNote) }),
       });
       if (response.status === 404) return "missing";
       if (response.status === 409) return "already-settled";
@@ -390,10 +426,15 @@ type SessionVerbRoutes = Pick<
   | "undo"
   | "redo"
   | "restoreTurn"
+  | "previewRestore"
   | "context"
   | "cost"
   | "exportSession"
   | "rename"
+  | "setQuiet"
+  | "flush"
+  | "forget"
+  | "spill"
   | "applyPreset"
 >;
 
@@ -414,6 +455,11 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
     undo: async (id) => answered(await verb(id, "undo")),
     redo: async (id) => answered(await verb(id, "redo")),
     restoreTurn: async (id, turn) => answered(await verb(id, "restore", { turn })),
+    previewRestore: async (id, turn) => {
+      const response = await reading(id, `restore?turn=${turn}`);
+      if (response.status !== 404) return json(response);
+      return (await refusalDetail(response)) === missingSessionDetail ? "missing" : "unknown-turn";
+    },
     context: async (id) => {
       const response = await reading(id, "context");
       return response.status === 404 ? "missing" : json(response);
@@ -427,6 +473,24 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
       return response.status === 200 ? { html: await response.text() } : answered(response);
     },
     rename: async (id, title) => answered(await verb(id, "rename", { title })),
+    setQuiet: async (id, on) => {
+      const response = await verb(id, "quiet", { on });
+      return response.status === 404 ? "missing" : json(response);
+    },
+    flush: async (id) => answered(await verb(id, "flush")),
+    forget: async (id, entryId, replacement) =>
+      answered(
+        await verb(id, "forget", { entryId, ...(replacement !== undefined && { replacement }) }),
+      ),
+    spill: async (id, spillId, range = {}) => {
+      const response = await request(
+        "GET",
+        `/sessions/${encodeURIComponent(id)}/spills/${encodeURIComponent(spillId)}${rangeQuery(range)}`,
+      );
+      if (response.status === 404) return spillGoneOrMissing(response);
+      if (response.status === 415) return "binary";
+      return json<SpillSlice>(response);
+    },
     applyPreset: async (name, confirmed = false) => {
       const response = await request("POST", "/preset", {
         name,
@@ -435,6 +499,56 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
       return (await controlRefusalOf(response, "needs-confirmation")) ?? json(response);
     },
   };
+}
+
+type QueueRoutes = Pick<KeyworkClient, "sendNow" | "moveQueued" | "cancelQueued">;
+
+function queueRoutes(request: Request): QueueRoutes {
+  const queued = (id: string, itemId: string, tail = ""): string =>
+    `/sessions/${encodeURIComponent(id)}/queue/${encodeURIComponent(itemId)}${tail}`;
+  return {
+    sendNow: async (id, text) => {
+      const response = await request("POST", `/sessions/${encodeURIComponent(id)}/prompt`, {
+        text,
+        behavior: "now",
+      });
+      if (response.status === 404) return "missing";
+      return (await json<{ setAside?: QueuedPrompt[] }>(response)).setAside ?? [];
+    },
+    moveQueued: async (id, itemId, to) => {
+      const response = await request("POST", queued(id, itemId, "/move"), { to });
+      if (response.status === 404) return queueMissOf(response);
+      if (response.status === 409) return queueConflictOf(response);
+      return json<QueueReport>(response);
+    },
+    cancelQueued: async (id, itemId) => {
+      const response = await request("DELETE", queued(id, itemId));
+      if (response.status === 404) return queueMissOf(response);
+      return json<QueueReport>(response);
+    },
+  };
+}
+
+async function queueMissOf(response: Response): Promise<"missing" | "unknown-item"> {
+  return (await refusalDetail(response)) === missingSessionDetail ? "missing" : "unknown-item";
+}
+
+const pastTheEndDetail = "to is past the end of the queue";
+
+async function queueConflictOf(response: Response): Promise<"out-of-range" | "crosses-steer"> {
+  return (await refusalDetail(response)) === pastTheEndDetail ? "out-of-range" : "crosses-steer";
+}
+
+async function spillGoneOrMissing(response: Response): Promise<"missing" | "gone"> {
+  return (await refusalDetail(response)) === missingSessionDetail ? "missing" : "gone";
+}
+
+function rangeQuery(range: FileRange): string {
+  const query = new URLSearchParams();
+  if (range.from !== undefined) query.set("from", String(range.from));
+  if (range.to !== undefined) query.set("to", String(range.to));
+  const text = query.toString();
+  return text === "" ? "" : `?${text}`;
 }
 
 type LifecycleRoutes = Pick<
@@ -696,7 +810,7 @@ function writeRefusalOf(response: Response): "inert" | "missing" | undefined {
 }
 
 interface OpenApiShape {
-  info: { version: string };
+  info: { version: string; "x-keywork-contract"?: string };
   paths: Record<string, Record<string, { operationId: string }>>;
 }
 
@@ -705,7 +819,7 @@ function documentOf(doc: OpenApiShape): ServerDocument {
     .flatMap((item) => Object.values(item))
     .map((operation) => operation.operationId)
     .sort();
-  return { version: doc.info.version, operationIds };
+  return { version: doc.info.version, contract: doc.info["x-keywork-contract"], operationIds };
 }
 
 async function* resumingEvents(
@@ -737,7 +851,7 @@ async function* resumingEvents(
       }
     }
     if (aborted()) return;
-    await delay(reconnectDelayMs(attempt), signal);
+    await (options.pause ?? delay)(reconnectDelayMs(attempt), signal);
     attempt += 1;
   }
 }

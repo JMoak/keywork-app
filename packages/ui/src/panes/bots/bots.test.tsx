@@ -56,13 +56,13 @@ describe("the bots pane", () => {
     harness.dispose();
   });
 
-  it("defines a bot from an inline slug and a scope keystroke", async () => {
+  it("defines a bot from a purpose, an inline slug and a scope keystroke", async () => {
     const drafts: string[] = [];
     const harness = overviewShell({
       empty: true,
       client: {
         createBot: async (draft) => {
-          drafts.push(`${draft.slug}:${draft.scope}`);
+          drafts.push(`${draft.slug}:${draft.scope}:${draft.purpose ?? ""}`);
           return { name: draft.slug, sigil: "◇", source: draft.scope };
         },
       },
@@ -71,12 +71,16 @@ describe("the bots pane", () => {
     const { container, act } = mountPane(botsPane.component, { kind: "bots" }, harness.shell);
     expect(container.querySelector(".kw-empty")?.textContent).toContain("bots.new defines one");
     act("bots.new");
-    const input = container.querySelector("input") as HTMLInputElement;
-    fireEvent.input(input, { target: { value: "scout" } });
-    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    const draftLine = (value: string): void => {
+      const input = container.querySelector("input") as HTMLInputElement;
+      fireEvent.input(input, { target: { value } });
+      fireEvent.submit(input.closest("form") as HTMLFormElement);
+    };
+    draftLine("reads the codebase");
+    draftLine("scout");
     fireEvent.keyDown(container.querySelector("[data-tone='ask']") as HTMLElement, { key: "p" });
     await settle();
-    expect(drafts).toEqual(["scout:project"]);
+    expect(drafts).toEqual(["scout:project:reads the codebase"]);
     expect(container.textContent).toContain("◇ scout defined");
     harness.dispose();
   });

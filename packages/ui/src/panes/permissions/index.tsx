@@ -1,12 +1,13 @@
 import { isGrantRefusal, type PermissionRule, type PermissionsView } from "@keywork-app/protocol";
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { z } from "zod";
+import { sessionName } from "../../chrome/session-name.ts";
 import { quietMark } from "../../chrome/title-row.tsx";
 import { ruleText } from "../../page/ask-card.tsx";
 import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { ConfirmLine, createCursor, NoticeLine, OverviewRow } from "../overview/rows.tsx";
-import { definePane, type PaneProps } from "../registry.ts";
+import { definePane, type KeyHints, type PaneProps, type ShellSeams } from "../registry.ts";
 import { createPermissionsStore, type Grant } from "./store.ts";
 import "../overview/overview.css";
 import "./permissions.css";
@@ -53,6 +54,14 @@ export const permissionsPane = definePane<PermissionsSpec>({
         description: "revoke this workspace or session grant so the call asks again",
       },
     },
+    "permissions.bundle": {
+      chords: "b",
+      help: "show or fold the trusted reads",
+      command: {
+        name: "trusted-reads",
+        description: "show or fold the read rules a trusted workspace allows without asking",
+      },
+    },
   },
 });
 
@@ -60,6 +69,7 @@ export interface SessionGrants {
   readonly sessionId: string;
   readonly title: string;
   readonly rules: readonly PermissionRule[];
+  readonly quiet: boolean;
   readonly firstRow: number;
 }
 
@@ -75,14 +85,17 @@ export function grantRows(view: PermissionsView): Grant[] {
 export type SessionTitles = (sessionId: string) => string | undefined;
 
 export function sessionGrantGroups(view: PermissionsView, titleOf: SessionTitles): SessionGrants[] {
-  const sessions = grantingSessions(view);
+  const sessions = sessionsShown(view);
   return sessions.map(([sessionId, rules], index) => ({
     sessionId,
     title: sessionNamed(sessionId, titleOf),
     rules,
+    quiet: isQuiet(view, sessionId),
     firstRow: view.workspace.length + rowsBefore(sessions, index),
   }));
 }
+
+export const quietGrantedNothing = "quiet has granted nothing here yet";
 
 export function revokeQuestion(grant: Grant, titleOf: SessionTitles): string {
   const reach =
@@ -102,6 +115,24 @@ export function postureWord(view: PermissionsView): "trusted" | "untrusted" {
   return view.trusted ? "trusted" : "untrusted";
 }
 
+export function bundleHead(view: PermissionsView, open: boolean, keys: KeyHints): string {
+  const head = `bundle · ${postureWord(view)}`;
+  const count = view.bundle.length;
+  if (count === 0) return head;
+  const rules = count === 1 ? "1 read rule" : `${count} read rules`;
+  const toggle = keys.chord("permissions.bundle");
+  return `${head} · ${rules} · ${toggle} ${open ? "folds them" : "shows them"}`;
+}
+
+export function sessionTitleIn(shell: Pick<ShellSeams, "store">): SessionTitles {
+  return (sessionId) => {
+    const summary = shell.store.summary(sessionId);
+    if (summary === undefined) return undefined;
+    const name = sessionName(summary, shell.store.projection(sessionId));
+    return name === "session" ? `session ${sessionId.slice(0, 8)}` : name;
+  };
+}
+
 export function bundleRuleText(rule: PermissionRule): string {
   return rule.effect === "allow" ? ruleText(rule) : `${ruleText(rule)} ${rule.effect}s`;
 }
@@ -110,8 +141,21 @@ export function hasGrants(view: PermissionsView): boolean {
   return view.workspace.length > 0 || Object.values(view.session).some((rules) => rules.length > 0);
 }
 
+export function isQuiet(view: PermissionsView, sessionId: string): boolean {
+  return view.quiet?.includes(sessionId) === true;
+}
+
 function grantingSessions(view: PermissionsView): Array<[string, PermissionRule[]]> {
   return Object.entries(view.session).filter(([, rules]) => rules.length > 0);
+}
+
+function sessionsShown(view: PermissionsView): Array<[string, PermissionRule[]]> {
+  const granting = grantingSessions(view);
+  const granted = new Set(granting.map(([sessionId]) => sessionId));
+  const quietOnly = (view.quiet ?? [])
+    .filter((sessionId) => !granted.has(sessionId))
+    .map((sessionId): [string, PermissionRule[]] => [sessionId, []]);
+  return [...granting, ...quietOnly];
 }
 
 function rowsBefore(sessions: Array<[string, PermissionRule[]]>, index: number): number {
@@ -119,7 +163,7 @@ function rowsBefore(sessions: Array<[string, PermissionRule[]]>, index: number):
 }
 
 function sessionNamed(sessionId: string, titleOf: SessionTitles): string {
-  return titleOf(sessionId) ?? sessionId;
+  return titleOf(sessionId) ?? `session ${sessionId.slice(0, 8)}`;
 }
 
 function PermissionsList(props: PaneProps<PermissionsSpec>) {
@@ -137,8 +181,8 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
   const cursor = createCursor(() => rows().length);
   const [confirming, setConfirming] = createSignal<Grant>();
   const [notice, setNotice] = createSignal<string>();
-  const sessionTitle = (sessionId: string) => props.shell.store.summary(sessionId)?.title;
-  const quiet = (sessionId: string): boolean => props.shell.quiet?.has(sessionId) ?? false;
+  const [bundleOpen, setBundleOpen] = createSignal(false);
+  const sessionTitle = sessionTitleIn(props.shell);
 
   const revoke = async (grant: Grant): Promise<void> => {
     setConfirming(undefined);
@@ -154,19 +198,21 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
         return cursor.move(-1);
       case "permissions.revoke":
         return setConfirming(rows()[cursor.index()]);
+      case "permissions.bundle":
+        return setBundleOpen((open) => !open);
     }
   });
 
   return (
     <section class="kw-ov kw-perm" aria-label="permissions" tabIndex={-1} ref={root}>
       <div class="kw-ov-head">
-        <span>bundle · {postureWord(view())}</span>
+        <span>{bundleHead(view(), bundleOpen(), props.shell.keys)}</span>
         <span class="kw-ov-head-detail">x revokes a grant</span>
       </div>
-      <Show
-        when={view().bundle.length > 0}
-        fallback={<p class="kw-perm-quiet">no read posture until the workspace is trusted</p>}
-      >
+      <Show when={view().bundle.length === 0}>
+        <p class="kw-perm-quiet">no read posture until the workspace is trusted</p>
+      </Show>
+      <Show when={bundleOpen() && view().bundle.length > 0}>
         <ul class="kw-perm-bundle" aria-label="bundle">
           <For each={view().bundle}>
             {(rule) => (
@@ -178,10 +224,13 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
         </ul>
       </Show>
       <Show
-        when={hasGrants(view())}
+        when={hasGrants(view()) || (view().quiet?.length ?? 0) > 0}
         fallback={<EmptyState line={permissionsPane.emptyState(props.shell.keys)} />}
       >
         <h3 class="kw-perm-heading">workspace grants</h3>
+        <Show when={view().workspace.length === 0}>
+          <p class="kw-perm-quiet">none yet</p>
+        </Show>
         <ol class="kw-ov-list kw-perm-grants" aria-label="workspace grants">
           <For each={view().workspace}>
             {(rule, index) => (
@@ -201,10 +250,13 @@ function PermissionsList(props: PaneProps<PermissionsSpec>) {
             <section class="kw-perm-session" aria-label={group.title}>
               <p class="kw-perm-session-title">
                 {group.title}
-                <Show when={quiet(group.sessionId)}>
+                <Show when={group.quiet}>
                   <span class="kw-perm-session-quiet">{quietMark} quiet</span>
                 </Show>
               </p>
+              <Show when={group.rules.length === 0}>
+                <p class="kw-perm-quiet">{quietGrantedNothing}</p>
+              </Show>
               <ol class="kw-ov-list kw-perm-grants">
                 <For each={group.rules}>
                   {(rule, index) => (

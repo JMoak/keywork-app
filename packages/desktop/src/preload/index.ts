@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
+  type EditorOpened,
+  type EditorTarget,
   hostChannels,
+  type KeybindingsReading,
+  type KeybindingsWatch,
   type PtyExit,
   type PtyOpened,
   ptyChannels,
@@ -89,6 +93,29 @@ function subscribe<Payload>(channel: string): (listener: (payload: Payload) => v
   };
 }
 
+let nextKeybindingsWatch = 1;
+
+function watchKeybindings(
+  scope: { workspace?: string | undefined; projectTrusted: boolean },
+  listener: (reading: KeybindingsReading) => void,
+): () => void {
+  const id = nextKeybindingsWatch++;
+  const relay = (_event: unknown, watchId: number, reading: KeybindingsReading): void => {
+    if (watchId === id) listener(reading);
+  };
+  ipcRenderer.on(hostChannels.keybindingsRead, relay);
+  const watch: KeybindingsWatch = {
+    id,
+    workspace: scope.workspace,
+    projectTrusted: scope.projectTrusted,
+  };
+  ipcRenderer.send(hostChannels.watchKeybindings, watch);
+  return () => {
+    ipcRenderer.removeListener(hostChannels.keybindingsRead, relay);
+    ipcRenderer.send(hostChannels.unwatchKeybindings, id);
+  };
+}
+
 const host = {
   about: () => ipcRenderer.invoke(hostChannels.about),
   pickFolder: () => ipcRenderer.invoke(hostChannels.pickFolder),
@@ -101,12 +128,17 @@ const host = {
   onOpenWorkspacesChanged: subscribe(hostChannels.openWorkspacesChanged),
   onOpenRequested: subscribe<string>(hostChannels.openRequested),
   openExternal: (url: string) => ipcRenderer.invoke(hostChannels.openExternal, url),
+  openInEditor: (target: EditorTarget) =>
+    ipcRenderer.invoke(hostChannels.openInEditor, target) as Promise<EditorOpened>,
+  writeClipboard: (text: string) => ipcRenderer.invoke(hostChannels.writeClipboard, text),
+  watchKeybindings,
   notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
   onNotificationActivated: subscribe(hostChannels.notificationActivated),
   setNeedsYou: (count: number) => ipcRenderer.invoke(hostChannels.setNeedsYou, count),
   saveAs: (suggestedName: string, text: string) =>
     ipcRenderer.invoke(hostChannels.saveAs, { suggestedName, text }),
   onServerLost: subscribe(hostChannels.serverLost),
+  onServerRegained: subscribe(hostChannels.serverRegained),
   pty,
   onUpdateReady: subscribe(hostChannels.updateReady),
   acceptUpdate: () => ipcRenderer.invoke(hostChannels.acceptUpdate),

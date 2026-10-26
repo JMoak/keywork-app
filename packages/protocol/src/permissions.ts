@@ -12,6 +12,10 @@ export type RememberedScope = Exclude<AskScope, "once">;
 
 export const askScopes: readonly AskScope[] = ["once", "session", "workspace"];
 
+export type DenyReason = "unsafe" | "not-now" | "other";
+
+export const denyReasons: readonly DenyReason[] = ["unsafe", "not-now", "other"];
+
 export interface AskRefusal {
   refused: "write-once" | "nothing-to-remember";
   detail: string;
@@ -41,6 +45,7 @@ export interface PermissionsView {
   bundle: PermissionRule[];
   workspace: PermissionRule[];
   session: Record<string, PermissionRule[]>;
+  quiet?: string[];
 }
 
 export interface GrantRevoked {

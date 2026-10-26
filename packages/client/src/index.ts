@@ -7,6 +7,7 @@ export {
   type KeyworkClient,
   keyworkClient,
   keyworkClientOver,
+  maxDenialNote,
   reconnectDelayMs,
   reconnectDelaysMs,
   type ServerDocument,
@@ -17,6 +18,8 @@ export {
   type BatchListener,
   type FeedOptions,
   nextFrame,
+  type RetryWaker,
+  retryWaker,
   type ServerFeed,
   serverFeed,
 } from "./feed.ts";
@@ -51,7 +54,13 @@ export {
   selectionOf,
   withDecision,
 } from "./projection/decisions.ts";
-export { historyEnvelopes } from "./projection/history.ts";
+export { historyEnvelopes, replayBase, summaryKindsOf } from "./projection/history.ts";
+export {
+  forgottenPromptIds,
+  type JournalReading,
+  type PathPrompt,
+  readJournal,
+} from "./projection/journal.ts";
 export {
   latestLedger,
   type PathMark,
@@ -107,9 +116,12 @@ export {
   type ChildState,
   emptyProjection,
   emptyUsage,
+  type FlushEntry,
   type LiveTurn,
   type NoticeEntry,
+  type NoticeLevel,
   type SessionProjection,
+  summaryKindOf,
   type ThinkingEntry,
   type ToolEntry,
   type ToolPhase,

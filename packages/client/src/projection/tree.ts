@@ -1,4 +1,10 @@
-import type { BusEnvelope, SessionEntries, SessionEntry, TreeChange } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  MessagePart,
+  SessionEntries,
+  SessionEntry,
+  TreeChange,
+} from "@keywork-app/protocol";
 
 export interface TreeState {
   readonly snapshot: SessionEntries | undefined;
@@ -47,10 +53,14 @@ export function treeSnapshot(state: TreeState, snapshot: SessionEntries): TreeSt
 
 export function treeNodes(snapshot: SessionEntries): TreeNode[] {
   const onPath = new Set(snapshot.activePath);
+  const shownParent = shownParentOf(snapshot);
+  const journal = new Set(snapshot.journal ?? []);
   const childrenOf = new Map<string | null, SessionEntry[]>();
   for (const entry of snapshot.entries) {
-    const siblings = childrenOf.get(entry.parentId);
-    if (siblings === undefined) childrenOf.set(entry.parentId, [entry]);
+    if (journal.has(entry.id)) continue;
+    const parentId = shownParent(entry.parentId);
+    const siblings = childrenOf.get(parentId);
+    if (siblings === undefined) childrenOf.set(parentId, [entry]);
     else siblings.push(entry);
   }
   const build = (parentId: string | null): TreeNode[] =>
@@ -68,6 +78,7 @@ export function treeRows(
   folded: ReadonlySet<string> = new Set(),
 ): TreeRow[] {
   const rows: TreeRow[] = [];
+  const leafId = shownParentOf(snapshot)(snapshot.leafId);
   const collect = (nodes: readonly TreeNode[], depth: number): void => {
     for (const node of nodes) {
       const hasChildren = node.children.length > 0;
@@ -79,7 +90,7 @@ export function treeRows(
         text: entryText(node.entry),
         label: node.label,
         onActivePath: node.onActivePath,
-        isLeaf: node.entry.id === snapshot.leafId,
+        isLeaf: node.entry.id === leafId,
         hasChildren,
         branchPoint: node.children.length > 1,
         folded: isFolded,
@@ -94,7 +105,7 @@ export function treeRows(
 export function entryText(entry: SessionEntry): string {
   switch (entry.type) {
     case "message":
-      return `${entry.message.role}: ${excerpt(messageText(entry.message.parts))}`;
+      return `${entry.message.role}: ${excerpt(messageText(entry.message.parts)) || partsSummary(entry.message.parts)}`;
     case "compaction":
       return `compacted · ${entry.tokensBefore} tokens summarized`;
     case "branch_summary":
@@ -132,6 +143,24 @@ function messageText(parts: readonly { type: string; text?: string }[]): string 
     .filter((part) => part.type === "text")
     .map((part) => part.text ?? "")
     .join("");
+}
+
+function partsSummary(parts: readonly MessagePart[]): string {
+  const calls = parts.flatMap((part) => (part.type === "tool-call" ? [part.name] : []));
+  if (calls.length > 0) return `calls ${calls.join(", ")}`;
+  const results = parts.filter((part) => part.type === "tool-result").length;
+  if (results > 0) return results === 1 ? "1 tool result" : `${results} tool results`;
+  return parts.some((part) => part.type.endsWith("thinking")) ? "thinking" : "";
+}
+
+function shownParentOf(snapshot: SessionEntries): (id: string | null) => string | null {
+  const journal = new Set(snapshot.journal ?? []);
+  const parentOf = new Map(snapshot.entries.map((entry) => [entry.id, entry.parentId]));
+  return (id) => {
+    let current = id;
+    while (current !== null && journal.has(current)) current = parentOf.get(current) ?? null;
+    return current;
+  };
 }
 
 function bindingText(arc: string | null | undefined, bot: string | null | undefined): string {

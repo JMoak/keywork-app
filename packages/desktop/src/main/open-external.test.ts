@@ -1,7 +1,14 @@
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { externalVerdict } from "./open-external.ts";
 
-const roots = ["C:/work/app", "D:/other"];
+const onWindows = process.platform === "win32";
+const app = onWindows ? "C:/work/app" : "/work/app";
+const roots = [app, onWindows ? "D:/other" : "/other"];
+
+function fileLink(path: string): string {
+  return pathToFileURL(path).href;
+}
 
 describe("openExternal's allowlist", () => {
   it("passes web links through untouched", () => {
@@ -13,20 +20,21 @@ describe("openExternal's allowlist", () => {
   });
 
   it("opens a file: link only inside an open workspace root", () => {
-    expect(externalVerdict("file:///C:/work/app/src/index.ts#L12", roots)).toEqual({
+    expect(externalVerdict(`${fileLink(`${app}/src/index.ts`)}#L12`, roots)).toEqual({
       ok: true,
-      url: "file:///C:/work/app/src/index.ts#L12",
+      url: `${fileLink(`${app}/src/index.ts`)}#L12`,
       path: expect.stringMatching(/index\.ts$/),
+      line: 12,
     });
-    expect(externalVerdict("file:///C:/work/app", roots)).toMatchObject({ ok: true });
-    expect(externalVerdict("file:///C:/work/app-evil/secret.txt", roots)).toMatchObject({
+    expect(externalVerdict(fileLink(app), roots)).toMatchObject({ ok: true });
+    expect(externalVerdict(fileLink(`${app}-evil/secret.txt`), roots)).toMatchObject({
       ok: false,
       reason: expect.stringContaining("outside the open workspaces"),
     });
-    expect(externalVerdict("file:///C:/work/app/../passwords.txt", roots)).toMatchObject({
+    expect(externalVerdict(`${fileLink(app)}/../passwords.txt`, roots)).toMatchObject({
       ok: false,
     });
-    expect(externalVerdict("file:///C:/work/app/a.ts", [])).toMatchObject({ ok: false });
+    expect(externalVerdict(fileLink(`${app}/a.ts`), [])).toMatchObject({ ok: false });
   });
 
   it("refuses every other scheme and anything that is not a url", () => {

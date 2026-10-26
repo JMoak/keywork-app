@@ -42,7 +42,7 @@
             {
               "type": "tool-result",
               "callId": "d1",
-              "output": "↳ child q1 · researcher · completed\n\nTwo rules allow more than they say.",
+              "output": "↳ child q2 · researcher · completed\n\nTwo rules allow more than they say.",
               "isError": false
             }
           ]
@@ -57,13 +57,16 @@
           ]
         }
       ],
+      "summaries": [],
+      "flushes": [],
+      "edits": [],
       "asOf": 13
     }
   },
   "child": {
     "status": 200,
     "body": {
-      "id": "q1",
+      "id": "q2",
       "title": "audit the trust rules",
       "createdAt": "2026-09-07T12:00:00.000Z",
       "lastActivityAt": "2026-09-07T12:00:00.000Z",
@@ -92,6 +95,9 @@
           ]
         }
       ],
+      "summaries": [],
+      "flushes": [],
+      "edits": [],
       "asOf": 13
     }
   },
@@ -106,7 +112,13 @@
           "lastActivityAt": "2026-09-07T12:00:00.000Z",
           "messageCount": 4,
           "model": "mock/mock-model",
-          "thinking": false
+          "thinking": false,
+          "live": true,
+          "working": false,
+          "waiting": {
+            "asks": 0,
+            "tools": []
+          }
         }
       ]
     }

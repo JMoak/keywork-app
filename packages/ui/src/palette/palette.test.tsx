@@ -6,10 +6,12 @@ import {
   helpRows,
   matchRuns,
   Palette,
-  paletteEntries,
   paletteModeOf,
+  paletteRows,
   searchTextOf,
 } from "./palette.tsx";
+
+const namesOf = (rows: ReturnType<typeof paletteRows>) => rows.map((row) => row.command.name);
 
 afterEach(cleanup);
 
@@ -47,11 +49,9 @@ function registry(ran: string[]): CommandRegistry {
 describe("CommandRegistry", () => {
   it("refuses a second claim on a name or alias", () => {
     const commands = registry([]);
-    expect(commands.register({ name: "new", description: "", run: () => undefined })).toEqual({
-      kind: "collision",
-      name: "new",
-      claimedBy: "split",
-    });
+    expect(() => commands.register({ name: "new", description: "", run: () => undefined })).toThrow(
+      'palette name "new" is claimed by both split and new',
+    );
   });
 
   it("ranks exact, prefix, and fuzzy matches in that order", () => {
@@ -99,13 +99,9 @@ describe("palette entries", () => {
   it("shows jump targets by default and commands behind a slash", () => {
     const commands = registry([]);
     expect(paletteModeOf("/zo")).toBe("commands");
-    expect(paletteEntries(commands, "").map((c) => c.name)).toEqual(["go-alpha"]);
-    expect(paletteEntries(commands, "/").map((c) => c.name)).toEqual([
-      "zoom",
-      "split",
-      "dock-cycle",
-    ]);
-    expect(paletteEntries(commands, "/spl").map((c) => c.name)).toEqual(["split"]);
+    expect(namesOf(paletteRows(commands, ""))).toEqual(["go-alpha"]);
+    expect(namesOf(paletteRows(commands, "/"))).toEqual(["zoom", "split", "dock-cycle"]);
+    expect(namesOf(paletteRows(commands, "/spl"))).toEqual(["split"]);
   });
 });
 

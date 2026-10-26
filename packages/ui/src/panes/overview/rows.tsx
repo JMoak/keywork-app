@@ -1,4 +1,5 @@
 import { createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
+import { readingMs } from "../../chrome/reading-time.ts";
 import "./overview.css";
 
 export interface Cursor {
@@ -50,6 +51,7 @@ export interface OverviewRowProps {
 export function OverviewRow(props: OverviewRowProps) {
   return (
     <li
+      ref={(row) => keepInView(row, () => props.cursor)}
       class="kw-ov-row"
       data-cursor={props.cursor ? "" : undefined}
       data-indent={props.indent ? "" : undefined}
@@ -175,4 +177,23 @@ export function NoticeLine(props: NoticeLineProps) {
       )}
     </Show>
   );
+}
+
+export interface FleetingNotice {
+  text(): string | undefined;
+  say(text: string | undefined): void;
+}
+
+export function createFleetingNotice(): FleetingNotice {
+  const [text, setText] = createSignal<string | undefined>(undefined, { equals: false });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(timer));
+  return {
+    text,
+    say: (said) => {
+      clearTimeout(timer);
+      setText(said);
+      if (said !== undefined) timer = setTimeout(() => setText(undefined), readingMs(said));
+    },
+  };
 }

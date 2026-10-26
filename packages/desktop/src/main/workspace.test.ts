@@ -262,7 +262,11 @@ describe("workspaceHost: attach first, spawn second", () => {
       failure: { kind: "failed", exitCode: 1, detail: "crash" },
     });
     expect(losses).toEqual([
-      { workspace: "/work", failure: { kind: "failed", exitCode: 1, detail: "crash" } },
+      {
+        workspace: "/work",
+        failure: { kind: "failed", exitCode: 1, detail: "crash" },
+        reattaching: false,
+      },
     ]);
     await host.close("/work");
     expect(h.processes[0]?.stopped).toBe(1);

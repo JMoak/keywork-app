@@ -1,10 +1,14 @@
 import {
   type AssistantEntry,
+  type FlushEntry,
   type NoticeEntry,
   type PathMark,
+  type RowSpan,
   type SessionProjection,
+  summaryKindOf,
   type ThinkingEntry,
   type ToolEntry,
+  type ToolRun,
   type TranscriptEntry,
   type TranscriptLedger,
   type TurnLedger,
@@ -15,13 +19,27 @@ import type {
   AnswerOutcome,
   AskScope,
   AskVerdict,
+  DenyReason,
   PermissionAsk,
   RememberedScope,
+  SummaryKind,
 } from "@keywork-app/protocol";
-import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  For,
+  type JSX,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+} from "solid-js";
 import { createStore } from "solid-js/store";
 import { AskCard, type AskChords } from "./ask-card.tsx";
 import { type BotLabel, childRowSpans, openChildHint, plainBot } from "./child-row.ts";
+import { followTail, type TailFollow } from "./follow.ts";
 import { LedgerLine, type LedgerVerbs, ledgerFacts, markText } from "./ledger.tsx";
 import { Markdown } from "./markdown.tsx";
 import "./page.css";
@@ -30,6 +48,8 @@ export type AskAnswerHandler = (
   callId: string,
   verdict: AskVerdict,
   scope?: AskScope,
+  reason?: DenyReason,
+  note?: string,
 ) => Promise<AnswerOutcome> | undefined;
 
 export type AskAcceptance = (ask: PermissionAsk) => RememberedScope | undefined;
@@ -46,15 +66,38 @@ export interface ConversationPaneProps {
   ledger?: TranscriptLedger | undefined;
   ledgerVerbs?: LedgerVerbs | undefined;
   redoable?: boolean | undefined;
+  forgotten?: ReadonlySet<string> | undefined;
+  onOpenSpill?: ((run: ToolRun) => void) | undefined;
 }
 
-export type Voice = "user" | "agent" | "machine" | "blank";
+export type Voice = "user" | "agent" | "machine" | "summary" | "blank";
 
 export const voiceGlyph: Record<Voice, string> = {
   user: "█",
   agent: "▓",
   machine: "░",
+  summary: "¶",
   blank: " ",
+};
+
+export const summaryWords: Readonly<Record<SummaryKind, string>> = {
+  compaction: "compacted history",
+  branch_summary: "branch summary",
+};
+
+export const forgottenTag = "forgotten · out of the model's context";
+
+export function flushLine(flush: Pick<FlushEntry, "facts" | "settled">): string {
+  if (!flush.settled) return "memory flush · the model is choosing what to keep";
+  const kept = flush.facts.length;
+  if (kept === 0) return "memory flush · nothing worth keeping";
+  return `memory flush · ${kept === 1 ? "1 fact" : `${kept} facts`} kept`;
+}
+
+export const openSpillHint: RowSpan = {
+  text: " ·· o opens the spill",
+  tone: "meta",
+  part: "spill",
 };
 
 export function ConversationPane(props: ConversationPaneProps) {
@@ -65,9 +108,27 @@ export function ConversationPane(props: ConversationPaneProps) {
   const closingAt = createMemo(
     () => new Map((props.ledger?.turns ?? []).map((turn) => [turn.end, turn])),
   );
+  let scroller: HTMLElement | undefined;
+  let transcript: HTMLOListElement | undefined;
+  let tail: TailFollow | undefined;
+  onMount(() => {
+    if (scroller === undefined || transcript === undefined) return;
+    const following = followTail(scroller, transcript);
+    tail = following;
+    onCleanup(() => following.dispose());
+  });
+  createEffect(
+    on(
+      () => lastSentPrompt(props.projection),
+      (sent) => {
+        if (sent !== -1) tail?.resume();
+      },
+      { defer: true },
+    ),
+  );
   return (
-    <section class="kw-pane" aria-label="conversation">
-      <ol class="kw-transcript">
+    <section class="kw-pane" aria-label="conversation" ref={scroller}>
+      <ol class="kw-transcript" ref={transcript}>
         <For each={props.ledger?.opening ?? []}>
           {(mark) => <MarkRow mark={mark} redoable={props.redoable} />}
         </For>
@@ -76,6 +137,8 @@ export function ConversationPane(props: ConversationPaneProps) {
             <>
               <Entry
                 entry={entry}
+                forgotten={isForgotten(entry, props.forgotten)}
+                summary={summaryKindOf(props.projection, entry)}
                 streaming={props.projection.streaming === index()}
                 unfolded={unfolded(index())}
                 onToggle={() => toggle(index())}
@@ -85,6 +148,7 @@ export function ConversationPane(props: ConversationPaneProps) {
                 onOpenSession={props.onOpenSession}
                 botLabel={props.botLabel}
                 askAccepted={props.askAccepted}
+                onOpenSpill={props.onOpenSpill}
               />
               <Show when={closingAt().get(index())}>
                 {(turn) => (
@@ -108,8 +172,14 @@ export function ConversationPane(props: ConversationPaneProps) {
   );
 }
 
+export function lastSentPrompt(projection: SessionProjection): number {
+  return projection.entries.findLastIndex((entry) => entry.kind === "user" && !entry.replay);
+}
+
 export function headline(projection: SessionProjection): string {
-  const first = projection.entries.find((entry) => entry.kind === "user");
+  const first = projection.entries.find(
+    (entry) => entry.kind === "user" && summaryKindOf(projection, entry) === undefined,
+  );
   return first?.kind === "user" ? first.text : "keywork";
 }
 
@@ -120,6 +190,8 @@ export function wordCount(text: string): string {
 
 interface EntryProps {
   entry: TranscriptEntry;
+  forgotten: boolean;
+  summary: SummaryKind | undefined;
   streaming: boolean;
   unfolded: boolean;
   onToggle: () => void;
@@ -129,21 +201,63 @@ interface EntryProps {
   onOpenSession?: ((sessionId: string) => void) | undefined;
   botLabel?: BotLabel | undefined;
   askAccepted?: AskAcceptance | undefined;
+  onOpenSpill?: ((run: ToolRun) => void) | undefined;
 }
 
 function Entry(props: EntryProps) {
   const entry = () => props.entry;
   return (
     <Switch>
+      <Match when={props.summary !== undefined && as<UserEntry>(entry(), "user")}>
+        {(user) => (
+          <Row voice="summary" replay={user().replay}>
+            <button
+              type="button"
+              class="kw-summary"
+              data-walk=""
+              aria-expanded={props.unfolded}
+              onClick={() => props.onToggle()}
+            >
+              {summaryWords[props.summary ?? "compaction"]} · {wordCount(user().text)}
+            </button>
+            <Show when={props.unfolded}>
+              <p class="kw-summary-text">{user().text}</p>
+            </Show>
+          </Row>
+        )}
+      </Match>
       <Match when={as<UserEntry>(entry(), "user")}>
         {(user) => (
           <Row voice="user" replay={user().replay}>
-            <p class="kw-user">
+            <p class="kw-user" data-forgotten={props.forgotten ? "" : undefined}>
               {user().text}
               <Show when={user().origin}>
                 {(origin) => <span class="kw-origin">via {origin().client}</span>}
               </Show>
+              <Show when={props.forgotten}>
+                <span class="kw-forgotten">{forgottenTag}</span>
+              </Show>
             </p>
+          </Row>
+        )}
+      </Match>
+      <Match when={as<FlushEntry>(entry(), "flush")}>
+        {(flush) => (
+          <Row voice="machine" replay={flush().replay}>
+            <button
+              type="button"
+              class="kw-flush"
+              data-walk=""
+              aria-expanded={props.unfolded}
+              onClick={() => props.onToggle()}
+            >
+              {flushLine(flush())}
+            </button>
+            <Show when={props.unfolded && flush().facts.length > 0}>
+              <ul class="kw-flush-facts">
+                <For each={flush().facts}>{(fact) => <li>{fact}</li>}</For>
+              </ul>
+            </Show>
           </Row>
         )}
       </Match>
@@ -166,6 +280,7 @@ function Entry(props: EntryProps) {
             <button
               type="button"
               class="kw-thinking"
+              data-walk=""
               aria-expanded={props.unfolded}
               onClick={() => props.onToggle()}
             >
@@ -189,6 +304,7 @@ function Entry(props: EntryProps) {
             onOpenSession={props.onOpenSession}
             botLabel={props.botLabel}
             askAccepted={props.askAccepted}
+            onOpenSpill={props.onOpenSpill}
           />
         )}
       </Match>
@@ -234,6 +350,7 @@ function Row(props: RowProps) {
           <button
             type="button"
             class="kw-stamp kw-stamp-fold"
+            tabIndex={-1}
             data-voice={props.voice}
             aria-label={props.stampLabel}
             onClick={() => onStamp()()}
@@ -257,30 +374,47 @@ interface ToolRowProps {
   onOpenSession?: ((sessionId: string) => void) | undefined;
   botLabel?: BotLabel | undefined;
   askAccepted?: AskAcceptance | undefined;
+  onOpenSpill?: ((run: ToolRun) => void) | undefined;
 }
 
 function ToolRow(props: ToolRowProps) {
   const run = () => props.tool.run;
   const openableChild = (): string | undefined =>
     props.onOpenSession === undefined ? undefined : run().child?.sessionId;
+  const openableSpill = (): boolean => props.onOpenSpill !== undefined && run().spill !== undefined;
+  const openSpill = (): void => props.onOpenSpill?.(run());
   const spans = () => {
     const child = run().child;
-    if (child === undefined) return toolRowSpans(run());
-    const row = childRowSpans(run(), child, props.botLabel ?? plainBot);
-    return openableChild() === undefined ? row : [...row, openChildHint];
+    const row =
+      child === undefined
+        ? toolRowSpans(run())
+        : childRowSpans(run(), child, props.botLabel ?? plainBot);
+    return [
+      ...row,
+      ...(openableChild() === undefined ? [] : [openChildHint]),
+      ...(openableSpill() ? [openSpillHint] : []),
+    ];
   };
   const disclosable = () => run().detail !== undefined && run().detail?.length !== 0;
-  const actionable = () => disclosable() || openableChild() !== undefined;
+  const actionable = () => disclosable() || openableChild() !== undefined || openableSpill();
   const activate = (): void => {
     const child = openableChild();
-    if (child === undefined) props.onToggle();
-    else props.onOpenSession?.(child);
+    if (child !== undefined) props.onOpenSession?.(child);
+    else if (disclosable()) props.onToggle();
+    else if (openableSpill()) openSpill();
   };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.key === "o" && openableSpill()) openSpill();
+    else if (event.key === "Enter") activate();
+    else if (event.key === " " && disclosable()) props.onToggle();
+    else if (event.key !== " ") return;
     event.preventDefault();
-    if (event.key === "Enter") activate();
-    else if (disclosable()) props.onToggle();
+    event.stopPropagation();
+  };
+  const onClick = (event: MouseEvent): void => {
+    if (spanPartOf(event.target) === "spill") openSpill();
+    else activate();
   };
   const spanElements = () => (
     <For each={spans()}>
@@ -309,10 +443,11 @@ function ToolRow(props: ToolRowProps) {
         <button
           type="button"
           class="kw-tool"
+          data-walk=""
           data-phase={run().phase}
           data-child={run().child === undefined ? undefined : ""}
           aria-expanded={disclosable() ? props.unfolded : undefined}
-          onClick={activate}
+          onClick={onClick}
           onKeyDown={onKey}
         >
           {spanElements()}
@@ -321,7 +456,9 @@ function ToolRow(props: ToolRowProps) {
       <Show when={run().phase === "asking" && props.onAnswerAsk !== undefined}>
         <AskCard
           run={run()}
-          onAnswer={(verdict, scope) => props.onAnswerAsk?.(run().callId, verdict, scope)}
+          onAnswer={(verdict, scope, reason, note) =>
+            props.onAnswerAsk?.(run().callId, verdict, scope, reason, note)
+          }
           chords={props.askChords}
           quiet={props.quiet}
           accepted={acceptedScopeOf(run(), props.askAccepted)}
@@ -372,11 +509,21 @@ function MarkRow(props: { mark: PathMark; redoable?: boolean | undefined }) {
   );
 }
 
+function isForgotten(entry: TranscriptEntry, forgotten: ReadonlySet<string> | undefined): boolean {
+  return (
+    entry.kind === "user" && entry.entryId !== undefined && forgotten?.has(entry.entryId) === true
+  );
+}
+
 function acceptedScopeOf(
   run: ToolEntry["run"],
   accepted: AskAcceptance | undefined,
 ): RememberedScope | undefined {
   return run.ask === undefined ? undefined : accepted?.(run.ask);
+}
+
+function spanPartOf(target: EventTarget | null): string | undefined {
+  return target instanceof HTMLElement ? target.dataset.part : undefined;
 }
 
 function as<T extends TranscriptEntry>(entry: TranscriptEntry, kind: T["kind"]): T | undefined {

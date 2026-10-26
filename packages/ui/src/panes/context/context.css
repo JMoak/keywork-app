@@ -4,6 +4,10 @@
   container: context-map / size;
 }
 
+.kw-context-map-measure {
+  color: var(--kw-text-faint);
+}
+
 .kw-context-map-total {
   margin-left: auto;
   color: var(--kw-text-mid);

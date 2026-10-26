@@ -1,6 +1,8 @@
 import type {
+  CacheMiss,
   ChildOutcome,
   ContextInjection,
+  ForkOrigin,
   MemoryDecision,
   PermissionAsk,
   PermissionDecision,
@@ -9,6 +11,7 @@ import type {
   RefusedCall,
   SessionState,
   SpillReference,
+  SummaryKind,
   Usage,
 } from "@keywork-app/protocol";
 
@@ -26,6 +29,9 @@ export interface SessionProjection {
   readonly injections: readonly ContextInjection[];
   readonly memoryDecisions: readonly MemoryDecision[];
   readonly diagnostics: Readonly<Record<string, number>>;
+  readonly summaries: Readonly<Record<string, SummaryKind>>;
+  readonly flushes: Readonly<Record<string, readonly string[]>>;
+  readonly forkedFrom?: ForkOrigin;
   readonly lastError: string | undefined;
   readonly lastEventId: number | undefined;
 }
@@ -45,9 +51,16 @@ export interface UsageLedger {
   readonly turns: number;
   readonly unpricedTurns: number;
   readonly costUsd: number;
+  readonly cacheMiss?: CacheMiss;
 }
 
-export type TranscriptEntry = UserEntry | AssistantEntry | ThinkingEntry | ToolEntry | NoticeEntry;
+export type TranscriptEntry =
+  | UserEntry
+  | AssistantEntry
+  | ThinkingEntry
+  | ToolEntry
+  | NoticeEntry
+  | FlushEntry;
 
 export interface UserEntry {
   readonly kind: "user";
@@ -68,6 +81,15 @@ export interface ThinkingEntry {
   readonly kind: "thinking";
   readonly text: string;
   readonly replay: boolean;
+  readonly sealed?: true;
+}
+
+export interface FlushEntry {
+  readonly kind: "flush";
+  readonly text: string;
+  readonly facts: readonly string[];
+  readonly replay: boolean;
+  readonly settled: boolean;
 }
 
 export interface ToolEntry {
@@ -75,9 +97,11 @@ export interface ToolEntry {
   readonly run: ToolRun;
 }
 
+export type NoticeLevel = "info" | "error" | "progress";
+
 export interface NoticeEntry {
   readonly kind: "notice";
-  readonly level: "info" | "error";
+  readonly level: NoticeLevel;
   readonly text: string;
 }
 
@@ -142,6 +166,17 @@ export const emptyProjection: SessionProjection = {
   injections: [],
   memoryDecisions: [],
   diagnostics: {},
+  summaries: {},
+  flushes: {},
   lastError: undefined,
   lastEventId: undefined,
 };
+
+export function summaryKindOf(
+  projection: Pick<SessionProjection, "summaries">,
+  entry: TranscriptEntry,
+): SummaryKind | undefined {
+  return entry.kind === "user" && entry.entryId !== undefined
+    ? projection.summaries[entry.entryId]
+    : undefined;
+}

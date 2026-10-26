@@ -1,5 +1,5 @@
 import type { UsageLedger } from "@keywork-app/client";
-import type { ContextParts, ContextReport } from "@keywork-app/protocol";
+import type { ContextParts, ContextReport, ContextBasis as Counting } from "@keywork-app/protocol";
 import type { DensityLevel } from "../theme/schema.ts";
 import { partsReadout } from "./context-map.ts";
 import { formatTokens } from "./format.ts";
@@ -12,9 +12,12 @@ export interface ContextLevel {
   readonly flushAt: number;
   readonly compactAt: number;
   readonly basis: ContextBasis;
+  readonly counted?: Counting | undefined;
   readonly declared?: boolean | undefined;
   readonly parts?: ContextParts | undefined;
 }
+
+export const estimatedWord = "estimated";
 
 export type GaugeStyle = "steps" | "bar";
 
@@ -39,6 +42,7 @@ export function contextLevelOfReport(report: ContextReport): ContextLevel | unde
     flushAt: report.flushAt,
     compactAt: report.compactAt,
     basis: "reported",
+    counted: report.basis,
     declared: report.declared,
     parts: report.parts,
   };
@@ -95,12 +99,19 @@ export function gaugeHover(level: ContextLevel): string {
 function windowBasis(level: ContextLevel): string {
   const window = formatTokens(level.window);
   if (level.basis === "assumed") return `window assumed at ${window} until the server reports one`;
+  const counted = countedLine(level.counted);
   if (level.declared === false) {
-    return `window reported at ${window}, assumed by the server · estimated from the conversation text · declare models[…].contextWindow in keywork.json for an honest limit`;
+    return `window reported at ${window}, assumed by the server · ${counted} · declare models[…].contextWindow in keywork.json for an honest limit`;
   }
   return level.declared === true
-    ? `window reported at ${window}, declared in keywork.json · estimated from the conversation text`
-    : `window reported at ${window}`;
+    ? `window reported at ${window}, declared in keywork.json · ${counted}`
+    : `window reported at ${window} · ${counted}`;
+}
+
+function countedLine(counted: Counting | undefined): string {
+  return counted === "reported"
+    ? "counted from what the provider reported"
+    : "estimated from the conversation text";
 }
 
 function windowIsAssumed(level: ContextLevel): boolean {

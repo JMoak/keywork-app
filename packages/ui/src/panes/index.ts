@@ -94,7 +94,7 @@ function summonAction(definition: PaneDefinition<PaneSpec>): Array<[string, AppA
         chords: summon.chords,
         help: summon.help,
         command: summon.command,
-        invoke: (target) => target.summon(definition.kind),
+        invoke: (target, argument) => target.summon(definition.kind, argument),
       },
     ],
     ...Object.entries(summon.variants ?? {}).map(([variant, detail]): [string, AppAction] => [
@@ -117,7 +117,7 @@ function localActions(definition: PaneDefinition<PaneSpec>): Array<[string, AppA
       help: action.help,
       scope: definition.kind,
       ...(action.command !== undefined && { command: action.command }),
-      invoke: (target) => target.paneAction(name),
+      invoke: (target, argument) => target.paneAction(name, argument),
     },
   ]);
 }

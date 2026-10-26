@@ -44,20 +44,31 @@ export function turnLedgerPane(): JSX.Element {
 
 const stagedTranscript = projectAll(emptyProjection, [
   ...envelopesOf("tool"),
-  ...envelopesOf("plain").map((envelope) => ({ ...envelope, id: envelope.id + 100 })),
+  ...envelopesOf("plain").map((envelope) => laterTurn(envelope, 100)),
+]);
+
+const [firstPrompt = "q1", secondPrompt = "q101"] = stagedTranscript.entries.flatMap((entry) =>
+  entry.kind === "user" && entry.entryId !== undefined ? [entry.entryId] : [],
+);
+
+const stagedLog: SessionEntries = log([
+  prompt(firstPrompt, "run echo served"),
+  reply("r1", 0.0123),
+  prompt(secondPrompt, "say hello"),
+  reply("r2", 0.0381),
+  { type: "custom", customType: "restore", data: { turn: 3 }, ...placed("x3") },
 ]);
 
 function envelopesOf(name: string): readonly BusEnvelope[] {
   return scenarios.find((scenario) => scenario.name === name)?.envelopes ?? [];
 }
 
-const stagedLog: SessionEntries = log([
-  prompt("p1", "run echo served"),
-  reply("r1", 0.0123),
-  prompt("p2", "say hello"),
-  reply("r2", 0.0381),
-  { type: "custom", customType: "restore", data: { turn: 3 }, ...placed("x3") },
-]);
+function laterTurn(envelope: BusEnvelope, by: number): BusEnvelope {
+  const shifted = { ...envelope, id: envelope.id + by };
+  return shifted.type === "turn.started"
+    ? { ...shifted, payload: { ...shifted.payload, entryId: `q${by + 1}` } }
+    : shifted;
+}
 
 const stagedChanges: ChangesState = {
   availability: "ready",

@@ -89,7 +89,10 @@ describe("PaneFrame instruments", () => {
       </PaneFrame>
     ));
     const slot = container.querySelector(".kw-frame-telemetry") as HTMLElement;
-    expect(slot.querySelector(".kw-gauge")?.textContent).toBe("░▒··90k");
+    const gauge = slot.querySelector(".kw-gauge") as HTMLElement;
+    expect(gauge.querySelector(".kw-gauge-cells")?.textContent).toBe("░▒··");
+    expect(gauge.querySelector(".kw-gauge-count")?.textContent).toBe("90k");
+    expect(gauge.querySelector(".kw-gauge-unit")?.textContent).toBe("in context");
     expect(slot.textContent).toContain("380 tokens · $0.0031");
   });
 

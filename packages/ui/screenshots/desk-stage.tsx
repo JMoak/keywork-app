@@ -1,5 +1,5 @@
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
-import type { BusEnvelope, PermissionRule, SessionSummary } from "@keywork-app/protocol";
+import type { BusEnvelope, PermissionRule, SessionRow } from "@keywork-app/protocol";
 import { createSignal, type JSX } from "solid-js";
 import { NeedsYouStrip, stripLine } from "../src/chrome/needs-you-strip.tsx";
 import { PaneFrame } from "../src/chrome/pane-frame.tsx";
@@ -13,7 +13,7 @@ import { needsYouPane } from "../src/panes/needs-you/index.tsx";
 import type { ShellSeams } from "../src/panes/registry.ts";
 import { type NeedsYouItem, orderNeedsYou, waitingKey, whereOf } from "../src/shell/needs-you.ts";
 import type { NeedsYouQueue } from "../src/shell/needs-you-queue.ts";
-import { createQuietSessions } from "../src/shell/quiet.ts";
+import type { QuietPosture } from "../src/shell/quiet.ts";
 import { createSessionReads } from "../src/shell/session-reads.ts";
 import type { Outfit } from "../src/theme/attire.ts";
 import { keyworkNight, themeNamed } from "../src/theme/index.ts";
@@ -100,12 +100,18 @@ const workspace = "C:/src/keywork-app";
 
 const trashCommand = "bun test src/shell/trash.test.ts --rerun-each 20 | tee artifacts/trash.log";
 
-const sessions: readonly SessionSummary[] = [
+const sessions: readonly SessionRow[] = [
   staged("rename", "rename the tiler verbs", 6, 0.42, { arc: "pricing", bot: "editor" }),
   staged("trash", "fix the flaky trash test", 2, 0.18, { arc: "keywork" }),
-  staged("page", "explain the page grammar", 0, 0.31, { arc: "concept" }),
+  staged("page", "explain the page grammar", 0, 0.31, {
+    arc: "concept",
+    changes: { files: 3, added: 42, deleted: 7 },
+  }),
   staged("scan", "scan the field for the desk", 1, 0.07, { arc: "concept", bot: "scout" }),
-  staged("seam", "why is the seam drag sticky", 4, 0.55, { arc: "pricing" }),
+  staged("seam", "why is the seam drag sticky", 4, 0.55, {
+    arc: "pricing",
+    changes: { files: 1, added: 9, deleted: 2 },
+  }),
   staged("sidecar", "bump the sidecar pin", 11, 0.02, {}),
   staged("wardrobe", "wardrobe follow-ups", 26 * 60, undefined, { arc: "keywork" }),
   staged("outfits", "outfits live round", 3 * 24 * 60, undefined, {}),
@@ -156,8 +162,7 @@ function deskShell(): ShellSeams {
   const reads = createSessionReads();
   reads.sight(sessions);
   reads.read(lookedAt("seam", 30));
-  const quiet = createQuietSessions();
-  quiet.toggle("wardrobe");
+  const quiet: QuietPosture = { has: (sessionId) => sessionId === "wardrobe" };
   const keymap = keymapFromConfig();
   const [items] = createSignal(waiting);
   const queue: NeedsYouQueue = {
@@ -203,7 +208,7 @@ function deskShell(): ShellSeams {
   return shell as ShellSeams;
 }
 
-function lookedAt(sessionId: string, minutes: number): SessionSummary {
+function lookedAt(sessionId: string, minutes: number): SessionRow {
   const held = sessions.find((candidate) => candidate.id === sessionId);
   return {
     ...(held ?? staged(sessionId, sessionId, minutes, undefined, {})),
@@ -220,8 +225,8 @@ function staged(
   title: string,
   minutes: number,
   usd: number | undefined,
-  extra: Partial<SessionSummary>,
-): SessionSummary {
+  extra: Partial<SessionRow>,
+): SessionRow {
   const at = minutesAgo(minutes);
   return {
     id,

@@ -1,10 +1,12 @@
 import {
   type BusEnvelope,
+  type CacheMiss,
   type ChildFinished,
   type ChildProvenance,
   type ChildStarted,
   childAnswerOf,
   childProvenanceOf,
+  type DenyReason,
   delegateToolName,
   type EnginePayloads,
   type ExtensionNotice,
@@ -22,6 +24,7 @@ import { compactJson, toolSubject } from "./tool-row.ts";
 import type {
   AssistantEntry,
   ChildMark,
+  NoticeLevel,
   SessionProjection,
   ThinkingEntry,
   ToolEntry,
@@ -116,22 +119,47 @@ function startTurn(
   replay: boolean,
 ): SessionProjection {
   const origin = payload.origin !== undefined && { origin: payload.origin };
-  const entry: TranscriptEntry = {
+  const settled = settleFlush(settleStream(state));
+  return {
+    ...settled,
+    entries: [...settled.entries, promptEntry(state, payload, replay)],
+    turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
+    usage: replay ? state.usage : withoutCacheMiss(state.usage),
+  };
+}
+
+function promptEntry(
+  state: SessionProjection,
+  payload: EnginePayloads["turn.started"],
+  replay: boolean,
+): TranscriptEntry {
+  const facts = payload.entryId === undefined ? undefined : state.flushes[payload.entryId];
+  if (facts !== undefined) {
+    return { kind: "flush", text: payload.userText, facts, replay, settled: false };
+  }
+  return {
     kind: "user",
     text: payload.userText,
     ...(payload.entryId !== undefined && { entryId: payload.entryId }),
-    ...origin,
+    ...(payload.origin !== undefined && { origin: payload.origin }),
     replay,
-  };
-  return {
-    ...settleStream(state),
-    entries: [...state.entries, entry],
-    turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
   };
 }
 
 function endTurn(state: SessionProjection): SessionProjection {
-  return { ...settleStream(state), turn: undefined };
+  return { ...settleFlush(settleStream(state)), turn: undefined };
+}
+
+function settleFlush(state: SessionProjection): SessionProjection {
+  const index = openFlushIndex(state);
+  const flush = index === undefined ? undefined : state.entries[index];
+  if (index === undefined || flush?.kind !== "flush") return state;
+  return { ...state, entries: replaceAt(state.entries, index, { ...flush, settled: true }) };
+}
+
+function openFlushIndex(state: SessionProjection): number | undefined {
+  const last = state.entries.at(-1);
+  return last?.kind === "flush" && !last.settled ? state.entries.length - 1 : undefined;
 }
 
 function settleStream(state: SessionProjection): SessionProjection {
@@ -156,14 +184,19 @@ function streamDelta(
       return streamText(state, delta.text, replay);
     case "visible-thinking":
       return streamThinking(state, delta.text, replay);
+    case "redacted-thinking":
+      return sealThinking(state);
     case "tool-call":
       return proposeTool(state, delta.call, ts, replay);
-    default:
-      return state;
+    case "progress":
+      return notice(settleStream(state), "progress", delta.text);
+    case "done":
+      return noteCacheMiss(state, delta.cacheMiss);
   }
 }
 
 function streamText(state: SessionProjection, text: string, replay: boolean): SessionProjection {
+  if (openFlushIndex(state) !== undefined) return state;
   const last = state.entries.at(-1);
   const index = state.entries.length - 1;
   if (last?.kind === "assistant" && !last.settled && state.streaming === index) {
@@ -186,9 +219,10 @@ function streamThinking(
   text: string,
   replay: boolean,
 ): SessionProjection {
+  if (openFlushIndex(state) !== undefined) return state;
   const last = state.entries.at(-1);
   const index = state.entries.length - 1;
-  if (last?.kind === "thinking" && state.streaming === undefined) {
+  if (last?.kind === "thinking" && last.sealed !== true && state.streaming === undefined) {
     return {
       ...state,
       entries: replaceAt(state.entries, index, { ...last, text: last.text + text }),
@@ -198,6 +232,18 @@ function streamThinking(
   const settled = settleStream(state);
   return { ...settled, entries: [...settled.entries, entry] };
 }
+
+function sealThinking(state: SessionProjection): SessionProjection {
+  const last = state.entries.at(-1);
+  if (last?.kind === "thinking" && last.sealed !== true) {
+    const sealed: ThinkingEntry = { ...last, sealed: true };
+    return { ...state, entries: replaceAt(state.entries, state.entries.length - 1, sealed) };
+  }
+  if (last?.kind === "notice" && last.level === "progress") return state;
+  return notice(settleStream(state), "info", sealedThinkingLine);
+}
+
+const sealedThinkingLine = "· thinking the provider kept sealed";
 
 function proposeTool(
   state: SessionProjection,
@@ -362,8 +408,19 @@ function settleUsage(state: SessionProjection, usage: Usage, replay: boolean): S
   return { ...state, usage: addUsage(state.usage, usage) };
 }
 
+function noteCacheMiss(state: SessionProjection, miss: CacheMiss | undefined): SessionProjection {
+  return miss === undefined ? state : { ...state, usage: { ...state.usage, cacheMiss: miss } };
+}
+
+function withoutCacheMiss(ledger: UsageLedger): UsageLedger {
+  if (ledger.cacheMiss === undefined) return ledger;
+  const { cacheMiss: _, ...rest } = ledger;
+  return rest;
+}
+
 function addUsage(ledger: UsageLedger, usage: Usage): UsageLedger {
   return {
+    ...ledger,
     inputTokens: ledger.inputTokens + usage.inputTokens,
     outputTokens: ledger.outputTokens + usage.outputTokens,
     cacheReadInputTokens: ledger.cacheReadInputTokens + (usage.cacheReadInputTokens ?? 0),
@@ -383,8 +440,48 @@ function settled(state: SessionProjection, settlement: SessionSettlement): Sessi
 }
 
 function extensionLine(payload: ExtensionNotice): string {
-  return `${extensionMarks[payload.level]} ${payload.extension} · ${payload.message}`;
+  const detail = detailText(payload.detail);
+  const said = `${extensionMarks[payload.level]} ${payload.extension} · ${payload.message}`;
+  return detail === undefined ? said : `${said} · ${detail}`;
 }
+
+function detailText(detail: unknown): string | undefined {
+  if (detail === undefined || detail === null) return undefined;
+  const text = isFlatRecord(detail) ? fieldsText(detail) : scalarOrJson(detail);
+  return text === "" ? undefined : clipped(text, detailLimit);
+}
+
+function fieldsText(record: Readonly<Record<string, Scalar>>): string {
+  return Object.entries(record)
+    .map(([key, value]) => `${key} ${String(value)}`)
+    .join(" · ");
+}
+
+function scalarOrJson(value: unknown): string {
+  return isScalar(value) ? String(value) : (JSON.stringify(value) ?? "");
+}
+
+type Scalar = string | number | boolean | null;
+
+function isFlatRecord(value: unknown): value is Readonly<Record<string, Scalar>> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every(isScalar)
+  );
+}
+
+function isScalar(value: unknown): value is Scalar {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+function clipped(text: string, limit: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > limit ? `${flat.slice(0, limit - 1)}…` : flat;
+}
+
+const detailLimit = 80;
 
 const extensionMarks: Readonly<Record<ExtensionNoticeLevel, string>> = {
   info: "░",
@@ -392,11 +489,7 @@ const extensionMarks: Readonly<Record<ExtensionNoticeLevel, string>> = {
   error: "█",
 };
 
-function notice(
-  state: SessionProjection,
-  level: "info" | "error",
-  text: string,
-): SessionProjection {
+function notice(state: SessionProjection, level: NoticeLevel, text: string): SessionProjection {
   return { ...state, entries: [...state.entries, { kind: "notice", level, text }] };
 }
 
@@ -487,11 +580,24 @@ function refusalReason(decision: PermissionDecision): string {
     case "headless":
       return "no one answered";
     case "user":
-      return "you said no";
+      return withNote(personalRefusals[decision.reason ?? "other"], decision.note);
     default:
       return `denied by ${decision.gate}`;
   }
 }
+
+function withNote(refusal: string, note: string | undefined): string {
+  const said = note === undefined ? "" : clipped(note, noteLimit);
+  return said === "" ? refusal : `${refusal}: ${said}`;
+}
+
+const noteLimit = 60;
+
+const personalRefusals: Readonly<Record<DenyReason, string>> = {
+  unsafe: "you called it unsafe",
+  "not-now": "you said not now",
+  other: "you said no",
+};
 
 function replaceAt<T>(items: readonly T[], index: number, item: T): T[] {
   const copy = items.slice();

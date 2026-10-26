@@ -1,8 +1,8 @@
-import type { ContextReport } from "@keywork-app/protocol";
+import type { ContextReport, Flushed } from "@keywork-app/protocol";
 import { createEffect, createSignal, Index, on, Show } from "solid-js";
 import { z } from "zod";
-import { sessionName } from "../../chrome/telemetry.ts";
-import { sessionContextLevel } from "../../instruments/context.ts";
+import { sessionName } from "../../chrome/session-name.ts";
+import { estimatedWord, sessionContextLevel } from "../../instruments/context.ts";
 import {
   basisLine,
   fenceRows,
@@ -16,7 +16,6 @@ import {
   mapRows,
   pastWindowLine,
 } from "../../instruments/context-map.ts";
-import { formatTokens } from "../../instruments/format.ts";
 import {
   compactingNotice,
   compactNotice,
@@ -37,7 +36,9 @@ const contextSpec = z.object({
 
 export type ContextSpec = z.output<typeof contextSpec>;
 
-export const contextHints = "c compacts now · f says when memory flushes · esc closes";
+export const contextHints = "c compacts now · f flushes memory now · esc closes";
+
+export const flushingNotice = "flushing memory · the model is choosing what to keep";
 
 export const unreadLine = "no reading of this window yet";
 
@@ -71,10 +72,10 @@ export const contextPane = definePane<ContextSpec>({
     },
     "context.flush": {
       chords: "f",
-      help: "when memory flushes",
+      help: "flush memory now",
       command: {
         name: "context-flush",
-        description: "say where keywork flushes the mapped session's memory",
+        description: "flush the mapped session's memory now instead of at the flush line",
       },
     },
     "context.close": {
@@ -94,9 +95,11 @@ export const contextPane = definePane<ContextSpec>({
   },
 });
 
-export function flushNotice(report: ContextReport | undefined): string {
-  const line = report === undefined ? "the flush line" : formatTokens(report.thresholds.flushAt);
-  return `memory flushes when a turn settles past ${line} · keywork has no route to flush now`;
+export function flushedNotice(flushed: Flushed): string {
+  const said = flushed.notices.length > 0 ? flushed.notices.join(" · ") : "memory flushed";
+  if (flushed.flushed === 0) return said;
+  const messages = flushed.flushed === 1 ? "1 message" : `${flushed.flushed} messages`;
+  return `${said} · ${messages} joined the conversation`;
 }
 
 export interface ContextMapProps {
@@ -109,7 +112,12 @@ export function ContextMap(props: ContextMapProps) {
     <>
       <header class="kw-ov-head">
         <span class="kw-ov-head-lead">{props.session}</span>
-        <span class="kw-context-map-total">{mapHead(props.report)}</span>
+        <span class="kw-context-map-total">
+          {mapHead(props.report)}
+          <Show when={props.report.basis === "estimated"}>
+            <span class="kw-context-map-measure"> {estimatedWord}</span>
+          </Show>
+        </span>
       </header>
       <div class="kw-context-map-body">
         <div
@@ -158,7 +166,7 @@ function ContextSlot(props: PaneProps<ContextSpec>) {
       },
     ),
   );
-  const keys = contextKeys(props, report, setNotice);
+  const keys = contextKeys(props, setNotice);
   props.onAction((action) => keys[action]?.());
 
   return (
@@ -195,27 +203,33 @@ function followTheFocusedConversation(props: PaneProps<ContextSpec>): void {
   });
 }
 
-function contextKeys(
-  props: PaneProps<ContextSpec>,
-  report: () => ContextReport | undefined,
-  say: Say,
-): Record<string, () => void> {
+function contextKeys(props: PaneProps<ContextSpec>, say: Say): Record<string, () => void> {
   const verbs = props.shell.store.controls;
-  const withSession = (run: (id: string) => Promise<void>) => (): void => {
+  const withSession = (run: (id: string, say: Say) => Promise<void>) => (): void => {
     const id = props.spec.sessionId;
     if (id === undefined) say(noSessionNotice);
-    else void run(id);
+    else void run(id, whileMapped(props, id, say));
   };
   return {
-    "context.compact": withSession(async (id) => {
+    "context.compact": withSession(async (id, say) => {
       say(compactingNotice);
       const reading = await verbs.compact(id);
       if (!isSettled(reading)) return say(refusalNotice(reading));
       say(compactNotice(reading));
       await verbs.watchReadings(id);
     }),
-    "context.flush": () => say(flushNotice(report())),
+    "context.flush": withSession(async (id, say) => {
+      say(flushingNotice);
+      const reading = await verbs.flush(id);
+      say(isSettled(reading) ? flushedNotice(reading) : refusalNotice(reading));
+    }),
     "context.close": () => props.shell.closePane?.(props.id),
+  };
+}
+
+function whileMapped(props: PaneProps<ContextSpec>, id: string, say: Say): Say {
+  return (line) => {
+    if (props.spec.sessionId === id) say(line);
   };
 }
 

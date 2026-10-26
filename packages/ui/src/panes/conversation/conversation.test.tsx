@@ -292,7 +292,7 @@ describe("the conversation pane's controls", () => {
     const row = document.querySelector(".kw-tool[data-child]") as HTMLElement;
     expect(row.textContent).toContain('child "audit the trust rules" · ◇ researcher');
     fireEvent.keyDown(row, { key: "Enter" });
-    expect(sent.verbs).toEqual(["open q1"]);
+    expect(sent.verbs).toEqual(["open q2"]);
   });
 
   it("seeds the composer with an undone prompt", () => {
@@ -387,43 +387,26 @@ describe("the conversation pane's controls", () => {
     expect(lines()).toEqual(["permissions preset → careful"]);
   });
 
-  it("offers a save named for the session beside the clipboard copy", async () => {
-    const copied: string[] = [];
-    vi.stubGlobal("navigator", {
-      clipboard: { writeText: async (text: string) => void copied.push(text) },
-    });
+  it("offers a save named for the session and says where the page went", async () => {
     const { act, sent } = mount({
       title: "Lights & beta",
       saved: { saved: true, path: "C:/work/lights-beta.html" },
     });
     await act("conversation.export");
-    expect(copied).toEqual(["<!doctype html><title>Lights</title>"]);
     expect(sent.verbs).toEqual(["save lights-beta.html 36"]);
-    expect(lines()).toEqual([
-      "session page saved to C:/work/lights-beta.html · copied to the clipboard · 36 B of html",
-    ]);
+    expect(lines()).toEqual(["session page saved to C:/work/lights-beta.html · 36 B"]);
     await act("conversation.export-file");
     expect(lines()).toEqual(["session page written to <cwd>/Lights.html"]);
   });
 
-  it("says a cancelled save plainly and keeps the clipboard copy", async () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: async () => undefined } });
+  it("says a cancelled save plainly", async () => {
     const { act, sent } = mount();
     await act("conversation.export");
     expect(sent.verbs).toEqual(["save session.html 36"]);
-    expect(lines()).toEqual([
-      "session page copied to the clipboard · 36 B of html · save cancelled",
-    ]);
+    expect(lines()).toEqual(["export cancelled · nothing was written"]);
   });
 
-  it("points at export-file when neither the clipboard nor a save dialog took the page", async () => {
-    vi.stubGlobal("navigator", {
-      clipboard: {
-        writeText: async () => {
-          throw new Error("not focused");
-        },
-      },
-    });
+  it("points at export-file when the host has no save dialog", async () => {
     const { act } = mount({
       saved: {
         saved: false,
@@ -433,7 +416,7 @@ describe("the conversation pane's controls", () => {
     });
     await act("conversation.export");
     expect(lines()).toEqual([
-      "the browser host has no save dialog and the clipboard refused the page · export-file writes it into the workspace",
+      "the browser host has no save dialog · export-file writes the page into the workspace instead",
     ]);
   });
 
@@ -447,7 +430,6 @@ describe("the conversation pane's controls", () => {
       "tokens 12▸5",
       "cost unknown · no pricing for mock/beta",
       "  mock/alpha · 1 turn · 12▸5 · no pricing",
-      "  mock/beta · 0 turns · 0▸0 · no pricing",
     ]);
   });
 
@@ -564,7 +546,7 @@ describe("the conversation pane's title row", () => {
       used: 4000,
       basis: "reported",
       declared: false,
-      flushAt: 175_424,
+      flushAt: 177_289,
     });
   });
 
@@ -611,6 +593,7 @@ describe("the conversation pane's title row", () => {
       "leader shift+c",
       "leader shift+r",
       "leader shift+e",
+      "leader shift+x",
       "leader [",
       "leader ]",
     ]);

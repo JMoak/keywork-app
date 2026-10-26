@@ -1,5 +1,5 @@
 import type { SessionProjection } from "@keywork-app/client";
-import type { CostReport, SessionSummary } from "@keywork-app/protocol";
+import type { CostReport } from "@keywork-app/protocol";
 import { usageLine } from "../instruments/cost.ts";
 import { reportedUsageLine } from "../instruments/cost-report.ts";
 
@@ -11,16 +11,6 @@ export function telemetry(projection: SessionProjection, report?: CostReport): s
   return live === "" ? "" : `${live} · ${liveTurnsOnly}`;
 }
 
-export function sessionName(
-  summary: SessionSummary | undefined,
-  projection: SessionProjection | undefined,
-): string {
-  if (summary !== undefined && summary.title !== untitled) return summary.title;
-  const firstPrompt = projection?.entries.find((entry) => entry.kind === "user");
-  if (firstPrompt?.kind === "user") return firstPrompt.text;
-  return summary === undefined ? "new session" : "session";
-}
-
 export function relativeAge(iso: string, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
   if (seconds < 60) return "now";
@@ -30,5 +20,3 @@ export function relativeAge(iso: string, now: number = Date.now()): string {
   if (hours < 48) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
 }
-
-const untitled = "(untitled session)";

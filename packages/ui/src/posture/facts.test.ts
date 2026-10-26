@@ -17,6 +17,7 @@ export function factsWith(overrides: Partial<PostureFacts> = {}): PostureFacts {
     version: "0.2.0",
     manifests: ["bun.lock", "package.json"],
     scripts: ["test"],
+    runners: [],
     mcp: [],
     bots: [],
     unread: [],

@@ -4,6 +4,8 @@ import {
   type ChangesState,
   changesSnapshot,
   emptyChangesState,
+  emptyProjection,
+  emptyTreeState,
   type SessionControls,
   unknownControls,
 } from "@keywork-app/client";
@@ -60,6 +62,9 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
         recorded.reads += 1;
       },
       controlsOf: () => ({ ...unknownControls, ...seams.controls }),
+      projection: () => emptyProjection,
+      tree: () => emptyTreeState,
+      openTree: async () => {},
       controls: {
         undo: async (id: string) => {
           recorded.verbs.push(`undo ${id}`);
@@ -314,6 +319,13 @@ describe("the changes pane's undo and redo", () => {
     );
     expect(verbStates().map(([, enabled]) => enabled)).toEqual(["yes", "no"]);
     act("diff.undo");
+    await settle();
+    expect(recorded.verbs).toEqual([]);
+    const question = document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement;
+    expect(question.textContent).toBe(
+      "undo the last turn and put back the files it changed? ctrl+k diff.redo redoes it · y confirms · any other key cancels",
+    );
+    fireEvent.keyDown(question, { key: "y" });
     await settle();
     expect(
       screen.getByText("undone · the prompt is back in the composer · files put back"),

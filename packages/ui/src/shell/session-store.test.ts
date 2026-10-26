@@ -28,10 +28,10 @@ describe("the session store's lineage", () => {
     const started = stream.findIndex((envelope) => envelope.type === "child.started");
     emit(stream.slice(0, started + 1));
     expect(store.children("s1").map((known) => [known.sessionId, known.state])).toEqual([
-      ["q1", "running"],
+      ["q2", "running"],
     ]);
     emit(stream.slice(started + 1));
-    expect(store.childOf("q1")).toMatchObject({
+    expect(store.childOf("q2")).toMatchObject({
       parentId: "s1",
       title: "audit the trust rules",
       bot: "researcher",
@@ -45,35 +45,35 @@ describe("the session store's lineage", () => {
     const { store } = mounted();
     await store.open("s1");
     expect(store.children("s1")).toEqual([
-      expect.objectContaining({ sessionId: "q1", callId: "d1", state: "completed" }),
+      expect.objectContaining({ sessionId: "q2", callId: "d1", state: "completed" }),
     ]);
   });
 
   it("keeps the summary of a child read by id, which the sessions list never shows", async () => {
     const { store } = mounted();
     await store.refresh();
-    await store.open("q1");
+    await store.open("q2");
     expect(store.state.summaries.map((summary) => summary.id)).toEqual(["s1"]);
-    expect(store.summary("q1")).toMatchObject({
+    expect(store.summary("q2")).toMatchObject({
       title: "audit the trust rules",
       bot: "researcher",
     });
-    expect(store.summary("q1")).not.toHaveProperty("messages");
-    expect(store.controlsOf("q1").title).toBe("audit the trust rules");
+    expect(store.summary("q2")).not.toHaveProperty("messages");
+    expect(store.controlsOf("q2").title).toBe("audit the trust rules");
   });
 
   it("rereads an open child on its parent's activity lines and when it finishes", async () => {
     const { store, emit, reads } = mounted();
     const started = stream.findIndex((envelope) => envelope.type === "child.started");
     emit(stream.slice(0, started + 1));
-    await store.open("q1");
+    await store.open("q2");
     emit([activity("read src/trust.ts")]);
-    await vi.waitFor(() => expect(reads("q1")).toBe(2));
+    await vi.waitFor(() => expect(reads("q2")).toBe(2));
     emit(stream.slice(started + 1));
-    await vi.waitFor(() => expect(reads("q1")).toBe(3));
+    await vi.waitFor(() => expect(reads("q2")).toBe(3));
     emit([activity("too late")]);
     await Promise.resolve();
-    expect(reads("q1")).toBe(3);
+    expect(reads("q2")).toBe(3);
   });
 });
 
@@ -149,7 +149,7 @@ interface Mounted {
 function mounted(pending: readonly PendingAsk[] = []): Mounted {
   const listeners: Array<(envelopes: readonly BusEnvelope[]) => void> = [];
   const sessionReads: string[] = [];
-  const details: Record<string, SessionDetail> = { s1: parent, q1: child };
+  const details: Record<string, SessionDetail> = { s1: parent, q2: child };
   const listed: SessionSummary[] = [summaryOf(parent)];
   const client = {
     sessions: async () => listed,

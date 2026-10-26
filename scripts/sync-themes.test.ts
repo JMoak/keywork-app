@@ -28,11 +28,25 @@ describe("check:themes", () => {
     const source = {
       origin: "keywork",
       themes: [day, { ...night, gap: 4 }, { ...night, name: "tokyo-night" }],
+      complete: true,
     };
     expect(galleryDrift(recorded, source)).toEqual([
       "tokyo-night is in keywork but not the app gallery",
       "keywork-night differs from keywork",
       "the gallery order differs from keywork",
+    ]);
+  });
+
+  it("holds only the house themes against the house file, which never has the whole gallery", async () => {
+    const [night, day, ...rest] = (await recordedThemes()) as [{ name: string }, unknown, unknown];
+    const house = { origin: houseFile, themes: [night, day], complete: false };
+    expect(galleryDrift([night, day, ...rest], house)).toEqual([]);
+    expect(galleryDrift([day, ...rest, night], house)).toEqual([]);
+    expect(galleryDrift([{ ...night, gap: 4 }, day], house)).toEqual([
+      `keywork-night differs from ${houseFile}`,
+    ]);
+    expect(galleryDrift([night, ...rest], house)).toEqual([
+      `keywork-day is in ${houseFile} but not the app gallery`,
     ]);
   });
 

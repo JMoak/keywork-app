@@ -450,7 +450,7 @@ describe("the tree pane, level two", () => {
     act("tree.fork");
     await Promise.resolve();
     await Promise.resolve();
-    expect(recorded.forks).toEqual(["q4"]);
+    expect(recorded.forks).toEqual(["q8"]);
     expect(recorded.opened).toEqual(["s3"]);
 
     act("tree.label");
@@ -458,13 +458,13 @@ describe("the tree pane, level two", () => {
     fireEvent.input(input, { target: { value: "the right one" } });
     act("tree.down");
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(recorded.labels).toEqual([["q4", "the right one"]]);
+    expect(recorded.labels).toEqual([["q8", "the right one"]]);
     expect(screen.queryByLabelText("label")).toBeNull();
 
     act("tree.label");
     fireEvent.input(screen.getByLabelText("label"), { target: { value: "  " } });
     fireEvent.keyDown(screen.getByLabelText("label"), { key: "Enter" });
-    expect(recorded.labels.at(-1)).toEqual(["q4", null]);
+    expect(recorded.labels.at(-1)).toEqual(["q8", null]);
   });
 
   it("goes back to the sessions on escape and refreshes on r", () => {

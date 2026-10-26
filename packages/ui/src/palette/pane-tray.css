@@ -1,0 +1,99 @@
+.kw-tray {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  max-height: min(60%, 20rem);
+  font-family: var(--kw-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  box-shadow:
+    inset 0 2px 0 var(--kw-pane-ink, var(--kw-accent)),
+    0 -0.75rem 1.5rem color-mix(in oklch, var(--kw-background) 70%, transparent);
+}
+
+.kw-tray-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem 0 0.25rem;
+}
+
+.kw-tray-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(6rem, max-content) minmax(0, 1fr) max-content;
+  gap: 0 2ch;
+  padding-right: 0.75rem;
+  cursor: pointer;
+  color: var(--kw-text-mid);
+}
+.kw-tray-mark {
+  text-align: center;
+  color: var(--kw-accent);
+}
+.kw-tray-name {
+  white-space: nowrap;
+  color: var(--kw-text);
+}
+.kw-tray-rows[data-searching] .kw-tray-run {
+  color: var(--kw-density-medium);
+}
+.kw-tray-rows[data-searching] .kw-tray-run[data-match] {
+  color: var(--kw-density-heavy);
+  font-weight: 700;
+}
+.kw-tray-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kw-text-dim);
+}
+.kw-tray-key {
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+.kw-tray-row[data-selected] {
+  background: var(--kw-panel-lift);
+}
+.kw-tray-row[data-selected] .kw-tray-name,
+.kw-tray-row[data-selected] .kw-tray-run {
+  color: var(--kw-accent);
+}
+.kw-tray-row[data-selected] .kw-tray-description {
+  color: var(--kw-text);
+}
+
+.kw-tray-empty {
+  margin: 0;
+  padding: 0.375rem 0.75rem 0.25rem 1.5rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-tray-ask {
+  display: flex;
+  align-items: baseline;
+  padding: 0.25rem 0.75rem 0.375rem 0;
+  box-shadow: inset 0 1px 0 var(--kw-border);
+}
+.kw-tray-prompt {
+  flex: none;
+  width: 1.5rem;
+  text-align: center;
+  color: var(--kw-accent);
+}
+.kw-tray-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--kw-text);
+  background: none;
+  border: none;
+  outline: none;
+  caret-color: var(--kw-cursor, var(--kw-accent));
+}

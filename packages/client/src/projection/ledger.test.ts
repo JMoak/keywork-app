@@ -36,8 +36,8 @@ describe("pathReading: the turns the server counts", () => {
     expect(
       path.turns.map(({ turn, promptId, leafId, text }) => [turn, promptId, leafId, text]),
     ).toEqual([
-      [1, "q5", "q1", "write two lines to notes.txt"],
-      [2, "q9", "q2", "now say done"],
+      [1, "q1", "q10", "write two lines to notes.txt"],
+      [2, "q3", "q11", "now say done"],
     ]);
     expect(path.opening).toEqual([]);
   });
@@ -46,14 +46,14 @@ describe("pathReading: the turns the server counts", () => {
     const path = pathReading(recordedLog);
     expect(path.turns[0]?.marks).toEqual([]);
     expect(path.turns[1]?.marks).toEqual([
-      { kind: "restore-undone", entryId: "q4", turn: 1, leaf: true },
+      { kind: "restore-undone", entryId: "q6", turn: 1, leaf: true },
     ]);
   });
 
   it("opens with a restore that left no turn on the path", () => {
-    const restoredToStart = { ...recordedLog, leafId: "q3", activePath: ["q6", "q3"] };
+    const restoredToStart = { ...recordedLog, leafId: "q5", activePath: ["q5"] };
     expect(pathReading(restoredToStart)).toEqual({
-      opening: [{ kind: "restore", entryId: "q3", turn: 1, leaf: true }],
+      opening: [{ kind: "restore", entryId: "q5", turn: 1, leaf: true }],
       turns: [],
     });
   });

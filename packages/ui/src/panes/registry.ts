@@ -7,11 +7,13 @@ import type { HostPort } from "../host/port.ts";
 import type { ContextLevel } from "../instruments/context.ts";
 import type { BindingSpec } from "../keys/keymap.ts";
 import type { DockSide, PaneId } from "../layout/index.ts";
+import type { ArgumentChoice, CommandRegistry } from "../palette/commands.ts";
 import type { TrustSetup } from "../posture/trust-setup.ts";
 import type { NeedsYouItem } from "../shell/needs-you.ts";
 import type { Reveal } from "../shell/needs-you-jumps.ts";
 import type { NeedsYouQueue } from "../shell/needs-you-queue.ts";
-import type { QuietSessions } from "../shell/quiet.ts";
+import type { QuietPosture } from "../shell/quiet.ts";
+import type { ServerStanding } from "../shell/server-standing.ts";
 import type { SessionReads } from "../shell/session-reads.ts";
 import type { SessionStore } from "../shell/session-store.ts";
 import type { TrustFlow } from "../shell/trust.ts";
@@ -46,33 +48,34 @@ export interface PaneSummon<Spec extends PaneSpecBase> {
   readonly action: string;
   readonly chords: BindingSpec;
   readonly help: string;
-  readonly command: {
-    readonly name: string;
-    readonly description: string;
-    readonly aliases?: readonly string[];
-  };
+  readonly command: ActionCommand;
   readonly variants?: Readonly<Record<string, PaneSummonVariant>>;
-  spec(shell: ShellSeams, variant?: string): Spec | Promise<Spec>;
+  spec(shell: ShellSeams, argument?: string): Spec | Promise<Spec>;
 }
 
 export interface PaneSummonVariant {
   readonly chords?: BindingSpec;
   readonly help: string;
-  readonly command: {
-    readonly name: string;
-    readonly description: string;
-    readonly aliases?: readonly string[];
-  };
+  readonly command: ActionCommand;
 }
 
 export interface PaneLocalAction {
   readonly chords: BindingSpec;
   readonly help: string;
-  readonly command?: {
-    readonly name: string;
-    readonly description: string;
-    readonly aliases?: readonly string[];
-  };
+  readonly command?: ActionCommand;
+}
+
+export interface ActionCommand {
+  readonly name: string;
+  readonly description: string;
+  readonly aliases?: readonly string[];
+  readonly argument?: ActionArgument;
+}
+
+export interface ActionArgument {
+  readonly hint: string;
+  readonly required?: true;
+  choices?(shell: ShellSeams): readonly ArgumentChoice[];
 }
 
 export interface PaneAdornments {
@@ -95,8 +98,10 @@ export interface PaneView<Spec extends PaneSpecBase> {
 
 export interface PaneProps<Spec extends PaneSpecBase> extends PaneView<Spec> {
   readonly shell: ShellSeams;
-  onAction(handler: (action: string) => void): void;
+  onAction(handler: PaneActionHandler): void;
 }
+
+export type PaneActionHandler = (action: string, argument?: string) => void;
 
 export interface KeyHints {
   chord(action: string): string;
@@ -142,11 +147,13 @@ export interface ShellSeams {
   readonly wardrobe?: Wardrobe;
   readonly attire?: Attire;
   readonly marks?: PaneMarks;
-  readonly quiet?: QuietSessions;
+  readonly quiet?: QuietPosture;
   readonly needsYou?: NeedsYouSeams;
+  readonly commands?: CommandRegistry;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
   closePane?(paneId: PaneId): void;
-  openInEditor?(path: string, line: number): Promise<void>;
+  openInEditor?(path: string, line?: number): Promise<void>;
+  server?(): ServerStanding;
 }
 
 export function definePane<Spec extends PaneSpecBase>(

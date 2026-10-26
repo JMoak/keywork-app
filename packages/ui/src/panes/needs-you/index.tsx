@@ -1,12 +1,14 @@
+import type { DenyReason } from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal, Index, Show } from "solid-js";
 import { z } from "zod";
 import { createTileFillStep } from "../../chrome/stamp.ts";
 import type { BindingSpec } from "../../keys/keymap.ts";
-import type { AskPick } from "../../page/ask-card.tsx";
+import { type AskPick, denialFor } from "../../page/ask-card.tsx";
+import { askingWhy, readWhyKeys, whyLine } from "../../page/ask-card-why.ts";
 import { answerHeldAsk, type HeldAsk } from "../../shell/answer-ask.ts";
 import type { NeedsYouItem } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
-import { keepKeyboardHome } from "../keyboard-home.ts";
+import { keepKeyboardHome, returnKeyboardHome } from "../keyboard-home.ts";
 import { createCursor } from "../overview/rows.tsx";
 import {
   definePane,
@@ -15,6 +17,7 @@ import {
   type PaneProps,
   type ShellSeams,
 } from "../registry.ts";
+import { sessionWorking } from "../tree/rows.ts";
 import {
   type DeskGroup,
   type DeskKeys,
@@ -78,15 +81,15 @@ export const needsYouPane = definePane<NeedsYouSpec>({
     ),
     "needs-you.approve": deskAction(
       "y",
-      "approve the row's ask · for the session when quiet",
+      "approve the row's ask once",
       "desk-approve",
-      "approve the row's ask: once, or for the session when it is quiet",
+      "approve the row's ask this one time",
     ),
     "needs-you.once": deskAction(
       "o",
       "approve the row's ask once",
       "desk-approve-once",
-      "approve the row's ask this one time, even in a quiet session",
+      "approve the row's ask this one time",
     ),
     "needs-you.session": deskAction(
       "s",
@@ -100,7 +103,12 @@ export const needsYouPane = definePane<NeedsYouSpec>({
       "desk-approve-workspace",
       "approve the row's ask and its rules for this workspace",
     ),
-    "needs-you.deny": deskAction("n", "deny the row's ask", "desk-deny", "deny the row's ask"),
+    "needs-you.deny": deskAction(
+      "n",
+      "deny the row's ask · then u unsafe, n not now, o other",
+      "desk-deny",
+      "deny the row's ask; the next key says why: unsafe, not now or other",
+    ),
   },
   lifecycle: (_view, shell) => (waitingIn(shell).length > 0 ? "needs-you" : "idle"),
 });
@@ -124,7 +132,8 @@ export function deskSources(shell: ShellSeams): DeskSources {
   return {
     waiting: waitingIn(shell),
     sessions: shell.store.state.summaries,
-    working: (sessionId) => shell.store.state.projections[sessionId]?.turn !== undefined,
+    working: (sessionId) =>
+      sessionWorking(shell.store.state.projections[sessionId], shell.store.summary(sessionId)),
     unread: (summary) => shell.needsYou?.reads.unread(summary) === true,
     quiet: (sessionId) => shell.quiet?.has(sessionId) === true,
   };
@@ -152,7 +161,19 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
   const keys = createMemo(() => deskKeys(props.shell.keys));
   const step = createTileFillStep(() => rows().some(isWorking));
   const [notice, setNotice] = createSignal<string>();
+  const [wording, setWording] = createSignal<string>();
   const current = (): DeskRow | undefined => rows()[cursor.index()];
+  const heldCallId = (): string | undefined => heldAsk(current())?.callId;
+  const sayingWhy = (): boolean => {
+    const callId = heldCallId();
+    return callId !== undefined && askingWhy(callId);
+  };
+  const wordingHere = (): boolean => wording() !== undefined && wording() === heldCallId();
+  const footLine = (): string | undefined => {
+    if (notice() !== undefined) return notice();
+    if (rows().length === 0 || wordingHere()) return undefined;
+    return sayingWhy() ? whyLine : deskHint(keys());
+  };
 
   const move = (delta: number): void => {
     setNotice(undefined);
@@ -175,19 +196,30 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
     setNotice(next === undefined ? "nothing needs you" : undefined);
     if (next !== undefined) cursor.set(next);
   };
-  const answer = (pick: AskPick): void => {
+  const answer = (pick: AskPick, reason?: DenyReason, note?: string): void => {
     const held = heldAsk(current());
     if (held === undefined) {
       setNotice(`no ask on this row · ${keys().waiting} goes to the next waiting`);
       return;
     }
-    const answering = {
-      store: props.shell.store,
-      quiet: props.shell.quiet,
-      approveKey: keys().approve,
-    };
-    void answerHeldAsk(answering, held, pick).then((line) => setNotice(line));
+    const answering = { store: props.shell.store, approveKey: keys().approve };
+    void answerHeldAsk(answering, held, pick, reason, note).then((line) => setNotice(line));
   };
+  const giveReason = (reason: DenyReason, words: boolean): void => {
+    if (words) setWording(heldCallId());
+    else answer("deny", reason);
+  };
+  const sendWords = (note: string): void => {
+    setWording(undefined);
+    const denial = denialFor("other", note);
+    answer("deny", denial.reason, denial.note);
+    returnKeyboardHome();
+  };
+  readWhyKeys(
+    () => root,
+    () => (props.focused && !wordingHere() ? heldCallId() : undefined),
+    giveReason,
+  );
 
   props.onAction((action) => {
     const pick = answerPicks[action];
@@ -232,14 +264,18 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
                   cursor.set(index);
                   answer(pick);
                 }}
+                onReason={(index, reason) => {
+                  cursor.set(index);
+                  giveReason(reason, reason === "other");
+                }}
+                wording={wordingHere()}
+                onWords={sendWords}
               />
             )}
           </Index>
         </div>
       </Show>
-      <Show when={notice() ?? (rows().length > 0 ? deskHint(keys()) : undefined)}>
-        {(line) => <p class="kw-ov-line">{line()}</p>}
-      </Show>
+      <Show when={footLine()}>{(line) => <p class="kw-ov-line">{line()}</p>}</Show>
     </section>
   );
 }
@@ -252,6 +288,9 @@ interface DeskSectionProps {
   keys: DeskKeys;
   onPick(index: number): void;
   onAnswer(index: number, pick: AskPick): void;
+  onReason(index: number, reason: DenyReason): void;
+  wording: boolean;
+  onWords(note: string): void;
 }
 
 function DeskSection(props: DeskSectionProps) {
@@ -269,6 +308,9 @@ function DeskSection(props: DeskSectionProps) {
               keys={props.keys}
               onPick={() => props.onPick(props.group.first + at)}
               onAnswer={(pick) => props.onAnswer(props.group.first + at, pick)}
+              onReason={(reason) => props.onReason(props.group.first + at, reason)}
+              wording={props.wording && props.cursor === props.group.first + at}
+              onWords={(note) => props.onWords(note)}
             />
           )}
         </Index>

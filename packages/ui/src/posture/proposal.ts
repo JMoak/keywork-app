@@ -71,7 +71,7 @@ const wholeServer = `${mcpToolSeparator}*`;
 const carveOutsNamed = 2;
 
 function commandOffers(facts: PostureFacts): Offer[] {
-  return commandFamilies(facts.manifests ?? [], facts.scripts).map((family) => ({
+  return commandFamilies(facts.manifests ?? [], facts.scripts, facts.runners).map((family) => ({
     rule: allow("bash", family.command),
     scope: "workspace",
     reason: family.reason,

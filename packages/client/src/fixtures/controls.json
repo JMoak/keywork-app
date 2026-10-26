@@ -53,11 +53,12 @@
   "context": {
     "status": 200,
     "body": {
-      "used": 13,
+      "used": 1878,
       "window": 200000,
-      "flushAt": 175424,
-      "compactAt": 183616,
+      "flushAt": 177289,
+      "compactAt": 185481,
       "declared": false,
+      "basis": "estimated",
       "parts": {
         "system": {
           "tokens": 137,
@@ -84,10 +85,9 @@
         "flushAt": 177289,
         "compactAt": 185481
       },
-      "fullness": 0.00007079993028929941,
+      "fullness": 0.01012502628301551,
       "flushDue": false,
-      "compactionDue": false,
-      "basis": "estimated"
+      "compactionDue": false
     }
   },
   "cost": {
@@ -118,20 +118,6 @@
             "meteredTurns": 0,
             "unpricedTurns": 1
           }
-        },
-        {
-          "reference": "mock/beta",
-          "turns": 0,
-          "usage": {
-            "inputTokens": 0,
-            "outputTokens": 0
-          },
-          "rollup": {
-            "nanos": 0,
-            "pricedTurns": 0,
-            "meteredTurns": 0,
-            "unpricedTurns": 0
-          }
         }
       ],
       "basis": "no pricing for beta"
@@ -141,7 +127,7 @@
     "status": 200,
     "body": {
       "prompt": {
-        "entryId": "q6",
+        "entryId": "q1",
         "text": "turn on the lights"
       },
       "filesNote": "files untouched",
@@ -196,7 +182,13 @@
           "messageCount": 0,
           "model": "mock/beta",
           "thinking": true,
-          "effort": "high"
+          "effort": "high",
+          "live": true,
+          "working": false,
+          "waiting": {
+            "asks": 0,
+            "tools": []
+          }
         }
       ]
     }

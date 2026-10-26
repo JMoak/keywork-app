@@ -78,8 +78,17 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
       lossListeners.add(listener);
       return () => lossListeners.delete(listener);
     },
+    onServerRegained: () => () => {},
     openExternal: async (url) => {
       window.open(url, "_blank", "noopener");
+    },
+    openInEditor: async () => {
+      throw new Error("the browser host has no editor to open · the desktop app does");
+    },
+    writeClipboard: (text) => navigator.clipboard.writeText(text),
+    watchKeybindings: (_scope, listener) => {
+      listener({ kind: "read", layers: [] });
+      return () => {};
     },
     notify: async (notice) => {
       console.info(`[notify] ${notice.title}: ${notice.body}`, notice.trigger);

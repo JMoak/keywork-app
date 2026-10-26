@@ -1,6 +1,6 @@
-{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"turn.started","payload":{"userText":"look around"}}
-{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"undoable":false,"redoable":false}}
+{"id":1,"ts":"2026-09-07T12:00:00.250Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":null,"quiet":false,"undoable":false,"redoable":false}}
+{"id":2,"ts":"2026-09-07T12:00:00.500Z","sessionId":"s1","type":"turn.started","payload":{"userText":"look around","entryId":"q1"}}
 {"id":3,"ts":"2026-09-07T12:00:00.750Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"text","text":"The tree is small."}}}
 {"id":4,"ts":"2026-09-07T12:00:01.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":12,"outputTokens":5}}}}
 {"id":5,"ts":"2026-09-07T12:00:01.250Z","sessionId":"s1","type":"turn.completed","payload":{"message":{"role":"assistant","parts":[{"type":"text","text":"The tree is small."}]},"usage":{"inputTokens":12,"outputTokens":5}}}
-{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q1","undoable":true,"redoable":false}}
+{"id":6,"ts":"2026-09-07T12:00:01.500Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q2","quiet":false,"undoable":true,"redoable":false}}

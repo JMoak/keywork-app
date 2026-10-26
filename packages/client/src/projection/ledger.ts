@@ -7,7 +7,12 @@ import type {
   Usage,
 } from "@keywork-app/protocol";
 import type { ChangesState } from "./changes.ts";
-import type { SessionProjection, TranscriptEntry, UserEntry } from "./types.ts";
+import {
+  type SessionProjection,
+  summaryKindOf,
+  type TranscriptEntry,
+  type UserEntry,
+} from "./types.ts";
 
 export interface TranscriptLedger {
   readonly opening: readonly PathMark[];
@@ -35,6 +40,7 @@ export interface PathTurn {
   readonly text: string;
   readonly costUsd: number | undefined;
   readonly marks: readonly PathMark[];
+  readonly files?: readonly ChangedPath[] | undefined;
 }
 
 export interface PathMark {
@@ -103,14 +109,14 @@ interface TurnSpan {
 }
 
 function settledTurns(projection: SessionProjection): TurnSpan[] {
-  const heads = projection.entries.flatMap((entry, head) =>
-    entry.kind === "user" ? [{ head, prompt: entry }] : [],
+  const voices = projection.entries.flatMap((entry, at) =>
+    entry.kind === "user" ? [{ at, prompt: entry }] : [],
   );
-  const spans = heads.map(({ head, prompt }, at) => ({
-    head,
-    end: (heads[at + 1]?.head ?? projection.entries.length) - 1,
-    prompt,
-  }));
+  const spans = voices.flatMap(({ at, prompt }, index) =>
+    summaryKindOf(projection, prompt) === undefined
+      ? [{ head: at, end: (voices[index + 1]?.at ?? projection.entries.length) - 1, prompt }]
+      : [],
+  );
   return projection.turn === undefined ? spans : spans.slice(0, -1);
 }
 
@@ -144,7 +150,7 @@ function turnLedger(
     head: span.head,
     end: span.end,
     place,
-    files: place === undefined ? undefined : filesOfTurn(changes, place.turn),
+    files: place === undefined ? undefined : (place.files ?? filesOfTurn(changes, place.turn)),
     toolMs: toolTime(entries.slice(span.head, span.end + 1)),
     costUsd: place?.costUsd,
   };
@@ -170,6 +176,7 @@ interface OpenTurn {
   readonly marks: PathMark[];
   readonly usages: (Usage | undefined)[];
   leafId: string;
+  files: ChangedPath[] | undefined;
 }
 
 function readPath(snapshot: SessionEntries): PathReading {
@@ -183,6 +190,8 @@ function readPath(snapshot: SessionEntries): PathReading {
       else if (open !== undefined) followMessage(open, entry);
       continue;
     }
+    const facts = frozenFilesOf(entry);
+    if (facts !== undefined && open !== undefined) open.files = facts;
     const mark = markOf(entry, byId, snapshot.leafId);
     if (mark !== undefined) (open?.marks ?? opening).push(mark);
   }
@@ -190,7 +199,7 @@ function readPath(snapshot: SessionEntries): PathReading {
 }
 
 function openedBy(prompt: MessageEntry, turn: number): OpenTurn {
-  return { turn, prompt, marks: [], usages: [], leafId: prompt.id };
+  return { turn, prompt, marks: [], usages: [], leafId: prompt.id, files: undefined };
 }
 
 function followMessage(open: OpenTurn, entry: MessageEntry): void {
@@ -206,6 +215,9 @@ function closedTurn(open: OpenTurn): PathTurn {
     text: promptText(open.prompt),
     costUsd: pricedTotal(open.usages),
     marks: open.marks,
+    ...(open.files !== undefined && {
+      files: open.files.map((file) => ({ ...file, turn: open.turn })),
+    }),
   };
 }
 
@@ -221,6 +233,21 @@ function pricedTotal(usages: readonly (Usage | undefined)[]): number | undefined
     total += usage.costUsd;
   }
   return total;
+}
+
+function frozenFilesOf(entry: SessionEntry): ChangedPath[] | undefined {
+  if (entry.type !== "custom" || entry.customType !== "turn_facts") return undefined;
+  const files = fieldOf(entry.data, "files");
+  return Array.isArray(files) ? files.filter(isChangedPath) : undefined;
+}
+
+function isChangedPath(value: unknown): value is ChangedPath {
+  const file = value as Partial<ChangedPath> | null;
+  return (
+    typeof file?.path === "string" &&
+    typeof file.added === "number" &&
+    typeof file.deleted === "number"
+  );
 }
 
 function markOf(

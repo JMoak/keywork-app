@@ -1,6 +1,14 @@
 import type { EffortLevel } from "./controls.ts";
-import type { Message, MessagePart, ToolPreview, Usage } from "./events.ts";
+import type {
+  Message,
+  MessagePart,
+  QueuedPrompt,
+  SpillReference,
+  ToolPreview,
+  Usage,
+} from "./events.ts";
 import type { AskRefusal, PermissionRule } from "./permissions.ts";
+import type { FileSlice } from "./workspace.ts";
 
 export interface SessionSummary {
   id: string;
@@ -16,13 +24,58 @@ export interface SessionSummary {
   bot?: string;
 }
 
+export interface SessionRow extends SessionSummary {
+  live?: boolean;
+  working?: boolean;
+  waiting?: WaitingAsks;
+  changes?: ChangesSummary;
+}
+
+export interface WaitingAsks {
+  asks: number;
+  tools: readonly string[];
+}
+
+export interface ChangesSummary {
+  files: number;
+  added: number;
+  deleted: number;
+}
+
 export interface SessionDetail extends SessionSummary {
   cwd: string;
   live: boolean;
   asOf: number;
   messages: readonly Message[];
+  summaries?: readonly SummaryMark[];
+  flushes?: readonly FlushMark[];
+  edits?: readonly ContextEditMark[];
   parentSession?: string;
   forkedFrom?: ForkOrigin;
+}
+
+export type SummaryKind = "compaction" | "branch_summary";
+
+export interface SummaryMark {
+  index: number;
+  entryId: string;
+  kind: SummaryKind;
+}
+
+export interface FlushMark {
+  index: number;
+  entryId: string;
+  facts: readonly string[];
+}
+
+export type ContextEditKind = "forgotten" | "rewritten";
+
+export interface ContextEditMark {
+  index: number;
+  entryId: string;
+  role: Message["role"];
+  kind: ContextEditKind;
+  text: string;
 }
 
 export interface ForkOrigin {
@@ -31,6 +84,24 @@ export interface ForkOrigin {
 }
 
 export type PromptOutcome = "started" | "queued" | "missing";
+
+export type SetAsideReading = readonly QueuedPrompt[] | "missing";
+
+export interface QueueReport {
+  queued: readonly QueuedPrompt[];
+}
+
+export type QueueRefusal = "missing" | "unknown-item" | "out-of-range" | "crosses-steer";
+
+export type QueueMoveReading = QueueReport | QueueRefusal;
+
+export type QueueCancelReading = QueueReport | Extract<QueueRefusal, "missing" | "unknown-item">;
+
+export interface SpillSlice extends Omit<FileSlice, "path"> {
+  spill: SpillReference;
+}
+
+export type SpillReading = SpillSlice | "missing" | "gone" | "binary";
 
 export interface PromptInjection {
   text: string;
@@ -64,6 +135,7 @@ export interface SessionEntries {
   entries: readonly SessionEntry[];
   labels: Readonly<Record<string, string>>;
   activePath: readonly string[];
+  journal?: readonly string[];
 }
 
 export interface FileTrackingDetails {

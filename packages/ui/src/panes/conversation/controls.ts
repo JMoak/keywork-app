@@ -118,15 +118,11 @@ export function isSettled<Reading>(
   return reading !== "missing" && !isControlRefusal(reading);
 }
 
-export function exportedNotice(page: string, copied: boolean, saved: SaveOutcome): string {
-  const clipboard = copied
-    ? `copied to the clipboard · ${kilobytes(new TextEncoder().encode(page).length)} of html`
-    : "the clipboard refused it";
-  if (saved.saved) return `session page saved to ${saved.path} · ${clipboard}`;
-  const save = saved.refused === "cancelled" ? "save cancelled" : saved.detail;
-  return copied
-    ? `session page ${clipboard} · ${save}`
-    : `${save} and the clipboard refused the page · export-file writes it into the workspace`;
+export function exportedNotice(page: string, saved: SaveOutcome): string {
+  const size = kilobytes(new TextEncoder().encode(page).length);
+  if (saved.saved) return `session page saved to ${saved.path} · ${size}`;
+  if (saved.refused === "cancelled") return "export cancelled · nothing was written";
+  return `${saved.detail} · export-file writes the page into the workspace instead`;
 }
 
 export function pageNameFor(title: string | undefined): string {

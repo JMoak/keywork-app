@@ -30,6 +30,7 @@ export interface SupervisorSeams {
   freePort(): Promise<number>;
   fetchDocument(ticket: ServerTicket): Promise<ServerDocument>;
   platform: NodeJS.Platform;
+  giveUpAfter?: Delay | undefined;
 }
 
 export interface ServeSpec {
@@ -45,7 +46,9 @@ export type ServeFailure =
   | { kind: "failed"; exitCode: number | null; detail: string }
   | { kind: "unreachable"; ticket: ServerTicket; detail: string }
   | { kind: "version-mismatch"; expected: string; actual: string; ticket: ServerTicket }
-  | { kind: "no-ticket"; detail: string };
+  | { kind: "no-ticket"; detail: string }
+  | { kind: "silent"; waitedMs: number; detail: string }
+  | { kind: "gone"; url: string };
 
 export type ServeStart =
   | { ok: true; ticket: ServerTicket; version: string; pid: number }
@@ -54,7 +57,7 @@ export type ServeStart =
 export type ServeState =
   | { kind: "starting"; attempt: number }
   | { kind: "ready"; ticket: ServerTicket; version: string; pid: number }
-  | { kind: "failed"; failure: ServeFailure }
+  | { kind: "failed"; failure: ServeFailure; retrying?: boolean }
   | { kind: "stopped" };
 
 export interface ServerProcess {
@@ -65,6 +68,8 @@ export interface ServerProcess {
 }
 
 export const killGraceMs = 2000;
+
+export const announceWithinMs = 30_000;
 
 export function superviseServer(spec: ServeSpec, seams: SupervisorSeams): ServerProcess {
   const listeners = new Set<(state: ServeState) => void>();
@@ -88,10 +93,14 @@ export function superviseServer(spec: ServeSpec, seams: SupervisorSeams): Server
     );
     child = running;
     const stderr = collect(running.stderr);
-    const outcome = await Promise.race([
+    const patience = new AbortController();
+    const announced = await Promise.race([
       awaitTicket(running.stdout),
       running.exited.then(async (code) => exitFailure(code, await stderr, port)),
+      silence(seams, patience.signal),
     ]);
+    patience.abort();
+    const outcome = announced === "silent" ? await giveUp(running, stderr, seams) : announced;
     if (!outcome.ok) {
       enter({ kind: "failed", failure: outcome.failure });
       return outcome;
@@ -120,7 +129,8 @@ export function superviseServer(spec: ServeSpec, seams: SupervisorSeams): Server
   ): Promise<void> => {
     if (stopping || child !== exited) return;
     restarts += 1;
-    enter({ kind: "failed", failure: exitFailureOf(code, await stderr, undefined) });
+    const failure = exitFailureOf(code, await stderr, undefined);
+    enter({ kind: "failed", failure, retrying: true });
     await seams.delay(reconnectDelayMs(restarts - 1));
     if (!stopping) await launch(restarts);
   };
@@ -236,6 +246,28 @@ async function terminate(child: ChildHandle, seams: SupervisorSeams): Promise<vo
   }
 }
 
+function silence(seams: SupervisorSeams, patience: AbortSignal): Promise<"silent"> {
+  const giveUpAfter = seams.giveUpAfter;
+  if (giveUpAfter === undefined) return never();
+  return giveUpAfter(announceWithinMs, patience).then(() =>
+    patience.aborted ? never() : "silent",
+  );
+}
+
+async function giveUp(
+  running: ChildHandle,
+  stderr: Promise<string>,
+  seams: SupervisorSeams,
+): Promise<ServeStart> {
+  await terminate(running, seams);
+  const detail = (await stderr).trim();
+  return { ok: false, failure: { kind: "silent", waitedMs: announceWithinMs, detail } };
+}
+
+function never<T>(): Promise<T> {
+  return new Promise<T>(() => undefined);
+}
+
 async function awaitTicket(stdout: AsyncIterable<string>): Promise<ServeStart> {
   const lines: ServeLine[] = [];
   for await (const chunk of stdout) {
@@ -246,7 +278,7 @@ async function awaitTicket(stdout: AsyncIterable<string>): Promise<ServeStart> {
       if (ticket !== undefined) return { ok: true, ticket, version: "", pid: 0 };
     }
   }
-  return new Promise<ServeStart>(() => undefined);
+  return never();
 }
 
 function exitFailure(code: number | null, stderr: string, port: number): ServeStart {

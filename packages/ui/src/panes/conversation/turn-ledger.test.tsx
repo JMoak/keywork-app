@@ -32,8 +32,8 @@ import {
 afterEach(cleanup);
 
 const stream = parseJsonl(restoredStream);
-const twoTurns = stream.filter((envelope) => envelope.id <= 17);
-const afterRestore = stream.filter((envelope) => envelope.id >= 18 && envelope.id <= 22);
+const twoTurns = stream.filter((envelope) => envelope.id <= 18);
+const afterRestore = stream.filter((envelope) => envelope.id >= 19 && envelope.id <= 22);
 const afterRedo = stream.filter((envelope) => envelope.id === 23);
 const recordedLog = recordedRestore.entries.body as SessionEntries;
 const restored = recordedRestore.restored.body as TurnRestored;
@@ -43,10 +43,10 @@ type Phase = "before" | "restored" | "redone";
 const logs: Readonly<Record<Phase, SessionEntries>> = {
   before: {
     ...recordedLog,
-    leafId: "q2",
-    activePath: recordedLog.activePath.filter((id) => id !== "q4"),
+    leafId: "q4",
+    activePath: recordedLog.activePath.filter((id) => id !== "q6"),
   },
-  restored: { ...recordedLog, leafId: "q3", activePath: ["q6", "q3"] },
+  restored: { ...recordedLog, leafId: "q5", activePath: ["q5"] },
   redone: recordedLog,
 };
 
@@ -245,7 +245,7 @@ describe("the turn ledger in a live conversation", () => {
         "the restore to before turn 1 was taken back",
       ),
     );
-    expect(ledgerLines()).toEqual(["turn 1 · 1 file · +2 −0", "turn 2"]);
+    expect(ledgerLines()).toEqual(["turn 1 · 1 file · +2 −0 · 500ms in tools", "turn 2"]);
   });
 
   it("leaves everything as it was when the restore is declined", async () => {
@@ -275,7 +275,7 @@ describe("the turn ledger in a live conversation", () => {
     const { server, opened } = await mounted();
     fireEvent.keyDown(ledgerOf(1), { key: "f" });
     await waitFor(() => expect(opened).toEqual(["s9"]));
-    expect(server.sent).toEqual(["fork s1 at q1"]);
+    expect(server.sent).toEqual(["fork s1 at q10"]);
     expect(said()).toEqual([forkedNotice(1)]);
   });
 
@@ -286,9 +286,9 @@ describe("the turn ledger in a live conversation", () => {
     fireEvent.keyDown(confirmLine() as HTMLElement, { key: "n" });
     fireEvent.focus(ledgerOf(1));
     act("conversation.fork-turn");
-    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q1"]));
+    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q10"]));
     act("conversation.fork-turn");
-    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q1", "fork s1 at q2"]));
+    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q10", "fork s1 at q11"]));
   });
 });
 

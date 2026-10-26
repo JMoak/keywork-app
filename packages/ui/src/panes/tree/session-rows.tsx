@@ -1,12 +1,27 @@
 import type { ChildLineage } from "@keywork-app/client";
 import { Show } from "solid-js";
+import { stampGlyph } from "../../chrome/stamp.ts";
 import { relativeAge } from "../../chrome/telemetry.ts";
-import { foldedLine, parentLine, type SessionRow } from "./rows.ts";
+import { keepInView } from "../overview/rows.tsx";
+import {
+  type ChangesFacts,
+  foldedLine,
+  type Liveness,
+  parentLine,
+  type SessionRow,
+} from "./rows.ts";
+
+export const livenessMarks: Readonly<Record<Liveness, string>> = {
+  waiting: stampGlyph("needs-you"),
+  working: "▓",
+  idle: "░",
+};
 
 export interface SessionRowProps {
   row: SessionRow;
   name: string;
-  mark: string;
+  liveness: Liveness;
+  changes: ChangesFacts | undefined;
   wears: string | undefined;
   cost: string | undefined;
   current: boolean;
@@ -18,16 +33,25 @@ export interface SessionRowProps {
 export function SessionRowView(props: SessionRowProps) {
   return (
     <li
+      ref={(row) => keepInView(row, () => props.cursor)}
       class="kw-tree-session"
       data-current={props.current ? "" : undefined}
       data-cursor={props.cursor ? "" : undefined}
     >
       <button type="button" class="kw-tree-row" onClick={() => props.onOpen()}>
-        <span class="kw-tree-mark" aria-hidden="true">
-          {props.mark}
+        <span class="kw-tree-mark" aria-hidden="true" data-liveness={props.liveness}>
+          {livenessMarks[props.liveness]}
         </span>
         <span class="kw-tree-title">
           <span class="kw-tree-name">{props.name}</span>
+          <Show when={props.changes}>
+            {(changes) => (
+              <span class="kw-tree-changes">
+                <span class="kw-tree-files">{changes().files} · </span>
+                {changes().counts}
+              </span>
+            )}
+          </Show>
           <Show when={props.row.folded}>
             <span class="kw-tree-folded">{foldedLine(props.row.children)}</span>
           </Show>
@@ -66,6 +90,7 @@ export interface ChildRowProps {
 export function ChildRowView(props: ChildRowProps) {
   return (
     <li
+      ref={(row) => keepInView(row, () => props.cursor)}
       class="kw-tree-session"
       data-child=""
       data-current={props.current ? "" : undefined}

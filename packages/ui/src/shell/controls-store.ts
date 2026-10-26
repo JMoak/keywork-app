@@ -10,6 +10,8 @@ import {
   type EffortReading,
   type ExportReading,
   type ExportRequest,
+  type FlushReading,
+  type ForgetReading,
   isControlRefusal,
   isPresetName,
   type ModelReading,
@@ -37,6 +39,8 @@ export type ControlsClient = Pick<
   | "cost"
   | "exportSession"
   | "rename"
+  | "flush"
+  | "forget"
   | "applyPreset"
 >;
 
@@ -71,6 +75,8 @@ export interface ControlsStore {
   redo(id: string): Promise<RedoReading>;
   restoreTurn(id: string, turn: number): Promise<TurnRestoreReading>;
   rename(id: string, title: string): Promise<RenameReading>;
+  flush(id: string): Promise<FlushReading>;
+  forget(id: string, entryId: string, replacement?: string): Promise<ForgetReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
   setPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
   dispose(): void;
@@ -151,6 +157,7 @@ export function createControlsStore(
     models: () =>
       unique([
         ...seams.knownModels().filter((model): model is string => model !== undefined),
+        ...Object.values(state.readings).flatMap(modelsThatRan),
         ...state.learnedModels,
       ]),
     setModel: async (id, reference) => {
@@ -177,6 +184,14 @@ export function createControlsStore(
         await seams.reload(id);
       }),
     rename: (id, title) => client.rename(id, title),
+    flush: (id) =>
+      whenAnswered(client.flush(id), async () => {
+        await Promise.all([seams.reload(id), refreshReadings(id)]);
+      }),
+    forget: (id, entryId, replacement) =>
+      whenAnswered(client.forget(id, entryId, replacement), async () => {
+        await Promise.all([seams.reload(id), refreshReadings(id)]);
+      }),
     exportSession: (id, request) => client.exportSession(id, request),
     setPreset: async (name, confirmed) => {
       const reading = await client.applyPreset(name, confirmed);
@@ -214,6 +229,10 @@ interface MutableControlsState {
 
 function refetchesReadings(envelope: BusEnvelope): boolean {
   return envelope.type === "turn.completed" || envelope.type === "session.state";
+}
+
+function modelsThatRan(readings: SessionReadings): string[] {
+  return readings.cost?.models.map((model) => model.reference) ?? [];
 }
 
 function unique(values: readonly string[]): string[] {

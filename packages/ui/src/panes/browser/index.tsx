@@ -84,8 +84,13 @@ export const browserPane = definePane<BrowserSpec>({
     },
     "browser.filter": {
       chords: "/",
-      help: "filter by name",
+      help: "filter by name · : lists this pane's commands",
       command: { name: "files-filter", description: "filter the loaded entries by name" },
+    },
+    "browser.editor": {
+      chords: "o",
+      help: "open the entry in your editor",
+      command: { name: "files-editor", description: "open this file or folder in your editor" },
     },
     "browser.refresh": {
       chords: "r",
@@ -197,6 +202,9 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
     setFiltering(false);
     filterInput?.blur();
   };
+  const openInEditor = (row: BrowserRow | undefined): void => {
+    if (row !== undefined) void props.shell.openInEditor?.(row.path).catch(() => undefined);
+  };
 
   props.onAction((action) => {
     switch (action) {
@@ -216,6 +224,8 @@ function BrowserSlot(props: PaneProps<BrowserSpec>) {
         return setTree(toggleHidden);
       case "browser.filter":
         return startFiltering();
+      case "browser.editor":
+        return openInEditor(current());
       case "browser.refresh":
         return setTree(forgetListings);
     }

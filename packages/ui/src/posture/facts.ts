@@ -1,12 +1,19 @@
 import type { KeyworkClient } from "@keywork-app/client";
 import type { McpServerStatus, PermissionsView } from "@keywork-app/protocol";
-import { isManifest, packageManifest, scriptsOfPackage } from "./toolchains.ts";
+import {
+  isManifest,
+  packageManifest,
+  runnersOfPackage,
+  type ScriptRunner,
+  scriptsOfPackage,
+} from "./toolchains.ts";
 
 export interface PostureFacts {
   readonly permissions: PermissionsView;
   readonly version: string | undefined;
   readonly manifests: readonly string[] | undefined;
   readonly scripts: readonly string[];
+  readonly runners: readonly ScriptRunner[];
   readonly mcp: readonly McpServerStatus[] | undefined;
   readonly bots: readonly string[] | undefined;
   readonly unread: readonly string[];
@@ -25,14 +32,15 @@ export async function readPostureFacts(client: FactsClient): Promise<PostureFact
     attempt("the mcp servers", () => enabledMcpServers(client)),
     attempt("the bots", async () => (await client.bots()).map((bot) => bot.name)),
   ]);
-  const scripts: Attempted<string[]> = manifests.value?.includes(packageManifest)
+  const scripts: Attempted<PackageScripts> = manifests.value?.includes(packageManifest)
     ? await attempt(`the ${packageManifest} scripts`, () => packageScripts(client))
-    : { value: [] };
+    : { value: noScripts };
   return {
     permissions,
     version: version.value,
     manifests: manifests.value,
-    scripts: scripts.value ?? [],
+    scripts: scripts.value?.names ?? [],
+    runners: scripts.value?.runners ?? [],
     mcp: mcp.value,
     bots: bots.value,
     unread: [version, manifests, scripts, mcp, bots].flatMap((reading) =>
@@ -63,10 +71,17 @@ async function rootManifests(client: FactsClient): Promise<string[]> {
     .sort();
 }
 
-async function packageScripts(client: FactsClient): Promise<string[]> {
+interface PackageScripts {
+  readonly names: readonly string[];
+  readonly runners: readonly ScriptRunner[];
+}
+
+const noScripts: PackageScripts = { names: [], runners: [] };
+
+async function packageScripts(client: FactsClient): Promise<PackageScripts> {
   const file = await client.file(packageManifest);
   if (typeof file === "string") throw new Error(`the server answers ${file}`);
-  return scriptsOfPackage(file.text);
+  return { names: scriptsOfPackage(file.text), runners: runnersOfPackage(file.text) };
 }
 
 async function enabledMcpServers(client: FactsClient): Promise<McpServerStatus[]> {

@@ -4,6 +4,7 @@ import type {
   AskScope,
   AskVerdict,
   BusEnvelope,
+  DenyReason,
   PermissionRule,
   SessionSummary,
 } from "@keywork-app/protocol";
@@ -12,17 +13,21 @@ import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { appActions } from "../../keys/actions.ts";
 import { keymapFromConfig } from "../../keys/index.ts";
+import { stopAskingWhy, whyLine } from "../../page/ask-card-why.ts";
 import { type NeedsYouItem, orderNeedsYou } from "../../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../../shell/needs-you-queue.ts";
 import { airlockItem, askItem, failedItem, inboxItem } from "../../shell/needs-you-testing.ts";
-import { createQuietSessions } from "../../shell/quiet.ts";
+import type { QuietPosture } from "../../shell/quiet.ts";
 import { createSessionReads } from "../../shell/session-reads.ts";
 import { keyworkNight, themeNamed } from "../../theme/index.ts";
 import { mountPane, overviewShell } from "../overview/rows.test.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { needsYouPane } from "./index.tsx";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  stopAskingWhy("c1");
+});
 
 describe("the desk", () => {
   it("groups every session by what it wants: needs you, working, back, quiet", () => {
@@ -87,10 +92,15 @@ describe("the desk", () => {
     expect(desk.answered).toEqual([["c1", "granted", "session"]]);
     act("needs-you.deny");
     await settle();
-    expect(desk.answered.at(-1)).toEqual(["c1", "denied", undefined]);
+    expect(desk.answered).toHaveLength(1);
+    expect(answers(container)).toEqual(["unsafe u", "not now n", "other o"]);
+    expect(lineText(container)).toBe(whyLine);
+    fireEvent.keyDown(container.querySelector(".kw-desk-row") as Element, { key: "u" });
+    await settle();
+    expect(desk.answered.at(-1)).toEqual(["c1", "denied", undefined, "unsafe"]);
   });
 
-  it("honours the session's quiet posture: y grants for the session, o stays once", async () => {
+  it("keeps its keys in a quiet session: y and o both grant once, the gate grants the rest", async () => {
     const desk = deskHarness({
       waiting: [askItem("c1", { sessionId: "trash" })],
       summaries: [summary("trash", "fix the flaky trash test")],
@@ -99,12 +109,12 @@ describe("the desk", () => {
     });
     const { container, act } = mount(desk);
     expect(container.querySelector(".kw-desk-quiet")?.textContent).toBe("»");
-    expect(answers(container)).toEqual(["this session y", "once o", "this workspace w", "deny n"]);
+    expect(answers(container)).toEqual(["once y", "this session s", "this workspace w", "deny n"]);
     act("needs-you.approve");
     act("needs-you.once");
     await settle();
     expect(desk.answered).toEqual([
-      ["c1", "granted", "session"],
+      ["c1", "granted", undefined],
       ["c1", "granted", undefined],
     ]);
   });
@@ -277,6 +287,10 @@ describe("the desk's keys", () => {
   });
 });
 
+type Answered =
+  | [string, AskVerdict, AskScope | undefined]
+  | [string, AskVerdict, AskScope | undefined, DenyReason];
+
 interface DeskStaging {
   waiting?: NeedsYouItem[];
   summaries?: SessionSummary[];
@@ -302,9 +316,9 @@ function deskHarness(staging: DeskStaging) {
     const jumped: string[] = [];
     const visited: string[] = [];
     const opened: string[] = [];
-    const answered: [string, AskVerdict, AskScope | undefined][] = [];
-    const quiet = createQuietSessions();
-    for (const id of staging.quiet ?? []) quiet.toggle(id);
+    const answered: Answered[] = [];
+    const quietIds = staging.quiet ?? [];
+    const quiet: QuietPosture = { has: (id) => id !== undefined && quietIds.includes(id) };
     const base = overviewShell({ summaries }).shell;
     const queue: NeedsYouQueue = {
       items,
@@ -337,8 +351,11 @@ function deskHarness(staging: DeskStaging) {
         callId: string,
         verdict: AskVerdict,
         scope?: AskScope,
+        reason?: DenyReason,
       ): Promise<AnswerOutcome> => {
-        answered.push([callId, verdict, scope]);
+        answered.push(
+          reason === undefined ? [callId, verdict, scope] : [callId, verdict, scope, reason],
+        );
         return staging.refuse === undefined
           ? "settled"
           : { refused: "nothing-to-remember", detail: staging.refuse };

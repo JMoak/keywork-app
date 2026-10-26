@@ -22,19 +22,24 @@ import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { readingMs } from "../chrome/reading-time.ts";
 import { gapCells } from "../chrome/root-attributes.ts";
 import { StatusLine } from "../chrome/status-line.tsx";
 import { telemetry } from "../chrome/telemetry.ts";
+import { createUpdateOffer, updateCommands } from "../chrome/update-offer.ts";
 import { followActivations } from "../host/activation.ts";
-import type { HostPort } from "../host/port.ts";
+import { openInEditorWith } from "../host/editor.ts";
+import { describeFailure, type HostPort } from "../host/port.ts";
 import {
   type ActionTarget,
+  actionScopes,
   appActions,
   bindingHelp,
   chordsOfKey,
   type Keymap,
   keymapFromConfig,
 } from "../keys/index.ts";
+import { createLiveKeymap, followKeybindings, foreignActionsLine } from "../keys/live.ts";
 import { keyFocusOf } from "../keys/typing.ts";
 import {
   type DropZone,
@@ -49,18 +54,27 @@ import {
   type Verdict,
 } from "../layout/index.ts";
 import type { AskPick } from "../page/ask-card.tsx";
-import { CommandRegistry } from "../palette/commands.ts";
-import { markCommands } from "../palette/mark-commands.ts";
-import { HelpOverlay, helpRows, Palette } from "../palette/palette.tsx";
-import { fileUrlOf } from "../panes/file/range.ts";
+import { actionCommand } from "../palette/action-commands.ts";
+import { CommandRegistry, type CommandSpec } from "../palette/commands.ts";
+import { markCommand } from "../palette/mark-commands.ts";
+import { HelpOverlay, helpSections, Palette } from "../palette/palette.tsx";
+import { PaneTray } from "../palette/pane-tray.tsx";
+import {
+  botJumps,
+  type SurfaceCommandSeams,
+  surfaceCommands,
+} from "../palette/surface-commands.ts";
 import {
   definitionOf,
   type PaneDefinition,
+  type PaneKind,
   type PaneSpec,
   parsePaneSpec,
   type ShellSeams,
 } from "../panes/index.ts";
 import { returnKeyboardHome } from "../panes/keyboard-home.ts";
+import { workingSession } from "../panes/overview/working-session.ts";
+import type { PaneActionHandler } from "../panes/registry.ts";
 import { postureStorageKey } from "../posture/record.ts";
 import { createTrustSetup, followTrustArrival } from "../posture/trust-setup.ts";
 import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts";
@@ -70,7 +84,15 @@ import { createPaneMarks } from "./marks.ts";
 import { createJumps, type NeedsYouPlace } from "./needs-you-jumps.ts";
 import type { NeedsYouQueue } from "./needs-you-queue.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
-import { createQuietSessions, toggleSessionQuiet } from "./quiet.ts";
+import { toggleSessionQuiet } from "./quiet.ts";
+import {
+  backNotice,
+  isLost,
+  reconnectCommand,
+  type ServerStanding,
+  serverUp,
+  standingLine,
+} from "./server-standing.ts";
 import { createSessionReads } from "./session-reads.ts";
 import type { SessionStore } from "./session-store.ts";
 import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
@@ -85,18 +107,28 @@ export interface WorkspaceViewProps {
   client: KeyworkClient;
   feed: ServerFeed;
   needsYou: NeedsYouQueue;
+  attached?: boolean | undefined;
+  standing?: ServerStanding | undefined;
   keymap?: Keymap | undefined;
   storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
 }
 
-type Overlay = { kind: "palette"; query: string | undefined } | { kind: "help" } | undefined;
+type Overlay =
+  | { kind: "palette"; query: string | undefined; scope: PaneKind | undefined }
+  | { kind: "help" }
+  | { kind: "tray"; pane: PaneId; commands: readonly CommandSpec[] }
+  | undefined;
 
 export function WorkspaceView(props: WorkspaceViewProps) {
   const storage = props.storage ?? localStorageOrNone();
   const storageKey = `keywork.layout:${props.workspace}`;
   const tiler = createTiler(restoredState(storage, storageKey));
   const keymap = props.keymap ?? keymapFromConfig();
+  const live = createLiveKeymap(keymap);
+  const keys = live.keys;
   const registry = new CommandRegistry();
+  const update = createUpdateOffer(props.host);
+  registry.addSource(() => updateCommands(update));
   const wardrobe = createWardrobe({
     serverThemes: () => props.store.surfaces.state.themes,
     storage,
@@ -123,7 +155,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     onArcWorn: (slug, theme) => recordArcTheme(slug, theme),
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
-  const quiet = createQuietSessions();
+  const quiet = props.store.quiet;
   const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
@@ -135,13 +167,17 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const [leaderArmed, setLeaderArmed] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
-  const localHandlers = new Map<PaneId, (action: string) => void>();
+  const localHandlers = new Map<PaneId, PaneActionHandler>();
+  const awaitingHandlers = new Map<PaneId, () => void>();
   const [gestures, setGestures] = createSignal<PointerGestures>();
   let stage: HTMLDivElement | undefined;
 
   const say = (text: string): void => {
     setNotice(text);
-    setTimeout(() => setNotice((current) => (current === text ? undefined : current)), 2400);
+    setTimeout(
+      () => setNotice((current) => (current === text ? undefined : current)),
+      readingMs(text),
+    );
   };
   const recordArcTheme = async (slug: string, theme: string | null): Promise<void> => {
     const answer = await props.client.setArcTheme(slug, theme);
@@ -162,8 +198,32 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       await props.host.restartServer(props.workspace);
       await props.store.refresh();
     },
+    attached: () => props.attached === true,
+    composedTrusted: async () => (await props.client.permissions()).trusted,
+    say: (line) => say(line),
   });
   onCleanup(() => trust.dispose());
+  const standing = (): ServerStanding => props.standing ?? serverUp;
+  createEffect(
+    on(standing, (now, before) => {
+      if (before?.kind !== "lost" || now.kind !== "up") return;
+      say(backNotice(props.serverLabel));
+      void trust.refresh();
+      void props.store.refresh();
+    }),
+  );
+  const reconnect = async (): Promise<void> => {
+    say("looking for keywork serve again");
+    const reopened = await props.host.restartServer(props.workspace);
+    if (!reopened.ok) say(`still no keywork serve · ${describeFailure(reopened.failure)}`);
+  };
+  const projectTrusted = createMemo(() => trust.state().kind === "trusted");
+  createEffect(
+    on(projectTrusted, (trusted) => {
+      const scope = { workspace: props.workspace, projectTrusted: trusted };
+      onCleanup(followKeybindings(props.host, scope, live, say));
+    }),
+  );
   const trustSetup = createTrustSetup({
     client: props.client,
     storage,
@@ -232,20 +292,25 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         jumps.toPlace({ kind: "session", workspace: props.workspace, sessionId }),
       dressed: dressedSession,
     },
+    server: standing,
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.summon(parsed, screen()));
     },
     closePane: (paneId) => act(tiler.close(paneId)),
-    openInEditor: (path, line) =>
-      props.host.openExternal(fileUrlOf(props.workspace, path, line)).catch((cause: unknown) => {
+    openInEditor: async (path, line) => {
+      try {
+        say(await openInEditorWith(props.host, props.workspace, path, line));
+      } catch (cause) {
         say(cause instanceof Error ? cause.message : String(cause));
         throw cause;
-      }),
-    keys: {
-      chord: (action) => keymap.describe(action) ?? "an unbound key",
-      leader: () => keymap.leader,
+      }
     },
+    keys: {
+      chord: (action) => keys.describe(action) ?? "an unbound key",
+      leader: () => keys.leader(),
+    },
+    commands: registry,
     host: props.host,
     workspace: props.workspace,
     currentSession: focusedSession,
@@ -297,14 +362,13 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       }),
   });
   const answerFocusedAsk = (pick: AskPick): void => {
-    const answering = { store: props.store, quiet, approveKey: shell.keys.chord("ask.approve") };
+    const answering = { store: props.store, approveKey: shell.keys.chord("ask.approve") };
     void answerHeldAsk(answering, { sessionId: focusedSession() }, pick).then((line) => {
       if (line !== undefined) say(line);
     });
   };
   const toggleFocusedQuiet = async (): Promise<void> => {
     const chords = {
-      approve: shell.keys.chord("ask.approve"),
       quiet: shell.keys.chord("session.quiet"),
       permissions: shell.keys.chord("permissions.summon"),
     };
@@ -325,6 +389,32 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     marks.clear();
     say(count === 0 ? "no panes are marked" : `unmarked ${paneCount(count)}`);
   };
+  const deliverToPane = (paneId: PaneId, action: string, argument?: string): void => {
+    const handler = localHandlers.get(paneId);
+    if (handler !== undefined) handler(action, argument);
+    else awaitingHandlers.set(paneId, () => localHandlers.get(paneId)?.(action, argument));
+  };
+  const summonThen = (kind: PaneKind, action?: string, argument?: string): void => {
+    void summon(definitionOf(kind)).then(() => {
+      const pane = tiler.focused();
+      if (action === undefined || pane === undefined || tiler.spec(pane)?.kind !== kind) return;
+      deliverToPane(pane, action, argument);
+    });
+  };
+  const trays = new Map<PaneKind, readonly CommandSpec[]>();
+  const trayOf = (kind: PaneKind): readonly CommandSpec[] => {
+    const built = trays.get(kind) ?? registry.ownedBy(kind);
+    trays.set(kind, built);
+    return built;
+  };
+  const openPaneCommands = (): void => {
+    const pane = tiler.focused();
+    const spec = tiler.focusedSpec();
+    const commands = spec === undefined ? [] : trayOf(spec.kind);
+    if (pane !== undefined && commands.length > 0) setOverlay({ kind: "tray", pane, commands });
+    else if (spec === undefined) say("no pane is focused · nothing to list");
+    else say(`${paneTitle(spec)} has no commands of its own`);
+  };
 
   const target: ActionTarget = {
     closePane: () => act(tiler.closeFocused()),
@@ -337,17 +427,19 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     dockPane: (side) => act(tiler.dock(side, screen())),
     resizeDock: (delta) => act(tiler.resizeDock(delta, screen())),
     resizePane: (delta) => act(tiler.resizePane(delta, screen())),
-    summon: (kind, variant) => void summon(definitionOf(kind), variant),
-    paneAction: (action) => {
+    summon: (kind, argument) => void summon(definitionOf(kind), argument),
+    paneAction: (action, argument) => {
       const id = tiler.focused();
-      if (id !== undefined) localHandlers.get(id)?.(action);
+      if (id !== undefined) deliverToPane(id, action, argument);
     },
+    openPaneCommands,
     cycleMode: () => say("modes arrive with the server's mode route"),
     answerAsk: answerFocusedAsk,
     toggleQuiet: () => void toggleFocusedQuiet(),
     toggleHelp: () =>
       setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
-    openPalette: (query) => setOverlay({ kind: "palette", query }),
+    openPalette: (query) =>
+      setOverlay({ kind: "palette", query, scope: tiler.focusedSpec()?.kind }),
     trustWorkspace: () => void trust.accept(),
     toggleMark: toggleFocusedMark,
     clearMarks,
@@ -361,20 +453,39 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       say(
         strip.toggle()
           ? "needs-you strip shown"
-          : stripHiddenNotice(keymap.describe("needs-you.summon")),
+          : stripHiddenNotice(keys.describe("needs-you.summon")),
       ),
   };
 
   onCleanup(followActivations(props.host, { workspace: props.workspace, show: jumps.toTrigger }));
 
+  const surfaceSeams: SurfaceCommandSeams = {
+    store: props.store,
+    keys: shell.keys,
+    workingSession: workingSession(shell, focusedSession()),
+    summon: summonThen,
+    showBotSession: (name) => {
+      const pane = tiler.findPane(
+        (spec) => spec.kind === "conversation" && props.store.summary(spec.sessionId)?.bot === name,
+      );
+      if (pane !== undefined) act(tiler.focus(pane));
+      return pane !== undefined;
+    },
+    openSession: (sessionId) => shell.sessions.openSession(sessionId),
+    reopen: () => props.host.restartServer(props.workspace),
+    say,
+  };
   for (const [name, action] of Object.entries(appActions)) {
-    if (action.command === undefined) continue;
-    registry.register({
-      ...action.command,
-      shortcut: keymap.describe(name),
-      run: () => action.invoke(target),
-    });
+    const command = actionCommand(name, action, { shell, target, keys });
+    if (command !== undefined) registry.register(command);
   }
+  for (const command of surfaceCommands(surfaceSeams)) registry.register(command);
+  registry.register({
+    name: reconnectCommand,
+    description: "find keywork serve for this workspace again, or start one",
+    run: () => void reconnect(),
+  });
+  registry.addSource(() => botJumps(surfaceSeams));
   registry.addSource(() =>
     wardrobe.choices().map((choice) => ({
       name: `theme-${choice.name}`,
@@ -394,15 +505,20 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       run: () => act(tiler.focus(slot.id)),
     })),
   );
-  registry.addSource(() =>
-    markCommands(
-      tiler
-        .slots(screen())
-        .flatMap((slot) =>
-          attire.dressable(slot.id) ? [{ id: slot.id, title: titleOf(slot) }] : [],
-        ),
-      { marked: marks.has, toggle: (paneId) => say(toggleMark(paneId)) },
-    ),
+  registry.register(
+    markCommand({
+      panes: () =>
+        tiler
+          .slots(screen())
+          .flatMap((slot) =>
+            attire.dressable(slot.id) ? [{ id: slot.id, title: titleOf(slot) }] : [],
+          ),
+      marked: marks.has,
+      toggle: (paneId) => say(toggleMark(paneId)),
+      toggleFocused: toggleFocusedMark,
+      shortcut: () => keys.describe("pane.mark"),
+      say,
+    }),
   );
 
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -502,6 +618,21 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     tiler.focusedSpec()?.kind === "conversation"
       ? props.store.projection(focusedSession())
       : emptyProjection;
+  const trayIn = (pane: PaneId) => {
+    const open = overlay();
+    return open?.kind === "tray" && open.pane === pane ? open : undefined;
+  };
+  const paletteOpen = () => {
+    const open = overlay();
+    return open?.kind === "palette" ? open : undefined;
+  };
+  const helpFooter = (): string[] => {
+    const foreign = foreignActionsLine(keys.foreignActions());
+    return [
+      "rebind any of these in the keybindings section of ~/.keywork/keywork.json",
+      ...(foreign === undefined ? [] : [foreign]),
+    ];
+  };
 
   const PaneSlotView = (view: { slot: PaneSlot }) => {
     const slot = () => view.slot;
@@ -532,10 +663,22 @@ export function WorkspaceView(props: WorkspaceViewProps) {
             focused={slot().focused}
             shell={shell}
             onAction={(handler) => {
-              localHandlers.set(slot().id, handler);
-              onCleanup(() => localHandlers.delete(slot().id));
+              const id = slot().id;
+              localHandlers.set(id, handler);
+              awaitingHandlers.get(id)?.();
+              awaitingHandlers.delete(id);
+              onCleanup(() => localHandlers.delete(id));
             }}
           />
+          <Show when={trayIn(slot().id)}>
+            {(tray) => (
+              <PaneTray
+                paneName={titleOf(slot())}
+                commands={tray().commands}
+                onDismiss={() => setOverlay(undefined)}
+              />
+            )}
+          </Show>
         </PaneFrame>
       </div>
     );
@@ -557,7 +700,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         <Show when={tiler.emptyMain(screen())}>
           {(rect) => (
             <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
-              <p class="kw-empty">{keymap.describe("pane.split")} opens a session here</p>
+              <p class="kw-empty">{keys.describe("pane.split")} opens a session here</p>
               <Show when={props.store.state.summaries.length === 0}>
                 <FirstRun keys={shell.keys} />
               </Show>
@@ -601,37 +744,37 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         })}
       />
       <StatusLine
-        serverLabel={props.serverLabel}
+        serverLabel={standingLine(props.standing, props.serverLabel)}
+        serverLost={isLost(props.standing)}
         projection={focusedProjection()}
         usage={telemetry(focusedProjection(), props.store.controls.readings(focusedSession()).cost)}
         preset={props.store.controls.state.preset}
         trust={trustStatusItem(trust, shell.keys.chord("trust.workspace"))}
-        leader={leaderArmed() ? keymap.leader : undefined}
+        leader={leaderArmed() ? keys.leader() : undefined}
         notice={notice()}
         gap={props.store.state.gap}
         lost={props.store.state.lost}
+        update={update}
       />
-      <Show when={overlay()}>
-        {(open) => (
-          <Switch>
-            <Match when={open().kind === "palette"}>
-              <Palette
-                registry={registry}
-                initialQuery={
-                  open().kind === "palette" ? (open() as { query?: string }).query : undefined
-                }
-                onDismiss={() => setOverlay(undefined)}
-              />
-            </Match>
-            <Match when={open().kind === "help"}>
-              <HelpOverlay
-                rows={helpRows(keymap, bindingHelp)}
-                onDismiss={() => setOverlay(undefined)}
-              />
-            </Match>
-          </Switch>
-        )}
-      </Show>
+      <Switch>
+        <Match when={paletteOpen()}>
+          {(open) => (
+            <Palette
+              registry={registry}
+              scope={open().scope}
+              initialQuery={open().query}
+              onDismiss={() => setOverlay(undefined)}
+            />
+          )}
+        </Match>
+        <Match when={overlay()?.kind === "help"}>
+          <HelpOverlay
+            sections={helpSections(keys, bindingHelp, actionScopes)}
+            footer={helpFooter()}
+            onDismiss={() => setOverlay(undefined)}
+          />
+        </Match>
+      </Switch>
     </div>
   );
 }
@@ -653,7 +796,12 @@ function paneCount(count: number): string {
 
 function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   const state = trust.state();
-  if (state.kind === "restarting") return "restarting keywork serve with trust recorded";
+  if (state.kind === "restarting") {
+    return state.attached === true
+      ? "trust recorded · waiting on the attached keywork serve"
+      : "restarting keywork serve with trust recorded";
+  }
+  if (state.kind === "stale") return "trust recorded · the attached keywork serve needs a restart";
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
 }
 

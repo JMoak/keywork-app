@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import type { ContextLevel, GaugeStyle } from "../instruments/context.ts";
-import { ContextGauge } from "../instruments/gauge.tsx";
+import { ContextGauge, contextUnit } from "../instruments/gauge.tsx";
 import { gaugeStyleFor, type InstrumentTier } from "../instruments/tier.ts";
 import type { WidthTier } from "../page/tiers.ts";
 import type { TitleBot } from "./identity.ts";
@@ -144,7 +144,7 @@ interface TitleGaugeProps {
 }
 
 function TitleGauge(props: TitleGaugeProps) {
-  const gauge = () => <ContextGauge level={props.level} style={props.style} />;
+  const gauge = () => <ContextGauge level={props.level} style={props.style} unit={contextUnit} />;
   return (
     <Show when={props.onOpen} fallback={gauge()}>
       <button type="button" class="kw-frame-gauge" onClick={() => props.onOpen?.()}>

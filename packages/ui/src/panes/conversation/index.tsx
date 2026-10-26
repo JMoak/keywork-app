@@ -1,26 +1,54 @@
-import type { SessionProjection } from "@keywork-app/client";
+import {
+  forgottenPromptIds,
+  type SessionControls,
+  type SessionProjection,
+  type ToolRun,
+} from "@keywork-app/client";
 import {
   type ActivePreset,
   type ControlRefusal,
   isControlRefusal,
   type PresetName,
-  type PromptBehavior,
+  type QueuedPrompt,
+  type QueueRefusal,
+  type SendBehavior,
 } from "@keywork-app/protocol";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { z } from "zod";
 import { FirstRun } from "../../chrome/first-run.tsx";
 import { arcHueRank, botNamed, titleBot } from "../../chrome/identity.ts";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
-import { sessionName, telemetry } from "../../chrome/telemetry.ts";
+import { sessionName } from "../../chrome/session-name.ts";
+import { telemetry } from "../../chrome/telemetry.ts";
 import { Composer } from "../../composer/composer.tsx";
+import {
+  broughtBackNotice,
+  createQueueEditor,
+  type QueueEdits,
+  queueHint,
+  setAsideNotice,
+} from "../../composer/queue-editor.ts";
 import { sessionContextLevel } from "../../instruments/context.ts";
 import { costReadout } from "../../instruments/cost-report.ts";
 import { askChordsOf } from "../../page/ask-card.tsx";
 import { ConversationPane } from "../../page/pane.tsx";
+import type { DraftSeed } from "../../shell/controls-store.ts";
+import { composerHold, promptReturnedNotice } from "../../shell/server-standing.ts";
 import { EmptyState } from "../empty-state.tsx";
+import { spillOpening } from "../file/spill.ts";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { restoreNotice } from "../tree/trash.ts";
+import {
+  effortChoices,
+  effortFrom,
+  effortUsage,
+  type ModelsKnown,
+  modelChoices,
+  thinkingChoices,
+  thinkingFrom,
+  thinkingUsage,
+} from "./arguments.ts";
 import { type ControlAsk, ControlRow } from "./control-row.tsx";
 import {
   childAtWorkNotice,
@@ -33,7 +61,6 @@ import {
   leftInTrashNotice,
   leftUnchanged,
   looseningQuestion,
-  nextEffort,
   type PresetDirection,
   pageNameFor,
   presetNotice,
@@ -47,8 +74,19 @@ import {
   undoneNotice,
   unsteppableNotice,
 } from "./controls.ts";
+import { copyActions, copyVerbs } from "./copy.ts";
+import {
+  forgetNotice,
+  forgetOptions,
+  forgetPickerHint,
+  forgottenWhat,
+  nothingToForgetNotice,
+  replacementOf,
+  turnRunningNotice,
+} from "./forget.ts";
 import { revealWhatWaits } from "./reveal.ts";
 import { createTurnLedger, turnRibbon } from "./turn-ledger.ts";
+import { walkTranscript } from "./walk.ts";
 
 const conversationSpec = z.object({
   kind: z.literal("conversation"),
@@ -80,19 +118,38 @@ export const conversationPane = definePane<ConversationSpec>({
     "conversation.model": {
       chords: "leader o",
       help: "switch the model",
-      command: { name: "model", description: "switch this session's model" },
+      command: {
+        name: "model",
+        aliases: ["models"],
+        description: "switch this session's model",
+        argument: {
+          hint: "[provider/model]",
+          choices: (shell) => modelChoices(modelsKnown(shell)),
+        },
+      },
     },
     "conversation.thinking": {
       chords: "leader v",
       help: "show or hide thinking",
-      command: { name: "thinking", description: "show or hide the model's reasoning" },
+      command: {
+        name: "thinking",
+        description: "show or hide the model's reasoning",
+        argument: {
+          hint: "[on|off]",
+          choices: (shell) => thinkingChoices(focusedControls(shell).thinking),
+        },
+      },
     },
     "conversation.effort": {
       chords: "leader e",
       help: "next effort level",
       command: {
         name: "effort",
-        description: "how much work each reply gets: low to max, then the provider's default",
+        description: "how much work each reply gets, low to max or the provider's default",
+        argument: {
+          hint: "[level]",
+          choices: (shell) => effortChoices(focusedControls(shell).effort),
+        },
       },
     },
     "conversation.compact": {
@@ -107,10 +164,10 @@ export const conversationPane = definePane<ConversationSpec>({
     },
     "conversation.export": {
       chords: "leader shift+e",
-      help: "save and copy the session",
+      help: "save the session as a page",
       command: {
         name: "export",
-        description: "save this session as a self-contained page, and copy it",
+        description: "save this session as a self-contained page",
       },
     },
     "conversation.export-file": {
@@ -152,6 +209,16 @@ export const conversationPane = definePane<ConversationSpec>({
       help: "cost per model",
       command: { name: "cost", description: "tokens and spend for each model this session ran" },
     },
+    "conversation.forget": {
+      chords: "leader shift+x",
+      help: "forget a prompt or tool result",
+      command: {
+        name: "forget",
+        description:
+          "take an earlier prompt or tool result out of the model's context: /forget [replacement]",
+        argument: { hint: "[replacement]" },
+      },
+    },
     "conversation.preset-tighter": {
       chords: "leader [",
       help: "tighter permissions",
@@ -177,6 +244,7 @@ export const conversationPane = definePane<ConversationSpec>({
       help: "open preset",
       command: { name: "preset-open", description: "allow the core tools without asking" },
     },
+    ...copyActions,
   },
   adornments: (spec, shell) => {
     const projection = shell.store.projection(spec.sessionId);
@@ -253,28 +321,70 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     setPending(restoreOffer(props.shell, id, knownName(), say));
   });
 
-  const send =
-    (behavior: PromptBehavior) =>
+  const [returned, setReturned] = createSignal<DraftSeed>();
+  const delivering =
+    (deliver: (text: string) => Promise<void>) =>
     async (text: string): Promise<void> => {
       setLines([]);
+      setReturned(undefined);
+      try {
+        await deliver(text);
+      } catch (cause) {
+        setReturned({ text });
+        say(promptReturnedNotice(messageOf(cause)));
+      }
+    };
+  const send = (behavior: SendBehavior) =>
+    delivering(async (text) => {
       const id = props.spec.sessionId;
       if (id === undefined) return props.shell.sessions.startSession(props.id, text);
       const outcome = await props.shell.store.prompt(id, text, behavior);
       if (outcome !== "missing") return;
       await props.shell.sessions.startSession(props.id, text);
       say(promptRehomedNotice);
-    };
+    });
+  const [setAside, setSetAside] = createSignal<readonly QueuedPrompt[]>([]);
+  const sendNow = delivering(async (text) => {
+    const id = props.spec.sessionId;
+    if (id === undefined) return props.shell.sessions.startSession(props.id, text);
+    const aside = await props.shell.store.sendNow(id, text);
+    if (aside === "missing") {
+      await props.shell.sessions.startSession(props.id, text);
+      return say(promptRehomedNotice);
+    }
+    if (aside.length === 0) return;
+    setSetAside((held) => [...held, ...aside]);
+    say(setAsideNotice(setAside().length));
+  });
+  const queueKeys = createQueueEditor(
+    queueEditsOf(props.shell, () => props.spec.sessionId, projection, say, {
+      held: setAside,
+      clear: () => setSetAside([]),
+    }),
+  );
+  const openSpill = (run: ToolRun): void => {
+    const id = props.spec.sessionId;
+    if (id !== undefined && run.spill !== undefined) {
+      props.shell.openPane(spillOpening(id, run, run.spill));
+    }
+  };
   const interrupt = (): void => {
     const id = props.spec.sessionId;
     if (id !== undefined) void props.shell.store.abort(id);
   };
 
   const turns = createTurnLedger(props.shell, () => props.spec.sessionId, say, setPending);
-  const controls = {
+  const forgotten = createMemo(() =>
+    forgottenPromptIds(props.shell.store.tree(props.spec.sessionId).snapshot),
+  );
+  const shownProjection = (): SessionProjection | undefined =>
+    props.spec.sessionId === undefined ? undefined : projection();
+  const controls: Record<string, (argument?: string) => void> = {
     ...sessionControlsOf(props.shell, () => props.spec.sessionId, say, setPending),
     ...turns.actions,
+    ...copyVerbs(props.shell.host, shownProjection, say),
   };
-  props.onAction((action) => controls[action]?.());
+  props.onAction((action, argument) => controls[action]?.(argument));
 
   const answerPending = (reply: string | boolean): void => {
     const asked = pending();
@@ -282,8 +392,10 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     void asked?.answer(reply);
   };
 
+  const walkSeams = { page: () => page, composer: () => composerInput };
+
   return (
-    <>
+    <div class="kw-conversation" ref={(root) => onCleanup(walkTranscript(root, walkSeams))}>
       <div class="kw-page" ref={page}>
         <Show
           when={props.spec.sessionId !== undefined}
@@ -298,8 +410,8 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         >
           <ConversationPane
             projection={projection()}
-            onAnswerAsk={(callId, verdict, scope) =>
-              props.shell.client.answerAsk(callId, verdict, scope)
+            onAnswerAsk={(callId, verdict, scope, reason, note) =>
+              props.shell.client.answerAsk(callId, verdict, scope, reason, note)
             }
             askChords={askChordsOf(props.shell.keys)}
             quiet={props.shell.quiet?.has(props.spec.sessionId)}
@@ -309,12 +421,14 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
             ledger={turns.ledger()}
             ledgerVerbs={turns.verbs}
             redoable={props.shell.store.controlsOf(props.spec.sessionId).redoable}
+            forgotten={forgotten()}
+            onOpenSpill={openSpill}
           />
         </Show>
       </div>
       <ControlRow
         ask={pending()?.ask}
-        lines={lines()}
+        lines={queueKeys.editing() ? [queueHint] : lines()}
         onAnswer={answerPending}
         onConfirm={answerPending}
         onDismiss={() => setPending(undefined)}
@@ -322,38 +436,112 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
       <Composer
         queue={projection().queue}
         busy={projection().turn !== undefined}
-        seed={props.shell.store.controls.seed(props.spec.sessionId)}
+        seed={returned() ?? props.shell.store.controls.seed(props.spec.sessionId)}
         hold={
-          props.shell.store.childOf(props.spec.sessionId)?.state === "running"
+          composerHold(props.shell.server?.()) ??
+          (props.shell.store.childOf(props.spec.sessionId)?.state === "running"
             ? childAtWorkNotice
-            : undefined
+            : undefined)
         }
         onSteer={(text) => void send("steer")(text)}
         onQueue={(text) => void send("queue")(text)}
+        onNow={(text) => void sendNow(text)}
         onInterrupt={interrupt}
+        queueKeys={queueKeys}
+        commands={props.shell.commands}
+        commandScope="conversation"
         inputRef={(input) => {
           composerInput = input;
         }}
       />
-    </>
+    </div>
   );
 }
 
 type Say = (...lines: string[]) => void;
+
+interface SetAside {
+  held(): readonly QueuedPrompt[];
+  clear(): void;
+}
+
+function queueEditsOf(
+  shell: ShellSeams,
+  sessionId: () => string | undefined,
+  projection: () => SessionProjection,
+  say: Say,
+  aside: SetAside,
+): QueueEdits {
+  const store = shell.store;
+  const inSession = (run: (id: string) => Promise<void>): void => {
+    const id = sessionId();
+    if (id !== undefined) void run(id);
+  };
+  return {
+    queue: () => projection().queue,
+    move: (prompt, to) =>
+      inSession(async (id) => {
+        const moved = await store.moveQueued(id, prompt.id, to);
+        if (typeof moved === "string") say(queueRefusalNotice(moved));
+      }),
+    cancel: (prompt) =>
+      inSession(async (id) => {
+        const cancelled = await store.cancelQueued(id, prompt.id);
+        if (typeof cancelled === "string") say(queueRefusalNotice(cancelled));
+      }),
+    sendNow: (prompt) =>
+      inSession(async (id) => {
+        const cancelled = await store.cancelQueued(id, prompt.id);
+        if (typeof cancelled === "string") return say(queueRefusalNotice(cancelled));
+        await store.prompt(id, prompt.text, "steer");
+      }),
+    bringBack: () => {
+      const held = aside.held();
+      const id = sessionId();
+      if (held.length === 0 || id === undefined) return false;
+      aside.clear();
+      void requeue(store, id, held).then(() => say(broughtBackNotice(held.length)));
+      return true;
+    },
+  };
+}
+
+async function requeue(
+  store: ShellSeams["store"],
+  sessionId: string,
+  prompts: readonly QueuedPrompt[],
+): Promise<void> {
+  for (const prompt of prompts) await store.prompt(sessionId, prompt.text, "queue");
+}
+
+function queueRefusalNotice(refusal: QueueRefusal): string {
+  switch (refusal) {
+    case "crosses-steer":
+      return "steered prompts run before queued ones · that move would cross one";
+    case "out-of-range":
+      return "that prompt is already at the end of the queue";
+    case "missing":
+      return sessionGoneNotice;
+    case "unknown-item":
+      return "that prompt already left the queue";
+  }
+}
 
 function sessionControlsOf(
   shell: ShellSeams,
   sessionId: () => string | undefined,
   say: Say,
   ask: (pending: PendingAsk | undefined) => void,
-): Record<string, () => void> {
+): Record<string, (argument?: string) => void> {
   const store = shell.store;
   const verbs = store.controls;
-  const withSession = (run: (id: string) => Promise<void> | void) => (): void => {
-    const id = sessionId();
-    if (id === undefined) say("no session here yet · send a prompt first");
-    else void run(id);
-  };
+  const withSession =
+    (run: (id: string, argument?: string) => Promise<void> | void) =>
+    (argument?: string): void => {
+      const id = sessionId();
+      if (id === undefined) say("no session here yet · send a prompt first");
+      else void run(id, argument);
+    };
   const report = <Reading,>(
     reading: Reading,
     settled: (answer: Exclude<Reading, "missing" | ControlRefusal>) => string,
@@ -386,8 +574,36 @@ function sessionControlsOf(
     else void choosePreset(target);
   };
 
+  const switchModel = async (id: string, reference: string): Promise<void> => {
+    report(await verbs.setModel(id, reference), (switched) => switched.notice);
+  };
+
+  const beginForget = async (id: string, argument?: string): Promise<void> => {
+    if (store.projection(id).turn !== undefined) return say(turnRunningNotice);
+    const replacement = replacementOf(argument);
+    await store.openTree(id, { force: true });
+    const snapshot = store.tree(id).snapshot;
+    const options = snapshot === undefined ? [] : forgetOptions(snapshot);
+    if (snapshot === undefined || options.length === 0) return say(nothingToForgetNotice);
+    ask({
+      ask: {
+        kind: "pick",
+        label: replacement === undefined ? "forget" : "rewrite",
+        hint: forgetPickerHint(replacement !== undefined),
+        options,
+      },
+      answer: async (chosen) => {
+        const entryId = String(chosen);
+        report(await verbs.forget(id, entryId, replacement), () =>
+          forgetNotice(forgottenWhat(snapshot, entryId), replacement),
+        );
+      },
+    });
+  };
+
   return {
-    "conversation.model": withSession((id) =>
+    "conversation.model": withSession((id, reference) => {
+      if (reference !== undefined) return switchModel(id, reference);
       ask({
         ask: {
           kind: "text",
@@ -395,20 +611,20 @@ function sessionControlsOf(
           initial: "",
           choices: verbs.models(),
         },
-        answer: async (reference) => {
-          report(await verbs.setModel(id, String(reference)), (switched) => switched.notice);
-        },
-      }),
-    ),
-    "conversation.thinking": withSession(async (id) => {
-      const on = !store.controlsOf(id).thinking;
+        answer: (chosen) => switchModel(id, String(chosen)),
+      });
+    }),
+    "conversation.thinking": withSession(async (id, argument) => {
+      const on = thinkingFrom(argument, store.controlsOf(id).thinking === true);
+      if (on === undefined) return say(`thinking takes on or off · ${thinkingUsage}`);
       report(await verbs.setThinking(id, on), (answer) =>
         thinkingNotice(answer.thinking, shell.keys.chord("conversation.thinking")),
       );
     }),
-    "conversation.effort": withSession(async (id) => {
-      const level = nextEffort(store.controlsOf(id).effort);
-      report(await verbs.setEffort(id, level), (answer) => effortNotice(answer.effort));
+    "conversation.effort": withSession(async (id, argument) => {
+      const choice = effortFrom(argument, store.controlsOf(id).effort);
+      if (choice.kind === "unknown") return say(`unknown effort ${choice.word} · ${effortUsage}`);
+      report(await verbs.setEffort(id, choice.level), (answer) => effortNotice(answer.effort));
     }),
     "conversation.compact": withSession(async (id) => {
       say(compactingNotice);
@@ -426,9 +642,8 @@ function sessionControlsOf(
       const reading = await verbs.exportSession(id);
       if (!isSettled(reading)) return say(refusalNotice(reading));
       if (!("html" in reading)) return say(`session page written to ${reading.file}`);
-      const copied = await copiedToClipboard(reading.html);
       const saved = await shell.host.saveAs(pageNameFor(currentTitle(shell, id)), reading.html);
-      say(exportedNotice(reading.html, copied, saved));
+      say(exportedNotice(reading.html, saved));
     }),
     "conversation.export-file": withSession(async (id) => {
       report(await verbs.exportSession(id, { out: "." }), (exported) =>
@@ -443,6 +658,7 @@ function sessionControlsOf(
     "conversation.redo": withSession(async (id) => {
       report(await verbs.redo(id), () => redoneNotice);
     }),
+    "conversation.forget": withSession((id, argument) => beginForget(id, argument)),
     "conversation.cost": withSession(async (id) => {
       await verbs.watchReadings(id);
       const cost = verbs.readings(id).cost;
@@ -457,18 +673,24 @@ function sessionControlsOf(
   };
 }
 
+function focusedControls(shell: ShellSeams): SessionControls {
+  return shell.store.controlsOf(shell.currentSession());
+}
+
+function modelsKnown(shell: ShellSeams): ModelsKnown {
+  const current = focusedControls(shell).model;
+  const sessionId = shell.currentSession();
+  const others = shell.store.state.summaries.filter((summary) => summary.id !== sessionId);
+  return {
+    models: shell.store.controls.models(),
+    current,
+    elsewhere: (model) => others.filter((summary) => summary.model === model).length,
+  };
+}
+
 function currentTitle(shell: ShellSeams, id: string): string {
   const title = shell.store.controlsOf(id).title;
   return title === undefined || title === untitled ? "" : title;
-}
-
-async function copiedToClipboard(html: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(html);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 const untitled = "(untitled session)";
@@ -515,4 +737,8 @@ function lastKnownName(
     return previous?.sessionId === id ? previous : undefined;
   });
   return () => known()?.name;
+}
+
+function messageOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
 }

@@ -1,17 +1,25 @@
 import {
   type KeyworkClient,
   keyworkClientOver,
+  type RetryWaker,
+  retryWaker,
   type ServerFeed,
   serverFeed,
 } from "@keywork-app/client";
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
-import { sessionName } from "./chrome/telemetry.ts";
+import { sessionName } from "./chrome/session-name.ts";
 import { reportNeedsYou } from "./host/needs-you-report.ts";
 import { describeFailure, type HostPort, type OpenedWorkspace } from "./host/port.ts";
 import { hostFetch } from "./host/transport.ts";
 import { frameTick } from "./shell/frame-tick.ts";
 import { createNeedsYouQueue, createWaiting } from "./shell/needs-you-queue.ts";
 import { OpenScreen } from "./shell/open-screen.tsx";
+import {
+  type ServerStanding,
+  serverUp,
+  standingAfterFailure,
+  standingAfterLoss,
+} from "./shell/server-standing.ts";
 import { createSessionStore, type SessionStore } from "./shell/session-store.ts";
 import { WorkspaceView } from "./shell/workspace-view.tsx";
 import { wearRememberedTheme } from "./theme/wardrobe.ts";
@@ -26,6 +34,7 @@ interface Connected {
   opened: OpenedWorkspace;
   client: KeyworkClient;
   feed: ServerFeed;
+  waker: RetryWaker;
   store: SessionStore;
   stopWaiting: () => void;
 }
@@ -37,6 +46,7 @@ export function App(props: AppProps) {
   const [connected, setConnected] = createSignal<Connected>();
   const [opening, setOpening] = createSignal<string>();
   const [failure, setFailure] = createSignal<string>();
+  const [standing, setStanding] = createSignal<ServerStanding>(serverUp);
 
   const connect =
     props.connect ??
@@ -61,7 +71,8 @@ export function App(props: AppProps) {
       return;
     }
     const client = connect(props.host, result.opened.workspace);
-    const feed = serverFeed(client, { tick: frameTick() });
+    const waker = retryWaker();
+    const feed = serverFeed(client, { tick: frameTick(), retry: waker });
     const store = createSessionStore(client, feed);
     const stopWaiting = needsYou.attach(
       createWaiting({
@@ -83,20 +94,34 @@ export function App(props: AppProps) {
     }
     void store.surfaces.load();
     const previous = connected();
-    setConnected({ opened: result.opened, client, feed, store, stopWaiting });
+    setStanding(serverUp);
+    setConnected({ opened: result.opened, client, feed, waker, store, stopWaiting });
     previous?.stopWaiting();
   };
 
-  const stopLoss = props.host.onServerLost((loss) => {
+  const liveFor = (workspace: string): Connected | undefined => {
     const live = connected();
-    if (live === undefined || loss.workspace !== live.opened.workspace) return;
-    setFailure(describeFailure(loss.failure));
+    return live?.opened.workspace === workspace ? live : undefined;
+  };
+  const regain = (live: Connected, opened: OpenedWorkspace): void => {
+    setConnected({ ...live, opened });
+    setStanding(serverUp);
+    live.waker.wake();
+  };
+
+  const stopLoss = props.host.onServerLost((loss) => {
+    if (liveFor(loss.workspace) !== undefined) setStanding(standingAfterLoss(loss));
+  });
+  const stopRegain = props.host.onServerRegained((regained) => {
+    const live = liveFor(regained.workspace);
+    if (live !== undefined) regain(live, regained.opened);
   });
 
   const stopOpenRequests = props.host.onOpenRequested((path) => void open(path));
 
   onCleanup(() => {
     stopLoss();
+    stopRegain();
     stopOpenRequests();
     const live = connected();
     live?.stopWaiting();
@@ -108,9 +133,10 @@ export function App(props: AppProps) {
     ...props.host,
     restartServer: async (path) => {
       const reopened = await props.host.restartServer(path);
-      if (reopened.ok) {
-        setConnected((live) => live && { ...live, opened: reopened.opened });
-      }
+      const live = liveFor(path);
+      if (live === undefined) return reopened;
+      if (reopened.ok) regain(live, reopened.opened);
+      else setStanding(standingAfterFailure(reopened.failure));
       return reopened;
     },
   };
@@ -123,6 +149,8 @@ export function App(props: AppProps) {
             host={host}
             workspace={live().opened.workspace}
             serverLabel={serverLabel(live().opened)}
+            attached={live().opened.attached}
+            standing={standing()}
             store={live().store}
             client={live().client}
             feed={live().feed}
