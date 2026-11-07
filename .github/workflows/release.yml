@@ -28,6 +28,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run setup:electron
       - run: bun run check
+      - name: Install Chromium for browser tests
+        run: bun run --cwd packages/ui screenshots:install
       - run: bun run test
       - name: fetch the pinned keywork sidecar and verify its SHA-256
         run: bun run fetch:sidecar

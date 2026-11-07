@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type Browser, chromium, type Page } from "@playwright/test";
 import { cleanup, render } from "@solidjs/testing-library";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 import type { ShellSeams } from "../registry.ts";
 import { type ChoresSpec, choresPaneWith } from "./index.tsx";
 import { reading, recordingPort, testZone, thursdayMorning } from "./testing.ts";
@@ -11,19 +11,11 @@ afterEach(cleanup);
 const paneWidth = 640;
 const halfColumn = 360;
 
-let browser: Browser;
-
-beforeAll(async () => {
-  browser = await chromium.launch();
-});
-
-afterAll(async () => {
-  await browser.close();
-});
-
 describe("the new-chore form in a half-height pane above another pane", () => {
   it("scrolls inside its own pane and every radio takes the click", async () => {
-    const page = await stackedPanesPage(await openedFormMarkup());
+    const browser = await chromium.launch();
+    onTestFinished(() => browser.close());
+    const page = await stackedPanesPage(browser, await openedFormMarkup());
     expect(await choresStayInsideTheirPane(page)).toBe(true);
     expect(await formOpensInView(page)).toBe(true);
     for (const value of ["manual", "interval", "file", "write", "act"]) {
@@ -60,7 +52,7 @@ async function openedFormMarkup(): Promise<string> {
   return container.innerHTML;
 }
 
-async function stackedPanesPage(chores: string): Promise<Page> {
+async function stackedPanesPage(browser: Browser, chores: string): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: paneWidth, height: halfColumn * 2 } });
   await page.setContent(`<!doctype html>
 <html>

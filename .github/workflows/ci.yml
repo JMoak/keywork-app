@@ -26,5 +26,7 @@ jobs:
       - run: bun run check:colors
       - run: bun run check:types
       - run: bun run lint
+      - name: Install Chromium for browser tests
+        run: bun run --cwd packages/ui screenshots:install
       - run: bun run test
 

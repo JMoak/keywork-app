@@ -42,12 +42,63 @@ describe("the default shell", () => {
 
   it("walks PATH entries in order and skips empty ones", () => {
     const seen: string[] = [];
-    const found = findOnPath("pwsh.exe", { PATH: `;${windowsPath};` }, (path) => {
-      seen.push(path);
-      return false;
-    });
+    const found = findOnPath(
+      "pwsh.exe",
+      { PATH: `;${windowsPath};` },
+      (path) => {
+        seen.push(path);
+        return false;
+      },
+      "win32",
+    );
     expect(found).toBeUndefined();
     expect(seen).toHaveLength(2);
+  });
+});
+
+describe("target platform PATH lookup", () => {
+  it("uses Windows separators for drive and UNC entries regardless of the host", () => {
+    const seen: string[] = [];
+    const found = findOnPath(
+      "pwsh.exe",
+      { Path: ";C:\\Program Files\\PowerShell\\7;\\\\server\\tools;C:\\unused;" },
+      (path) => {
+        seen.push(path);
+        return path === "\\\\server\\tools\\pwsh.exe";
+      },
+      "win32",
+    );
+    expect(found).toBe("\\\\server\\tools\\pwsh.exe");
+    expect(seen).toEqual([
+      "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "\\\\server\\tools\\pwsh.exe",
+    ]);
+  });
+
+  it.each(["linux", "darwin"] as const)(
+    "uses POSIX separators on %s and keeps semicolons inside directory names",
+    (platform) => {
+      const seen: string[] = [];
+      const found = findOnPath(
+        "fish",
+        { PATH: ":/opt/tools;beta:/usr/local/bin:/unused:" },
+        (path) => {
+          seen.push(path);
+          return path === "/usr/local/bin/fish";
+        },
+        platform,
+      );
+      expect(found).toBe("/usr/local/bin/fish");
+      expect(seen).toEqual(["/opt/tools;beta/fish", "/usr/local/bin/fish"]);
+    },
+  );
+
+  it("keeps native platform behavior for callers that omit the platform", () => {
+    const directory = process.platform === "win32" ? "C:\\tools" : "/opt/tools";
+    const expected = process.platform === "win32" ? "C:\\tools\\shell" : "/opt/tools/shell";
+    const exists = vi.fn(() => true);
+    expect(findOnPath("shell", { PATH: directory }, exists)).toBe(expected);
+    expect(exists).toHaveBeenCalledExactlyOnceWith(expected);
   });
 });
 

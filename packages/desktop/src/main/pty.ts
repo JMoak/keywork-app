@@ -1,4 +1,4 @@
-import { delimiter, join } from "node:path";
+import { posix, win32 } from "node:path";
 import type { PtyExit, PtyOpened, PtyOpenRequest } from "../shared/channels.ts";
 import { treeKillCommand } from "./serve-process.ts";
 import { spawnsThroughShell } from "./system.ts";
@@ -114,8 +114,8 @@ export function defaultShell(
 ): string {
   if (platform !== "win32") return env.SHELL ?? "/bin/sh";
   return (
-    findOnPath("pwsh.exe", env, exists) ??
-    findOnPath("powershell.exe", env, exists) ??
+    findOnPath("pwsh.exe", env, exists, platform) ??
+    findOnPath("powershell.exe", env, exists, platform) ??
     env.COMSPEC ??
     "cmd.exe"
   );
@@ -125,11 +125,13 @@ export function findOnPath(
   name: string,
   env: Record<string, string>,
   exists: (path: string) => boolean,
+  platform: NodeJS.Platform = process.platform,
 ): string | undefined {
+  const paths = platform === "win32" ? win32 : posix;
   const path = env.PATH ?? env.Path ?? "";
-  for (const dir of path.split(delimiter)) {
+  for (const dir of path.split(paths.delimiter)) {
     if (dir === "") continue;
-    const candidate = join(dir, name);
+    const candidate = paths.join(dir, name);
     if (exists(candidate)) return candidate;
   }
   return undefined;
