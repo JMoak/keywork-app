@@ -502,8 +502,12 @@ silently, surface `onUpdateReady`, install on quit only after `acceptUpdate`, of
 Parity scaffold: Playwright 1.63.0 captures the transcript scenarios per theme and width
 tier on three runners; `scripts/compare-shots.ts` diffs across OS with a 5% tolerance for
 font fallback, advisory until the first baselines exist. The capture lives in its own
-`screenshots.yml`, run on pushes to `main` and by hand, never blocking a PR; `ci.yml` is the
-required gate. `docs/release.md` records the ritual.
+`screenshots.yml`, run manually from Actions when a full visual review is needed. It does
+not run on pushes or pull requests. The comparison writes a short advisory summary and
+attaches its complete output as `screenshot-comparison`; differences require review rather
+than failing the comparison job. `ci.yml` remains the required gate, including the focused
+browser layout test. Local `bun run compare:shots` retains its strict exit status and 5%
+threshold. `docs/release.md` records the ritual.
 Decision for Jordan: `productName: keywork` makes the deb executable `keywork`, shadowing
 the CLI on PATH; `executableName: keywork-app` would avoid it.
 

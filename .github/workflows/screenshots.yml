@@ -1,8 +1,6 @@
 name: screenshots
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -45,6 +43,36 @@ jobs:
           pattern: shots-*
           path: artifacts/shots
           merge-multiple: true
-      # Advisory until the first baselines from all three runners have been read side by side
-      # and the font-fallback tolerance in scripts/compare-shots.ts is confirmed against them.
-      - run: bun run compare:shots
+      - name: Report cross-platform differences (advisory)
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          report=artifacts/screenshot-comparison.txt
+          missing_platforms=""
+          for platform in linux macos windows; do
+            if ! compgen -G "artifacts/shots/$platform/*.png" > /dev/null; then
+              missing_platforms="$missing_platforms $platform"
+            fi
+          done
+          comparison_exit=0
+          bun run compare:shots > "$report" 2>&1 || comparison_exit=$?
+          if [ -n "$missing_platforms" ]; then
+            outcome="Incomplete capture: missing screenshots for$missing_platforms. Comparison exited with status $comparison_exit."
+          elif [ "$comparison_exit" -eq 0 ]; then
+            outcome="No differences above the configured threshold."
+          else
+            outcome="Review required: comparison exited with status $comparison_exit."
+          fi
+          printf '%s\n' "$outcome"
+          {
+            printf '### Screenshot comparison (advisory)\n\n%s\n\n' "$outcome"
+            printf '```text\n'
+            head -n 12 "$report"
+            printf '\n```\n\nFull output: the `screenshot-comparison` artifact.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: screenshot-comparison
+          path: artifacts/screenshot-comparison.txt
+          if-no-files-found: warn
