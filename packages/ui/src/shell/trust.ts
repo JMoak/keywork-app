@@ -1,5 +1,5 @@
 import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
-import type { BusEnvelope, WorkspaceView } from "@keywork-app/protocol";
+import type { AnchorSource, BusEnvelope, WorkspaceView } from "@keywork-app/protocol";
 import { createSignal } from "solid-js";
 
 export type TrustState =
@@ -26,6 +26,7 @@ export interface TrustSeams {
   restart(): Promise<void>;
   attached?: (() => boolean) | undefined;
   composedTrusted?: (() => Promise<boolean | undefined>) | undefined;
+  folder?: string | undefined;
   say?: ((line: string) => void) | undefined;
 }
 
@@ -38,7 +39,7 @@ export const composedPollMs = 500;
 export const trustEnables = "memory, changes, the terminal, LSP and project config";
 
 export function trustPrompt(root: string): string {
-  return `trust ${root}? keywork keeps workspace files and memory in .keywork`;
+  return `trust ${root}? the server keeps workspace files and memory in .keywork`;
 }
 
 export const trustStaysOff = `${trustEnables} stay off until you trust it`;
@@ -56,15 +57,21 @@ export function readyNotice(root: string): string {
 }
 
 export function waitingOnServeNotice(root: string): string {
-  return `trust is recorded for ${root} · waiting for the keywork serve this window attached to to pick it up`;
+  return `trust is recorded for ${root} · waiting for the server this window attached to to pick it up`;
 }
 
 export function recomposedNotice(root: string): string {
-  return `trusted ${root} · keywork recomposed in place · open sessions reload on their next prompt · any running turn stopped and its asks were refused`;
+  return `trusted ${root} · the server recomposed in place · open sessions reload on their next prompt · any running turn stopped and its asks were refused`;
 }
 
 export function staleServeNotice(root: string): string {
-  return `trust is recorded for ${root}, but the keywork serve this window attached to started before it · restart that serve and ${trustEnables} turn on`;
+  return `trust is recorded for ${root}, but the server this window attached to started before it · restart that server and ${trustEnables} turn on`;
+}
+
+export function anchorNotice(folder: string, anchor: WorkspaceView["anchor"]): string | undefined {
+  const words = anchorWords[anchor.source];
+  if (words === undefined || canonicalPath(folder) === canonicalPath(anchor.root)) return undefined;
+  return `${folder} opens the workspace at ${anchor.root} (its ${words}) · its sessions and chores are that workspace's`;
 }
 
 export function trustStateOf(view: WorkspaceView): TrustState {
@@ -86,10 +93,20 @@ export function createTrustFlow(seams: TrustSeams): TrustFlow {
   const composedTrusted = (): Promise<boolean | undefined> =>
     seams.composedTrusted?.().catch(() => undefined) ?? Promise.resolve(undefined);
 
+  let anchorSaid = false;
+  const sayAnchorOnce = (fetched: WorkspaceView): void => {
+    if (anchorSaid || seams.folder === undefined) return;
+    const line = anchorNotice(seams.folder, fetched.anchor);
+    if (line === undefined) return;
+    anchorSaid = true;
+    seams.say?.(line);
+  };
+
   const refresh = async (): Promise<void> => {
     const fetched = await seams.client.workspace().catch(() => undefined);
     if (fetched === undefined) return;
     setView(fetched);
+    sayAnchorOnce(fetched);
     const decided = trustStateOf(fetched);
     const stale = decided.kind === "trusted" && (await composedTrusted()) === false;
     setState(stale ? { kind: "stale", root: decided.root } : decided);
@@ -155,6 +172,15 @@ export function isUntrusted(state: TrustState): boolean {
 }
 
 const acceptsFrom: ReadonlySet<TrustState["kind"]> = new Set(["undecided", "failed", "stale"]);
+
+const anchorWords: Partial<Record<AnchorSource, string>> = {
+  git: "git root",
+  declaration: "declared workspace root",
+};
+
+function canonicalPath(path: string): string {
+  return path.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+}
 
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

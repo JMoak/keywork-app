@@ -7,6 +7,7 @@ import {
 } from "@keywork-app/client";
 import type { BusEnvelope } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
+import { useProductProfile } from "../chrome/product.ts";
 import { telemetry } from "../chrome/telemetry.ts";
 import { Composer } from "../composer/composer.tsx";
 import { ConversationPane } from "../page/pane.tsx";
@@ -20,6 +21,7 @@ import "./dev.css";
 const widths = Object.keys(tierPresetPx) as WidthTier[];
 
 export function DevPage() {
+  const profile = useProductProfile();
   const [scenario, setScenario] = createSignal(scenarios[0]?.name ?? "plain");
   const [themeChoice, setThemeChoice] = createSignal("system");
   const [width, setWidth] = createSignal<WidthTier>("column");
@@ -87,7 +89,7 @@ export function DevPage() {
   return (
     <main class="kw-dev">
       <header class="kw-dev-bar">
-        <span class="kw-dev-brand">keywork · the page</span>
+        <span class="kw-dev-brand">{profile.name} · the page</span>
         <label class="kw-dev-field">
           scenario
           <select value={scenario()} onChange={(event) => setScenario(event.currentTarget.value)}>

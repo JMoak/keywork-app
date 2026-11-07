@@ -1,0 +1,131 @@
+.kw-onboard {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 1rem;
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  background: var(--kw-panel);
+  box-shadow: inset 0 2px 0 var(--kw-accent-soft);
+  color: var(--kw-text-mid);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-onboard:focus {
+  outline: none;
+}
+
+.kw-onboard-head {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  color: var(--kw-text-dim);
+}
+
+.kw-onboard-title {
+  color: var(--kw-text);
+}
+
+.kw-onboard-steps {
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kw-onboard-step {
+  color: var(--kw-text-faint);
+}
+.kw-onboard-step[data-decided] {
+  color: var(--kw-text-mid);
+}
+.kw-onboard-step[data-current] {
+  color: var(--kw-accent);
+}
+
+.kw-onboard-portrait-slot {
+  display: flex;
+  align-items: flex-end;
+  min-width: 96px;
+}
+
+.kw-onboard-portrait {
+  display: block;
+  image-rendering: pixelated;
+  forced-color-adjust: none;
+}
+
+.kw-onboard-portrait-refused {
+  margin: 0;
+  color: var(--kw-error);
+}
+
+.kw-onboard-body {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.kw-onboard-ask {
+  margin: 0;
+  color: var(--kw-text);
+}
+
+.kw-onboard-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kw-onboard .kw-ov-button {
+  padding-left: 0;
+}
+
+.kw-onboard .kw-ov-sub {
+  margin-left: 1.25rem;
+  border-top: none;
+  padding-top: 0;
+}
+
+.kw-onboard-facts {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-onboard-policy {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0 1.5ch;
+  margin: 0;
+}
+.kw-onboard-policy dt {
+  color: var(--kw-text-dim);
+}
+.kw-onboard-policy dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kw-onboard-line {
+  margin: 0;
+  color: var(--kw-text-dim);
+  overflow-wrap: anywhere;
+}
+.kw-onboard-line[data-tone="error"] {
+  color: var(--kw-error);
+}
+.kw-onboard-line[data-tone="made"] {
+  color: var(--kw-text);
+}
+
+.kw-onboard .kw-ov-draft {
+  padding: 0;
+  border-top: none;
+}

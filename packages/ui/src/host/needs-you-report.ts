@@ -1,5 +1,12 @@
 import { createEffect } from "solid-js";
-import { askNotice, inboxNotice, type NeedsYouItem, risingEdge } from "../shell/needs-you.ts";
+import {
+  askNotice,
+  choreNotice,
+  inboxNotice,
+  interrupts,
+  type NeedsYouItem,
+  risingEdge,
+} from "../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../shell/needs-you-queue.ts";
 import type { HostPort } from "./port.ts";
 
@@ -28,6 +35,7 @@ export function reportNeedsYou(
 
   const stopArrivals = queue.onArrival((item) => {
     if (item.kind === "ask") void host.notify(askNotice(item, queue.where(item)));
+    if (item.kind === "chore" && interrupts(item)) void host.notify(choreNotice(item));
   });
 
   return () => {

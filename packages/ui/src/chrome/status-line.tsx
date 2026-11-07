@@ -1,5 +1,7 @@
 import type { SessionProjection } from "@keywork-app/client";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { For, Show } from "solid-js";
+import { useProductProfile } from "./product.ts";
 import { acceptLabel, type UpdateOffer, updateLine } from "./update-offer.ts";
 import "./status-line.css";
 
@@ -24,9 +26,12 @@ export interface StatusItem {
   readonly text: string;
 }
 
-export function statusItems(props: StatusLineProps): StatusItem[] {
+export function statusItems(
+  props: StatusLineProps,
+  profile: ProductProfile = keyworkProfile,
+): StatusItem[] {
   const candidates: { tone: StatusTone; text: string | undefined }[] = [
-    { tone: "mark", text: "keywork" },
+    { tone: "mark", text: profile.name },
     { tone: props.serverLost ? "warn" : "where", text: props.serverLabel },
     { tone: "warn", text: props.trust },
     { tone: "word", text: props.preset },
@@ -39,10 +44,11 @@ export function statusItems(props: StatusLineProps): StatusItem[] {
 }
 
 export function StatusLine(props: StatusLineProps) {
+  const profile = useProductProfile();
   return (
     <footer class="kw-status" data-lost={props.lost !== undefined ? "" : undefined}>
       <span class="kw-status-items">
-        <For each={statusItems(props)}>
+        <For each={statusItems(props, profile)}>
           {(item) => (
             <span class="kw-status-item" data-tone={item.tone}>
               {item.text}
@@ -81,7 +87,7 @@ function UpdateNotice(props: { offer: UpdateOffer }) {
       {(update) => (
         <span class="kw-status-update">
           {updateLine(update(), props.offer.accepted())}
-          <Show when={!props.offer.accepted()}>
+          <Show when={update().reviewRequired !== true && !props.offer.accepted()}>
             <button
               type="button"
               class="kw-status-update-accept"

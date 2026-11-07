@@ -46,6 +46,7 @@ export const noSessionNotice = "no session here · focus a conversation first";
 
 export const contextPane = definePane<ContextSpec>({
   kind: "context",
+  heading: "in the context map",
   spec: contextSpec,
   home: "right",
   attire: "work",

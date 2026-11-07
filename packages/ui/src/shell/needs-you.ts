@@ -1,7 +1,15 @@
+import type { PendingAsk, RoutineNeed, RoutineNeedKind } from "@keywork-app/protocol";
 import { stampGlyph } from "../chrome/stamp.ts";
 import type { HostNotice } from "../host/port.ts";
 
-export type NeedsYouItem = AskWaiting | AirlockWaiting | InboxWaiting | FailedTurn;
+export type NeedsYouItem =
+  | AskWaiting
+  | AirlockWaiting
+  | InboxWaiting
+  | FailedTurn
+  | ReviewWaiting
+  | ChoreWaiting
+  | DecidedForYou;
 
 export type NeedsYouKind = NeedsYouItem["kind"];
 
@@ -32,6 +40,33 @@ export interface FailedTurn extends Waiting {
   readonly message: string;
 }
 
+export interface ReviewWaiting extends Waiting {
+  readonly kind: "review";
+  readonly sessionId: string;
+  readonly path: string;
+  readonly header: string;
+  readonly digest: string;
+}
+
+export interface ChoreWaiting extends Waiting {
+  readonly kind: "chore";
+  readonly creature: string;
+  readonly routineId: string;
+  readonly need: RoutineNeedKind;
+  readonly reason: string;
+  readonly runId: string | null;
+  readonly digest: string | null;
+}
+
+export interface DecidedForYou extends Waiting {
+  readonly kind: "decided";
+  readonly sessionId: string;
+  readonly recordId: string;
+  readonly ruleClass: string;
+  readonly tool: string;
+  readonly creature: string | undefined;
+}
+
 interface Waiting {
   readonly key: string;
   readonly workspace: string;
@@ -43,6 +78,9 @@ export const urgency: Readonly<Record<NeedsYouKind, number>> = {
   airlock: 1,
   inbox: 2,
   failed: 3,
+  review: 4,
+  chore: 5,
+  decided: 6,
 };
 
 export function orderNeedsYou(items: readonly NeedsYouItem[]): NeedsYouItem[] {
@@ -73,10 +111,41 @@ export const kindMarks: Readonly<Record<NeedsYouKind, string>> = {
   airlock: "▓",
   inbox: "▒",
   failed: stampGlyph("failed"),
+  review: "▒",
+  chore: "▓",
+  decided: "░",
 };
 
 export function needYouCount(count: number): string {
   return count === 1 ? "1 needs you" : `${count} need you`;
+}
+
+export const bubbleWords = {
+  finished: "finished",
+  blocked: "blocked",
+  question: "question",
+} as const;
+
+export function decidedForYouLine(item: Pick<DecidedForYou, "tool">): string {
+  return `decided for you · approved ${item.tool}`;
+}
+
+export const editTools: ReadonlySet<string> = new Set([
+  "edit",
+  "write",
+  "multi_edit",
+  "multi-edit",
+]);
+
+export const shellTools: ReadonlySet<string> = new Set(["bash"]);
+
+export function askGloss(tool: string, subject = ""): string {
+  if (editTools.has(tool))
+    return subject === "" ? "asks to edit a file" : `asks to edit ${subject}`;
+  if (shellTools.has(tool)) {
+    return subject === "" ? "asks to run a command" : `asks to run ${subject}`;
+  }
+  return bubbleWords.question;
 }
 
 export function glossOf(item: NeedsYouItem): string {
@@ -89,6 +158,12 @@ export function glossOf(item: NeedsYouItem): string {
       return `inbox: ${item.title}`;
     case "failed":
       return `failed: ${item.message}`;
+    case "review":
+      return `review: ${item.path} ${item.header}`;
+    case "chore":
+      return `chore: ${item.reason}`;
+    case "decided":
+      return `${decidedForYouLine(item)} (${item.ruleClass})`;
   }
 }
 
@@ -96,11 +171,15 @@ export function whereOf(item: NeedsYouItem, sessionName: (sessionId: string) => 
   switch (item.kind) {
     case "ask":
     case "failed":
+    case "review":
+    case "decided":
       return sessionName(item.sessionId);
     case "airlock":
       return item.arc;
     case "inbox":
       return "memory";
+    case "chore":
+      return `${item.creature} · ${item.routineId}`;
   }
 }
 
@@ -113,6 +192,12 @@ export function dismissNotice(item: NeedsYouItem): string {
     case "airlock":
     case "inbox":
       return "dismissed · the memory pane still holds it";
+    case "review":
+      return "dismissed · the diff pane still holds the hunk until you keep or drop it";
+    case "chore":
+      return "dismissed · the chores pane still holds it";
+    case "decided":
+      return "dismissed · the decision stands and the conversation keeps its notice";
   }
 }
 
@@ -128,6 +213,57 @@ export function askNotice(item: AskWaiting, title: string): HostNotice {
       sessionId: item.sessionId,
       callId: item.callId,
     },
+  };
+}
+
+export function choreNotice(item: ChoreWaiting): HostNotice {
+  return {
+    title: `${item.creature} · ${item.routineId}`,
+    body: glossOf(item),
+    trigger: {
+      kind: "chore",
+      workspace: item.workspace,
+      creature: item.creature,
+      routineId: item.routineId,
+    },
+  };
+}
+
+export function choreAcceptedLine(routineId: string): string {
+  return `${routineId}: grants accepted, the parked run proceeds`;
+}
+
+export function interrupts(item: ChoreWaiting): boolean {
+  return item.need !== "grants" || item.runId !== null;
+}
+
+export function heldChoresAmong(items: readonly NeedsYouItem[]): RoutineNeed[] {
+  return items.flatMap((item) => (item.kind === "chore" ? [routineNeedOf(item)] : []));
+}
+
+export function routineNeedOf(item: ChoreWaiting): RoutineNeed {
+  return {
+    creature: item.creature,
+    routineId: item.routineId,
+    kind: item.need,
+    reason: item.reason,
+    runId: item.runId,
+    since: item.since === "" ? null : item.since,
+    action: item.digest === null ? null : { verb: "accept", digest: item.digest },
+  };
+}
+
+export function pendingAsksAmong(items: readonly NeedsYouItem[]): PendingAsk[] {
+  return items.flatMap((item) => (item.kind === "ask" ? [pendingAskOf(item)] : []));
+}
+
+export function pendingAskOf(item: AskWaiting): PendingAsk {
+  return {
+    sessionId: item.sessionId,
+    callId: item.callId,
+    tool: item.tool,
+    arguments: { subject: item.subject },
+    askedAt: item.since,
   };
 }
 

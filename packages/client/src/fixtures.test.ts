@@ -455,8 +455,16 @@ describe("a turn restore recorded from the server", () => {
       type: "session.state",
       payload: { leafId: "q5", redoable: true },
     });
+    const restoreAnnounced = stream
+      .slice(0, moved)
+      .filter((envelope) => envelope.type === "changes.updated")
+      .at(-1);
+    expect(restoreAnnounced?.payload).toEqual({ paths: [] });
     expect(stream.slice(moved)).toContainEqual(
-      expect.objectContaining({ type: "changes.updated", payload: { paths: [] } }),
+      expect.objectContaining({
+        type: "changes.updated",
+        payload: { paths: ["notes.txt"], turn: 1 },
+      }),
     );
   });
 

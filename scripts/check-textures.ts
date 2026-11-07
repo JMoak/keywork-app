@@ -15,6 +15,7 @@ import {
   regressions,
   tightenable,
 } from "./textures/ratchets.ts";
+import { recordedScreenLatency, recordingFile } from "./textures/screen-latency.ts";
 
 export interface TextureVerdict {
   violations: string[];
@@ -25,6 +26,7 @@ export function judgeTextures(
   ratchets: Ratchets,
   committed: Ratchets | undefined,
   themes: readonly Theme[],
+  recorded: Readonly<Record<string, number>> = {},
 ): TextureVerdict {
   const audits = themes.map(auditTheme);
   const measured = {
@@ -35,6 +37,7 @@ export function judgeTextures(
         [`T6.sectionMarginLc.${audit.theme}`, audit.sectionMarginLc],
       ]),
     ),
+    ...recorded,
   };
   return {
     violations: [
@@ -60,9 +63,9 @@ async function recordedRatchets(): Promise<Ratchets> {
   return parseRatchets(JSON.parse(await readFile(join(repoRoot, ratchetsFile), "utf8")));
 }
 
-function committedRatchets(): Ratchets | undefined {
+export function committedRatchets(): Ratchets | undefined {
   try {
-    const committed = execFileSync("git", ["show", `HEAD:${ratchetsFile}`], {
+    const committed = execFileSync("git", ["show", `HEAD:./${ratchetsFile}`], {
       cwd: repoRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
@@ -75,13 +78,18 @@ function committedRatchets(): Ratchets | undefined {
 
 if (import.meta.main) {
   const committed = committedRatchets();
-  const verdict = judgeTextures(await recordedRatchets(), committed, gallery);
+  const verdict = judgeTextures(
+    await recordedRatchets(),
+    committed,
+    gallery,
+    await recordedScreenLatency(),
+  );
   for (const hint of verdict.hints) console.log(`check:textures: ${hint}`);
   process.exitCode = reportViolations(
     {
       check: "check:textures",
       heading: `Texture ratchets regressed (${ratchetsFile}, docs/textures.md):`,
-      scanned: `${gallery.length} themes, ${graphemeCorpus.length} grapheme samples, ${committed === undefined ? "no committed ratchets yet" : "held against HEAD"}`,
+      scanned: `${gallery.length} themes, ${graphemeCorpus.length} grapheme samples, the ${recordingFile} recording, ${committed === undefined ? "no committed ratchets yet" : "held against HEAD"}`,
     },
     verdict.violations,
   );

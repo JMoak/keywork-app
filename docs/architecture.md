@@ -26,9 +26,15 @@ surface. Consequences:
 
 - The app contains **zero engine logic**. Sessions, tools, permissions, memory, providers,
   and inference resolution are reached over HTTP + SSE and nowhere else.
-- The contract is the wire: `docs/events.md` (the fifteen bus events and their envelope)
+- The contract is the wire: `docs/events.md` (the twenty-one bus events and their envelope)
   and the OpenAPI document at `/doc`. The app's `protocol` package mirrors both, and a
   contract check against a real `keywork serve` fails the build when they drift.
+- The contract is also the identity of an engine at run time. The installed console runs the
+  engine it ships (its sidecar, never PATH; a development build takes `KEYWORK_BIN`, then the
+  sibling checkout through bun, then PATH), and before it uses an attached ticket or a server
+  it spawned it reads `info.x-keywork-contract` from `/doc` and refuses a mismatch in the
+  keeper's words, naming both contracts and where the engine came from
+  (adr.the-installed-console-runs-the-engine-it-ships).
 - When the app needs something the server lacks, **the server grows**, as a task in the
   keywork repo (`docs/plan.md`, server lane). The app never re-implements the missing piece.
 - Ratchet: `scripts/check-guardrails.ts` fails on any import of `@keywork/engine`,
@@ -51,9 +57,11 @@ queues, so the app never starts a second one.
   first answer to an ask wins and the other client sees the resulting `gate.permission`.
   Context and memory stay single-writer because the server is the only writer.
 - The app bundles the same single-file `keywork` binary every release ships (Bun-compiled,
-  per platform, checksummed) as its sidecar. A `keywork` already on the user's PATH is used
-  instead when its `/doc` version matches the app's pinned server version; otherwise the
-  bundled one runs. Mismatch is shown, never silently papered over.
+  per platform, checksummed) as its sidecar, and a packaged app runs that sidecar and nothing
+  else: PATH is never consulted. A development build takes `KEYWORK_BIN`, then the sibling
+  checkout's CLI through bun (`KEYWORK_REPO`, else `../keywork`, as `check:contract` finds it),
+  then PATH. A contract other than the app's is shown, never silently papered over
+  (adr.the-installed-console-runs-the-engine-it-ships).
 - The server's security posture is inherited unchanged: `127.0.0.1` only, bearer token per
   launch, no CORS.
 - The app never reads or writes `~/.keywork` directly. Sessions, config, memory, and

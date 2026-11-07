@@ -1,0 +1,43 @@
+3 parcels · 3 mills · 1 down · 2 loaded · 1 on the market road   p probe · a acknowledge license · b bench · enter last report · c next creature
+  mill · model                     health     held                   classes        license                USD/M in/out
+  moak-main                                   2 mills
+█   ollama 0.40.14 :11434          up         2 loaded · 3 installed
+█     qwen3.8-27b                  up         loaded                 strong vision  Apache-2.0             0.00/0.00 est
+        bench ollama/qwen3.8-27b · chat · 3 repeats of 6 turns
+        server ollama 0.40.14 · fingerprint ollama@0.40.14
+        measure                     mean    range
+        valid@1                     0.94    0.83 to 1.00
+        tool name                   1.00
+        tool schema                 0.97    0.92 to 1.00
+        tool arguments              0.89    0.83 to 0.92
+        no tool when none           1.00
+        parallel calls              n/a
+        tokens per turn             412     388 to 440
+        seconds per turn            5.62    5.10 to 6.05
+        decode tok/s                74.8    73.9 to 75.6
+        fallbacks                   0
+·     gemma-4-31b preview          up         installed              vision         Gemma · needs ack      0.00/0.00 est
+        not strong: needs tool calls and enough context allocated
+        not loop: needs tool calls and enough context allocated and decode measured on this node
+        not decide: needs a decision endpoint or logprobs
+        Gemma is not a permissive license · read its terms, then acknowledge with a
+█     nimble                       up         loaded                 decide         MIT                    0.00/0.00 est
+▌   llama-server b12122 :9931      loading    0 loaded · 0 installed
+        /health answers 503 while the model loads
+▌     qwen3.8-flash-next           loading    listed                 unprobed       unknown                0.00/0.00 est
+  spark-ad4d                                  1 mill
+    ollama :11434                  down       0 loaded · 1 installed
+        connect ECONNREFUSED 100.101.1.20:11434
+      qwen3.8-flash-next           down       installed              unprobed       unknown                0.00/0.00 est
+  moak-laptop                                 no mill
+        no mill found · install Ollama on port 11434 or llama.cpp on port 9931 here
+  market road
+█   openrouter                     up         2 models
+█     jev-1.14                     up         served                 decide         proprietary · acked    0.12/0.00
+█     glm-5                        up         served                 unprobed       unknown                unknown
+policy · Wren · c next creature
+   strong  inherit                     from the workspace, then you, then the bot's model
+   loop    ollama/qwen3.8-27b          on moak-main · lacks decode measured on this node
+   decide  openrouter/jev-1.14         on the market road
+   vision  inherit                     from the workspace, then you, then the bot's model
+read only here · change it in Wren's profile with o

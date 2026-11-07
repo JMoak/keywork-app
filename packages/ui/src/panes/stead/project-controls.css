@@ -1,0 +1,38 @@
+.kw-stead-projects,
+.kw-stead-projects form,
+.kw-stead-projects label {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.kw-stead-projects {
+  border-top: 1px solid var(--kw-border);
+  color: var(--kw-text-mid);
+  padding: 0.625rem 0;
+}
+
+.kw-stead-project-actions,
+.kw-stead-project-activity li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.625rem;
+}
+
+.kw-stead-projects p,
+.kw-stead-project-activity ol {
+  margin: 0;
+}
+
+.kw-stead-projects textarea,
+.kw-stead-projects button {
+  border: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  color: var(--kw-text);
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+}
+
+.kw-stead-projects button:disabled {
+  color: var(--kw-text-dim);
+}

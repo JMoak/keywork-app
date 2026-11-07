@@ -97,6 +97,7 @@ export type ConversationSpec = z.output<typeof conversationSpec>;
 
 export const conversationPane = definePane<ConversationSpec>({
   kind: "conversation",
+  heading: "in a session pane",
   spec: conversationSpec,
   home: "main",
   attire: "work",

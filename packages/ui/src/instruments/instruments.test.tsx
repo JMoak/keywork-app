@@ -184,7 +184,7 @@ describe("ContextGauge", () => {
     expect(gauge.getAttribute("title")).toBe(gaugeHover(level));
     expect(gaugeHover(level).split("\n")).toEqual([
       gaugeReadout(level),
-      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text keywork sends",
+      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text the server sends",
     ]);
     expect(gaugeHover(assumedContextLevel(90_000))).toBe(gaugeReadout(assumedContextLevel(90_000)));
   });

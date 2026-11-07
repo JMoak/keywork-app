@@ -1,8 +1,21 @@
 import type { ChildFinished, ChildStarted } from "./children.ts";
 import type { CacheMiss, SendBehavior, SessionState } from "./controls.ts";
+import type { CreatureChanged, PromptOrigin } from "./creatures.ts";
 import type { MemoryDecision } from "./decisions.ts";
+import type {
+  MeshGrantChange,
+  MeshListenerChange,
+  MeshPairChange,
+  MeshPairingChange,
+  MeshPeersChange,
+  MeshRevocationChange,
+  MeshWalk,
+} from "./mesh.ts";
+import type { ModelFallback, ModelsChanged } from "./models.ts";
 import type { AskScope, DenyReason, PermissionRule } from "./permissions.ts";
+import type { RoutineFinished, RoutineFired, RoutineNeeds } from "./routines.ts";
 import type { CompactionEntry } from "./sessions.ts";
+import type { WorkshopChange } from "./workshops.ts";
 import type { SurfaceKind } from "./workspace.ts";
 
 export const engineEventTypes = [
@@ -10,6 +23,8 @@ export const engineEventTypes = [
   "turn.delta",
   "turn.completed",
   "turn.interrupted",
+  "turn.waiting",
+  "turn.resumed",
   "queue.changed",
   "tool.started",
   "tool.output",
@@ -20,6 +35,7 @@ export const engineEventTypes = [
   "session.mode",
   "context.injected",
   "memory.decided",
+  "model.fallback",
   "child.started",
   "child.finished",
   "diagnostics.published",
@@ -39,9 +55,39 @@ export const serverEventTypes = [
   "session.removed",
   "session.restored",
   "session.settled",
+  "creature.changed",
+  "routine.fired",
+  "routine.finished",
+  "routine.needs",
+  "workshop.changed",
+  "models.changed",
+  "mesh.listener",
+  "mesh.pairing",
+  "mesh.pair",
+  "mesh.grant",
+  "mesh.revocation",
+  "mesh.walked",
+  "mesh.peers",
 ] as const;
 
 export type ServerEventType = (typeof serverEventTypes)[number];
+
+export const ranchEventTypes = [
+  "creature.changed",
+  "routine.fired",
+  "routine.finished",
+  "workshop.changed",
+  "models.changed",
+  "mesh.listener",
+  "mesh.pairing",
+  "mesh.pair",
+  "mesh.grant",
+  "mesh.revocation",
+  "mesh.walked",
+  "mesh.peers",
+] as const satisfies readonly ServerEventType[];
+
+export type RanchEventType = (typeof ranchEventTypes)[number];
 
 export const eventTypes = [...engineEventTypes, ...serverEventTypes] as const;
 
@@ -58,6 +104,19 @@ export interface ServerPayloads {
   "session.removed": SessionRemoval;
   "session.restored": SessionRemoval;
   "session.settled": SessionSettlement;
+  "creature.changed": CreatureChanged;
+  "routine.fired": RoutineFired;
+  "routine.finished": RoutineFinished;
+  "routine.needs": RoutineNeeds;
+  "workshop.changed": WorkshopChange;
+  "models.changed": ModelsChanged;
+  "mesh.listener": MeshListenerChange;
+  "mesh.pairing": MeshPairingChange;
+  "mesh.pair": MeshPairChange;
+  "mesh.grant": MeshGrantChange;
+  "mesh.revocation": MeshRevocationChange;
+  "mesh.walked": MeshWalk;
+  "mesh.peers": MeshPeersChange;
 }
 
 export interface InboxTally {
@@ -119,6 +178,8 @@ export interface EnginePayloads {
   "turn.delta": { delta: TurnDelta };
   "turn.completed": { message: Message; usage: Usage };
   "turn.interrupted": { message: Message };
+  "turn.waiting": TurnWaiting;
+  "turn.resumed": TurnResumed;
   "queue.changed": { queued: QueuedPrompt[] };
   "tool.started": { call: ToolCallPart };
   "tool.output": { chunk: string; callId?: string };
@@ -129,6 +190,7 @@ export interface EnginePayloads {
   "session.mode": { mode: string };
   "context.injected": { injection: ContextInjection };
   "memory.decided": { decision: MemoryDecision };
+  "model.fallback": ModelFallback;
   "child.started": ChildStarted;
   "child.finished": ChildFinished;
   "diagnostics.published": { path: string; count: number };
@@ -144,6 +206,18 @@ export interface ExtensionNotice {
   level: ExtensionNoticeLevel;
   message: string;
   detail?: unknown;
+}
+
+export type WaitReason = "rate-limited" | "overloaded" | "unreachable";
+
+export interface TurnWaiting {
+  reason: WaitReason;
+  until: string;
+  attempt: number;
+}
+
+export interface TurnResumed {
+  attempt: number;
 }
 
 export type TurnDelta =
@@ -200,11 +274,6 @@ export interface Usage {
   costUsd?: number;
 }
 
-export interface PromptOrigin {
-  kind: "external";
-  client: string;
-}
-
 export interface QueuedPrompt {
   id: string;
   text: string;
@@ -255,7 +324,8 @@ export interface ContextInjection {
     | "skill"
     | "project-instructions"
     | "repo-map"
-    | "subagent";
+    | "subagent"
+    | "creature";
   id?: string;
   scope?: string;
 }

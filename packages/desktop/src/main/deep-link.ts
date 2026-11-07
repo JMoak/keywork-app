@@ -1,4 +1,6 @@
-export const protocolScheme = "keywork";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
+
+export const protocolScheme = keyworkProfile.protocolScheme;
 
 export type OpenRequest =
   | { ok: true; action: "open"; path: string }
@@ -11,9 +13,24 @@ export type RefusalReason =
   | "relative-path"
   | "unsafe-path";
 
-export function requestFromUrl(input: string): OpenRequest {
+export type Launch = {
+  defaultApp: boolean;
+  appPath: string | undefined;
+  switches: readonly string[];
+  operands: readonly string[];
+};
+
+export type ProtocolHandler =
+  | { kind: "this-executable" }
+  | { kind: "dev-app"; appPath: string }
+  | { kind: "untouched" };
+
+export function requestFromUrl(
+  input: string,
+  profile: ProductProfile = keyworkProfile,
+): OpenRequest {
   const url = parseUrl(input);
-  if (url === undefined || url.protocol !== `${protocolScheme}:`) {
+  if (url === undefined || url.protocol !== `${profile.protocolScheme}:`) {
     return { ok: false, reason: "malformed-url", input };
   }
   if (actionOf(url) !== "open") return { ok: false, reason: "unknown-action", input };
@@ -24,17 +41,39 @@ export function requestFromUrl(input: string): OpenRequest {
 
 export function requestFromArgv(
   argv: readonly string[],
-  launcherArguments = 1,
+  defaultApp = false,
+  profile: ProductProfile = keyworkProfile,
 ): OpenRequest | undefined {
-  for (const argument of argv.slice(launcherArguments)) {
-    if (argument.startsWith(`${protocolScheme}:`)) return requestFromUrl(argument);
-    if (looksLikePath(argument)) return requestForPath(argument, argument);
+  return requestFromLaunch(launchFrom(argv, defaultApp), profile);
+}
+
+export function requestFromLaunch(
+  launch: Launch,
+  profile: ProductProfile = keyworkProfile,
+): OpenRequest | undefined {
+  for (const operand of launch.operands) {
+    if (operand.startsWith(`${profile.protocolScheme}:`)) return requestFromUrl(operand, profile);
+    if (isAbsolute(operand)) return requestForPath(operand, operand);
   }
   return undefined;
 }
 
-export function openUrlFor(path: string): string {
-  return `${protocolScheme}://open?path=${encodeURIComponent(path)}`;
+export function launchFrom(argv: readonly string[], defaultApp: boolean): Launch {
+  const { switches, positionals } = splitSwitches(argv.slice(1));
+  if (!defaultApp) return { defaultApp, appPath: undefined, switches, operands: positionals };
+  const [appPath, ...operands] = positionals;
+  return { defaultApp, appPath, switches, operands };
+}
+
+export function protocolHandlerFor(launch: Launch): ProtocolHandler {
+  if (launch.switches.length > 0) return { kind: "untouched" };
+  if (!launch.defaultApp) return { kind: "this-executable" };
+  if (launch.appPath === undefined) return { kind: "untouched" };
+  return { kind: "dev-app", appPath: launch.appPath };
+}
+
+export function openUrlFor(path: string, profile: ProductProfile = keyworkProfile): string {
+  return `${profile.protocolScheme}://open?path=${encodeURIComponent(path)}`;
 }
 
 function requestForPath(path: string, input: string): OpenRequest {
@@ -56,8 +95,21 @@ function actionOf(url: URL): string {
   return url.pathname.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
-function looksLikePath(argument: string): boolean {
-  return !argument.startsWith("-") && isAbsolute(argument);
+function splitSwitches(argv: readonly string[]): { switches: string[]; positionals: string[] } {
+  const terminator = argv.indexOf("--");
+  const beforeTerminator = terminator === -1 ? argv : argv.slice(0, terminator);
+  const afterTerminator = terminator === -1 ? [] : argv.slice(terminator + 1);
+  return {
+    switches: beforeTerminator.filter(isSwitch),
+    positionals: [
+      ...beforeTerminator.filter((argument) => !isSwitch(argument)),
+      ...afterTerminator,
+    ],
+  };
+}
+
+function isSwitch(argument: string): boolean {
+  return argument.startsWith("-");
 }
 
 function isAbsolute(path: string): boolean {

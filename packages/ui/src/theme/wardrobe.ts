@@ -1,7 +1,15 @@
 import { type ServerTheme, systemThemeName } from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { parseTheme, type Theme } from "./schema.ts";
-import { gallery, keyworkDay, keyworkNight } from "./themes.ts";
+import {
+  formerWornThemeKey,
+  gallery,
+  keyworkNight,
+  rememberedTheme,
+  systemBasisKey,
+  systemPairing,
+  wornThemeKey,
+} from "./themes.ts";
 import { applyTheme } from "./variables.ts";
 
 export type ThemeSource = "system" | "gallery" | "server";
@@ -32,10 +40,6 @@ export interface WardrobeOptions {
   prefersDark?: (() => boolean) | undefined;
   watchAppearance?: ((listener: () => void) => () => void) | undefined;
 }
-
-export const wornThemeKey = "keywork.theme";
-export const formerWornThemeKey = "keywork.flavor";
-export const systemBasisKey = "keywork.theme.system";
 
 export function createWardrobe(options: WardrobeOptions): Wardrobe {
   const prefersDark = options.prefersDark ?? systemPrefersDark;
@@ -125,11 +129,7 @@ export interface BootOptions {
 
 export function wearRememberedTheme(options: BootOptions = {}): Theme {
   const prefersDark = (options.prefersDark ?? systemPrefersDark)();
-  const closet = closetOf([]);
-  const basis = remembered(options.storage, systemBasisKey);
-  const theme =
-    fitted(closet, rememberedChoice(options.storage)) ??
-    resolveTheme(systemThemeName, closet, prefersDark, basis);
+  const theme = rememberedTheme((key) => remembered(options.storage, key), prefersDark);
   (options.apply ?? ((chosen: Theme) => applyTheme(chosen)))(theme);
   return theme;
 }
@@ -180,16 +180,7 @@ export function watchSystemAppearance(listener: () => void): () => void {
 }
 
 function systemTheme(closet: Closet, prefersDark: boolean, basis: string | undefined): Theme {
-  const wanted = prefersDark ? "dark" : "light";
-  const pairing = basisPair(closet, basis) ?? [keyworkNight, keyworkDay];
-  return pairing.find((theme) => theme.appearance === wanted) ?? pairing[0];
-}
-
-function basisPair(closet: Closet, basis: string | undefined): [Theme, Theme] | undefined {
-  if (basis === undefined) return undefined;
-  const theme = fitted(closet, basis);
-  const pair = theme?.pair === undefined ? undefined : fitted(closet, theme.pair);
-  return theme === undefined || pair === undefined ? undefined : [theme, pair];
+  return systemPairing((name) => fitted(closet, name), prefersDark, basis);
 }
 
 function fitted(closet: Closet, name: string): Theme | undefined {

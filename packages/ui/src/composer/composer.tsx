@@ -1,6 +1,8 @@
 import type { QueuedPrompt } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { originLabel } from "../page/origin.ts";
 import type { CommandRegistry } from "../palette/commands.ts";
+import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import "./composer.css";
 import { clusterAfter, clusterBefore, type TextSpan } from "./graphemes.ts";
 import { createPasteVault, type PasteVault } from "./paste-vault.ts";
@@ -39,6 +41,7 @@ export function intentOf(
 }
 
 export function Composer(props: ComposerProps) {
+  const keyboard = useKeyboardScope();
   const [draft, setDraft] = createSignal("");
   const pastes = createPasteVault();
   createEffect(
@@ -117,7 +120,7 @@ export function Composer(props: ComposerProps) {
                 </span>
                 {prompt.text}
                 <Show when={prompt.origin}>
-                  {(origin) => <span class="kw-queue-origin">via {origin().client}</span>}
+                  {(origin) => <span class="kw-queue-origin">{originLabel(origin())}</span>}
                 </Show>
               </li>
             )}
@@ -144,6 +147,7 @@ export function Composer(props: ComposerProps) {
           placeholder={props.placeholder ?? "say what you want done"}
           value={draft()}
           onInput={(event) => setDraft(event.currentTarget.value)}
+          onFocus={(event) => keyboard?.yieldToClaim(event.currentTarget)}
           onPaste={onPaste}
           onKeyDown={onKeyDown}
         />

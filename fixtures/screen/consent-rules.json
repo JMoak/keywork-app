@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "about": "Consent rules the TypeScript control grant and the input helper must agree on. Each case runs against the grant book (packages/screen/src/consent-rules.test.ts) and the helper stand-in (packages/desktop/src/main/screen/helper/stand-in.test.ts); the Rust helper reads the same file.",
+  "cases": [
+    {
+      "name": "input without a grant is refused",
+      "steps": [{ "do": "input", "expect": "refused" }]
+    },
+    {
+      "name": "input under a live control grant is applied",
+      "steps": [
+        { "do": "grant", "lifetimeMs": 60000 },
+        { "do": "input", "expect": "applied" }
+      ]
+    },
+    {
+      "name": "input after the grant expires is refused",
+      "steps": [
+        { "do": "grant", "lifetimeMs": 150 },
+        { "do": "input", "expect": "applied" },
+        { "do": "wait", "ms": 250 },
+        { "do": "input", "expect": "refused" }
+      ]
+    },
+    {
+      "name": "a grant never survives a restart",
+      "steps": [
+        { "do": "grant", "lifetimeMs": 60000 },
+        { "do": "restart" },
+        { "do": "input", "expect": "refused" }
+      ]
+    }
+  ]
+}

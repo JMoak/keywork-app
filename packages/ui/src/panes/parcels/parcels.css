@@ -1,0 +1,71 @@
+.kw-parcels-who {
+  color: var(--kw-text-dim);
+}
+
+.kw-parcels-health {
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kw-parcels-detail {
+  margin: 0 0.75rem 0.25rem 1.75rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid color-mix(in oklch, var(--kw-border) 50%, transparent);
+}
+
+.kw-parcels-detail p {
+  margin: 0;
+  color: var(--kw-text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.kw-parcels-detail p[data-kind="gate"] {
+  color: var(--kw-text-mid);
+}
+.kw-parcels-detail p[data-kind="code"] {
+  color: var(--kw-accent);
+}
+
+.kw-parcels-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+}
+.kw-parcels-form label {
+  display: contents;
+}
+.kw-parcels-form-title,
+.kw-parcels-problem {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.kw-parcels-form-title {
+  color: var(--kw-text);
+}
+.kw-parcels-problem {
+  color: var(--kw-error);
+  overflow-wrap: anywhere;
+}
+.kw-parcels-form input {
+  min-width: 0;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+  padding: 0.125rem 0.5ch;
+}
+.kw-parcels-form input:focus {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+.kw-parcels-form button {
+  grid-column: 2;
+  justify-self: start;
+}

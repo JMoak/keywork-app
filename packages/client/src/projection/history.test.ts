@@ -63,6 +63,43 @@ describe("historyEnvelopes", () => {
     expect(state.turn).toBeUndefined();
   });
 
+  it("draws a framed prompt as the creature line in its place, never as the keeper's prompt, live and after a reload", () => {
+    const frame = "You are Vey, the keeper's creature, and this is your first thread.";
+    const origin = { kind: "creature", creature: "vey", thread: "s2" } as const;
+    const introduced: SessionDetail = {
+      ...detail,
+      id: "s2",
+      messages: [
+        { role: "user", parts: [{ type: "text", text: frame }] },
+        { role: "assistant", parts: [{ type: "text", text: "I am Vey." }] },
+      ],
+      reports: [
+        { index: 0, entryId: "e1", at: detail.createdAt, text: frame, origin, kind: "frame" },
+      ],
+    };
+    const reloaded = projectAll(emptyProjection, historyEnvelopes(introduced));
+    expect(reloaded.entries.map((entry) => entry.kind)).toEqual(["notice", "assistant"]);
+    expect(reloaded.entries[0]).toMatchObject({ text: frame });
+    const live = projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: detail.createdAt,
+        sessionId: "s2",
+        type: "extension.notice",
+        payload: { extension: "creature", level: "info", message: frame, detail: { origin } },
+      },
+      {
+        id: 2,
+        ts: detail.createdAt,
+        sessionId: "s2",
+        type: "turn.started",
+        payload: { userText: frame, entryId: "e2", origin },
+      },
+    ]);
+    expect(live.entries.map((entry) => entry.kind)).toEqual(["notice"]);
+    expect(live.turn).toMatchObject({ userText: frame, origin });
+  });
+
   it("gives replayed envelopes negative ids so they never advance the resume point", () => {
     const state = projectAll(emptyProjection, historyEnvelopes(detail));
     expect(state.lastEventId).toBeLessThan(0);

@@ -1,0 +1,57 @@
+.kw-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--kw-background);
+}
+
+.kw-screen-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  padding: 0.25rem 0.75rem;
+  font-family: var(--kw-font-mono);
+  line-height: 1.25rem;
+  color: var(--kw-text-mid);
+  border-bottom: 1px solid var(--kw-border);
+}
+
+.kw-screen-path {
+  color: var(--kw-text);
+}
+
+.kw-screen-path[data-path="derp"],
+.kw-screen-path[data-path="unknown"] {
+  color: var(--kw-text-dim);
+}
+
+.kw-screen-stats {
+  color: var(--kw-text-dim);
+}
+
+.kw-screen[data-phase="ended"] .kw-screen-status,
+.kw-screen[data-phase="failed"] .kw-screen-status {
+  color: var(--kw-error);
+}
+
+.kw-screen-video {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  background: var(--kw-panel);
+}
+
+.kw-screen-video[data-live="false"] {
+  opacity: 0.4;
+}
+
+.kw-screen-control[data-control="active"] {
+  color: var(--kw-error);
+}
+
+.kw-screen-control[data-control="paused"],
+.kw-screen-control[data-control="revoked"] {
+  color: var(--kw-text-dim);
+}

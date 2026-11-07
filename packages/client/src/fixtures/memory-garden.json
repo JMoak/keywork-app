@@ -38,19 +38,19 @@
           "before": null,
           "beforeHash": null,
           "after": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
-          "afterHash": "03f03b70a6093ec0bc724e58b8f017e6a2f91bf825d22286f62cafc183a18528"
+          "afterHash": "87aa83404d2f0c4192735c2d185a41e7a1d694b7f0b1af727defb951703d6221"
         },
         {
           "path": ".staging/q1.md",
           "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
-          "beforeHash": "03f03b70a6093ec0bc724e58b8f017e6a2f91bf825d22286f62cafc183a18528",
+          "beforeHash": "87aa83404d2f0c4192735c2d185a41e7a1d694b7f0b1af727defb951703d6221",
           "after": null,
           "afterHash": null
         },
         {
           "path": ".staging/q1.json",
           "before": "{\"kind\":\"note\",\"target\":\"Stray Claim.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
-          "beforeHash": "caf78cf20f075e5646772a1c591b5c6705f7f2e289a31b68665edea798e0e295",
+          "beforeHash": "03d1c48df980e077415af3a6fcfc11557304b046713f450adb6842d87f3bf223",
           "after": null,
           "afterHash": null
         }
@@ -64,14 +64,14 @@
         {
           "path": ".staging/q5.md",
           "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nAny flavor file can be imported from the palette.\n",
-          "beforeHash": "b55f3013494024a60e0b7dd7aeb451e4f24ac53811e8107370981651cd7a215c",
+          "beforeHash": "6d59a71b138e1fd7cb30f3ca0cf5528a9450d196c5aa8aee181a229bd8f075ff",
           "after": null,
           "afterHash": null
         },
         {
           "path": ".staging/q5.json",
           "before": "{\"kind\":\"note\",\"target\":\"Flavor Import.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
-          "beforeHash": "efbac41b2be32b4877f3c1a270b3cb5f7080099672ba295334dfec29d84c36b6",
+          "beforeHash": "e29403115eabce422061c19dbb51b0747fd1e64d403db58f52d77f11093b02eb",
           "after": null,
           "afterHash": null
         }
@@ -85,7 +85,7 @@
         {
           "path": "Stray Claim.md",
           "before": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
-          "beforeHash": "03f03b70a6093ec0bc724e58b8f017e6a2f91bf825d22286f62cafc183a18528",
+          "beforeHash": "87aa83404d2f0c4192735c2d185a41e7a1d694b7f0b1af727defb951703d6221",
           "after": null,
           "afterHash": null
         },
@@ -94,14 +94,14 @@
           "before": null,
           "beforeHash": null,
           "after": "---\nprovenance: \"untrusted\"\ncreated: \"2026-09-07T12:00:00.000Z\"\n---\nThirds, maybe.\n",
-          "afterHash": "03f03b70a6093ec0bc724e58b8f017e6a2f91bf825d22286f62cafc183a18528"
+          "afterHash": "87aa83404d2f0c4192735c2d185a41e7a1d694b7f0b1af727defb951703d6221"
         },
         {
           "path": ".staging/q1.json",
           "before": null,
           "beforeHash": null,
           "after": "{\"kind\":\"note\",\"target\":\"Stray Claim.md\",\"created\":\"2026-09-07T12:00:00.000Z\"}\n",
-          "afterHash": "caf78cf20f075e5646772a1c591b5c6705f7f2e289a31b68665edea798e0e295"
+          "afterHash": "03d1c48df980e077415af3a6fcfc11557304b046713f450adb6842d87f3bf223"
         }
       ]
     }

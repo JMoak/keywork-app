@@ -9,7 +9,7 @@ export function echoPty(): PtyPort {
       const shell = echoShell(id, request);
       shells.set(id, shell);
       shell.say(`${banner(request)}\r\n${shell.prompt()}`);
-      return { id, title: request.program === "keywork" ? "keywork" : "echo" };
+      return { id, title: request.program === "keywork" ? commandLineOf(request) : "echo" };
     },
     write: (id, data) => shells.get(id)?.type(data),
     resize: (id, cols, rows) => shells.get(id)?.resize(cols, rows),
@@ -102,6 +102,10 @@ function echoShell(id: number, request: PtyOpenRequest): EchoShell {
 
 function banner(request: PtyOpenRequest): string {
   return request.program === "keywork"
-    ? `keywork ${(request.args ?? []).join(" ")} · the browser build has no keywork binary, this echoes`
+    ? `\`${commandLineOf(request)}\` · the browser build has no keywork binary, this echoes`
     : "echo shell · the browser build has no pty, this echoes what you type";
+}
+
+function commandLineOf(request: PtyOpenRequest): string {
+  return [request.program, ...(request.args ?? [])].join(" ");
 }

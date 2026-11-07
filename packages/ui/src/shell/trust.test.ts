@@ -1,9 +1,10 @@
-import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { ConsoleClient, KeyworkClient, ServerFeed } from "@keywork-app/client";
 import type { BusEnvelope, TrustOutcome, WorkspaceView } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import type { ShellSeams } from "../panes/registry.ts";
 import {
+  anchorNotice,
   createTrustFlow,
   isUntrusted,
   type TrustFlow,
@@ -45,7 +46,7 @@ export function inertShellExtras(
   overrides: Partial<Pick<ShellSeams, "client" | "feed" | "trust" | "openPane">> = {},
 ): Pick<ShellSeams, "client" | "feed" | "trust" | "openPane"> {
   return {
-    client: inertWorkspaceClient() as unknown as KeyworkClient,
+    client: inertWorkspaceClient() as unknown as ConsoleClient,
     feed: inertFeed(),
     trust: inertTrust(),
     openPane: () => undefined,
@@ -124,6 +125,57 @@ function harness(first: WorkspaceView, ...answers: TrustOutcome[]): Harness {
   });
   return state;
 }
+
+describe("the anchor line", () => {
+  const flowSaying = (
+    folder: string,
+    view: WorkspaceView,
+  ): { said: string[]; dispose: () => void } => {
+    const said: string[] = [];
+    let dispose = (): void => undefined;
+    createRoot((stop) => {
+      dispose = stop;
+      createTrustFlow({
+        client: {
+          workspace: async () => view,
+          trustWorkspace: async () => {
+            throw new Error("not asked");
+          },
+        },
+        feed: { subscribe: () => () => undefined },
+        restart: async () => undefined,
+        folder,
+        say: (line) => said.push(line),
+      });
+    });
+    return { said, dispose };
+  };
+
+  it("names the repository root a folder inside it opens, once", async () => {
+    const h = flowSaying("C:/work/scratch/run-3", undecidedWorkspace);
+    await settle();
+    expect(h.said).toEqual([
+      "C:/work/scratch/run-3 opens the workspace at C:/work (its git root) · its sessions and chores are that workspace's",
+    ]);
+    expect(anchorNotice("C:/work/scratch", { root: "C:/work", source: "declaration" })).toBe(
+      "C:/work/scratch opens the workspace at C:/work (its declared workspace root) · its sessions and chores are that workspace's",
+    );
+    h.dispose();
+  });
+
+  it("says nothing when the folder is the root, however spelled, or the root is the launch folder", async () => {
+    const atRoot = flowSaying("c:\\Work\\", undecidedWorkspace);
+    const launched = flowSaying("C:/work/scratch", {
+      ...undecidedWorkspace,
+      anchor: { root: "C:/work", source: "launch" },
+    });
+    await settle();
+    expect(atRoot.said).toEqual([]);
+    expect(launched.said).toEqual([]);
+    atRoot.dispose();
+    launched.dispose();
+  });
+});
 
 describe("the trust flow", () => {
   it("reads the workspace once and reports an undecided root as untrusted", async () => {
@@ -207,9 +259,9 @@ describe("the trust flow", () => {
     h.dispose();
   });
 
-  it("speaks in keywork's own words", () => {
+  it("speaks in the product's words: the server, never the engine's name", () => {
     expect(trustPrompt("C:/work")).toBe(
-      "trust C:/work? keywork keeps workspace files and memory in .keywork",
+      "trust C:/work? the server keeps workspace files and memory in .keywork",
     );
     expect(untrustedNotice("C:/work", "ctrl+k u")).toContain("ctrl+k u trusts it");
     expect(trustStateOf({ ...undecidedWorkspace, trust: "untrusted" })).toMatchObject({

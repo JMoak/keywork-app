@@ -79,7 +79,9 @@ import type {
   RestoreOutcome,
   RestorePreviewReading,
   RevertReply,
+  ReviewVerdict,
   RevokeOutcome,
+  RoutineNeed,
   SendBehavior,
   SessionBinding,
   SessionDetail,
@@ -96,11 +98,15 @@ import type {
   TrustOutcome,
   TurnRestoreReading,
   UndoReading,
+  VerdictRecording,
+  VerdictsReading,
   WorkspaceChoice,
   WorkspaceUse,
   WorkspaceView,
   WriteResult,
 } from "@keywork-app/protocol";
+import { type CreatureProjectsClient, creatureProjectClient } from "./creature-projects.ts";
+import { type RanchClient, ranchRoutes } from "./ranch.ts";
 import {
   envelopeOf,
   type FrameReader,
@@ -128,6 +134,8 @@ export interface KeyworkClient {
   moveLeaf(id: string, entryId: string | null): Promise<LeafOutcome>;
   changes(id: string): Promise<ChangesReading>;
   changedFile(id: string, path: string): Promise<ChangedFileReading>;
+  hunkVerdicts(id: string): Promise<VerdictsReading>;
+  recordHunkVerdict(id: string, verdict: ReviewVerdict): Promise<VerdictRecording>;
   removeSession(id: string): Promise<RemoveOutcome>;
   listTrash(): Promise<readonly SessionSummary[]>;
   restoreSession(id: string): Promise<RestoreOutcome>;
@@ -151,6 +159,7 @@ export interface KeyworkClient {
   spill(id: string, spillId: string, range?: FileRange): Promise<SpillReading>;
   applyPreset(name: PresetName, confirmed?: boolean): Promise<PresetReading>;
   asks(): Promise<readonly PendingAsk[]>;
+  routineNeeds(): Promise<readonly RoutineNeed[]>;
   answerAsk(
     callId: string,
     verdict: AskVerdict,
@@ -213,6 +222,8 @@ export interface KeyworkClient {
   themes(): Promise<ThemesView>;
 }
 
+export type ConsoleClient = KeyworkClient & RanchClient & CreatureProjectsClient;
+
 export interface ServerDocument {
   version: string;
   contract?: string | undefined;
@@ -261,7 +272,7 @@ export function reconnectDelayMs(attempt: number): number {
   return Math.min(reconnectDelaysMs.first * 2 ** attempt, reconnectDelaysMs.ceiling);
 }
 
-export function keyworkClient(ticket: ServerTicket, seams: ClientSeams = {}): KeyworkClient {
+export function keyworkClient(ticket: ServerTicket, seams: ClientSeams = {}): ConsoleClient {
   return clientOver(
     ticket.url.replace(/\/+$/, ""),
     authorizedFetch(ticket, seams.fetch ?? fetch),
@@ -269,7 +280,7 @@ export function keyworkClient(ticket: ServerTicket, seams: ClientSeams = {}): Ke
   );
 }
 
-export function keyworkClientOver(transport: Fetch, seams: ClientSeams = {}): KeyworkClient {
+export function keyworkClientOver(transport: Fetch, seams: ClientSeams = {}): ConsoleClient {
   return clientOver("", transport, seams);
 }
 
@@ -281,7 +292,7 @@ export function authorizedFetch(ticket: ServerTicket, transport: Fetch): Fetch {
     });
 }
 
-function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkClient {
+function clientOver(url: string, transport: Fetch, seams: ClientSeams): ConsoleClient {
   const readFrames = seams.readFrames ?? sseFrames;
   const delay = seams.delay ?? sleep;
   const request = (method: string, path: string, body?: unknown, init: RequestInit = {}) =>
@@ -376,10 +387,31 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
       if (response.status === 409) return "no-baseline";
       return json<ChangedFileReading>(response);
     },
+    hunkVerdicts: async (id) => {
+      const response = await request("GET", `/sessions/${encodeURIComponent(id)}/changes/verdicts`);
+      if (response.status === 404) return "missing";
+      return json<VerdictsReading>(response);
+    },
+    recordHunkVerdict: async (id, verdict) => {
+      const response = await request(
+        "POST",
+        `/sessions/${encodeURIComponent(id)}/changes/verdicts`,
+        verdict,
+      );
+      if (response.status === 404) return "missing";
+      if (response.status === 501) return "unwired";
+      return json<VerdictRecording>(response);
+    },
     ...lifecycleRoutes(request),
     asks: async () => {
       const listed = await json<{ asks: PendingAsk[] }>(await request("GET", "/asks"));
       return listed.asks;
+    },
+    routineNeeds: async () => {
+      const listed = await json<{ items: RoutineNeed[] }>(
+        await request("GET", "/routines/needs-you"),
+      );
+      return Array.isArray(listed.items) ? listed.items : [];
     },
     answerAsk: async (callId, verdict, scope, reason, note) => {
       const denied = verdict === "denied";
@@ -401,6 +433,8 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): KeyworkC
     ...memoryRoutes(request),
     ...workspaceRoutes(request),
     ...surfaceRoutes(request),
+    ...ranchRoutes(request),
+    ...creatureProjectClient(request),
     events: (options = {}) =>
       resumingEvents(
         options,

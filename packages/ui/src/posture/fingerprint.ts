@@ -77,7 +77,7 @@ export function factPhrases(facts: readonly Fact[]): string[] {
       const noun = names.length === 1 ? factNouns[kind] : `${factNouns[kind]}s`;
       return [`new ${noun}: ${names.join(", ")}`];
     }),
-    ...(version === undefined ? [] : [`keywork now ${version}`]),
+    ...(version === undefined ? [] : [`the engine is now ${version}`]),
   ];
 }
 

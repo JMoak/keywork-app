@@ -1,5 +1,7 @@
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { createResource, createSignal, For, onCleanup, Show } from "solid-js";
 import { FirstRun } from "../chrome/first-run.tsx";
+import { useProductProfile } from "../chrome/product.ts";
 import { themeName } from "../chrome/root-attributes.ts";
 import { createTileFillStep, stampGlyph } from "../chrome/stamp.ts";
 import { relativeAge } from "../chrome/telemetry.ts";
@@ -12,9 +14,15 @@ export interface OpenScreenProps {
   failure: string | undefined;
   opening: string | undefined;
   onOpen: (path: string) => void;
+  onEnableRuntime?: (() => void) | undefined;
+}
+
+export function startingLine(path: string, profile: ProductProfile = keyworkProfile): string {
+  return `starting ${profile.name} in ${path}`;
 }
 
 export function OpenScreen(props: OpenScreenProps) {
+  const profile = useProductProfile();
   const [recents] = createResource(() => props.host.recentWorkspaces());
   const [about] = createResource(() => props.host.about());
   const live = createLiveKeymap(keymapFromConfig());
@@ -29,7 +37,7 @@ export function OpenScreen(props: OpenScreenProps) {
     <main class="kw-open">
       <div class="kw-open-sheet">
         <header class="kw-open-masthead">
-          <h1 class="kw-open-name">keywork</h1>
+          <h1 class="kw-open-name">{profile.name}</h1>
           <Show when={themeName()}>
             {(name) => (
               <p class="kw-open-theme">
@@ -68,7 +76,20 @@ export function OpenScreen(props: OpenScreenProps) {
           <FirstRun keys={keys} />
         </Show>
         <Show when={props.opening}>{(path) => <OpeningNote path={path()} />}</Show>
-        <Show when={props.failure}>{(text) => <p class="kw-open-failure">{text()}</p>}</Show>
+        <Show when={props.failure}>
+          {(text) => (
+            <>
+              <p class="kw-open-failure">{text()}</p>
+              <Show when={props.onEnableRuntime}>
+                {(enable) => (
+                  <button class="kw-open-pick" type="button" onClick={() => enable()()}>
+                    Enable background work
+                  </button>
+                )}
+              </Show>
+            </>
+          )}
+        </Show>
       </div>
     </main>
   );
@@ -96,6 +117,7 @@ function TypedWorkspace(props: { onOpen: (path: string) => void }) {
 }
 
 function OpeningNote(props: { path: string }) {
+  const profile = useProductProfile();
   const step = createTileFillStep(() => true);
   const waited = createWaitedSeconds();
   return (
@@ -103,7 +125,7 @@ function OpeningNote(props: { path: string }) {
       <span class="kw-open-stamp" aria-hidden="true">
         {stampGlyph("working", step())}
       </span>
-      starting keywork in {props.path}
+      {startingLine(props.path, profile)}
       <Show when={waited() >= patientAfterSeconds}>
         <span class="kw-open-waited">· {waited()}s</span>
       </Show>

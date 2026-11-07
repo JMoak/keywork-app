@@ -1,4 +1,5 @@
 import { emptyProjection } from "@keywork-app/client";
+import { keyworkProfile, steadProfile } from "@keywork-app/product";
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { StatusLine, type StatusLineProps, statusItems } from "./status-line.tsx";
@@ -18,13 +19,16 @@ const quiet: StatusLineProps = {
 };
 
 describe("statusItems", () => {
-  it("speaks the C18 grammar in order and leaves out what has nothing to say", () => {
-    expect(statusItems(quiet).map((item) => [item.tone, item.text])).toEqual([
-      ["mark", "keywork"],
-      ["where", "127.0.0.1:4770"],
-      ["word", "careful"],
-    ]);
-  });
+  it.each([keyworkProfile, steadProfile])(
+    "renders the $name mark followed by the status grammar",
+    (profile) => {
+      expect(statusItems(quiet, profile).map((item) => [item.tone, item.text])).toEqual([
+        ["mark", profile.name],
+        ["where", "127.0.0.1:4770"],
+        ["word", "careful"],
+      ]);
+    },
+  );
 
   it("puts an untrusted workspace beside the server, where the eye lands first", () => {
     const items = statusItems({ ...quiet, trust: "untrusted · ctrl+k u trusts" });
@@ -45,6 +49,23 @@ describe("StatusLine", () => {
     );
     expect(tones).toEqual(["mark", "where", "word"]);
     expect(container.querySelector(".kw-status-moment")?.textContent).toBe("");
+  });
+
+  it("shows a manual compatibility notice without an install button", () => {
+    const { container } = render(() => (
+      <StatusLine
+        {...quiet}
+        update={{
+          waiting: () => ({ version: "0.2.1", reviewRequired: true }),
+          accepted: () => false,
+          accept: () => undefined,
+        }}
+      />
+    ));
+    expect(container.querySelector(".kw-status-update")?.textContent).toBe(
+      "update 0.2.1 available · manual compatibility review required",
+    );
+    expect(container.querySelector(".kw-status-update button")).toBeNull();
   });
 
   it("shows the armed leader, the notice, and a lost server", () => {

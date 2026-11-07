@@ -1,7 +1,7 @@
 import type { McpServerStatus } from "@keywork-app/protocol";
 import { cleanup } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
-import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
+import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import { mcpPane, serverAside, serverDensity, serverMark, stateTally } from "./index.tsx";
 
 afterEach(cleanup);

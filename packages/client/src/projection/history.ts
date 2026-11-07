@@ -3,12 +3,16 @@ import type {
   ContextEditMark,
   Message,
   PermissionDecision,
+  PromptOrigin,
+  ReportMark,
   SessionDetail,
   SessionEntries,
   SummaryKind,
   ToolCallPart,
+  VerdictMark,
 } from "@keywork-app/protocol";
 import { promptIds, readJournal } from "./journal.ts";
+import { reviewNotice } from "./review.ts";
 import { emptyProjection, type SessionProjection } from "./types.ts";
 
 export function historyEnvelopes(detail: SessionDetail, journal?: SessionEntries): BusEnvelope[] {
@@ -25,13 +29,18 @@ export function historyEnvelopes(detail: SessionDetail, journal?: SessionEntries
     id -= 1;
     envelopes.push({ ...stamp, id, ...envelope } as BusEnvelope);
   };
+  const reports = reportsAt(detail);
+  const verdicts = verdictsAt(detail);
+  const frames = framesAt(detail);
   const replayForgottenAt = (index: number): void => {
     for (const edit of forgotten.get(index) ?? []) replayForgotten(edit, emit);
+    for (const report of reports.get(index) ?? []) replayReport(report, emit);
+    for (const verdict of verdicts.get(index) ?? []) replayVerdict(verdict, emit);
   };
   detail.messages.forEach((message, index) => {
     replayForgottenAt(index);
     const entryId = marked.get(index) ?? placed.get(index);
-    if (message.role === "user") replayPrompt(message, entryId, emit);
+    if (message.role === "user") replayPrompt(message, entryId, emit, frames.get(index));
     else if (message.role === "assistant") replayAssistant(message, calls, emit);
     else replayToolResults(message, calls, decisions, emit);
   });
@@ -71,14 +80,62 @@ function forgottenPromptsAt(detail: SessionDetail): ReadonlyMap<number, ContextE
   return slots;
 }
 
+function reportsAt(detail: SessionDetail): ReadonlyMap<number, ReportMark[]> {
+  const slots = new Map<number, ReportMark[]>();
+  for (const report of detail.reports ?? []) {
+    slots.set(report.index, [...(slots.get(report.index) ?? []), report]);
+  }
+  return slots;
+}
+
+function verdictsAt(detail: SessionDetail): ReadonlyMap<number, VerdictMark[]> {
+  const slots = new Map<number, VerdictMark[]>();
+  for (const verdict of detail.verdicts ?? []) {
+    slots.set(verdict.index, [...(slots.get(verdict.index) ?? []), verdict]);
+  }
+  return slots;
+}
+
+function replayVerdict(verdict: VerdictMark, emit: Emit): void {
+  emit({ type: "extension.notice", payload: { ...reviewNotice(verdict), replay: true } });
+}
+
+function framesAt(detail: SessionDetail): ReadonlyMap<number, PromptOrigin> {
+  const frames = (detail.reports ?? []).filter((report) => report.kind === "frame");
+  return new Map(frames.map((frame) => [frame.index, frame.origin]));
+}
+
+function replayReport(report: ReportMark, emit: Emit): void {
+  emit({
+    type: "extension.notice",
+    payload: {
+      extension: "creature",
+      level: "info",
+      message: report.text,
+      detail: {
+        origin: report.origin,
+        entryId: report.entryId,
+        ...(report.kind !== undefined && { kind: report.kind }),
+      },
+      replay: true,
+    },
+  });
+}
+
 const zeroUsage = { inputTokens: 0, outputTokens: 0 };
 
-function replayPrompt(message: Message, entryId: string | undefined, emit: Emit): void {
+function replayPrompt(
+  message: Message,
+  entryId: string | undefined,
+  emit: Emit,
+  framedBy: PromptOrigin | undefined,
+): void {
   emit({
     type: "turn.started",
     payload: {
       userText: textOf(message),
       ...(entryId !== undefined && { entryId }),
+      ...(framedBy !== undefined && { origin: framedBy }),
       replay: true,
     },
   });

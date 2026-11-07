@@ -16,7 +16,7 @@ export const keybindingsSchema = z
       .string()
       .default(defaultLeader)
       .describe(
-        "The one leader chord every harness verb hangs off; keywork's default is ctrl+k so muscle memory transfers between the terminal and the app.",
+        "The one leader chord every harness verb hangs off; the default is ctrl+k so muscle memory transfers between the terminal and the app.",
       ),
     timeoutMs: z
       .number()

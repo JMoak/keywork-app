@@ -1,6 +1,14 @@
+export type {
+  CreatureProjectBinding,
+  CreatureProjectLink,
+  ProjectDiscussionInput,
+  ProjectThreadInput,
+  WorkspaceSessionRef,
+} from "@keywork-app/protocol";
 export {
   authorizedFetch,
   type ClientSeams,
+  type ConsoleClient,
   type Delay,
   type EventStreamOptions,
   type Fetch,
@@ -14,6 +22,7 @@ export {
   ServerRefusal,
   type ServerTicket,
 } from "./client.ts";
+export { CreatureProjectRefusal, type CreatureProjectsClient } from "./creature-projects.ts";
 export {
   type BatchListener,
   type FeedOptions,
@@ -87,6 +96,26 @@ export {
 } from "./projection/lineage.ts";
 export { detailLineLimit, project, projectAll } from "./projection/project.ts";
 export {
+  emptyReview,
+  hunkDigest,
+  hunkHeader,
+  hunkKey,
+  hunkReference,
+  isReviewNotice,
+  latestVerdicts,
+  openAsks,
+  type ReviewState,
+  type ReviewTally,
+  reviewMarked,
+  reviewNotice,
+  reviewSnapshot,
+  reviewState,
+  reviewTally,
+  reviewVerdictOf,
+  verdictFor,
+  verdictLine,
+} from "./projection/review.ts";
+export {
   compactJson,
   durationText,
   elapsedText,
@@ -130,6 +159,7 @@ export {
   type UsageLedger,
   type UserEntry,
 } from "./projection/types.ts";
+export { type RanchClient, ranchOperations, ranchRoutes, servedRefusalOf } from "./ranch.ts";
 export { parseServeLine, type ServeLine, serveTicket } from "./serve-output.ts";
 export {
   envelopeOf,

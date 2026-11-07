@@ -1,6 +1,6 @@
 {
   "name": "@keywork-app/desktop",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
@@ -14,17 +14,19 @@
     "@keywork-app/client": "workspace:*",
     "@keywork-app/protocol": "workspace:*",
     "@keywork-app/ui": "workspace:*",
-    "electron-updater": "6.8.9",
+    "electron-updater": "6.8.11",
     "node-pty": "1.1.0",
-    "zod": "4.5.4"
+    "zod": "4.5.4",
+    "@keywork-app/product": "workspace:*"
   },
   "devDependencies": {
+    "@keywork-app/screen": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
-    "electron": "44.2.0",
-    "electron-builder": "26.15.3",
-    "electron-vite": "5.0.0",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
     "tailwindcss": "4.3.3",
-    "vite": "7.3.6",
+    "vite": "8.3.6",
     "vite-plugin-solid": "2.11.14"
   }
 }

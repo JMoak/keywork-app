@@ -1,14 +1,22 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { gallery, keyworkDay, keyworkNight } from "../packages/ui/src/theme/themes.ts";
-import { judgeTextures } from "./check-textures.ts";
+import { committedRatchets, judgeTextures } from "./check-textures.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 import { parseRatchets, ratchetsFile } from "./textures/ratchets.ts";
 
 const ratchets = parseRatchets(JSON.parse(readFileSync(join(repoRoot, ratchetsFile), "utf8")));
 
 describe("check:textures", () => {
+  it.skipIf(!insideARepository())(
+    "reads the committed ratchets from HEAD when the app sits inside another repository",
+    () => {
+      expect(committedRatchets()).toBeDefined();
+    },
+  );
+
   it("holds the shipped gallery and corpus at their ratchets", () => {
     expect(judgeTextures(ratchets, ratchets, gallery).violations).toEqual([]);
   });
@@ -41,3 +49,15 @@ describe("check:textures", () => {
     ]);
   });
 });
+
+function insideARepository(): boolean {
+  try {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

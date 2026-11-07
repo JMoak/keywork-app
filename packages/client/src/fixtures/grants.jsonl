@@ -13,9 +13,9 @@
 {"id":13,"ts":"2026-09-07T12:00:03.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":0,"outputTokens":0}}}}
 {"id":14,"ts":"2026-09-07T12:00:03.500Z","sessionId":"s1","type":"tool.started","payload":{"call":{"type":"tool-call","callId":"g2","name":"bash","arguments":{"command":"mkdir -p build"}}}}
 {"id":15,"ts":"2026-09-07T12:00:03.750Z","sessionId":"s1","type":"gate.permission","payload":{"decision":{"tool":"bash","callId":"g2","verdict":"granted","gate":"user","scope":"session","asked":false}}}
-{"id":16,"ts":"2026-09-07T12:00:04.000Z","sessionId":"s1","type":"changes.updated","payload":{"paths":[]}}
+{"id":16,"ts":"2026-09-07T12:00:04.000Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"\n","callId":"g2"}}
 {"id":17,"ts":"2026-09-07T12:00:04.250Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"\n","callId":"g2"}}
-{"id":18,"ts":"2026-09-07T12:00:04.500Z","sessionId":"s1","type":"tool.output","payload":{"chunk":"\n","callId":"g2"}}
+{"id":18,"ts":"2026-09-07T12:00:04.500Z","sessionId":"s1","type":"changes.updated","payload":{"paths":[]}}
 {"id":19,"ts":"2026-09-07T12:00:04.750Z","sessionId":"s1","type":"tool.finished","payload":{"callId":"g2","output":"","isError":false}}
 {"id":20,"ts":"2026-09-07T12:00:05.000Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"tool-call","call":{"type":"tool-call","callId":"g3","name":"bash","arguments":{"command":"git add -A"}}}}}
 {"id":21,"ts":"2026-09-07T12:00:05.250Z","sessionId":"s1","type":"turn.delta","payload":{"delta":{"type":"done","usage":{"inputTokens":0,"outputTokens":0}}}}

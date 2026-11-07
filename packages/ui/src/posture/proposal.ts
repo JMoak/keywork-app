@@ -91,7 +91,7 @@ function mcpOffers(facts: PostureFacts): Offer[] {
 function readsLine(view: PermissionsView): string {
   if (!view.trusted) return "trusted reads · off until the workspace is trusted";
   const allowed = view.bundle.filter((rule) => rule.effect === "allow").length;
-  return `trusted reads · ${counted(allowed, "command")} without an ask · fixed in keywork`;
+  return `trusted reads · ${counted(allowed, "command")} without an ask · fixed in the engine`;
 }
 
 function stillAsks(view: PermissionsView): string[] {

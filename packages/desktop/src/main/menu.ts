@@ -1,3 +1,5 @@
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
+
 export type MenuAction =
   | "open-folder"
   | "open-recent"
@@ -5,6 +7,7 @@ export type MenuAction =
   | "reload"
   | "toggle-devtools"
   | "about"
+  | "screen-stop"
   | "quit";
 
 export type MenuRole =
@@ -35,6 +38,7 @@ export type MenuItemModel =
 export type Chords = Partial<Record<MenuAction, string>>;
 
 export interface MenuInput {
+  profile?: ProductProfile;
   platform: NodeJS.Platform;
   dev: boolean;
   recents: readonly string[];
@@ -47,8 +51,9 @@ export function menuModel(input: MenuInput): readonly MenuItemModel[] {
   const item = (label: string, action: MenuAction, payload?: string): MenuItemModel =>
     withChord({ kind: "action", label, action, ...(payload !== undefined && { payload }) }, input);
   const mac = input.platform === "darwin";
+  const profile = input.profile ?? keyworkProfile;
   return [
-    ...(mac ? [appMenu(item)] : []),
+    ...(mac ? [appMenu(item, profile)] : []),
     submenu("File", [
       item("Open Folder…", "open-folder"),
       recentMenu(input.recents, item),
@@ -72,7 +77,7 @@ export function menuModel(input: MenuInput): readonly MenuItemModel[] {
       role: "window",
       items: roles("minimize", "zoom", ...(mac ? (["front"] as const) : [])),
     },
-    submenu("Help", [item("About keywork-app", "about")]),
+    submenu("Help", [item(aboutLabel(profile), "about")]),
   ];
 }
 
@@ -100,14 +105,19 @@ function recentMenu(
 
 function appMenu(
   item: (label: string, action: MenuAction, payload?: string) => MenuItemModel,
+  profile: ProductProfile,
 ): MenuItemModel {
-  return submenu("keywork", [
-    item("About keywork-app", "about"),
+  return submenu(profile.name, [
+    item(aboutLabel(profile), "about"),
     { kind: "separator" },
     ...roles("hide", "hideOthers", "unhide"),
     { kind: "separator" },
     item("Quit", "quit"),
   ]);
+}
+
+function aboutLabel(profile: ProductProfile): string {
+  return profile.id === "keywork" ? "About keywork-app" : `About ${profile.name}`;
 }
 
 function submenu(label: string, items: readonly MenuItemModel[]): MenuItemModel {

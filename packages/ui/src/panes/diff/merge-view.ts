@@ -1,11 +1,19 @@
 import {
+  type Chunk,
   getChunks,
+  getOriginalDoc,
   goToNextChunk,
   goToPreviousChunk,
   MergeView,
   unifiedMergeView,
 } from "@codemirror/merge";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  type Text,
+} from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { WidthTier } from "../../page/tiers.ts";
 import { codeHighlighting, codeTheme } from "../../theme/code.ts";
@@ -19,9 +27,19 @@ export interface MergeSides {
   readonly path?: string | undefined;
 }
 
+export interface MergeHunk {
+  readonly header: string;
+  readonly removed: readonly string[];
+  readonly added: readonly string[];
+  readonly line: number;
+}
+
 export interface MergeMount {
   readonly layout: MergeLayout;
   hunkCount(): number;
+  hunks(): readonly MergeHunk[];
+  hunkAt(): number;
+  goToHunk(index: number): void;
   nextHunk(): void;
   previousHunk(): void;
   languageLoaded(): Promise<void>;
@@ -101,9 +119,13 @@ function unifiedView(host: HTMLElement, sides: MergeSides): MergeMount {
     parent: host,
   });
   const languageLoaded = dressInLanguage(view, language, sides.path);
+  const chunks = (): readonly Chunk[] => getChunks(view.state)?.chunks ?? [];
   return {
     layout: "unified",
-    hunkCount: () => getChunks(view.state)?.chunks.length ?? 0,
+    hunkCount: () => chunks().length,
+    hunks: () => chunks().map((chunk) => hunkOf(chunk, getOriginalDoc(view.state), view.state.doc)),
+    hunkAt: () => hunkIndexAt(chunks(), view.state.selection.main.head),
+    goToHunk: (index) => landOn(view, chunks()[index]),
     nextHunk: () => goToNextChunk({ state: view.state, dispatch: view.dispatch }),
     previousHunk: () => goToPreviousChunk({ state: view.state, dispatch: view.dispatch }),
     languageLoaded: () => languageLoaded,
@@ -126,12 +148,59 @@ function splitView(host: HTMLElement, sides: MergeSides): MergeMount {
     dressInLanguage(view.a, before, sides.path),
     dressInLanguage(view.b, after, sides.path),
   ]).then(() => undefined);
+  const chunks = (): readonly Chunk[] => getChunks(view.b.state)?.chunks ?? [];
   return {
     layout: "split",
-    hunkCount: () => getChunks(view.b.state)?.chunks.length ?? 0,
+    hunkCount: () => chunks().length,
+    hunks: () => chunks().map((chunk) => hunkOf(chunk, view.a.state.doc, view.b.state.doc)),
+    hunkAt: () => hunkIndexAt(chunks(), view.b.state.selection.main.head),
+    goToHunk: (index) => landOn(view.b, chunks()[index]),
     nextHunk: () => goToNextChunk({ state: view.b.state, dispatch: view.b.dispatch }),
     previousHunk: () => goToPreviousChunk({ state: view.b.state, dispatch: view.b.dispatch }),
     languageLoaded: () => languageLoaded,
     destroy: () => view.destroy(),
   };
+}
+
+function hunkOf(chunk: Chunk, before: Text, after: Text): MergeHunk {
+  const removed = linesOf(before, chunk.fromA, chunk.toA, chunk.endA);
+  const added = linesOf(after, chunk.fromB, chunk.toB, chunk.endB);
+  return {
+    header: `@@ -${rangeOf(removed)} +${rangeOf(added)} @@`,
+    removed: removed.lines,
+    added: added.lines,
+    line: added.from + 1,
+  };
+}
+
+interface LineSpan {
+  readonly from: number;
+  readonly lines: readonly string[];
+}
+
+function linesOf(doc: Text, from: number, to: number, end: number): LineSpan {
+  const start = doc.lineAt(Math.min(from, doc.length)).number;
+  if (from === to) return { from: from >= doc.length ? doc.lines : start - 1, lines: [] };
+  const last = doc.lineAt(Math.min(end, doc.length)).number;
+  const lines: string[] = [];
+  for (let number = start; number <= last; number += 1) lines.push(doc.line(number).text);
+  return { from: start - 1, lines };
+}
+
+function rangeOf(span: LineSpan): string {
+  return span.lines.length === 0 ? `${span.from},0` : `${span.from + 1},${span.lines.length}`;
+}
+
+function landOn(view: EditorView, chunk: Chunk | undefined): void {
+  if (chunk === undefined) return;
+  const to = Math.min(chunk.toB, view.state.doc.length);
+  view.dispatch({
+    selection: { anchor: chunk.fromB },
+    effects: EditorView.scrollIntoView(EditorSelection.range(to, chunk.fromB)),
+  });
+}
+
+function hunkIndexAt(chunks: readonly Chunk[], head: number): number {
+  const index = chunks.findLastIndex((chunk) => chunk.fromB <= head);
+  return Math.max(index, 0);
 }

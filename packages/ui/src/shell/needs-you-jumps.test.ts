@@ -199,6 +199,7 @@ function deskWith(initial: NeedsYouItem[]) {
           tiler.summon({ kind: "memory" }, screen);
           return;
         }
+        if (place.kind !== "session") return;
         const showing = tiler.findPane(
           (spec) => spec.kind === "conversation" && spec.sessionId === place.sessionId,
         );

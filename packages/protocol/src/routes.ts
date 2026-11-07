@@ -1,15 +1,29 @@
+import { creatureProjectRoutes, projectThreadBody } from "./creature-projects.ts";
+import {
+  creatureDraftBody,
+  creaturePatchBody,
+  creatureRoutes,
+  recordIdBody,
+  ruleClassBody,
+} from "./creatures.ts";
 import { lifecycleRoutes } from "./lifecycle.ts";
+import { forgetApplyBody, forgetSourceBody } from "./memory.ts";
+import { creatureMessageBody, meshRoutes } from "./mesh.ts";
+import { modelRoutes } from "./models.ts";
 import { permissionRoutes } from "./permissions.ts";
+import { routineFileBody, routineRoutes } from "./routines.ts";
+import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
+import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.2.0";
 
-export const contractVersion = "1.7";
+export const contractVersion = "1.26";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
 }
 
-export type HttpMethod = "GET" | "POST" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface RouteShape {
   readonly method: HttpMethod;
@@ -17,7 +31,32 @@ export interface RouteShape {
   readonly operationId: string;
 }
 
+export const requestBodies: Readonly<Record<string, readonly string[]>> = {
+  startCreatureProjectThread: projectThreadBody,
+  discussCreatureProjectSession: projectThreadBody,
+  receiveCreatureProjectWork: [
+    ...projectThreadBody,
+    "creature",
+    "creature.workspace",
+    "creature.slug",
+    "project",
+  ],
+  createCreature: creatureDraftBody,
+  updateCreature: creaturePatchBody,
+  promoteCreatureClass: ruleClassBody,
+  demoteCreatureClass: ruleClassBody,
+  overturnCreatureDecision: recordIdBody,
+  execInWorkshop: workshopTerminalBody,
+  injectPrompt: promptInjectionBody,
+  recordHunkVerdict: hunkVerdictBody,
+  putRoutine: routineFileBody,
+  previewMemoryForget: forgetSourceBody,
+  applyMemoryForget: forgetApplyBody,
+  sendCreatureMessage: creatureMessageBody,
+};
+
 export const routes = [
+  ...creatureProjectRoutes,
   { method: "GET", path: "/doc", operationId: "getDocument" },
   { method: "GET", path: "/events", operationId: "streamEvents" },
   { method: "GET", path: "/sessions", operationId: "listSessions" },
@@ -32,6 +71,8 @@ export const routes = [
   { method: "POST", path: "/sessions/{id}/leaf", operationId: "moveSessionLeaf" },
   { method: "GET", path: "/sessions/{id}/changes", operationId: "readSessionChanges" },
   { method: "GET", path: "/sessions/{id}/changes/file", operationId: "readChangedFile" },
+  { method: "GET", path: "/sessions/{id}/changes/verdicts", operationId: "readHunkVerdicts" },
+  { method: "POST", path: "/sessions/{id}/changes/verdicts", operationId: "recordHunkVerdict" },
   { method: "POST", path: "/sessions/{id}/model", operationId: "setSessionModel" },
   { method: "POST", path: "/sessions/{id}/thinking", operationId: "setSessionThinking" },
   { method: "POST", path: "/sessions/{id}/effort", operationId: "setSessionEffort" },
@@ -64,6 +105,8 @@ export const routes = [
   { method: "GET", path: "/memory/ledger", operationId: "readMemoryLedger" },
   { method: "POST", path: "/memory/ledger/{id}/revert", operationId: "revertMemoryLedgerEntry" },
   { method: "POST", path: "/memory/ask", operationId: "askMemory" },
+  { method: "POST", path: "/memory/forget/preview", operationId: "previewMemoryForget" },
+  { method: "POST", path: "/memory/forget/apply", operationId: "applyMemoryForget" },
   { method: "GET", path: "/arcs/{slug}/airlock", operationId: "readAirlock" },
   {
     method: "POST",
@@ -98,6 +141,11 @@ export const routes = [
   { method: "GET", path: "/themes", operationId: "listThemes" },
   ...lifecycleRoutes,
   ...permissionRoutes,
+  ...creatureRoutes,
+  ...routineRoutes,
+  ...modelRoutes,
+  ...workshopRoutes,
+  ...meshRoutes,
 ] as const satisfies readonly RouteShape[];
 
 export type OperationId = (typeof routes)[number]["operationId"];

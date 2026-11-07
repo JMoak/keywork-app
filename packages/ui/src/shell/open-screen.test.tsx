@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { tileFill } from "../chrome/stamp.ts";
 import { browserHost } from "../host/browser.ts";
 import type { HostPort, RecentWorkspace } from "../host/port.ts";
-import { OpenScreen } from "./open-screen.tsx";
+import { OpenScreen, startingLine } from "./open-screen.tsx";
 
 afterEach(async () => {
   cleanup();
@@ -33,6 +33,12 @@ describe("OpenScreen", () => {
     expect((await screen.findByText("keywork-day")).className).toBe("kw-open-theme-name");
   });
 
+  it("names Keywork on the workspace picker", () => {
+    openScreen([]);
+    expect(screen.getByRole("heading", { name: "keywork" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "open a folder" })).toBeTruthy();
+  });
+
   it("teaches the five keys on the very first run and lists workspaces after that", async () => {
     const first = openScreen([]);
     await screen.findByLabelText("five keys to start");
@@ -42,10 +48,11 @@ describe("OpenScreen", () => {
     expect(document.querySelector(".kw-first-run")).toBeNull();
   });
 
-  it("marks a starting server with the tile-fill, never a spinner", async () => {
+  it("marks a starting server with the tile-fill, never a spinner, in the product's words", async () => {
     const { container } = openScreen([], "C:\\src\\keywork");
+    expect(startingLine("C:\\src\\keywork")).toBe("starting keywork in C:\\src\\keywork");
     expect(container.querySelector(".kw-open-note")?.textContent).toContain(
-      "starting keywork in C:\\src\\keywork",
+      startingLine("C:\\src\\keywork"),
     );
     expect(tileFill).toContain(container.querySelector(".kw-open-stamp")?.textContent);
   });

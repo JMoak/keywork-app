@@ -2,19 +2,26 @@ import type { AppAction } from "../keys/actions.ts";
 import { arcsPane } from "./arcs/index.tsx";
 import { botsPane } from "./bots/index.tsx";
 import { browserPane } from "./browser/index.tsx";
+import { choresPane } from "./chores/index.tsx";
 import { contextPane } from "./context/index.tsx";
 import { conversationPane } from "./conversation/index.tsx";
+import { creaturePane } from "./creature/index.tsx";
 import { diffPane } from "./diff/index.tsx";
 import { filePane } from "./file/index.tsx";
 import { mcpPane } from "./mcp/index.tsx";
 import { memoryPane } from "./memory/index.tsx";
+import { millsPane } from "./mills/index.tsx";
 import { needsYouPane } from "./needs-you/index.tsx";
+import { parcelsPane } from "./parcels/index.tsx";
 import { permissionsPane } from "./permissions/index.tsx";
 import { posturePane } from "./posture/index.tsx";
 import type { PaneDefinition } from "./registry.ts";
+import { screenPane } from "./screen/index.tsx";
+import { steadPane } from "./stead/index.tsx";
 import { terminalPane } from "./terminal/index.tsx";
 import { themesPane } from "./themes/index.tsx";
 import { treePane } from "./tree/index.tsx";
+import { workshopPane } from "./workshop/index.tsx";
 import { workspacesPane } from "./workspaces/index.tsx";
 
 export const paneDefinitions = [
@@ -34,6 +41,13 @@ export const paneDefinitions = [
   permissionsPane,
   needsYouPane,
   posturePane,
+  steadPane,
+  screenPane,
+  choresPane,
+  parcelsPane,
+  millsPane,
+  workshopPane,
+  creaturePane,
 ] as const;
 
 export type PaneSpec = SpecOf<(typeof paneDefinitions)[number]>;

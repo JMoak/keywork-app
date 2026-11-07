@@ -4,6 +4,7 @@ import {
   emptyProjection,
   emptyTreeState,
   projectAll,
+  reviewNotice,
   type SessionControls,
   type SessionProjection,
   unknownControls,
@@ -597,5 +598,173 @@ describe("the conversation pane's title row", () => {
       "leader [",
       "leader ]",
     ]);
+  });
+});
+
+describe("the review trail in the conversation", () => {
+  const at = "2026-11-06T10:00:00.000Z";
+  const mark = {
+    index: 1,
+    entryId: "v1",
+    at,
+    path: "src/a.ts",
+    header: "@@ -1,3 +1,4 @@",
+    digest: "a1b2c3d4",
+    verdict: "keep",
+  } as const;
+  const quoted = [
+    "About src/a.ts @@ -1,3 +1,4 @@ (hunk a1b2c3d4):",
+    "",
+    "```diff",
+    "-two",
+    "+2",
+    "```",
+    "",
+    "why 2 and not two?",
+  ].join("\n");
+
+  function reviewed(replay: boolean): SessionProjection {
+    return projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: at,
+        sessionId: "s1",
+        type: "turn.started",
+        payload: { userText: "take the delivery", entryId: "q1", replay },
+      },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "extension.notice",
+        payload: { ...reviewNotice(mark), replay },
+      },
+      {
+        id: 3,
+        ts: at,
+        sessionId: "s1",
+        type: "turn.started",
+        payload: { userText: quoted, entryId: "q2", replay },
+      },
+    ]);
+  }
+
+  it("draws each verdict as a bare notice between the turns, live and replayed", () => {
+    for (const replay of [false, true]) {
+      mount({
+        live: {
+          summary: () => undefined,
+          projection: () => reviewed(replay),
+          trashed: () => false,
+        },
+      });
+      const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
+      expect(notices, `replay ${replay}`).toEqual([
+        "keep · src/a.ts @@ -1,3 +1,4 @@ · hunk a1b2c3d4",
+      ]);
+      cleanup();
+    }
+  });
+
+  it("shows talking to the diff as the keeper's own message carrying the hunk reference", () => {
+    mount({
+      live: { summary: () => undefined, projection: () => reviewed(false), trashed: () => false },
+    });
+    const prompts = [...document.querySelectorAll(".kw-user")].map((n) => n.textContent ?? "");
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("About src/a.ts @@ -1,3 +1,4 @@ (hunk a1b2c3d4):");
+    expect(prompts[1]).toContain("why 2 and not two?");
+  });
+});
+
+describe("a creature's report on its own turn", () => {
+  const at = "2026-11-06T10:00:00.000Z";
+  const sentence = "I listed the five largest files under docs and wrote them to notes/largest.md.";
+  const reply = `${sentence} The list is sorted by size.`;
+  const crateDeliveredLine = "delivered · the crate is on the porch";
+
+  function reported(replay: boolean): SessionProjection {
+    return projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: at,
+        sessionId: "s1",
+        type: "turn.started",
+        payload: { userText: "list the five largest files under docs", entryId: "q1", replay },
+      },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "turn.delta",
+        payload: { delta: { type: "text", text: reply }, replay },
+      },
+      {
+        id: 3,
+        ts: at,
+        sessionId: "s1",
+        type: "turn.completed",
+        payload: {
+          message: { role: "assistant", parts: [{ type: "text", text: reply }] },
+          usage: { inputTokens: 1, outputTokens: 1 },
+          replay,
+        },
+      },
+      {
+        id: 4,
+        ts: at,
+        sessionId: "s1",
+        type: "extension.notice",
+        payload: {
+          extension: "creature",
+          level: "info",
+          message: sentence,
+          detail: { origin: { kind: "creature", creature: "cob", thread: "s1" }, entryId: "e9" },
+          replay,
+        },
+      },
+    ]);
+  }
+
+  it("draws the turn's first sentence once and its report line as the delivery notice, live and replayed", () => {
+    for (const replay of [false, true]) {
+      mount({
+        live: {
+          summary: () => undefined,
+          projection: () => reported(replay),
+          trashed: () => false,
+        },
+      });
+      const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
+      expect(notices, `replay ${replay}`).toEqual([crateDeliveredLine]);
+      const drawn = document.body.textContent ?? "";
+      expect(drawn.split(sentence).length - 1, `replay ${replay}`).toBe(1);
+      cleanup();
+    }
+  });
+
+  it("still draws a thread's report line as its own sentence, since only the conversation's label is the crate", () => {
+    const threadReport = projectAll(emptyProjection, [
+      {
+        id: 1,
+        ts: at,
+        sessionId: "s1",
+        type: "extension.notice",
+        payload: {
+          extension: "creature",
+          level: "info",
+          message: sentence,
+          detail: {
+            origin: { kind: "creature", creature: "cob", thread: "thread-2" },
+            entryId: "e9",
+          },
+        },
+      },
+    ]);
+    mount({
+      live: { summary: () => undefined, projection: () => threadReport, trashed: () => false },
+    });
+    const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
+    expect(notices).toEqual([sentence]);
   });
 });

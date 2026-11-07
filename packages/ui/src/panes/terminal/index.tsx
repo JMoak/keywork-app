@@ -16,7 +16,7 @@ export const terminalModes = ["shell", "mirror", "bridge"] as const;
 const modeChoices: readonly ArgumentChoice[] = [
   { value: "shell", description: "a shell in the workspace" },
   { value: "mirror", description: "tail the current session's bash calls" },
-  { value: "bridge", description: "the keywork TUI attached to this server" },
+  { value: "bridge", description: "the engine's TUI attached to this server" },
 ];
 
 const terminalSpec = z.object({
@@ -31,6 +31,7 @@ export type TerminalMode = TerminalSpec["mode"];
 
 export const terminalPane = definePane<TerminalSpec>({
   kind: "terminal",
+  heading: "in a terminal",
   spec: terminalSpec,
   home: "main",
   attire: "work",
@@ -55,8 +56,8 @@ export const terminalPane = definePane<TerminalSpec>({
         command: { name: "mirror", description: "tail the current session's bash calls" },
       },
       bridge: {
-        help: "the keywork TUI in a pane",
-        command: { name: "bridge", description: "run the keywork TUI attached to this server" },
+        help: "the engine's TUI in a pane",
+        command: { name: "bridge", description: "run the engine's TUI attached to this server" },
       },
     },
     spec: (shell, variant) => specFor(shell, variant),
@@ -100,7 +101,7 @@ function titleOf(spec: TerminalSpec, shell: ShellSeams): string {
         ? "mirror"
         : `mirror · ${sessionName(shell.store.summary(spec.sessionId), shell.store.projection(spec.sessionId))}`;
     case "bridge":
-      return spec.verb === "connect" ? "keywork connect" : "keywork";
+      return spec.verb === "connect" ? "connect" : "bridge";
   }
 }
 

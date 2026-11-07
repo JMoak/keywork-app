@@ -4,7 +4,19 @@ import type { LifecycleState } from "../../chrome/stamp.ts";
 import { relativeAge } from "../../chrome/telemetry.ts";
 import { formatCost } from "../../instruments/format.ts";
 import type { AskChords } from "../../page/ask-card.tsx";
-import { dismissNotice, type NeedsYouItem, needYouCount } from "../../shell/needs-you.ts";
+import {
+  type DecidedForYou,
+  dismissNotice,
+  type NeedsYouItem,
+  needYouCount,
+} from "../../shell/needs-you.ts";
+import { needsYouCount } from "../../shell/needs-you-ledger.ts";
+
+export {
+  type DecisionOverturning,
+  type OverturnAnswer,
+  overturnDecided,
+} from "../../shell/overturn.ts";
 
 export type DeskGroupName = "needs you" | "working" | "back" | "quiet";
 
@@ -46,6 +58,7 @@ export interface DeskKeys extends AskChords {
   readonly open: string;
   readonly dismiss: string;
   readonly waiting: string;
+  readonly overturn: string;
 }
 
 export function deskGroups(sources: DeskSources): DeskGroup[] {
@@ -78,7 +91,7 @@ export function deskHead(sources: DeskSources): string {
   const spent = sources.sessions.reduce((sum, summary) => sum + (summary.costNanos ?? 0), 0);
   return [
     countOf(sources.sessions.length, "session"),
-    sources.waiting.length > 0 ? needYouCount(sources.waiting.length) : undefined,
+    sources.waiting.length > 0 ? needYouCount(needsYouCount(sources.waiting)) : undefined,
     working.length > 0 ? `${working.length} working` : undefined,
     spent > 0 ? formatCost(spent / 1e9) : undefined,
   ]
@@ -95,6 +108,14 @@ export function deskHint(keys: DeskKeys): string {
     `${keys.dismiss} dismisses`,
     `${keys.waiting} next waiting`,
   ].join(" · ");
+}
+
+export function decidedOfRow(row: DeskRow | undefined): DecidedForYou | undefined {
+  return row?.kind === "waiting" && row.item.kind === "decided" ? row.item : undefined;
+}
+
+export function overturnHint(keys: DeskKeys): string {
+  return `${keys.overturn} overturns it and its class waits for you again · ${keys.dismiss} lets it stand`;
 }
 
 export function rowAge(row: DeskRow, now?: number): string {

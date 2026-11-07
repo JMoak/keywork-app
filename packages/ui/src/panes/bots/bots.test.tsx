@@ -1,7 +1,7 @@
 import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
+import { mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
 import { botAside, botLabel, botsPane } from "./index.tsx";
 

@@ -248,5 +248,10 @@
     "value": 207,
     "better": "lower",
     "why": "DOM elements the conversation pane builds on first paint, summed over every recorded fixture; the delegated fixture's child row joined the sum in wave 7"
+  },
+  "T9.screenGlassToGlassP50Ms": {
+    "value": 167,
+    "better": "lower",
+    "why": "median glass-to-glass latency in scripts/textures/screen-latency.json, which only `bun run perf:screen` writes, and only on an idle machine (CPU at most 15 percent busy in the 5 s before the probes and 25 percent during them, the loopback included, and no other electron, vitest, playwright or bun test process) unless --record forces it, under fixed conditions it pins and checks (3840x2160 capture of the LG TV at 200 percent, encoded 2560x1440 H.265 on the NVIDIA HEVC MFT, 60 warm-up frames discarded, 150 probes); re-decided from 134 to 167 ms (10 frames at 60 Hz) by the idle run of 2026-11-06 17:52 UTC on a quiet desktop (Windows Terminal in front, nothing but the clock and the viewer drawing on the captured display): glass to capture 132, capture to receive 16, receive to present 1, present to glass 17. Glass to capture follows how much of the captured display changes, not the code: 128 to 157 ms on a quiet desktop and 92 to 95 ms with a window repainting the whole display every frame, on one build, one capture and encoded size and 29 to 30 fps, with or without the indicator windows (wi-jcqg); the 117 ms run of 15:14 UTC had a fullscreen browser playing video in front. The budget is 120 ms (adr.screen-is-webrtc-with-host-candidates), so this number only falls"
   }
 }

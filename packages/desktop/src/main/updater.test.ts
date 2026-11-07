@@ -5,6 +5,7 @@ import {
   runUpdater,
   scheduleOf,
   shouldCheck,
+  type UpdateCheck,
   type UpdateReady,
   type UpdateSource,
 } from "./updater.ts";
@@ -38,19 +39,17 @@ describe("runUpdater", () => {
   function harness() {
     let clock = 0;
     let checks = 0;
-    let downloaded: ((update: UpdateReady) => void) | undefined;
+    let result: UpdateCheck | null = null;
     let accept: (() => void) | undefined;
     const announced: UpdateReady[] = [];
     const logged: string[] = [];
     const timers: { run: () => void; at: number }[] = [];
     const source: UpdateSource = {
-      autoDownload: false,
+      autoDownload: true,
       autoInstallOnAppQuit: true,
       checkForUpdates: async () => {
         checks += 1;
-      },
-      onDownloaded: (listener) => {
-        downloaded = listener;
+        return result;
       },
       onError: () => undefined,
     };
@@ -82,20 +81,33 @@ describe("runUpdater", () => {
       advanceTo,
       checks: () => checks,
       nextDueAt: () => timers[0]?.at,
-      download: (update: UpdateReady) => downloaded?.(update),
+      report: (update: UpdateCheck | null) => {
+        result = update;
+      },
       accept: () => accept?.(),
     };
   }
 
-  it("downloads silently and never installs until the user accepts", () => {
-    const { source, download, announced, accept } = harness();
-    expect(source.autoDownload).toBe(true);
+  it("announces a manual review without downloading or arming an installer", async () => {
+    const { source, report, announced, accept, advanceTo } = harness();
+    expect(source.autoDownload).toBe(false);
     expect(source.autoInstallOnAppQuit).toBe(false);
-    download({ version: "0.2.0" });
-    expect(announced).toEqual([{ version: "0.2.0" }]);
+    report({ isUpdateAvailable: true, updateInfo: { version: "0.2.0" } });
+    advanceTo(launchCheckDelayMs);
+    await Promise.resolve();
+    expect(announced).toEqual([{ version: "0.2.0", reviewRequired: true }]);
     expect(source.autoInstallOnAppQuit).toBe(false);
-    accept();
-    expect(source.autoInstallOnAppQuit).toBe(true);
+    expect(accept).toThrow(/shared engine compatibility/);
+    expect(source.autoInstallOnAppQuit).toBe(false);
+    expect(source.autoDownload).toBe(false);
+  });
+
+  it("does not turn a current-version check into an update offer", async () => {
+    const { report, announced, advanceTo } = harness();
+    report({ isUpdateAvailable: false, updateInfo: { version: "0.2.0" } });
+    advanceTo(launchCheckDelayMs);
+    await Promise.resolve();
+    expect(announced).toEqual([]);
   });
 
   it("checks once after the launch delay and then every six hours", () => {

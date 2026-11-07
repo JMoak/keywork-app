@@ -1,4 +1,5 @@
 import type { EffortLevel } from "./controls.ts";
+import type { PromptOrigin } from "./creatures.ts";
 import type {
   Message,
   MessagePart,
@@ -50,6 +51,8 @@ export interface SessionDetail extends SessionSummary {
   summaries?: readonly SummaryMark[];
   flushes?: readonly FlushMark[];
   edits?: readonly ContextEditMark[];
+  reports?: readonly ReportMark[];
+  verdicts?: readonly VerdictMark[];
   parentSession?: string;
   forkedFrom?: ForkOrigin;
 }
@@ -76,6 +79,15 @@ export interface ContextEditMark {
   role: Message["role"];
   kind: ContextEditKind;
   text: string;
+}
+
+export interface ReportMark {
+  index: number;
+  entryId: string;
+  at: string;
+  text: string;
+  origin: PromptOrigin;
+  kind?: "frame";
 }
 
 export interface ForkOrigin {
@@ -106,7 +118,10 @@ export type SpillReading = SpillSlice | "missing" | "gone" | "binary";
 export interface PromptInjection {
   text: string;
   client: string;
+  frame?: { creature: string };
 }
+
+export const promptInjectionBody = ["text", "client", "frame"] as const;
 
 export const injectingClientName = /^[A-Za-z0-9._-]{1,64}$/;
 
@@ -282,3 +297,35 @@ export interface ChangedFile {
 export type ChangesReading = SessionChanges | "missing" | "no-baseline";
 
 export type ChangedFileReading = ChangedFile | "missing" | "no-baseline" | "outside-scope";
+
+export const hunkVerdicts = ["keep", "drop", "ask"] as const;
+
+export type HunkVerdict = (typeof hunkVerdicts)[number];
+
+export interface HunkReference {
+  path: string;
+  header: string;
+  digest: string;
+}
+
+export interface ReviewVerdict extends HunkReference {
+  verdict: HunkVerdict;
+}
+
+export interface VerdictMark extends ReviewVerdict {
+  index: number;
+  entryId: string;
+  at: string;
+}
+
+export interface HunkVerdicts {
+  verdicts: readonly VerdictMark[];
+}
+
+export type VerdictsReading = HunkVerdicts | "missing";
+
+export type VerdictRecording = VerdictMark | "missing" | "unwired";
+
+export const hunkVerdictBody = ["path", "header", "digest", "verdict"] as const;
+
+export const reviewExtension = "review";

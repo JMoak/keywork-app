@@ -20,7 +20,7 @@ import { airlockItem, askItem, failedItem, inboxItem } from "../../shell/needs-y
 import type { QuietPosture } from "../../shell/quiet.ts";
 import { createSessionReads } from "../../shell/session-reads.ts";
 import { keyworkNight, themeNamed } from "../../theme/index.ts";
-import { mountPane, overviewShell } from "../overview/rows.test.tsx";
+import { mountPane, overviewShell } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { needsYouPane } from "./index.tsx";
 
@@ -263,6 +263,7 @@ describe("the desk's keys", () => {
       "needs-you.open": "enter",
       "needs-you.waiting": "tab",
       "needs-you.dismiss": "d",
+      "needs-you.overturn": "x",
       "needs-you.approve": "y",
       "needs-you.once": "o",
       "needs-you.session": "s",

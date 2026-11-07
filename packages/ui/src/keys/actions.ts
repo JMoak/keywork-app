@@ -1,5 +1,8 @@
+import { companionSwitchAction, companionSwitchActionId } from "../companion/floating.ts";
+import { companionToggleAction, companionToggleActionId } from "../companion/switch.tsx";
 import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
+import { onboardingAction, onboardingActionId } from "../onboarding/index.tsx";
 import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { ActionCommand } from "../panes/registry.ts";
@@ -8,6 +11,9 @@ import { type BindingSpec, everyPane } from "./keymap.ts";
 export type FocusContext = "pane" | "composer" | "overlay";
 
 export interface ActionTarget {
+  requestOnboarding(): void;
+  toggleCompanion(): void;
+  switchCompanion(creature: string | undefined): void;
   closePane(): void;
   zoomPane(): void;
   rotatePane(): void;
@@ -45,6 +51,9 @@ export interface AppAction {
 }
 
 export const coreActions: Record<string, AppAction> = {
+  [onboardingActionId]: onboardingAction,
+  [companionToggleActionId]: companionToggleAction,
+  [companionSwitchActionId]: companionSwitchAction,
   "pane.close": {
     chords: "leader x",
     help: "close focused pane",

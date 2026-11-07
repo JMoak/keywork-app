@@ -1,0 +1,24 @@
+‹ Wren  Morning triage  tomorrow 09:00
+  trigger       weekdays at 09:00 (America/Chicago), until 2026-12-31
+  next          tomorrow 09:00
+  to            the conversation
+  notify        only when it needs you
+  tools         read-only
+  budget        $0.50 and 10 minutes a run
+  file          routines/morning-triage.json
+  instructions  Read the inbox and the calendar. Tell me only what needs me today.
+  runs
+  when         outcome    process    delivery   verified    cost (USD)  minutes
+  11-05 08:40  delivered  completed  delivered  verified    0.04        3.2
+        run by hand
+  11-04 09:00  completed  completed  unknown    unchecked   0.03        2.7
+  11-03 09:00  delivered  completed  delivered  unverified  0.05        4
+        caught up: the 09:00 slot ran at 11:42
+  11-02 09:00  skipped    not run    not run    not run     —           —
+        skipped: missed; only the most recent slot is caught up
+  10-30 09:00  blocked    blocked    none       unchecked   0.12        10
+        blocked: ran past its 10-minute budget · attempt 2
+  10-29 14:00  cancelled  cancelled  none       unchecked   unknown     0.5
+        cancelled: stopped by the keeper; stopping does not undo what already ran · run by hand
+  10-29 09:00  skipped    not run    not run    not run     —           —
+        skipped: this chore already ran 6 times in the last hour (cap 6)

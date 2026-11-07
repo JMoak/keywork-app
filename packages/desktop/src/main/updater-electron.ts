@@ -1,12 +1,13 @@
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { app, BrowserWindow, ipcMain } from "electron";
 import electronUpdater from "electron-updater";
 import { hostChannels } from "../shared/channels.ts";
-import { runUpdater, type UpdateReady, type Updater, updateFeed } from "./updater.ts";
+import { runUpdater, type UpdateReady, type Updater } from "./updater.ts";
 
-export function startUpdater(): Updater | undefined {
+export function startUpdater(profile: ProductProfile = keyworkProfile): Updater | undefined {
   if (!app.isPackaged) return undefined;
   const { autoUpdater } = electronUpdater;
-  autoUpdater.setFeedURL(updateFeed);
+  autoUpdater.setFeedURL(profile.updateFeed);
   return runUpdater({
     source: {
       get autoDownload() {
@@ -22,8 +23,6 @@ export function startUpdater(): Updater | undefined {
         autoUpdater.autoInstallOnAppQuit = value;
       },
       checkForUpdates: () => autoUpdater.checkForUpdates(),
-      onDownloaded: (listener) =>
-        autoUpdater.on("update-downloaded", (event) => listener({ version: event.version })),
       onError: (listener) => autoUpdater.on("error", listener),
     },
     announce: announceToEveryWindow(),

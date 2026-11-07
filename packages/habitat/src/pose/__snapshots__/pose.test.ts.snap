@@ -1,0 +1,2374 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden poses > blocked at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 730.4466,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 7,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "blocked",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > carry at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "carry",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 265.9888,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "carry",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "carry",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "carry",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 3010.8719,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "carry",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6625.3495,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "carry",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "carry",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > carve at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "carve",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 271.1078,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "carve",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "carve",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "carve",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 3004.3389,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "carve",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "carve",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "carve",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > celebrate at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "celebrate",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "celebrate",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": true,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > deliver at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "deliver",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "deliver",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > greet at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "greet",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "greet",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > hammer at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 732.3551,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "hammer",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > idle at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > look at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "look",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > nap at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "nap",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "nap",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "nap",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "nap",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "nap",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "nap",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "nap",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > raise at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "raise",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "raise",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "raise",
+    "frame": 7,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > read at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "read",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "read",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 713.5213,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "read",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "read",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "read",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "read",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "read",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > ring at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "ring",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "ring",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "wait",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "wait",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "wait",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "wait",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "wait",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > sit at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "sit",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "sit",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "sit",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "sit",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "sit",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "sit",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "sit",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > stretch at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "stretch",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "stretch",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > stumble at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "stumble",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 282.6054,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "stumble",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "work",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "work",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "work",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6631.7037,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "work",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "work",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > wait at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "wait",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "wait",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "wait",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "wait",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "wait",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "wait",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "wait",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > walk-left at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 273.8211,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 6,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6621.2403,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9904.258,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "walk-left",
+    "frame": 7,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > walk-right at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 270.1552,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 6,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 1,
+    "lift": 0,
+    "nextFrameAt": 9927.185,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "walk-right",
+    "frame": 7,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > wave at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "wave",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.3333,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "wave",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "idle",
+    "frame": 2,
+    "lift": 0,
+    "nextFrameAt": 9933.3333,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "idle",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;
+
+exports[`golden poses > work at fixed timestamps 1`] = `
+[
+  {
+    "at": 0,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 33.3333,
+    "scale": {
+      "x": 1,
+      "y": 1,
+    },
+  },
+  {
+    "at": 100,
+    "blink": false,
+    "clip": "idle",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 133.3333,
+    "scale": {
+      "x": 0.9978,
+      "y": 1.0022,
+    },
+  },
+  {
+    "at": 250,
+    "blink": false,
+    "clip": "work",
+    "frame": 0,
+    "lift": 0,
+    "nextFrameAt": 283.1638,
+    "scale": {
+      "x": 0.9946,
+      "y": 1.0054,
+    },
+  },
+  {
+    "at": 700,
+    "blink": false,
+    "clip": "work",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 733.3333,
+    "scale": {
+      "x": 0.9873,
+      "y": 1.0129,
+    },
+  },
+  {
+    "at": 1500,
+    "blink": false,
+    "clip": "work",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 1533.3333,
+    "scale": {
+      "x": 0.9881,
+      "y": 1.012,
+    },
+  },
+  {
+    "at": 3000,
+    "blink": false,
+    "clip": "work",
+    "frame": 3,
+    "lift": 0,
+    "nextFrameAt": 3033.3333,
+    "scale": {
+      "x": 1.0146,
+      "y": 0.9856,
+    },
+  },
+  {
+    "at": 6600,
+    "blink": false,
+    "clip": "work",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 6633.3333,
+    "scale": {
+      "x": 1.0047,
+      "y": 0.9953,
+    },
+  },
+  {
+    "at": 9900,
+    "blink": false,
+    "clip": "work",
+    "frame": 4,
+    "lift": 0,
+    "nextFrameAt": 9916.813,
+    "scale": {
+      "x": 0.9869,
+      "y": 1.0133,
+    },
+  },
+  {
+    "at": 20000,
+    "blink": false,
+    "clip": "work",
+    "frame": 5,
+    "lift": 0,
+    "nextFrameAt": 20033.3333,
+    "scale": {
+      "x": 1.0145,
+      "y": 0.9857,
+    },
+  },
+]
+`;

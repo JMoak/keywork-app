@@ -1,9 +1,18 @@
+import type { ProductId } from "@keywork-app/product";
+import type { CompanionHost } from "../companion/port.ts";
+import type { ScreenPort } from "../panes/screen/port.ts";
+
 export interface HostPort {
+  readonly productId?: ProductId;
   about(): Promise<HostAbout>;
   pickFolder(): Promise<string | undefined>;
   recentWorkspaces(): Promise<readonly RecentWorkspace[]>;
   openWorkspace(path: string): Promise<WorkspaceOpen>;
+  openHome?(): Promise<WorkspaceOpen>;
+  enableRuntime?(): Promise<void>;
   restartServer(path: string): Promise<WorkspaceOpen>;
+  servingOf?(path: string): Promise<"node" | "console" | undefined>;
+  stopServing?(path: string): Promise<WorkspaceOpen>;
   closeWorkspace(path: string): Promise<void>;
   listOpenWorkspaces(): Promise<readonly OpenWorkspaceEntry[]>;
   switchWorkspace(path: string): Promise<void>;
@@ -30,6 +39,8 @@ export interface HostPort {
     init: ServerRequestInit,
   ): Promise<ServerResponseHead>;
   readonly pty: PtyPort;
+  readonly companion?: CompanionHost | undefined;
+  readonly screen?: ScreenPort | undefined;
 }
 
 export interface PtyPort {
@@ -112,6 +123,7 @@ export type WorkspaceOpen =
 
 export interface UpdateReady {
   version: string;
+  reviewRequired?: boolean;
 }
 
 export interface ServerLoss {
@@ -133,7 +145,8 @@ export interface OpenWorkspaceEntry {
 
 export type NeedsYouTrigger =
   | { kind: "ask"; workspace: string; sessionId: string; callId: string }
-  | { kind: "memory-inbox"; workspace: string; pending: number };
+  | { kind: "memory-inbox"; workspace: string; pending: number }
+  | { kind: "chore"; workspace: string; creature: string; routineId: string };
 
 export type SaveOutcome =
   | { saved: true; path: string }
@@ -183,24 +196,24 @@ export function describeFailure(failure: WorkspaceFailure): string {
         ? failure.message
         : `${failure.message} · ${failure.nextAction}`;
     case "version-mismatch":
-      return `the running keywork is ${failure.actual}; this app expects ${failure.expected}`;
+      return `the running engine is version ${failure.actual}; this app expects ${failure.expected}`;
     case "port-in-use":
       return `port ${failure.port} is taken`;
     case "unreachable":
-      return `keywork serve started but did not answer: ${failure.detail}`;
+      return `the server started but did not answer: ${failure.detail}`;
     case "silent":
       return silentLine(failure.waitedMs, failure.detail);
     case "gone":
-      return `the keywork serve at ${hostOf(failure.url)} stopped answering`;
+      return `the server at ${hostOf(failure.url)} stopped answering`;
     case "no-ticket":
     case "usage":
     case "failed":
-      return failure.detail === "" ? "keywork serve stopped without saying why" : failure.detail;
+      return failure.detail === "" ? "the server stopped without saying why" : failure.detail;
   }
 }
 
 function silentLine(waitedMs: number, stderr: string): string {
-  const said = `keywork serve gave no address in ${Math.round(waitedMs / 1000)}s`;
+  const said = `the server gave no address in ${Math.round(waitedMs / 1000)}s`;
   const lastWords = stderr.split("\n").findLast((line) => line.trim() !== "");
   return lastWords === undefined
     ? `${said} and was stopped`

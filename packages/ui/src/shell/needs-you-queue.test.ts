@@ -1,11 +1,24 @@
 import type { BatchListener, StreamNotice } from "@keywork-app/client";
-import type { BusEnvelope, InboxTally, MemoryGarden, PendingAsk } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  InboxTally,
+  MemoryGarden,
+  PendingAsk,
+  SessionRow,
+  VerdictMark,
+} from "@keywork-app/protocol";
 import { createRoot, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { afterEach, describe, expect, it } from "vitest";
 import { type EntryDecisions, emptyInbox, inertGarden } from "./memory-store.ts";
 import type { NeedsYouItem } from "./needs-you.ts";
-import { createNeedsYouQueue, createWaiting, type WaitingSource } from "./needs-you-queue.ts";
+import {
+  createNeedsYouQueue,
+  createWaiting,
+  type SessionVerdicts,
+  sessionVerdicts,
+  type WaitingSource,
+} from "./needs-you-queue.ts";
 import { airlockItem, askItem, failedItem, inboxItem } from "./needs-you-testing.ts";
 
 const disposers: Array<() => void> = [];
@@ -100,6 +113,35 @@ describe("a workspace's waiting source", () => {
     expect(harness.arrived).toEqual(["C:/work#ask:c1", "C:/work#ask:c2"]);
   });
 
+  it("seeds the review asks a cold start missed from each session's verdict trail", async () => {
+    const asked = verdictMark("src/a.ts", "a1", "ask");
+    const settled = verdictMark("src/b.ts", "b2", "ask");
+    const harness = waitingHarness({
+      pending: [],
+      reviews: [
+        { sessionId: "s3", verdicts: [asked, settled, verdictMark("src/b.ts", "b2", "keep")] },
+      ],
+    });
+    await settle();
+    expect(keysOf(harness.source.items())).toEqual(["C:/work#review:s3#src/a.ts#a1"]);
+  });
+
+  it("reads every listed session's verdict trail and keeps only those with marks", async () => {
+    const trails: Record<string, readonly VerdictMark[] | "missing"> = {
+      s1: [verdictMark("src/a.ts", "a1", "ask")],
+      s2: [],
+      s3: "missing",
+    };
+    const read = await sessionVerdicts({
+      sessions: async () => Object.keys(trails).map(sessionRow),
+      hunkVerdicts: async (id) => {
+        const trail = trails[id] ?? "missing";
+        return trail === "missing" ? "missing" : { verdicts: trail };
+      },
+    });
+    expect(read).toEqual([{ sessionId: "s1", verdicts: trails.s1 }]);
+  });
+
   it("asks the server again on reconnect and drops what it no longer holds", async () => {
     const harness = waitingHarness({ pending: [] });
     await settle();
@@ -117,15 +159,13 @@ describe("a workspace's waiting source", () => {
     expect(harness.memoryReads()).toBe(1);
     harness.setGarden({
       ...inertGarden,
-      inbox: [
-        {
-          id: "w1",
-          kind: "note",
-          target: "entities/pricing.md",
-          created: "2026-10-15T08:00:00.000Z",
-          content: "",
-        },
-      ],
+      inbox: ["w1", "w2", "w3"].map((id) => ({
+        id,
+        kind: "note" as const,
+        target: `entities/${id}.md`,
+        created: "2026-10-15T08:00:00.000Z",
+        content: "",
+      })),
       airlocks: [{ arc: "pricing", candidates: [], questions: [] }],
     });
     expect(harness.source.items().map((item) => item.kind)).toEqual(["airlock", "inbox"]);
@@ -173,7 +213,7 @@ function fakeSource(workspace: string, initial: NeedsYouItem[]) {
   };
 }
 
-function waitingHarness(options: { pending: PendingAsk[] }) {
+function waitingHarness(options: { pending: PendingAsk[]; reviews?: SessionVerdicts[] }) {
   const listeners = new Set<BatchListener>();
   const notices = new Set<(notice: StreamNotice) => void>();
   const pending = options.pending;
@@ -205,6 +245,7 @@ function waitingHarness(options: { pending: PendingAsk[] }) {
       },
     },
     asks: async () => [...pending],
+    reviews: async () => options.reviews ?? [],
     memory: {
       state: memory,
       refresh: async () => {
@@ -261,6 +302,28 @@ function pendingAsk(callId: string): PendingAsk {
     tool: "bash",
     arguments: { command: "rm -rf dist" },
     askedAt: "2026-10-15T09:00:00.000Z",
+  };
+}
+
+function verdictMark(path: string, digest: string, verdict: VerdictMark["verdict"]): VerdictMark {
+  return {
+    index: 2,
+    entryId: `e-${digest}-${verdict}`,
+    at: "2026-10-15T09:00:00.000Z",
+    path,
+    header: "@@ -1,3 +1,4 @@",
+    digest,
+    verdict,
+  };
+}
+
+function sessionRow(id: string): SessionRow {
+  return {
+    id,
+    title: id,
+    createdAt: "2026-10-15T08:00:00.000Z",
+    lastActivityAt: "2026-10-15T08:00:00.000Z",
+    messageCount: 2,
   };
 }
 

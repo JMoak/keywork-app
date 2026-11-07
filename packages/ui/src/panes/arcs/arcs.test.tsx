@@ -4,7 +4,7 @@ import { createStore, produce } from "solid-js/store";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Attire, AttireTarget } from "../../theme/attire.ts";
 import { keyworkNight } from "../../theme/themes.ts";
-import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
+import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
 import type { PaneSpecBase } from "../registry.ts";
 import {

@@ -3,14 +3,27 @@ import { describe, expect, it } from "vitest";
 import {
   type ChildHandle,
   exitFailureOf,
+  expectedContract,
   expectedServerVersion,
+  healthCheck,
   type ServeState,
   type Spawn,
   type SupervisorSeams,
+  serveArguments,
   superviseServer,
   treeKillCommand,
   unresolvedFailure,
+  withSource,
 } from "./serve-process.ts";
+
+it("starts an explicit managed home without a project workspace", () => {
+  expect(serveArguments({ binary: "/engine", cwd: "/private/home", home: true }, 0)).toEqual([
+    "serve",
+    "--home",
+    "--port",
+    "0",
+  ]);
+});
 
 interface ScriptedChild {
   handle: ChildHandle;
@@ -91,12 +104,15 @@ interface Harness {
   document: ServerDocument;
 }
 
-function harness(options: { platform?: NodeJS.Platform; version?: string } = {}): Harness {
+function harness(
+  options: { platform?: NodeJS.Platform; version?: string; contract?: string | null } = {},
+): Harness {
   const children: ScriptedChild[] = [];
   const spawned: Harness["spawned"] = [];
   const delays: number[] = [];
   const document: ServerDocument = {
     version: options.version ?? expectedServerVersion,
+    contract: options.contract === null ? undefined : (options.contract ?? expectedContract),
     operationIds: [],
   };
   const spawn: Spawn = (command, args, cwd) => {
@@ -137,6 +153,29 @@ const spec = { binary: "/opt/keywork", cwd: "/work" };
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 2));
 
 describe("superviseServer", () => {
+  it("uses the launch directory while the CLI prepares a missing private home", async () => {
+    const h = harness();
+    const server = superviseServer(
+      {
+        binary: "/opt/keywork",
+        cwd: "/missing/private/home",
+        launchCwd: "/opt",
+        home: true,
+      },
+      h.seams,
+    );
+    const starting = server.start();
+    await tick();
+    expect(h.spawned[0]).toEqual({
+      command: "/opt/keywork",
+      args: ["serve", "--home", "--port", "4771"],
+      cwd: "/opt",
+    });
+    announce(h.children[0] as ScriptedChild);
+    expect(await starting).toMatchObject({ ok: true });
+    await server.stop();
+  });
+
   it("spawns serve on a free port, reads the ticket, health-checks, and reports ready", async () => {
     const h = harness();
     const server = superviseServer(spec, h.seams);
@@ -230,6 +269,52 @@ describe("superviseServer", () => {
     expect(h.delays).toEqual([2000]);
   });
 
+  it("refuses an engine whose contract differs before it reads the release version, and stops it", async () => {
+    const h = harness({ version: "9.9.9", contract: "1.7" });
+    const server = superviseServer(spec, h.seams);
+    const starting = server.start();
+    await tick();
+    announce(h.children[0] as ScriptedChild);
+    expect(await starting).toEqual({
+      ok: false,
+      failure: {
+        kind: "contract-mismatch",
+        expected: expectedContract,
+        actual: "1.7",
+        ticket: { url: "http://127.0.0.1:4771", token: "abc123" },
+      },
+    });
+    expect(h.delays).toEqual([2000]);
+    expect(server.state.kind).toBe("failed");
+  });
+
+  it("refuses an engine that names no contract", async () => {
+    const h = harness({ contract: null });
+    const server = superviseServer(spec, h.seams);
+    const starting = server.start();
+    await tick();
+    announce(h.children[0] as ScriptedChild);
+    expect(await starting).toMatchObject({
+      ok: false,
+      failure: { kind: "contract-mismatch", expected: expectedContract, actual: undefined },
+    });
+  });
+
+  it("puts the entry ahead of the serve verb when the engine runs through one", async () => {
+    const h = harness();
+    const cli = "/src/stead/repos/keywork/packages/cli/src/main.ts";
+    const server = superviseServer({ binary: "bun", cwd: "/work", entry: [cli] }, h.seams);
+    const starting = server.start();
+    await tick();
+    expect(h.spawned[0]).toEqual({
+      command: "bun",
+      args: [cli, "serve", "--port", "4771"],
+      cwd: "/work",
+    });
+    announce(h.children[0] as ScriptedChild);
+    expect((await starting).ok).toBe(true);
+  });
+
   it("restarts after an unexpected exit with 250ms doubling to 5s, and not after stop", async () => {
     const h = harness();
     const server = superviseServer(spec, h.seams);
@@ -295,6 +380,39 @@ describe("superviseServer", () => {
     (h.children[0] as ScriptedChild).exit(null);
     await stopping;
     expect(server.state).toEqual({ kind: "stopped" });
+  });
+});
+
+describe("healthCheck", () => {
+  const ticket: ServerTicket = { url: "http://127.0.0.1:4771", token: "t" };
+  const served = (version: string, contract: string | undefined) => async () => ({
+    version,
+    contract,
+    operationIds: [],
+  });
+
+  it("passes an engine that speaks the pinned contract at the pinned release", async () => {
+    expect(await healthCheck(ticket, served(expectedServerVersion, expectedContract))).toEqual({
+      ok: true,
+      version: expectedServerVersion,
+    });
+  });
+
+  it("judges the contract first and the release version second, from the one /doc read", async () => {
+    expect(await healthCheck(ticket, served("9.9.9", "1.7"))).toMatchObject({
+      failure: { kind: "contract-mismatch", actual: "1.7" },
+    });
+    expect(await healthCheck(ticket, served("9.9.9", expectedContract))).toMatchObject({
+      failure: { kind: "version-mismatch", actual: "9.9.9" },
+    });
+  });
+
+  it("stamps where the engine came from onto a contract refusal and nothing else", () => {
+    const source = { origin: "PATH" as const, from: "/usr/bin/keywork" };
+    const refused = { kind: "contract-mismatch" as const, expected: "1.25", actual: "1.7", ticket };
+    expect(withSource(refused, source)).toEqual({ ...refused, source });
+    const gone = { kind: "gone" as const, url: ticket.url };
+    expect(withSource(gone, source)).toBe(gone);
   });
 });
 

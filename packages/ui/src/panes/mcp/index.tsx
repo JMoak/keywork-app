@@ -19,12 +19,13 @@ export type McpSpec = z.output<typeof mcpSpec>;
 
 export const mcpPane = definePane<McpSpec>({
   kind: "mcp",
+  heading: "in mcp",
   spec: mcpSpec,
   home: "right",
   attire: "house",
   title: () => "mcp",
   emptyState: (keys) =>
-    `no mcp servers · name one in keywork's config and ${keys.chord("palette.commands")} /mcp lists it`,
+    `no mcp servers · name one in the engine's config and ${keys.chord("palette.commands")} /mcp lists it`,
   component: McpList,
   summon: {
     action: "mcp.summon",

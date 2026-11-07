@@ -2,6 +2,7 @@ appId: dev.keywork.app
 productName: keywork
 directories:
   output: release
+  buildResources: resources
 artifactName: ${productName}-app-${version}-${os}-${arch}.${ext}
 files:
   - out/**
@@ -15,6 +16,13 @@ extraResources:
       - "**/*"
 win:
   target: nsis
+  executableName: keywork
+nsis:
+  oneClick: true
+  perMachine: false
+  include: resources/installer.nsh
+  shortcutName: keywork
+  uninstallDisplayName: keywork
 mac:
   target: dmg
 linux:

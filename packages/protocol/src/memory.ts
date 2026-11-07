@@ -59,8 +59,12 @@ export interface StagedWrite {
   target: string;
   created: string;
   supersedes?: string;
+  source?: string;
+  for?: StagedAddressee;
   content: string;
 }
+
+export type StagedAddressee = "keeper" | `creature:${string}`;
 
 export type StagedReview = { id: string; key: string; created: string } & ReviewProposal;
 
@@ -280,3 +284,88 @@ export type AirlockFinish =
   | MemoryWriteRefusal;
 
 export const inertMemoryDetail = "memory is inert: this workspace is untrusted";
+
+export const craftSection = "craft";
+
+export type ForgetSourceKind = "session" | "creature" | "web" | "workshop" | "craft";
+
+export interface ForgetCounts {
+  notes: number;
+  anchors: number;
+  edges: number;
+  citations: number;
+  entries: number;
+  staged?: number | undefined;
+}
+
+export interface ForgetStagedLine {
+  id: string;
+  kind: StagedWriteKind;
+  target: string;
+  for: string;
+  firstLine: string;
+}
+
+export interface ForgetNoteLine {
+  name: string;
+  path: string;
+  firstLine: string;
+}
+
+export interface ForgetAnchorLine {
+  note: string;
+  at: string;
+  sha?: string | undefined;
+  checkpoint?: string | undefined;
+}
+
+export interface ForgetEdgeLine {
+  subject: string;
+  predicate: string;
+  object: string;
+}
+
+export interface ForgetCitationLine {
+  note: string;
+  kind: "recall" | "citation";
+  timestamp: string;
+  session?: string | undefined;
+}
+
+export interface ForgetEntryLine {
+  id: string;
+  date: string;
+  time: string;
+  text: string;
+}
+
+export interface ForgetSourcePlan {
+  source: string;
+  digest: string;
+  counts: ForgetCounts;
+  notes: ForgetNoteLine[];
+  anchors: ForgetAnchorLine[];
+  edges: ForgetEdgeLine[];
+  citations: ForgetCitationLine[];
+  entries: ForgetEntryLine[];
+  staged?: ForgetStagedLine[] | undefined;
+  kept: { note: string; reason: string }[];
+}
+
+export interface ForgetSourceReport {
+  source: string;
+  counts: ForgetCounts;
+  ledgerId?: string | undefined;
+}
+
+export interface ForgetSourcePreview {
+  plan: ForgetSourcePlan;
+}
+
+export interface ForgetSourceApplied {
+  forgot: ForgetSourceReport;
+}
+
+export const forgetSourceBody = ["source"] as const;
+
+export const forgetApplyBody = ["source", "digest"] as const;

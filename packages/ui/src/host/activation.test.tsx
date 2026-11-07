@@ -1,4 +1,5 @@
-import type { KeyworkClient } from "@keywork-app/client";
+import type { ConsoleClient, KeyworkClient } from "@keywork-app/client";
+import { keyworkProfile, type ProductProfile, steadProfile } from "@keywork-app/product";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
@@ -39,9 +40,9 @@ describe("followActivations", () => {
   });
 });
 
-describe("activation in the running app", () => {
+describe.each([keyworkProfile, steadProfile])("activation in the running $name app", (profile) => {
   it("focuses the asking session's pane when its toast is clicked, opening one only when needed", async () => {
-    const harness = await openApp();
+    const harness = await openApp(profile);
     await screen.findByText("session 1", { selector: ".kw-frame-name" });
     expect(focusedName()).toBe("session 1");
 
@@ -49,7 +50,7 @@ describe("activation in the running app", () => {
     await waitFor(() => expect(focusedName()).toBe("session 2"));
     const frames = frameCount();
 
-    fireEvent.keyDown(document.body, { key: "2", altKey: true });
+    fireEvent.keyDown(document.body, { key: profile.startup === "ide" ? "2" : "3", altKey: true });
     expect(focusedName()).toBe("session 1");
     harness.activate(askFrom("s2"));
     await waitFor(() => expect(focusedName()).toBe("session 2"));
@@ -57,7 +58,7 @@ describe("activation in the running app", () => {
   });
 
   it("treats a toast click as a needs-you jump that leader shift+n walks back", async () => {
-    const harness = await openApp();
+    const harness = await openApp(profile);
     await screen.findByText("session 1", { selector: ".kw-frame-name" });
     harness.activate(askFrom("s2"));
     await waitFor(() => expect(focusedName()).toBe("session 2"));
@@ -67,7 +68,7 @@ describe("activation in the running app", () => {
   });
 
   it("says so in the status line when there is no pane to close", async () => {
-    await openApp();
+    await openApp(profile);
     await screen.findByText("session 1", { selector: ".kw-frame-name" });
     while (frameCount() > 0) closeFocused();
     closeFocused();
@@ -81,7 +82,7 @@ interface Harness {
   activate(trigger: NeedsYouTrigger): void;
 }
 
-async function openApp(): Promise<Harness> {
+async function openApp(profile: ProductProfile): Promise<Harness> {
   const listeners = new Set<(trigger: NeedsYouTrigger) => void>();
   const host: HostPort = {
     ...browserHost({ server: { url: "http://127.0.0.1:4770", token: "t" } }),
@@ -90,10 +91,15 @@ async function openApp(): Promise<Harness> {
       return () => listeners.delete(listener);
     },
   };
-  render(() => <App host={host} connect={quietClient} />);
+  render(() => <App profile={profile} host={host} connect={quietClient} />);
   const input = await screen.findByLabelText("workspace");
   fireEvent.input(input, { target: { value: "/work" } });
   fireEvent.submit(input.closest("form") as HTMLFormElement);
+  if (profile.startup === "creature") {
+    await screen.findByText("stead", { selector: ".kw-frame-name" });
+    await openTheFirstSession();
+  }
+  await screen.findByText("session 1", { selector: ".kw-frame-name" });
   return {
     activate: (trigger) => {
       for (const listener of listeners) listener(trigger);
@@ -101,7 +107,7 @@ async function openApp(): Promise<Harness> {
   };
 }
 
-function quietClient(): KeyworkClient {
+function quietClient(): ConsoleClient {
   const summaries = [summary("s1", "session 1"), summary("s2", "session 2")];
   const known: Partial<KeyworkClient> = {
     url: "http://127.0.0.1:4770",
@@ -119,7 +125,7 @@ function quietClient(): KeyworkClient {
   };
   return new Proxy(known, {
     get: (target, name) => Reflect.get(target, name) ?? (async () => undefined),
-  }) as KeyworkClient;
+  }) as ConsoleClient;
 }
 
 function summary(id: string, title: string): SessionSummary {
@@ -134,6 +140,14 @@ function summary(id: string, title: string): SessionSummary {
 
 function askFrom(sessionId: string): NeedsYouTrigger {
   return { kind: "ask", workspace: "/work", sessionId, callId: `call-${sessionId}` };
+}
+
+async function openTheFirstSession(): Promise<void> {
+  await screen.findByText("session 1", { selector: ".kw-tree-name" });
+  fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+  fireEvent.keyDown(document.body, { key: "t" });
+  await waitFor(() => expect(focusedName()).toBe("sessions"));
+  fireEvent.keyDown(document.body, { key: "Enter" });
 }
 
 function closeFocused(): void {

@@ -1,7 +1,9 @@
 import { join } from "node:path";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { BrowserWindow, screen } from "electron";
 import { hostChannels } from "../shared/channels.ts";
 import { markImage } from "./native.ts";
+import { windowTitle } from "./product.ts";
 import { trayModel } from "./tray.ts";
 import {
   positionOn,
@@ -25,6 +27,7 @@ export interface DesktopShell {
 }
 
 export interface ShellSeams {
+  profile?: ProductProfile;
   workspaces: WorkspaceHost;
   states: WindowStateBook;
   platform: NodeJS.Platform;
@@ -32,7 +35,8 @@ export interface ShellSeams {
 
 export function desktopShell(seams: ShellSeams): DesktopShell {
   const windows = windowRegistry();
-  const { workspaces, states } = seams;
+  const consoleWindows = new Set<number>();
+  const { workspaces, states, profile = keyworkProfile } = seams;
 
   const releaseIfLast = async (
     release: { workspace: string; lastWindow: boolean } | undefined,
@@ -55,11 +59,22 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
     window.focus();
   };
 
+  const titleFor = (windowId: number): string => {
+    const workspace = windows.workspaceOf(windowId);
+    const open = windows.list().find((entry) => entry.workspace === workspace);
+    return windowTitle(open?.needsYou ?? 0, profile);
+  };
+
   const openWindow = async (workspace?: string): Promise<BrowserWindow> => {
     const key = windowStateKey(workspace, seams.platform);
     const remembered = await states.read(key);
-    const window = createWindow(remembered);
+    const window = createWindow(remembered, profile);
     windows.add(window.id, workspace);
+    consoleWindows.add(window.id);
+    window.on("page-title-updated", (event) => {
+      event.preventDefault();
+      window.setTitle(titleFor(window.id));
+    });
     window.on("focus", () => windows.focused(window.id));
     window.on("close", () => {
       void states.write(
@@ -68,6 +83,7 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
       );
     });
     window.on("closed", () => {
+      consoleWindows.delete(window.id);
       void releaseIfLast(windows.remove(window.id));
     });
     window.once("ready-to-show", () => {
@@ -81,12 +97,18 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
 
   const refreshOverlays = (): void => {
     if (seams.platform !== "win32") return;
-    const badge = trayModel(windows.list()).badge;
+    const badge = trayModel(windows.list(), [], profile).badge;
     for (const window of BrowserWindow.getAllWindows()) {
       window.setOverlayIcon(badge === undefined ? null : markImage("win32", true), badge ?? "");
     }
   };
   windows.onChange(refreshOverlays);
+
+  const retitle = (): void => {
+    for (const windowId of consoleWindows)
+      BrowserWindow.fromId(windowId)?.setTitle(titleFor(windowId));
+  };
+  windows.onChange(retitle);
 
   return {
     windows,
@@ -124,7 +146,7 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
   };
 }
 
-function createWindow(remembered: WindowState): BrowserWindow {
+function createWindow(remembered: WindowState, profile: ProductProfile): BrowserWindow {
   const displays = screen.getAllDisplays().map((display) => display.bounds);
   return new BrowserWindow({
     width: remembered.width,
@@ -132,9 +154,10 @@ function createWindow(remembered: WindowState): BrowserWindow {
     ...positionOn(remembered, displays),
     show: false,
     autoHideMenuBar: true,
-    title: "keywork",
+    title: windowTitle(0, profile),
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.js"),
+      additionalArguments: [`--keywork-product=${profile.id}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

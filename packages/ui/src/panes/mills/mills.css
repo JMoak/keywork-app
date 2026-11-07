@@ -1,0 +1,129 @@
+.kw-mills-heads,
+.kw-mills-button {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(14ch, 1fr) 9ch 18ch 22ch 20ch 15ch;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.kw-mills-heads {
+  padding: 0.3rem 0.75rem 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-faint);
+  white-space: nowrap;
+}
+
+.kw-mills-button [data-cell] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-mills-row[data-kind="place"] .kw-ov-name {
+  color: var(--kw-text);
+}
+.kw-mills-row[data-kind="server"] .kw-ov-name {
+  padding-left: 1ch;
+}
+.kw-mills-row[data-kind="model"] .kw-ov-name {
+  padding-left: 3ch;
+}
+
+.kw-mills-row[data-tone="error"] [data-cell="health"] {
+  color: var(--kw-error);
+}
+.kw-mills-row[data-tone="ask"] [data-cell="license"] {
+  color: var(--kw-accent);
+}
+
+.kw-mills-row [data-cell="cost"] {
+  text-align: right;
+}
+
+.kw-mills-tag {
+  color: var(--kw-accent);
+}
+
+.kw-mills-sub[data-depth="server"] {
+  margin-left: 2.75rem;
+}
+.kw-mills-sub[data-depth="model"] {
+  margin-left: 3.75rem;
+}
+.kw-mills-sub[data-tone="ask"] {
+  color: var(--kw-accent);
+}
+
+.kw-mills-bench {
+  margin: 0.15rem 0.75rem 0.35rem 3.75rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-mills-bench-line {
+  margin: 0;
+  color: var(--kw-text-dim);
+}
+
+.kw-mills-bench-table {
+  border-collapse: collapse;
+  margin-top: 0.2rem;
+  font: inherit;
+}
+.kw-mills-bench-table th {
+  font-weight: normal;
+  text-align: left;
+  color: var(--kw-text-faint);
+  border-bottom: 1px solid var(--kw-border);
+}
+.kw-mills-bench-table th,
+.kw-mills-bench-table td {
+  padding: 0 2ch 0 0;
+}
+
+.kw-mills-policy {
+  border-top: 1px solid var(--kw-border);
+}
+
+.kw-mills-policy-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.kw-mills-policy-row {
+  display: grid;
+  grid-template-columns: 8ch minmax(12ch, 28ch) minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.15rem 0.75rem 0.15rem 1.75rem;
+  color: var(--kw-text-mid);
+}
+.kw-mills-policy-row[data-inherited] [data-cell="choice"],
+.kw-mills-policy-row [data-cell="where"] {
+  color: var(--kw-text-dim);
+}
+
+@container frame (max-width: 899.98px) {
+  .kw-mills-heads,
+  .kw-mills-button {
+    grid-template-columns: 1.25rem minmax(12ch, 1fr) 9ch 22ch 16ch;
+  }
+  .kw-mills-heads [data-cell="held"],
+  .kw-mills-button [data-cell="held"],
+  .kw-mills-heads [data-cell="cost"],
+  .kw-mills-button [data-cell="cost"] {
+    display: none;
+  }
+}
+
+@container frame (max-width: 539.98px) {
+  .kw-mills-heads,
+  .kw-mills-button {
+    grid-template-columns: 1.25rem minmax(0, 1fr) 9ch;
+  }
+  .kw-mills-heads [data-cell="classes"],
+  .kw-mills-button [data-cell="classes"],
+  .kw-mills-heads [data-cell="license"],
+  .kw-mills-button [data-cell="license"] {
+    display: none;
+  }
+}

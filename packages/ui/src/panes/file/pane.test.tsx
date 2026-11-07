@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { KeyworkClient } from "@keywork-app/client";
+import type { ConsoleClient } from "@keywork-app/client";
 import type { FileRange, FileReading, FileSlice, TreeEntry } from "@keywork-app/protocol";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
@@ -9,7 +9,7 @@ import fileWhole from "../../../../client/src/fixtures/file.json?raw";
 import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
-import { holdTypingFocus } from "../overview/rows.test.tsx";
+import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { describeRefusal, type FileSpec, filePane } from "./index.tsx";
 
@@ -66,7 +66,7 @@ function harness(
       const entries = folders[path];
       return entries === undefined ? "missing" : { path, entries };
     },
-  }) as unknown as KeyworkClient;
+  }) as unknown as ConsoleClient;
   const host = browserHost();
   host.openExternal = async (url) => void external.push(url);
   const shell: ShellSeams = {

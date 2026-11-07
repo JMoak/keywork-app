@@ -244,6 +244,20 @@ describe("the app's bindings", () => {
     expect(map.describeAll("help.toggle")).toEqual(["ctrl+k /", "f1"]);
   });
 
+  it("make a creature on leader 1 from the stead, the creature pane and the chores pane alike", () => {
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
+    expect(map.describe("onboarding.start")).toBe("ctrl+k 1");
+    expect(map.describe("stead.summon")).toBe("ctrl+k 0");
+    for (const scope of ["stead", "creature", "chores", "conversation", undefined]) {
+      map.press(parseChord("ctrl+k"), 0, scope);
+      expect(map.press(parseChord("1"), 1, scope), scope ?? "no pane").toEqual({
+        type: "action",
+        action: "onboarding.start",
+      });
+    }
+    expect(appActions["onboarding.start"]?.command?.name).toBe("creature.new");
+  });
+
   it("put quiet behind the leader and every way to answer an ask on the hot path", () => {
     const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
     expect(map.describe("session.quiet")).toBe("ctrl+k shift+s");

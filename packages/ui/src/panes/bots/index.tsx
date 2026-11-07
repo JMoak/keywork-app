@@ -30,6 +30,7 @@ export type BotsSpec = z.output<typeof botsSpec>;
 
 export const botsPane = definePane<BotsSpec>({
   kind: "bots",
+  heading: "in bots",
   spec: botsSpec,
   home: "left",
   attire: "house",

@@ -151,7 +151,7 @@ describe("the first trust setup on a workspace", () => {
     ],
     [
       { refused: "invalid", detail: "the body must be { rule }" },
-      "not recorded · keywork could not read the rule",
+      "not recorded · the engine could not read the rule",
     ],
   ] as const)("reads a %o refusal in the house's words", async (refusal, words) => {
     const { setup, harness, offers } = await begun();

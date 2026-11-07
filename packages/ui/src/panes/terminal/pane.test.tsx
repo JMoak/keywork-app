@@ -149,9 +149,9 @@ describe("the terminal pane", () => {
   it("describes itself per mode and names the leader in its empty state", () => {
     const shell = shellSeams();
     expect(terminalPane.title({ kind: "terminal", mode: "shell" }, shell)).toBe("shell");
-    expect(terminalPane.title({ kind: "terminal", mode: "bridge" }, shell)).toBe("keywork");
+    expect(terminalPane.title({ kind: "terminal", mode: "bridge" }, shell)).toBe("bridge");
     expect(terminalPane.title({ kind: "terminal", mode: "bridge", verb: "connect" }, shell)).toBe(
-      "keywork connect",
+      "connect",
     );
     expect(terminalPane.title({ kind: "terminal", mode: "mirror" }, shell)).toBe("mirror");
     expect(terminalPane.emptyState(shell.keys)).toContain("every key but the leader");

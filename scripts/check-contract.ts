@@ -8,6 +8,7 @@ import {
   type HttpMethod,
   protocolVersion,
   type RouteShape,
+  requestBodies,
   routes,
 } from "@keywork-app/protocol";
 import { keyworkCheckoutPresent, keyworkModuleUrl, keyworkRepo } from "./lib/keywork-checkout.ts";
@@ -38,6 +39,7 @@ export interface ContractDocument {
   readonly contract: string | undefined;
   readonly routes: readonly RouteShape[];
   readonly events: readonly string[] | undefined;
+  readonly bodies: ReadonlyMap<string, readonly string[]>;
   readonly shapes?: EventShapes | undefined;
 }
 
@@ -46,6 +48,7 @@ export function contractViolations(document: ContractDocument, pinned?: EventSha
     ...versionViolations(document.version),
     ...contractVersionViolations(document.contract),
     ...routeViolations(document.routes),
+    ...bodyViolations(document.bodies),
     ...eventViolations(document.events),
     ...shapeViolations(pinned, document.shapes),
   ];
@@ -67,6 +70,7 @@ export function shapeViolations(
 
 export function documentOfOpenApi(doc: OpenApiShape, origin: string): ContractDocument {
   const served: RouteShape[] = [];
+  const bodies = new Map<string, readonly string[]>();
   for (const [path, item] of Object.entries(doc.paths)) {
     for (const [method, operation] of Object.entries(item)) {
       served.push({
@@ -74,6 +78,8 @@ export function documentOfOpenApi(doc: OpenApiShape, origin: string): ContractDo
         path,
         operationId: operation.operationId,
       });
+      const schema = operation.requestBody?.content?.["application/json"]?.schema;
+      if (schema !== undefined) bodies.set(operation.operationId, propertyPathsOf(schema));
     }
   }
   return {
@@ -81,6 +87,7 @@ export function documentOfOpenApi(doc: OpenApiShape, origin: string): ContractDo
     version: doc.info.version === recordedVersion ? undefined : doc.info.version,
     contract: doc.info["x-keywork-contract"],
     routes: served.sort(byRoute),
+    bodies,
     events: doc.components?.schemas?.BusEnvelope?.properties?.type?.enum,
   };
 }
@@ -117,10 +124,38 @@ export function pinnedEventShapes(): Promise<EventShapes> {
 
 export interface OpenApiShape {
   info: { version: string; "x-keywork-contract"?: string };
-  paths: Record<string, Record<string, { operationId: string }>>;
+  paths: Record<string, Record<string, OpenApiOperation>>;
   components?: {
     schemas?: { BusEnvelope?: { properties?: { type?: { enum?: string[] } } } };
   };
+}
+
+export interface OpenApiOperation {
+  operationId: string;
+  requestBody?: { content?: Record<string, { schema?: JsonSchema }> };
+}
+
+export interface JsonSchema {
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  oneOf?: JsonSchema[];
+  anyOf?: JsonSchema[];
+  allOf?: JsonSchema[];
+}
+
+export function propertyPathsOf(schema: JsonSchema, prefix = "", depth = 0): string[] {
+  if (depth > 8) return [];
+  const own = Object.entries(schema.properties ?? {}).flatMap(([key, child]) => [
+    `${prefix}${key}`,
+    ...propertyPathsOf(child, `${prefix}${key}.`, depth + 1),
+  ]);
+  const nested = [
+    ...(schema.items === undefined ? [] : [schema.items]),
+    ...(schema.oneOf ?? []),
+    ...(schema.anyOf ?? []),
+    ...(schema.allOf ?? []),
+  ].flatMap((child) => propertyPathsOf(child, prefix, depth + 1));
+  return [...new Set([...own, ...nested])];
 }
 
 const recordedVersion = "fixture";
@@ -162,6 +197,19 @@ function routeViolations(served: readonly RouteShape[]): string[] {
         `${route.operationId} moved: the protocol has ${routeKey(route)}, the server ${routeKey(actual.get(route.operationId) as RouteShape)}`,
     ),
   ];
+}
+
+function bodyViolations(served: ReadonlyMap<string, readonly string[]>): string[] {
+  return Object.entries(requestBodies).flatMap(([operationId, sent]) => {
+    const accepted = served.get(operationId);
+    if (accepted === undefined) return [];
+    return sent
+      .filter((property) => !accepted.includes(property))
+      .map(
+        (property) =>
+          `${operationId}: the protocol sends ${property}; the server's request body does not accept it`,
+      );
+  });
 }
 
 function eventViolations(served: readonly string[] | undefined): string[] {

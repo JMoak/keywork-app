@@ -25,6 +25,9 @@ describe("the needs-you ordering rule", () => {
       ["airlock", 1],
       ["inbox", 2],
       ["failed", 3],
+      ["review", 4],
+      ["chore", 5],
+      ["decided", 6],
     ]);
     const ordered = orderNeedsYou([
       failedItem("s4", { since: "2026-10-15T00:00:00.000Z" }),
@@ -101,7 +104,15 @@ describe("the needs-you words", () => {
   });
 
   it("marks urgency as density, and a failed turn with the failed stamp", () => {
-    expect(kindMarks).toEqual({ ask: "█", airlock: "▓", inbox: "▒", failed: "▛" });
+    expect(kindMarks).toEqual({
+      ask: "█",
+      airlock: "▓",
+      inbox: "▒",
+      failed: "▛",
+      review: "▒",
+      chore: "▓",
+      decided: "░",
+    });
   });
 
   it("lets everything but an ask be dismissed, and says why an ask cannot be", () => {

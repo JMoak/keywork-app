@@ -1,0 +1,252 @@
+.kw-chores {
+  overflow: auto;
+}
+
+.kw-chores[data-drafting] > :not(.kw-chores-form, .kw-ov-line) {
+  display: none;
+}
+
+.kw-chores .kw-ov-list {
+  flex: none;
+  overflow: visible;
+}
+
+.kw-chores-row .kw-ov-sub {
+  margin-left: 2.25rem;
+}
+
+.kw-chores-awaiting,
+.kw-chores-tools[data-accepted="false"] {
+  color: var(--kw-accent);
+}
+
+.kw-chores-tools[data-accepted="true"] {
+  color: var(--kw-success);
+}
+
+.kw-chores-heading {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.15rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.15rem 1.5ch;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+}
+
+.kw-chores-facts dt {
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-facts dd {
+  margin: 0;
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-chores-instructions {
+  white-space: pre-wrap;
+}
+
+.kw-chores-grants {
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem 0.75rem 0.35rem 1.75rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-chores-action {
+  display: inline-block;
+  min-width: 8ch;
+  color: var(--kw-text);
+}
+
+.kw-chores-runs {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+  color: var(--kw-text-mid);
+}
+
+.kw-chores-runs th {
+  padding: 0.2rem 0.75rem 0.2rem 0;
+  font-weight: normal;
+  text-align: left;
+  color: var(--kw-text-dim);
+  border-bottom: 1px solid var(--kw-border);
+  white-space: nowrap;
+}
+
+.kw-chores-runs th:first-child,
+.kw-chores-runs td:first-child {
+  padding-left: 0.75rem;
+}
+
+.kw-chores-runs td {
+  padding: 0.2rem 0.75rem 0.2rem 0;
+  white-space: nowrap;
+}
+
+.kw-chores-run {
+  cursor: pointer;
+}
+
+.kw-chores-run[data-cursor] {
+  color: var(--kw-text);
+  background: var(--kw-panel);
+}
+
+.kw-chores-number {
+  text-align: right;
+}
+
+.kw-chores-note td {
+  padding-left: 2.25rem;
+  color: var(--kw-text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kw-chores-run [data-outcome="blocked"],
+.kw-chores-run [data-mark="failed"],
+.kw-chores-run [data-mark="unknown"],
+.kw-chores-run [data-mark="unverified"] {
+  color: var(--kw-error);
+}
+
+.kw-chores-run [data-outcome="needs you"] {
+  color: var(--kw-accent);
+}
+
+.kw-chores-run [data-outcome="delivered"],
+.kw-chores-run [data-mark="delivered"],
+.kw-chores-run [data-mark="verified"] {
+  color: var(--kw-success);
+}
+
+.kw-chores-run [data-mark="not run"],
+.kw-chores-run [data-mark="unchecked"],
+.kw-chores-run [data-mark="none"] {
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-accept {
+  border-top: 1px solid var(--kw-border);
+}
+
+.kw-chores-settings {
+  margin-top: auto;
+  padding: 0.35rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-settings p {
+  margin: 0;
+}
+
+.kw-chores-form {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-form .kw-chores-heading {
+  padding: 0 0 0.25rem;
+}
+
+.kw-chores-field {
+  display: grid;
+  grid-template-columns: 16ch minmax(0, 1fr);
+  align-items: baseline;
+  gap: 1ch;
+}
+
+.kw-chores-field input,
+.kw-chores-field textarea {
+  min-width: 0;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+  padding: 0.125rem 0.5ch;
+  resize: vertical;
+}
+
+.kw-chores-field input:focus,
+.kw-chores-field textarea:focus {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
+.kw-chores-field input:read-only {
+  color: var(--kw-text-dim);
+}
+
+.kw-chores-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 2ch;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.kw-chores-choice legend {
+  float: left;
+  width: 16ch;
+  padding: 0;
+}
+
+.kw-chores-choice label {
+  color: var(--kw-text-mid);
+  cursor: pointer;
+}
+
+.kw-chores-choice input {
+  accent-color: var(--kw-accent);
+}
+
+.kw-chores-choice input:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+}
+
+.kw-chores-preview,
+.kw-chores-consent {
+  margin: 0 0 0 17ch;
+  color: var(--kw-text-mid);
+}
+
+.kw-chores-consent {
+  color: var(--kw-accent);
+}
+
+.kw-chores-form-keys {
+  display: flex;
+  align-items: baseline;
+  gap: 2ch;
+  margin: 0.25rem 0 0;
+}
+
+@container frame (max-width: 479.98px) {
+  .kw-chores-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kw-chores-preview,
+  .kw-chores-consent {
+    margin-left: 0;
+  }
+
+  .kw-chores-runs th:nth-child(n + 6),
+  .kw-chores-runs td:nth-child(n + 6) {
+    display: none;
+  }
+}

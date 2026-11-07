@@ -1,0 +1,21 @@
+5 parcels · 1 paired · 2 pairing · 2 gates open    p pair · c confirm · g gate · x revoke · u unpair
+listening on 100.124.48.125 · port 47800 · policy verified 11:40 · audit chain intact · 5 rows
+  █ moak-main · Jordan Moak · windows    here · claimed
+      roles house
+      gate moss from spark-ad4d · screen:view · until 13:30
+  ▓ build-box · tag:ci · linux           ░ DERP ord · pairing
+      code 482 913 · if build-box shows the same code, c confirms
+  ▓ lab-mac · Jordan Moak · macOS        ░ peer relay · pairing
+      code 105 377 · the console on lab-mac asks to pair; if it shows the same code, c confirms here
+  · old-laptop · Jordan Moak · windows   offline · no node
+> █ spark-ad4d · Jordan Moak · linux     direct · claimed host
+      roles host · pasture
+      gate wren · exec bun, git status · files:read ~/src/** · until 18:00
+      audit 11:48 allow screen:view · grant-moss
+      audit 11:35 deny exec · rm outside the grant
+      audit 11:20 allow exec · grant-wren
+open a gate onto spark-ad4d
+  [creature wren, or wren@spark-ad4d]
+  [caps exec bun, git status; files:read ~/src/**]
+  [expiry 1h]
+pairing with build-box · compare the codes

@@ -2,11 +2,19 @@ import { emptyProjection, projectAll } from "@keywork-app/client";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { orderNeedsYou } from "../../shell/needs-you.ts";
-import { airlockItem, askItem, failedItem, inboxItem } from "../../shell/needs-you-testing.ts";
+import {
+  airlockItem,
+  askItem,
+  decidedItem,
+  failedItem,
+  inboxItem,
+} from "../../shell/needs-you-testing.ts";
 import {
   currentStep,
+  type DecisionOverturning,
   type DeskRow,
   type DeskSources,
+  decidedOfRow,
   deskDismissNotice,
   deskGroups,
   deskHead,
@@ -14,11 +22,74 @@ import {
   deskRows,
   deskTitle,
   nextWaiting,
+  overturnDecided,
+  overturnHint,
   rowAge,
   workspaceName,
 } from "./desk.ts";
 
 const now = Date.parse("2026-10-15T16:00:00.000Z");
+
+describe("a decision made for you on the desk", () => {
+  function overturning(
+    answer: Awaited<ReturnType<DecisionOverturning["overturnCreatureDecision"]>>,
+  ) {
+    const calls: [string, string][] = [];
+    const client: DecisionOverturning = {
+      overturnCreatureDecision: async (slug, recordId) => {
+        calls.push([slug, recordId]);
+        return answer;
+      },
+    };
+    return { client, calls };
+  }
+
+  it("waits last on the desk and offers the one key that overturns it", () => {
+    const waiting = orderNeedsYou([decidedItem("r1"), askItem("c1"), failedItem("s4")]);
+    const rows = deskRows(deskGroups(sources({ waiting })));
+    expect(rows.map((row) => (row.kind === "waiting" ? row.item.kind : row.kind))).toEqual([
+      "ask",
+      "failed",
+      "decided",
+    ]);
+    expect(decidedOfRow(rows[2])?.recordId).toBe("r1");
+    expect(decidedOfRow(rows[0])).toBeUndefined();
+    expect(overturnHint(keys)).toBe(
+      "x overturns it and its class waits for you again · d lets it stand",
+    );
+  });
+
+  it("overturns through the creature's route and names the class that waits again", async () => {
+    const { client, calls } = overturning({
+      overturned: true,
+      recordId: "r1",
+      ruleClass: "shell.read",
+      demoted: [],
+    });
+    expect(await overturnDecided(client, decidedItem("r1"))).toEqual({
+      overturned: true,
+      line: "overturned · every shell.read ask waits for you again",
+    });
+    expect(calls).toEqual([["wren", "r1"]]);
+  });
+
+  it("says why a decision was not overturned, and never calls without a creature", async () => {
+    const twice = overturning({ overturned: false, reason: "already-overturned" });
+    expect(await overturnDecided(twice.client, decidedItem("r1"))).toEqual({
+      overturned: false,
+      line: "already overturned · its class already waits for you",
+    });
+    const refused = overturning({ refused: "failed", detail: "the server answered 500" });
+    expect((await overturnDecided(refused.client, decidedItem("r1"))).line).toBe(
+      "not overturned · the server answered 500",
+    );
+    const nameless = overturning({ overturned: false, reason: "not-decided-for-you" });
+    expect(
+      await overturnDecided(nameless.client, decidedItem("r2", { creature: undefined })),
+    ).toMatchObject({ overturned: false });
+    expect(nameless.calls).toEqual([]);
+  });
+});
 
 describe("the desk's groups", () => {
   it("orders needs you, working, back and quiet, and drops the empty ones", () => {
@@ -232,6 +303,7 @@ const keys = {
   open: "enter",
   dismiss: "d",
   waiting: "tab",
+  overturn: "x",
   approve: "y",
   once: "o",
   session: "s",

@@ -120,10 +120,10 @@ describe("the context map", () => {
 
   it("says what the parts rest on and where the window came from", () => {
     expect(basisLine(recorded)).toBe(
-      "parts estimated from the text keywork sends · window assumed by the server",
+      "parts estimated from the text the server sends · window assumed by the server",
     );
     expect(basisLine(report({ conversationBasis: "reported", declared: true }))).toBe(
-      "conversation from the usage the provider reported at the last turn · the rest estimated from the text keywork sends · window declared in keywork.json",
+      "conversation from the usage the provider reported at the last turn · the rest estimated from the text the server sends · window declared in keywork.json",
     );
   });
 
@@ -152,16 +152,16 @@ describe("the context map", () => {
   it("says in one line when a line falls past the window, which is the server's finding", () => {
     expect(pastWindowLine(report())).toBeUndefined();
     expect(pastWindowLine(report({ flushAt: 190_000, compactAt: 201_000 }))).toBe(
-      "compaction at 201k · past the window · keywork measures the conversation only",
+      "compaction at 201k · past the window · the server measures the conversation only",
     );
     expect(pastWindowLine(report({ flushAt: 226_724, compactAt: 234_916 }))).toBe(
-      "memory flush at 227k, compaction at 235k · past the window · keywork measures the conversation only",
+      "memory flush at 227k, compaction at 235k · past the window · the server measures the conversation only",
     );
   });
 
   it("reads the parts aloud for the grid's label and the gauge's hover", () => {
     expect(partsReadout(recorded.parts)).toBe(
-      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text keywork sends",
+      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text the server sends",
     );
     expect(mapReadout(recorded)).toMatch(/^context 1\.9k of 200k · 1% · system prompt 137/);
   });

@@ -36,6 +36,7 @@ export const unnamedArcLine = "an arc needs a slug · lowercase letters, digits,
 
 export const arcsPane = definePane<ArcsSpec>({
   kind: "arcs",
+  heading: "in arcs",
   spec: arcsSpec,
   home: "left",
   attire: "house",

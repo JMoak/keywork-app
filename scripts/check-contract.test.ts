@@ -40,6 +40,20 @@ describe("check:contract", () => {
     ]);
   });
 
+  it("names a request-body property the server spells differently", async () => {
+    const recorded = await documentOfFixture();
+    const bodies = new Map(recorded.bodies);
+    bodies.set(
+      "putRoutine",
+      (bodies.get("putRoutine") ?? []).map((p) =>
+        p === "trigger.expr" ? "trigger.expression" : p,
+      ),
+    );
+    expect(contractViolations({ ...recorded, bodies })).toEqual([
+      "putRoutine: the protocol sends trigger.expr; the server's request body does not accept it",
+    ]);
+  });
+
   describe("against a keywork checkout", () => {
     let checkout: string;
 

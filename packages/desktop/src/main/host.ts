@@ -2,7 +2,8 @@ import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { keyworkClient } from "@keywork-app/client";
+import { keyworkClient, type ServerTicket } from "@keywork-app/client";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from "electron";
 import {
   type EditorOpened,
@@ -14,24 +15,33 @@ import { freePort, spawnChild } from "./child.ts";
 import { type EditorSeams, openInEditor, startDetached } from "./editor.ts";
 import { followKeybindingFiles, keybindingFileSeams, keybindingFilesFor } from "./keybindings.ts";
 import { showToast } from "./native.ts";
+import { type SidecarRun, sidecarNodeServing } from "./node-consent.ts";
+import { answerTheNodeRefusal, retrySharedRuntime } from "./node-consent-electron.ts";
 import { isNotice, shouldNotify } from "./notify.ts";
 import { editorVerdict, externalVerdict } from "./open-external.ts";
 import { registerPtyHandlers } from "./pty-ipc.ts";
 import { recentStore } from "./recents.ts";
 import { saveAs } from "./save-as.ts";
 import { type ServeFailure, superviseServer } from "./serve-process.ts";
-import { serverRelay } from "./server-relay.ts";
+import { type ServerRelay, serverRelay } from "./server-relay.ts";
 import type { DesktopShell } from "./shell.ts";
 import {
+  appRepoRoot,
   bundledBinary,
   fileSeams,
   keyworkOnPath,
   keyworkTickets,
-  keyworkVersion,
+  siblingCheckout,
+  siblingKeyworkRepo,
 } from "./system.ts";
 import { probeTicket } from "./ticket.ts";
 import {
-  chooseBinary,
+  chooseEngine,
+  contractRefusal,
+  type EngineLaunch,
+  type EngineSeams,
+  launchableEngine,
+  type NodeServing,
   type OpenedWorkspace,
   type WorkspaceClock,
   type WorkspaceHost,
@@ -48,27 +58,83 @@ export function aboutInfo(): HostAbout {
   return { shell: "electron", platform: process.platform, version: app.getVersion() };
 }
 
-export function createWorkspaces(): WorkspaceHost {
+export function createWorkspaces(profile: ProductProfile = keyworkProfile): WorkspaceHost {
+  const fetchDocument = (ticket: ServerTicket) => keyworkClient(ticket).document();
   return workspaceHost({
+    profile,
+    homePath: managedHomePath,
     locateTickets: keyworkTickets,
     readText: fileSeams.readText,
     removeFile: (path) => rm(path, { force: true }),
     probeTicket: (ticket) => probeTicket(ticket, fetch),
+    fetchDocument,
     supervise: (spec) =>
       superviseServer(spec, {
         spawn: spawnChild,
         delay: sleep,
         freePort,
-        fetchDocument: (ticket) => keyworkClient(ticket).document(),
+        fetchDocument,
         platform: process.platform,
         giveUpAfter: sleep,
       }),
-    keyworkOnPath: () => keyworkOnPath(),
-    binaryVersion: keyworkVersion,
-    bundledBinary: bundledBinary(process.resourcesPath),
+    engine: announcedEngine,
     recents: recentStore(join(app.getPath("userData"), "recents.json"), fileSeams),
     clock: wallClock,
+    node: app.isPackaged ? theNode(profile) : undefined,
   });
+}
+
+export const nodeVerbPatienceMs = 30_000;
+
+function theNode(profile: ProductProfile): NodeServing {
+  return sidecarNodeServing({
+    sidecar: bundledBinary(process.resourcesPath),
+    run: runSidecarVerb,
+    consolePid: process.pid,
+    profile,
+  });
+}
+
+async function runSidecarVerb(
+  binary: string,
+  args: readonly string[],
+  cwd: string = homedir(),
+): Promise<SidecarRun> {
+  const child = spawnChild(binary, args, cwd);
+  const patience = new AbortController();
+  const gaveUp = sleep(nodeVerbPatienceMs, patience.signal).then(() => {
+    if (!patience.signal.aborted) child.signal("SIGKILL");
+    return null;
+  });
+  const [code, stdout, stderr] = await Promise.all([
+    Promise.race([child.exited, gaveUp]),
+    collected(child.stdout),
+    collected(child.stderr),
+  ]);
+  patience.abort();
+  return { code, output: code === 0 || stderr.trim() === "" ? stdout : stderr };
+}
+
+async function collected(chunks: AsyncIterable<string>): Promise<string> {
+  let text = "";
+  for await (const chunk of chunks) text += chunk;
+  return text;
+}
+
+export function engineSeams(): EngineSeams {
+  return {
+    packaged: app.isPackaged,
+    bundledBinary: bundledBinary(process.resourcesPath),
+    keyworkBin: process.env.KEYWORK_BIN,
+    siblingCheckout: () => siblingCheckout(siblingKeyworkRepo(appRepoRoot(app.getAppPath()))),
+    keyworkOnPath: () => keyworkOnPath(),
+  };
+}
+
+async function announcedEngine(): Promise<EngineLaunch> {
+  const engine = await chooseEngine(engineSeams());
+  console.info(`engine: ${engine.origin} · ${engine.from}`);
+  return engine;
 }
 
 export async function pickFolder(): Promise<string | undefined> {
@@ -84,20 +150,66 @@ export function registerHostHandlers(
   workspaces: WorkspaceHost,
   desktop: DesktopShell,
   onWorkspaceOpened: () => void,
+  profile: ProductProfile = keyworkProfile,
 ): HostHandlers {
-  const relay = serverRelay({
-    ticketFor: (workspace) => workspaces.ticketFor(workspace),
-    fetch: (input, init) => fetch(input, init),
-    suspect: (workspace) => workspaces.suspect(workspace),
-  });
+  const homeReaders = new Set<number>();
+  const relays = new Map<number, ServerRelay>();
+  const relayFor = (sender: WebContents): ServerRelay => {
+    const present = relays.get(sender.id);
+    if (present !== undefined) return present;
+    const relay = serverRelay({
+      ticketFor: (workspace) => {
+        const window = BrowserWindow.fromWebContents(sender);
+        const project = window !== null && desktop.windows.workspaceOf(window.id) === workspace;
+        const home = workspace === managedHomePath && homeReaders.has(sender.id);
+        return project || home ? workspaces.ticketFor(workspace) : undefined;
+      },
+      fetch: (input, init) => fetch(input, init),
+      suspect: (workspace) => workspaces.suspect(workspace),
+    });
+    relays.set(sender.id, relay);
+    sender.once("destroyed", () => {
+      relay.abortAll();
+      relays.delete(sender.id);
+      homeReaders.delete(sender.id);
+    });
+    return relay;
+  };
 
   ipcMain.handle(hostChannels.about, () => aboutInfo());
   ipcMain.handle(hostChannels.pickFolder, () => pickFolder());
   ipcMain.handle(hostChannels.recentWorkspaces, () => workspaces.recent());
+  ipcMain.handle(hostChannels.enableRuntime, async (event) => {
+    if (!app.isPackaged) return;
+    const result = await retrySharedRuntime(profile, BrowserWindow.fromWebContents(event.sender));
+    if (result.kind === "failed") throw new Error(result.detail);
+  });
+  ipcMain.handle(hostChannels.openHome, async (event) => {
+    if (workspaces.openHome === undefined) {
+      return {
+        ok: false,
+        failure: {
+          kind: "unresolved",
+          message: "the shared creature home is unavailable",
+          nextAction: "update the app and its runtime together",
+        },
+      };
+    }
+    const result = await workspaces.openHome();
+    if (!result.ok) return { ok: false, failure: publicFailure(result.failure, profile) };
+    homeReaders.add(event.sender.id);
+    relayFor(event.sender);
+    return { ok: true, opened: publicView(result.opened) };
+  });
   ipcMain.handle(hostChannels.openWorkspace, async (event, path: string) => {
-    const result = await workspaces.open(path);
-    if (!result.ok) return { ok: false, failure: publicFailure(result.failure) };
     const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await workspaces.open(path);
+    if (!result.ok) {
+      return {
+        ok: false,
+        failure: publicFailure(await withNodeAnswered(result.failure, window, profile), profile),
+      };
+    }
     if (window !== null) await desktop.bindWindow(window.id, result.opened.workspace);
     onWorkspaceOpened();
     return { ok: true, opened: publicView(result.opened) };
@@ -106,7 +218,15 @@ export function registerHostHandlers(
     const result = await workspaces.restart(path);
     return result.ok
       ? { ok: true, opened: publicView(result.opened) }
-      : { ok: false, failure: publicFailure(result.failure) };
+      : { ok: false, failure: publicFailure(result.failure, profile) };
+  });
+  ipcMain.handle(hostChannels.servingOf, (_event, path: string) => workspaces.servingOf(path));
+  ipcMain.handle(hostChannels.stopServing, async (_event, path: string) => {
+    const result = await workspaces.stopServing(path);
+    if (result.ok) onWorkspaceOpened();
+    return result.ok
+      ? { ok: true, opened: publicView(result.opened) }
+      : { ok: false, failure: publicFailure(result.failure, profile) };
   });
   ipcMain.handle(hostChannels.closeWorkspace, async (event, path: string) => {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -149,15 +269,20 @@ export function registerHostHandlers(
     });
   });
   ipcMain.handle(hostChannels.serverFetch, (event, request: RelayRequest) =>
-    relay.start(request, {
+    relayFor(event.sender).start(request, {
       chunk: (requestId, bytes) =>
         sendUnlessGone(event.sender, hostChannels.serverChunk, requestId, bytes),
       end: (end) => sendUnlessGone(event.sender, hostChannels.serverEnd, end),
     }),
   );
-  ipcMain.on(hostChannels.serverAbort, (_event, requestId: number) => relay.abort(requestId));
+  ipcMain.on(hostChannels.serverAbort, (event, requestId: number) =>
+    relays.get(event.sender.id)?.abort(requestId),
+  );
   workspaces.onServerLost((loss) =>
-    desktop.broadcast(hostChannels.serverLost, { ...loss, failure: publicFailure(loss.failure) }),
+    desktop.broadcast(hostChannels.serverLost, {
+      ...loss,
+      failure: publicFailure(loss.failure, profile),
+    }),
   );
   workspaces.onServerRegained(({ workspace, opened }) =>
     desktop.broadcast(hostChannels.serverRegained, { workspace, opened: publicView(opened) }),
@@ -166,15 +291,14 @@ export function registerHostHandlers(
     desktop.broadcast(hostChannels.openWorkspacesChanged, open),
   );
   registerPtyHandlers({
-    keyworkBinary: () =>
-      chooseBinary({
-        keyworkOnPath,
-        binaryVersion: keyworkVersion,
-        bundledBinary: bundledBinary(process.resourcesPath),
-      }),
+    keyworkBinary: () => launchableEngine(engineSeams()),
     secretsFor: (workspace) => [workspaces.ticketFor(workspace)?.token ?? ""],
   });
-  return { abortRelays: () => relay.abortAll() };
+  return {
+    abortRelays: () => {
+      for (const relay of relays.values()) relay.abortAll();
+    },
+  };
 }
 
 async function chooseSavePath(
@@ -193,6 +317,15 @@ function sendUnlessGone(target: WebContents, channel: string, ...payload: unknow
   if (!target.isDestroyed()) target.send(channel, ...payload);
 }
 
+async function withNodeAnswered(
+  failure: ServeFailure,
+  window: BrowserWindow | null,
+  profile: ProductProfile,
+): Promise<ServeFailure> {
+  if (!app.isPackaged || failure.kind !== "contract-mismatch") return failure;
+  return answerTheNodeRefusal(window, failure, profile);
+}
+
 function publicView(opened: OpenedWorkspace) {
   return {
     workspace: opened.workspace,
@@ -200,26 +333,30 @@ function publicView(opened: OpenedWorkspace) {
     attached: opened.attached,
     version: opened.version,
     binary: opened.binary,
+    servedBy: opened.servedByNode === true ? "node" : "console",
   };
 }
 
-function publicFailure(failure: ServeFailure): PublicFailure {
+function publicFailure(failure: ServeFailure, profile: ProductProfile): PublicFailure {
   switch (failure.kind) {
     case "unreachable":
       return { kind: "unreachable", ticket: { url: failure.ticket.url }, detail: failure.detail };
     case "version-mismatch":
       return { kind: "version-mismatch", expected: failure.expected, actual: failure.actual };
+    case "contract-mismatch":
+      return { kind: "unresolved", ...contractRefusal(failure, profile) };
     default:
       return failure;
   }
 }
 
 type PublicFailure =
-  | Exclude<ServeFailure, { kind: "unreachable" | "version-mismatch" }>
+  | Exclude<ServeFailure, { kind: "unreachable" | "version-mismatch" | "contract-mismatch" }>
   | { kind: "unreachable"; ticket: { url: string }; detail: string }
   | { kind: "version-mismatch"; expected: string; actual: string };
 
 const userMemoryVault = join(homedir(), ".keywork", "memory");
+const managedHomePath = join(homedir(), ".keywork", "home");
 
 async function openExternal(url: string, openableRoots: readonly string[]): Promise<void> {
   const verdict = externalVerdict(url, openableRoots);

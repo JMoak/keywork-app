@@ -13,7 +13,9 @@ import type {
   ChangedFileReading,
   ChangesReading,
   RedoReading,
+  ReviewVerdict,
   UndoReading,
+  VerdictMark,
 } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,6 +35,8 @@ interface Recorded {
   fileReads: string[];
   editor: Array<[string, number]>;
   verbs: string[];
+  verdicts: Array<[string, ReviewVerdict]>;
+  prompts: string[];
 }
 
 interface Seams {
@@ -42,6 +46,8 @@ interface Seams {
   controls?: Partial<SessionControls>;
   undo?: UndoReading;
   redo?: RedoReading;
+  verdicts?: VerdictMark[];
+  unwired?: boolean;
 }
 
 function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
@@ -79,7 +85,20 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
         recorded.fileReads.push(path);
         return seams.file ?? recordedFile;
       },
+      prompt: async (_id: string, text: string) => {
+        recorded.prompts.push(text);
+        return "started";
+      },
     } as unknown as ShellSeams["store"],
+    client: {
+      hunkVerdicts: async () => ({ verdicts: seams.verdicts ?? [] }),
+      recordHunkVerdict: async (id: string, verdict: ReviewVerdict) => {
+        recorded.verdicts.push([id, verdict]);
+        if (seams.unwired) return "unwired";
+        return { index: 0, entryId: `v${recorded.verdicts.length}`, at: "t", ...verdict };
+      },
+    } as unknown as ShellSeams["client"],
+    feed: { subscribeSession: () => () => {} } as unknown as ShellSeams["feed"],
     keys: { chord: (action) => `ctrl+k ${action}`, leader: () => "ctrl+k" },
     sessions: { openSession: () => {}, newSession: async () => {}, startSession: async () => {} },
     host: browserHost(),
@@ -120,6 +139,8 @@ const recording = (): Recorded => ({
   fileReads: [],
   editor: [],
   verbs: [],
+  verdicts: [],
+  prompts: [],
 });
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));

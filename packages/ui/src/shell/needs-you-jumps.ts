@@ -5,7 +5,8 @@ import type { NeedsYouItem } from "./needs-you.ts";
 
 export type NeedsYouPlace =
   | { readonly kind: "session"; readonly workspace: string; readonly sessionId: string }
-  | { readonly kind: "memory"; readonly workspace: string };
+  | { readonly kind: "memory"; readonly workspace: string }
+  | { readonly kind: "chores"; readonly workspace: string };
 
 export interface Reveal {
   readonly item: NeedsYouItem;
@@ -94,26 +95,47 @@ export function placeOf(item: NeedsYouItem): NeedsYouPlace {
   switch (item.kind) {
     case "ask":
     case "failed":
+    case "review":
+    case "decided":
       return { kind: "session", workspace: item.workspace, sessionId: item.sessionId };
     case "airlock":
     case "inbox":
       return { kind: "memory", workspace: item.workspace };
+    case "chore":
+      return { kind: "chores", workspace: item.workspace };
   }
 }
 
 export function placeOfTrigger(trigger: NeedsYouTrigger): NeedsYouPlace {
-  return trigger.kind === "ask"
-    ? { kind: "session", workspace: trigger.workspace, sessionId: trigger.sessionId }
-    : { kind: "memory", workspace: trigger.workspace };
+  switch (trigger.kind) {
+    case "ask":
+      return { kind: "session", workspace: trigger.workspace, sessionId: trigger.sessionId };
+    case "memory-inbox":
+      return { kind: "memory", workspace: trigger.workspace };
+    case "chore":
+      return { kind: "chores", workspace: trigger.workspace };
+  }
 }
 
 export function itemOfTrigger(
   items: readonly NeedsYouItem[],
   trigger: NeedsYouTrigger,
 ): NeedsYouItem | undefined {
-  return items.find((item) =>
-    trigger.kind === "ask"
-      ? item.kind === "ask" && item.callId === trigger.callId
-      : item.kind === "inbox" && item.workspace === trigger.workspace,
-  );
+  return items.find((item) => triggered(item, trigger));
+}
+
+function triggered(item: NeedsYouItem, trigger: NeedsYouTrigger): boolean {
+  switch (trigger.kind) {
+    case "ask":
+      return item.kind === "ask" && item.callId === trigger.callId;
+    case "memory-inbox":
+      return item.kind === "inbox" && item.workspace === trigger.workspace;
+    case "chore":
+      return (
+        item.kind === "chore" &&
+        item.workspace === trigger.workspace &&
+        item.creature === trigger.creature &&
+        item.routineId === trigger.routineId
+      );
+  }
 }

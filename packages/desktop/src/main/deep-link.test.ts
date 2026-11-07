@@ -1,5 +1,12 @@
+import { steadProfile } from "@keywork-app/product";
 import { describe, expect, it } from "vitest";
-import { openUrlFor, requestFromArgv, requestFromUrl } from "./deep-link.ts";
+import {
+  launchFrom,
+  openUrlFor,
+  protocolHandlerFor,
+  requestFromArgv,
+  requestFromUrl,
+} from "./deep-link.ts";
 
 describe("requestFromUrl", () => {
   it("opens an absolute encoded path on either platform", () => {
@@ -55,24 +62,43 @@ describe("requestFromUrl", () => {
 });
 
 describe("requestFromArgv", () => {
-  it("skips the executable and flags, taking the first link or folder", () => {
-    expect(
-      requestFromArgv(["C:\\app\\keywork.exe", "--allow-x", "keywork://open?path=C%3A%5Cw"]),
-    ).toMatchObject({ ok: true, path: "C:\\w" });
+  const electron = "C:\\electron\\electron.exe";
+  const script = "C:\\app\\out\\main\\index.js";
+
+  it("opens the folder a packaged launch names", () => {
+    expect(requestFromArgv(["C:\\keywork\\keywork.exe", "C:\\work\\app"])).toMatchObject({
+      ok: true,
+      path: "C:\\work\\app",
+    });
     expect(requestFromArgv(["/usr/bin/keywork-app", "/home/me/app"])).toMatchObject({
       ok: true,
       path: "/home/me/app",
     });
-    expect(requestFromArgv(["electron", ".", "--inspect"])).toBeUndefined();
     expect(requestFromArgv([])).toBeUndefined();
   });
 
-  it("skips the script path too when a dev launcher carries one", () => {
-    const script = "C:\\app\\out\\main\\index.js";
-    const argv = ["electron.exe", script, "keywork://open?path=%2Fsrc"];
-    expect(requestFromArgv(argv, 2)).toMatchObject({ ok: true, path: "/src" });
-    expect(requestFromArgv(["electron.exe", script], 2)).toBeUndefined();
-    expect(requestFromArgv(["electron.exe", script])).toMatchObject({ ok: true, path: script });
+  it("takes a deep link wherever the switches Chromium inserts put it", () => {
+    const argv = ["C:\\keywork\\keywork.exe", "--allow-x", "keywork://open?path=C%3A%5Cw"];
+    expect(requestFromArgv(argv)).toMatchObject({ ok: true, path: "C:\\w" });
+    const dev = [electron, "--original-process-start-time=1", script, "keywork://open?path=%2Fsrc"];
+    expect(requestFromArgv(dev, true)).toMatchObject({ ok: true, path: "/src" });
+  });
+
+  it("never opens the dev app's own path as the workspace", () => {
+    expect(requestFromArgv([electron, script], true)).toBeUndefined();
+    expect(requestFromArgv([electron, ".", "--inspect=9229"], true)).toBeUndefined();
+  });
+
+  it("finds the app path after the switches of an instrumented launch", () => {
+    const argv = [electron, "--inspect=0", "--remote-debugging-port=0", script, "C:\\some\\dir"];
+    expect(requestFromArgv(argv, true)).toMatchObject({ ok: true, path: "C:\\some\\dir" });
+  });
+
+  it("reads everything after -- as an operand", () => {
+    expect(requestFromArgv([electron, ".", "--", "C:\\work\\app"], true)).toMatchObject({
+      ok: true,
+      path: "C:\\work\\app",
+    });
   });
 
   it("reports a bad link rather than falling through to a later argument", () => {
@@ -80,5 +106,53 @@ describe("requestFromArgv", () => {
       ok: false,
       reason: "unknown-action",
     });
+  });
+});
+
+describe("protocolHandlerFor", () => {
+  const electron = "C:\\electron\\electron.exe";
+
+  it("registers the packaged executable itself", () => {
+    expect(protocolHandlerFor(launchFrom(["C:\\keywork\\keywork.exe"], false))).toEqual({
+      kind: "this-executable",
+    });
+  });
+
+  it("registers a plain dev launch with its app path", () => {
+    expect(protocolHandlerFor(launchFrom([electron, "."], true))).toEqual({
+      kind: "dev-app",
+      appPath: ".",
+    });
+    expect(protocolHandlerFor(launchFrom([electron, ".", "--", "C:\\work"], true))).toEqual({
+      kind: "dev-app",
+      appPath: ".",
+    });
+  });
+
+  it("leaves the machine's handler alone under a launch carrying switches", () => {
+    const playwright = [electron, "--inspect=0", "--remote-debugging-port=0", "out/main/index.js"];
+    expect(protocolHandlerFor(launchFrom(playwright, true))).toEqual({ kind: "untouched" });
+    expect(protocolHandlerFor(launchFrom([electron, ".", "--inspect=9229"], true))).toEqual({
+      kind: "untouched",
+    });
+    expect(protocolHandlerFor(launchFrom(["keywork.exe", "--updated"], false))).toEqual({
+      kind: "untouched",
+    });
+  });
+
+  it("leaves it alone when a dev launch names no app", () => {
+    expect(protocolHandlerFor(launchFrom([electron], true))).toEqual({ kind: "untouched" });
+  });
+});
+
+it("uses the selected product URL scheme", () => {
+  const path = "C:/work/creature";
+  const url = openUrlFor(path, steadProfile);
+  expect(url).toBe("stead://open?path=C%3A%2Fwork%2Fcreature");
+  expect(requestFromUrl(url, steadProfile)).toEqual({ ok: true, action: "open", path });
+  expect(requestFromUrl(url)).toMatchObject({ ok: false, reason: "malformed-url" });
+  expect(requestFromArgv(["stead.exe", url], false, steadProfile)).toMatchObject({
+    ok: true,
+    path,
   });
 });

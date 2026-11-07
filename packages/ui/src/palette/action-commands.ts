@@ -18,6 +18,7 @@ export function actionCommand(
   if (command === undefined) return undefined;
   return {
     name: command.name,
+    ...(command.label !== undefined && { label: command.label }),
     description: command.description,
     aliases: command.aliases,
     claimant: name,

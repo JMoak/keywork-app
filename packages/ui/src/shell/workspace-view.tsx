@@ -1,6 +1,6 @@
 import {
+  type ConsoleClient,
   emptyProjection,
-  type KeyworkClient,
   type ServerFeed,
   type SessionProjection,
 } from "@keywork-app/client";
@@ -22,14 +22,18 @@ import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { useProductProfile } from "../chrome/product.ts";
 import { readingMs } from "../chrome/reading-time.ts";
 import { gapCells } from "../chrome/root-attributes.ts";
 import { StatusLine } from "../chrome/status-line.tsx";
 import { telemetry } from "../chrome/telemetry.ts";
 import { createUpdateOffer, updateCommands } from "../chrome/update-offer.ts";
+import { followCompanion } from "../companion/console.ts";
+import { createCompanionController } from "../companion/floating.ts";
 import { followActivations } from "../host/activation.ts";
 import { openInEditorWith } from "../host/editor.ts";
 import { describeFailure, type HostPort } from "../host/port.ts";
+import { hostFetch } from "../host/transport.ts";
 import {
   type ActionTarget,
   actionScopes,
@@ -53,6 +57,7 @@ import {
   seamZoneRect,
   type Verdict,
 } from "../layout/index.ts";
+import { createOnboardingController } from "../onboarding/controller.ts";
 import type { AskPick } from "../page/ask-card.tsx";
 import { actionCommand } from "../palette/action-commands.ts";
 import { CommandRegistry, type CommandSpec } from "../palette/commands.ts";
@@ -64,6 +69,8 @@ import {
   type SurfaceCommandSeams,
   surfaceCommands,
 } from "../palette/surface-commands.ts";
+import { choresOverFetch } from "../panes/chores/port.ts";
+import { createCreatureNames } from "../panes/creature/names.ts";
 import {
   definitionOf,
   type PaneDefinition,
@@ -72,17 +79,33 @@ import {
   parsePaneSpec,
   type ShellSeams,
 } from "../panes/index.ts";
-import { returnKeyboardHome } from "../panes/keyboard-home.ts";
 import { workingSession } from "../panes/overview/working-session.ts";
 import type { PaneActionHandler } from "../panes/registry.ts";
+import { type SteadHomeScope, shellForStead } from "../panes/stead/home-scope.ts";
+import { steadPane } from "../panes/stead/index.tsx";
 import { postureStorageKey } from "../posture/record.ts";
 import { createTrustSetup, followTrustArrival } from "../posture/trust-setup.ts";
 import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
 import { answerHeldAsk } from "./answer-ask.ts";
+import {
+  creaturesListed,
+  recordSteadSummoned,
+  steadSummonedAt,
+  steadSummonStorageKey,
+  steadSummonWanted,
+} from "./first-frame.ts";
+import {
+  createKeyboardScope,
+  type KeyboardScope,
+  KeyboardScopeProvider,
+  paneIdOf,
+} from "./keyboard-claim.ts";
 import { createPaneMarks } from "./marks.ts";
+import { choreAcceptedLine, heldChoresAmong } from "./needs-you.ts";
 import { createJumps, type NeedsYouPlace } from "./needs-you-jumps.ts";
 import type { NeedsYouQueue } from "./needs-you-queue.ts";
+import { decidedAmong, overturnStanding } from "./overturn.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import { toggleSessionQuiet } from "./quiet.ts";
 import {
@@ -100,11 +123,15 @@ import { createTrustFlow, type TrustFlow } from "./trust.ts";
 import { TrustCard } from "./trust-card.tsx";
 
 export interface WorkspaceViewProps {
+  home?: boolean | undefined;
+  prepareSteadHome?: ((retry?: boolean) => void) | undefined;
+  steadHomeFailure?: string | undefined;
+  steadHome?: ((shell: ShellSeams) => SteadHomeScope | undefined) | undefined;
   host: HostPort;
   workspace: string;
   serverLabel: string;
   store: SessionStore;
-  client: KeyworkClient;
+  client: ConsoleClient;
   feed: ServerFeed;
   needsYou: NeedsYouQueue;
   attached?: boolean | undefined;
@@ -120,15 +147,28 @@ type Overlay =
   | undefined;
 
 export function WorkspaceView(props: WorkspaceViewProps) {
+  const keyboard = createKeyboardScope();
+  return (
+    <KeyboardScopeProvider value={keyboard}>
+      <WorkspaceSurface {...props} keyboard={keyboard} />
+    </KeyboardScopeProvider>
+  );
+}
+
+function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope }) {
+  const keyboard = props.keyboard;
+  const onboarding = createOnboardingController();
+  const companion = createCompanionController();
   const storage = props.storage ?? localStorageOrNone();
-  const storageKey = `keywork.layout:${props.workspace}`;
+  const profile = useProductProfile();
+  const storageKey = `${profile.id}.layout:${props.workspace}`;
   const tiler = createTiler(restoredState(storage, storageKey));
   const keymap = props.keymap ?? keymapFromConfig();
   const live = createLiveKeymap(keymap);
   const keys = live.keys;
   const registry = new CommandRegistry();
   const update = createUpdateOffer(props.host);
-  registry.addSource(() => updateCommands(update));
+  registry.addSource(() => updateCommands(update, profile));
   const wardrobe = createWardrobe({
     serverThemes: () => props.store.surfaces.state.themes,
     storage,
@@ -161,7 +201,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const [overlay, setOverlay] = createSignal<Overlay>();
   createEffect(
     on(overlay, (open, wasOpen) => {
-      if (open === undefined && wasOpen !== undefined) returnKeyboardHome();
+      if (open === undefined && wasOpen !== undefined && !keyboard.restore()) keyboard.returnHome();
     }),
   );
   const [leaderArmed, setLeaderArmed] = createSignal(false);
@@ -170,6 +210,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const localHandlers = new Map<PaneId, PaneActionHandler>();
   const awaitingHandlers = new Map<PaneId, () => void>();
   const [gestures, setGestures] = createSignal<PointerGestures>();
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
+  let workspaceRoot: HTMLDivElement | undefined;
   let stage: HTMLDivElement | undefined;
 
   const say = (text: string): void => {
@@ -200,6 +245,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     },
     attached: () => props.attached === true,
     composedTrusted: async () => (await props.client.permissions()).trusted,
+    folder: props.workspace,
     say: (line) => say(line),
   });
   onCleanup(() => trust.dispose());
@@ -213,9 +259,9 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     }),
   );
   const reconnect = async (): Promise<void> => {
-    say("looking for keywork serve again");
+    say("looking for the server again");
     const reopened = await props.host.restartServer(props.workspace);
-    if (!reopened.ok) say(`still no keywork serve · ${describeFailure(reopened.failure)}`);
+    if (!reopened.ok) say(`still no server · ${describeFailure(reopened.failure)}`);
   };
   const projectTrusted = createMemo(() => trust.state().kind === "trusted");
   createEffect(
@@ -236,11 +282,25 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   };
   const showPlace = (place: NeedsYouPlace): void => {
     if (place.workspace !== props.workspace) {
-      void props.host.switchWorkspace(place.workspace);
+      const scope = steadHome();
+      if (scope?.shell.workspace === place.workspace) {
+        const shown = tiler.summon({ kind: steadPane.kind }, screen());
+        act(shown);
+        if (!shown.ok) return;
+        if (place.kind === "session")
+          scope.openSession({ workspace: scope.workspace, session: place.sessionId });
+        else scope.shell.openPane({ kind: place.kind });
+      } else {
+        void props.host.switchWorkspace(place.workspace);
+      }
       return;
     }
     if (place.kind === "memory") {
       act(tiler.summon({ kind: "memory" }, screen()));
+      return;
+    }
+    if (place.kind === "chores") {
+      act(tiler.summon({ kind: "chores" }, screen()));
       return;
     }
     const showing = paneShowing(place.sessionId);
@@ -266,6 +326,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       pane === undefined ? arcOutfit(props.store.summary(sessionId)?.arc) : attire.outfit(pane);
     return outfit?.source === "window" ? undefined : outfit;
   };
+  const [lastIdeSession, setLastIdeSession] = createSignal<string>();
+  createEffect(() => {
+    const spec = tiler.focusedSpec();
+    if (spec?.kind === "conversation") setLastIdeSession(spec.sessionId);
+  });
   const reads = createSessionReads();
   createEffect(() => reads.sight(props.store.state.summaries));
   createEffect(() => {
@@ -274,6 +339,19 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   });
 
   const shell: ShellSeams = {
+    get steadHome() {
+      return steadHome();
+    },
+    get prepareSteadHome() {
+      return props.prepareSteadHome;
+    },
+    get steadHomeFailure() {
+      return props.steadHomeFailure;
+    },
+    currentIdeSession: lastIdeSession,
+    companion,
+    onboarding,
+    creatureNames: createCreatureNames(),
     store: props.store,
     client: props.client,
     feed: props.feed,
@@ -352,7 +430,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
 
   const summon = async (definition: PaneDefinition<PaneSpec>, variant?: string): Promise<void> => {
     if (definition.summon === undefined) return;
-    act(tiler.summon(await definition.summon.spec(shell, variant), screen()));
+    act(tiler.summon(await definition.summon.spec(shell, variant), screen(), variant));
+    if (!keyboard.restore()) keyboard.returnHome();
   };
   followTrustArrival(trust.state, {
     granted: () => void summon(definitionOf("posture")),
@@ -361,9 +440,19 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         if (line !== undefined) say(line);
       }),
   });
+  const presentedHome = (): PaneSpec | undefined => {
+    if (tiler.focusedSpec()?.kind !== "stead") return undefined;
+    return parsePaneSpec(steadHome()?.presentedPane?.());
+  };
   const answerFocusedAsk = (pick: AskPick): void => {
-    const answering = { store: props.store, approveKey: shell.keys.chord("ask.approve") };
-    void answerHeldAsk(answering, { sessionId: focusedSession() }, pick).then((line) => {
+    const presented = presentedHome();
+    const home = presented?.kind === "conversation" ? steadHome()?.shell : undefined;
+    const sessionId = presented?.kind === "conversation" ? presented.sessionId : focusedSession();
+    const answering = {
+      store: home?.store ?? props.store,
+      approveKey: shell.keys.chord("ask.approve"),
+    };
+    void answerHeldAsk(answering, { sessionId }, pick).then((line) => {
       if (line !== undefined) say(line);
     });
   };
@@ -416,7 +505,12 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     else say(`${paneTitle(spec)} has no commands of its own`);
   };
 
+  const steadHome = createMemo(() => props.steadHome?.(shell));
+
   const target: ActionTarget = {
+    requestOnboarding: () => (steadHome()?.shell.onboarding ?? onboarding).request(),
+    toggleCompanion: () => void companion.toggle()?.toggle(),
+    switchCompanion: companion.switchTo,
     closePane: () => act(tiler.closeFocused()),
     zoomPane: () => act(tiler.zoom()),
     rotatePane: () => act(tiler.rotate()),
@@ -458,6 +552,51 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   };
 
   onCleanup(followActivations(props.host, { workspace: props.workspace, show: jumps.toTrigger }));
+  createEffect(
+    on(steadHome, (scope) => {
+      if (scope !== undefined && scope.shell.workspace !== props.workspace) {
+        onCleanup(
+          followActivations(props.host, {
+            workspace: scope.shell.workspace,
+            show: jumps.toTrigger,
+          }),
+        );
+      }
+    }),
+  );
+  const companionHost = props.host.companion;
+  if (companionHost !== undefined) {
+    createEffect(
+      on(steadHome, (scope) => {
+        if (scope === undefined && props.prepareSteadHome !== undefined) return;
+        const resident = scope === undefined ? shell : shellForStead(shell, scope);
+        const waiting = () =>
+          props.needsYou.items().filter((item) => item.workspace === resident.workspace);
+        followCompanion({
+          controller: companion,
+          onboarding: () => onboarding.active() !== undefined,
+          host: companionHost,
+          store: resident.store,
+          feed: resident.feed,
+          currentSession: resident.currentSession,
+          approveKey: () => resident.keys.chord("ask.approve"),
+          openSession: (sessionId) => resident.sessions.openSession(sessionId),
+          chores: () => heldChoresAmong(waiting()),
+          decided: () => decidedAmong(waiting()),
+          needsYou: waiting,
+          creatures: () => resident.client.creatures(),
+          openChores: () => resident.openPane({ kind: "chores" }),
+          overturn: (recordId) => overturnStanding(resident.client, props.needsYou, recordId),
+          acceptChore: async (chore) => {
+            const chores = choresOverFetch(hostFetch(resident.host, resident.workspace));
+            const answer = await chores.accept(chore.creature, chore.routineId, chore.digest);
+            return answer.ok ? choreAcceptedLine(chore.routineId) : answer.error;
+          },
+          say,
+        });
+      }),
+    );
+  }
 
   const surfaceSeams: SurfaceCommandSeams = {
     store: props.store,
@@ -482,7 +621,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   for (const command of surfaceCommands(surfaceSeams)) registry.register(command);
   registry.register({
     name: reconnectCommand,
-    description: "find keywork serve for this workspace again, or start one",
+    description: "find this workspace's server again, or start one",
     run: () => void reconnect(),
   });
   registry.addSource(() => botJumps(surfaceSeams));
@@ -522,16 +661,37 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   );
 
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (overlay() !== undefined) return;
+    if (overlay() !== undefined || event.defaultPrevented) return;
+    const eventTarget = event.target === document.body ? document.activeElement : event.target;
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      eventTarget instanceof Element &&
+      eventTarget.closest("[data-native-activation] button") !== null
+    )
+      return;
+    if (eventTarget instanceof Element && !workspaceOwnsKey(workspaceRoot, eventTarget)) return;
     const chords = chordsOfKey(event);
     if (chords.length === 0) return;
-    const focus = keyFocusOf(tiler.focusedSpec()?.kind, event.target, keymap);
+    const focus = keyFocusOf(
+      presentedHome()?.kind ?? tiler.focusedSpec()?.kind,
+      event.target,
+      keymap,
+    );
     const result = keymap.press(chords, performance.now(), focus.scope, focus.typing);
     setLeaderArmed(result.type === "leader-pending");
     if (result.type === "pass") return;
     event.preventDefault();
     event.stopPropagation();
     if (result.type === "action") appActions[result.action]?.invoke(target);
+  };
+
+  const focusPaneHolding = (element: Element): void => {
+    const pane = paneIdOf(element);
+    if (pane === undefined || pane === tiler.focused() || tiler.spec(pane) === undefined) return;
+    act(tiler.focus(pane));
+  };
+  const followKeyboard = (event: FocusEvent): void => {
+    if (event.target instanceof Element) focusPaneHolding(event.target);
   };
 
   const applyGesture = (intent: PointerIntent): void => {
@@ -543,7 +703,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   onMount(() => {
     document.addEventListener("keydown", onKeyDown, true);
     onCleanup(() => document.removeEventListener("keydown", onKeyDown, true));
+    onCleanup(keyboard.routeToPanes(focusPaneHolding));
     if (stage === undefined) return;
+    const keyboardStage = stage;
+    keyboardStage.addEventListener("focusin", followKeyboard);
+    onCleanup(() => keyboardStage.removeEventListener("focusin", followKeyboard));
     setGestures(bindPointerGestures(stage, { scene: () => scene(), apply: applyGesture }));
     const measure = (): void => {
       if (stage === undefined || stage.clientWidth === 0 || stage.clientHeight === 0) return;
@@ -560,16 +724,41 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   });
 
   const firstLayout = (): void => {
+    if (profile.startup === "creature") {
+      if (!props.home) tiler.summon({ kind: "tree" }, screen());
+      act(tiler.summon({ kind: "stead" }, screen()));
+      if (props.home) void openFirstHomeConversation();
+      return;
+    }
     tiler.summon({ kind: "tree" }, screen());
     const sessionId = props.store.state.summaries[0]?.id;
     act(tiler.open({ kind: "conversation", sessionId }, screen()));
     if (sessionId !== undefined) void props.store.open(sessionId);
+  };
+  const openFirstHomeConversation = async (): Promise<void> => {
+    const creatures = await creaturesListed(props.client);
+    const conversation = creatures?.find((creature) => creature.conversation)?.conversation;
+    if (!disposed && conversation != null) shell.sessions.openSession(conversation);
   };
   const restorePanes = (): void => {
     for (const id of tiler.panes()) {
       const spec = tiler.spec(id);
       if (spec !== undefined) definitionOf(spec.kind).onRestore?.(spec, shell);
     }
+    if (profile.startup === "creature") void summonSteadOnce();
+  };
+  const summonSteadOnce = async (): Promise<void> => {
+    const key = steadSummonStorageKey(props.workspace);
+    const facts = () => ({
+      steadShowing: tiler.findPane((spec) => spec.kind === "stead") !== undefined,
+      summonedAt: steadSummonedAt(storage, key),
+    });
+    if (!steadSummonWanted({ ...facts(), creatures: [] })) return;
+    const creatures = await creaturesListed(props.client);
+    if (disposed || !steadSummonWanted({ ...facts(), creatures })) return;
+    const outcome = tiler.summon({ kind: "stead" }, screen());
+    if (outcome.ok) recordSteadSummoned(storage, key, new Date().toISOString());
+    act(outcome);
   };
 
   createEffect(() => {
@@ -637,7 +826,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   const PaneSlotView = (view: { slot: PaneSlot }) => {
     const slot = () => view.slot;
     return (
-      <div class="kw-slot" style={rectStyle(slot().rect)}>
+      <div class="kw-slot" data-pane-id={slot().id} style={rectStyle(slot().rect)}>
         <PaneFrame
           name={titleOf(slot())}
           state={lifecycleOf(slot())}
@@ -685,7 +874,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   };
 
   return (
-    <div class="kw-workspace">
+    <div class="kw-workspace" ref={workspaceRoot}>
       <div class="kw-stage" ref={stage} data-gesture={pointer().phase}>
         <For each={paneIds()}>
           {(id) => {
@@ -794,14 +983,19 @@ function paneCount(count: number): string {
   return `${count} ${count === 1 ? "pane" : "panes"}`;
 }
 
+function workspaceOwnsKey(workspace: HTMLElement | undefined, target: Element): boolean {
+  const owner = target.closest(".kw-workspace");
+  return owner === null || owner === workspace;
+}
+
 function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   const state = trust.state();
   if (state.kind === "restarting") {
     return state.attached === true
-      ? "trust recorded · waiting on the attached keywork serve"
-      : "restarting keywork serve with trust recorded";
+      ? "trust recorded · waiting on the attached server"
+      : "restarting the server with trust recorded";
   }
-  if (state.kind === "stale") return "trust recorded · the attached keywork serve needs a restart";
+  if (state.kind === "stale") return "trust recorded · the attached server needs a restart";
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
 }
 

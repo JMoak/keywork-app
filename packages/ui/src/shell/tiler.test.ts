@@ -88,6 +88,21 @@ describe("createTiler", () => {
     });
   });
 
+  it("summons a main pane once per spec and focuses it thereafter, opening another only for a different spec", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      expect(tiler.summon({ kind: "stead" }, screen).ok).toBe(true);
+      tiler.focus("conversation-1");
+      expect(tiler.summon({ kind: "stead" }, screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("stead"))).toHaveLength(1);
+      expect(tiler.focused()).toBe("stead-1");
+      expect(tiler.summon(conversation("s1"), screen).ok).toBe(true);
+      expect(tiler.focused()).toBe("conversation-1");
+      expect(tiler.summon(conversation("s2"), screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("conversation"))).toHaveLength(2);
+    });
+  });
+
   it("retargets an open pane with summon variants and leaves the others' specs alone", () => {
     withTiler((tiler) => {
       tiler.open(conversation("s1"), screen);
@@ -104,6 +119,81 @@ describe("createTiler", () => {
       expect(tiler.spec(sessionsPaneId)).toEqual({ kind: "tree", sessionId: "s1" });
       expect(tiler.panes().filter((id) => id.startsWith("themes"))).toHaveLength(1);
       expect(tiler.focused()).toBe(sessionsPaneId);
+    });
+  });
+
+  it("retargets the open pane of the kind when a summon names its target", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.summon({ kind: "workshop" }, screen);
+      tiler.bind("workshop-1", { kind: "workshop", creature: "bea" });
+      tiler.focus("conversation-1");
+      expect(tiler.summon({ kind: "workshop", creature: "osk" }, screen, "osk").ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("workshop"))).toEqual(["workshop-1"]);
+      expect(tiler.spec("workshop-1")).toEqual({ kind: "workshop", creature: "osk" });
+      expect(tiler.focused()).toBe("workshop-1");
+      expect(tiler.summon(conversation("s2"), screen, "s2").ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("conversation"))).toEqual([
+        "conversation-1",
+      ]);
+      expect(tiler.spec("conversation-1")).toEqual(conversation("s2"));
+      expect(tiler.focused()).toBe("conversation-1");
+    });
+  });
+
+  it("focuses a pane already showing the named target and retargets the newest of the kind otherwise", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      expect(tiler.summon(conversation("s1"), screen, "s1").ok).toBe(true);
+      expect(tiler.focused()).toBe("conversation-1");
+      expect(tiler.spec("conversation-2")).toEqual(conversation("s2"));
+      expect(tiler.summon(conversation("s3"), screen, "s3").ok).toBe(true);
+      expect(tiler.spec("conversation-1")).toEqual(conversation("s3"));
+      expect(tiler.spec("conversation-2")).toEqual(conversation("s2"));
+      expect(tiler.summon(conversation("s4"), screen, " ").ok).toBe(true);
+      expect(tiler.summon(conversation("s5"), screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("conversation"))).toHaveLength(4);
+    });
+  });
+
+  it("hands a screen pane every named summon, so an ended pane hears the request again", () => {
+    withTiler((tiler) => {
+      const view: PaneSpec = { kind: "screen", peer: "moak-main" };
+      const control: PaneSpec = { kind: "screen", peer: "moak-main", control: true };
+      tiler.summon(view, screen, "moak-main");
+      expect(tiler.summon(control, screen, "moak-main control").ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("screen"))).toEqual(["screen-1"]);
+      expect(tiler.spec("screen-1")).toBe(control);
+      const again: PaneSpec = { kind: "screen", peer: "moak-main", control: true };
+      tiler.summon(again, screen, "moak-main control");
+      expect(tiler.spec("screen-1")).toBe(again);
+    });
+  });
+
+  it("turns a docked pane that follows a session to the session it is summoned from", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.summon({ kind: "diff", sessionId: undefined }, screen);
+      expect(tiler.spec("diff-1")).toEqual({ kind: "diff", sessionId: undefined });
+      tiler.focus("conversation-1");
+      expect(tiler.summon({ kind: "diff", sessionId: "s1" }, screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("diff"))).toEqual(["diff-1"]);
+      expect(tiler.spec("diff-1")).toEqual({ kind: "diff", sessionId: "s1" });
+      expect(tiler.focused()).toBe("diff-1");
+      tiler.bind("diff-1", { kind: "diff", sessionId: "s1", path: "notes/largest.md" });
+      tiler.summon({ kind: "diff", sessionId: "s1" }, screen);
+      expect(tiler.spec("diff-1")).toEqual({
+        kind: "diff",
+        sessionId: "s1",
+        path: "notes/largest.md",
+      });
+      tiler.summon({ kind: "diff", sessionId: undefined }, screen);
+      expect(tiler.spec("diff-1")).toEqual({
+        kind: "diff",
+        sessionId: "s1",
+        path: "notes/largest.md",
+      });
     });
   });
 

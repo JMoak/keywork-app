@@ -1,0 +1,282 @@
+.kw-creature {
+  height: 100%;
+  overflow: auto;
+}
+
+.kw-creature-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 1rem;
+  align-items: start;
+  padding: 0.75rem 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--kw-border);
+}
+
+.kw-creature-portrait {
+  display: block;
+  image-rendering: pixelated;
+  forced-color-adjust: none;
+}
+
+.kw-creature-portrait-missing {
+  display: inline-block;
+  width: 96px;
+  height: 104px;
+  line-height: 104px;
+  text-align: center;
+  color: var(--kw-text-dim);
+  box-shadow: inset 0 0 0 1px var(--kw-border);
+}
+
+.kw-creature-identity {
+  display: grid;
+  row-gap: 0.25rem;
+  min-width: 0;
+}
+
+.kw-creature-name {
+  font-size: 1.125rem;
+  color: var(--kw-text);
+}
+
+.kw-creature-handle {
+  margin-left: 1ch;
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-telling {
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-creature-hints {
+  color: var(--kw-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kw-creature-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 1.5ch;
+  row-gap: 0.2rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+}
+
+.kw-creature-facts dt {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-facts dd {
+  display: flex;
+  justify-content: space-between;
+  gap: 1ch;
+  margin: 0;
+  min-width: 0;
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-facts dd > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-creature-facts dd[data-health="down"],
+.kw-creature-facts dd[data-health="unresponsive"] {
+  color: var(--kw-error);
+}
+
+.kw-creature-facts dd[data-inherit] {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-opens {
+  flex: none;
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-heading {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.1rem;
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-group {
+  margin: 0;
+  padding: 0.25rem 0.75rem 0;
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.25rem;
+}
+
+.kw-creature-state {
+  color: var(--kw-text-dim);
+}
+.kw-creature-state[data-state="waiting"] {
+  color: var(--kw-accent);
+}
+.kw-creature-state[data-state="blocked"],
+.kw-creature-state[data-state="failed"] {
+  color: var(--kw-error);
+}
+.kw-creature-state[data-state="back"],
+.kw-creature-state[data-state="completed"] {
+  color: var(--kw-success);
+}
+
+.kw-creature-usage {
+  margin: 0 0.75rem 0.5rem;
+  border-collapse: collapse;
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-usage th,
+.kw-creature-usage td {
+  padding: 0.1rem 1.5ch 0.1rem 0;
+  font-weight: normal;
+  text-align: right;
+}
+
+.kw-creature-usage th:first-child,
+.kw-creature-usage td:first-child {
+  text-align: left;
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-usage thead th {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-remembered,
+.kw-creature-shadow {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.75rem 0.5rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-remembered li,
+.kw-creature-shadow li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 1.5ch;
+  line-height: 1.25rem;
+}
+
+.kw-creature-remembered time,
+.kw-creature-shadow .kw-creature-class {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-landmark {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-shadow-opening {
+  margin: 0;
+  padding: 0.1rem 0.75rem 0.35rem;
+  color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
+}
+
+.kw-creature-card {
+  display: grid;
+  row-gap: 0.35rem;
+  margin: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem 0.6rem;
+  border: none;
+  background: var(--kw-panel);
+  color: var(--kw-text);
+  box-shadow: inset 0 0 0 1px var(--kw-error);
+}
+.kw-creature-card:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--kw-error);
+}
+
+.kw-creature-card-title {
+  padding: 0 0.5ch;
+  color: var(--kw-error);
+}
+
+.kw-creature-card-line {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kw-creature-card-keep {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-card-keep kbd,
+.kw-creature-card-keys {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-card-buttons {
+  display: flex;
+  gap: 2ch;
+}
+
+.kw-creature-card-button {
+  padding: 0.1rem 1ch;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+  cursor: pointer;
+}
+.kw-creature-card-button[data-tone="deny"] {
+  color: var(--kw-error);
+}
+
+.kw-creature-card-keys {
+  margin: 0;
+}
+
+@container frame (max-width: 559.98px) {
+  .kw-creature-hints,
+  .kw-creature-opens {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .kw-creature-card {
+    forced-color-adjust: none;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: inset 0 0 0 1px CanvasText;
+  }
+}
+
+.kw-creature-craft {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.75rem 0.25rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-craft li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 1.5ch;
+  line-height: 1.25rem;
+}
+
+.kw-creature-craft li[aria-current="true"] {
+  color: var(--kw-text);
+}

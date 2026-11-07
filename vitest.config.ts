@@ -10,6 +10,8 @@ export default defineConfig({
           include: [
             "packages/protocol/src/**/*.test.ts",
             "packages/client/src/**/*.test.ts",
+            "packages/habitat/src/**/*.test.ts",
+            "packages/screen/src/**/*.test.ts",
             "packages/desktop/src/**/*.test.ts",
             "scripts/**/*.test.ts",
           ],

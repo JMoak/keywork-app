@@ -10,7 +10,7 @@ import {
   type RememberedScope,
 } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { returnKeyboardHome } from "../panes/keyboard-home.ts";
+import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import {
   askingWhy,
   askWhy,
@@ -81,6 +81,7 @@ export function acceptedLine(scope: RememberedScope, chords: AskChords): string 
 }
 
 export function AskCard(props: AskCardProps) {
+  const keyboard = useKeyboardScope();
   let card: HTMLFieldSetElement | undefined;
   const [refusal, setRefusal] = createSignal<string>();
   const [answering, setAnswering] = createSignal(false);
@@ -118,7 +119,7 @@ export function AskCard(props: AskCardProps) {
   const settle = (): void => {
     setNoting(false);
     stopAskingWhy(props.run.callId);
-    returnKeyboardHome();
+    keyboard?.returnHome();
   };
   const giveReason = (reason: DenyReason): void => {
     if (reason === "other") setNoting(true);
@@ -151,7 +152,7 @@ export function AskCard(props: AskCardProps) {
     if (card !== undefined && mayClaimFocus(card)) card.focus({ preventScroll: true });
   });
   onCleanup(() => {
-    if (card?.contains(document.activeElement)) returnKeyboardHome();
+    if (card?.contains(document.activeElement)) keyboard?.returnHome();
   });
 
   return (
@@ -320,15 +321,23 @@ export function isBareDenial(choice: AskChoice): boolean {
   return choice.verdict === "denied" && choice.reason === undefined;
 }
 
+export const pickLabels: Readonly<Record<AskPick, string>> = {
+  approve: "once",
+  once: "once",
+  session: "this session",
+  workspace: "this workspace",
+  deny: "deny",
+};
+
 export function answerLabel(choice: AskChoice): string {
-  if (choice.verdict === "denied") return "deny";
+  if (choice.verdict === "denied") return pickLabels.deny;
   switch (choice.scope) {
     case "session":
-      return "this session";
+      return pickLabels.session;
     case "workspace":
-      return "this workspace";
+      return pickLabels.workspace;
     default:
-      return "once";
+      return pickLabels.once;
   }
 }
 

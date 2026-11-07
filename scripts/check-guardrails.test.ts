@@ -23,6 +23,28 @@ describe("check:guardrails", () => {
     ]);
   });
 
+  it("fails a microtask focus claim where the keyboard claim owns focus, and nowhere else", () => {
+    const claim = "ref={(input) => queueMicrotask(() => input.focus())}";
+    const name =
+      "focus claimed in a microtask (one focus policy: the onboarding card owns the keyboard through shell/keyboard-claim.ts; focus on mount or yield to the claim)";
+    expect(findGuardrailViolations(claim, "code", "packages/ui/src/onboarding/index.tsx")).toEqual([
+      name,
+    ]);
+    expect(
+      findGuardrailViolations(
+        "queueMicrotask(() => card?.focus())",
+        "code",
+        "packages/ui/src/panes/stead/index.tsx",
+      ),
+    ).toEqual([name]);
+    expect(findGuardrailViolations(claim, "code", "packages/ui/src/panes/tree/index.tsx")).toEqual(
+      [],
+    );
+    expect(
+      findGuardrailViolations(claim, "code", "packages/ui/src/onboarding/onboarding.test.tsx"),
+    ).toEqual([]);
+  });
+
   it("scans prose only for the everywhere patterns", () => {
     expect(findGuardrailViolations("we read the x-api-key header", "prose")).toEqual([]);
   });

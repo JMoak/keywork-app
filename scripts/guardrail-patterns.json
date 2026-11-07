@@ -21,6 +21,19 @@
       "name": "anthropic api key handled in the app",
       "pattern": "x-api-key|ANTHROPIC_API_KEY|sk-ant-",
       "flags": ""
+    },
+    {
+      "name": "permission check handler outside the screen guard (a deny-by-default media check hides the tailnet interface from WebRTC, stead docs/spec/product/SCREEN.md section 1)",
+      "pattern": "setPermissionCheckHandler",
+      "flags": "",
+      "except": ["packages/desktop/src/main/screen/electron.ts"]
+    },
+    {
+      "name": "focus claimed in a microtask (one focus policy: the onboarding card owns the keyboard through shell/keyboard-claim.ts; focus on mount or yield to the claim)",
+      "pattern": "queueMicrotask\\(\\(\\)\\s*=>\\s*[A-Za-z_$][\\w$]*\\??\\.focus\\(",
+      "flags": "",
+      "only": ["packages/ui/src/onboarding/", "packages/ui/src/panes/stead/"],
+      "except": ["packages/ui/src/onboarding/onboarding.test.tsx"]
     }
   ]
 }

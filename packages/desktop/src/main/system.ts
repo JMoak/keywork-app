@@ -1,10 +1,29 @@
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { bundledSidecar } from "../shared/sidecar.ts";
 import { commandOutput } from "./child.ts";
 import type { FileSeams } from "./recents.ts";
-import { versionOfLine } from "./workspace.ts";
+import { type SiblingCheckout, versionOfLine } from "./workspace.ts";
 import { locateTickets, type TicketLocation } from "./workspace-identity.ts";
+
+export const siblingCliEntry = "packages/cli/src/main.ts";
+
+export function appRepoRoot(appPath: string): string {
+  return resolve(appPath, "..", "..");
+}
+
+export function siblingKeyworkRepo(repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  return resolve(env.KEYWORK_REPO ?? join(repoRoot, "../keywork"));
+}
+
+export async function siblingCheckout(
+  root: string,
+  present: (path: string) => Promise<boolean> = exists,
+): Promise<SiblingCheckout | undefined> {
+  const cli = join(root, siblingCliEntry);
+  return (await present(cli)) ? { root, cli } : undefined;
+}
 
 export function keyworkTickets(workspace: string): Promise<TicketLocation> {
   return locateTickets(workspace, { home: homedir(), platform: process.platform, exists });

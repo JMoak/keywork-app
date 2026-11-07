@@ -12,6 +12,13 @@ import {
   OverviewRow,
 } from "../overview/rows.tsx";
 import { definePane, type PaneProps } from "../registry.ts";
+import {
+  type FolderServing,
+  nodeServingOf,
+  servingLine,
+  stoppedServingNotice,
+  stopServingQuestion,
+} from "./serving.ts";
 
 const workspacesSpec = z.object({ kind: z.literal("workspaces") });
 
@@ -19,6 +26,7 @@ export type WorkspacesSpec = z.output<typeof workspacesSpec>;
 
 export const workspacesPane = definePane<WorkspacesSpec>({
   kind: "workspaces",
+  heading: "in workspaces",
   spec: workspacesSpec,
   home: "left",
   attire: "house",
@@ -50,7 +58,7 @@ export const workspacesPane = definePane<WorkspacesSpec>({
     "workspaces.use": {
       chords: "enter",
       help: "open this workspace (the server reopens)",
-      command: { name: "workspaces-use", description: "reopen keywork on this workspace" },
+      command: { name: "workspaces-use", description: "reopen the server on this workspace" },
     },
     "workspaces.new": {
       chords: "n",
@@ -68,6 +76,14 @@ export const workspacesPane = definePane<WorkspacesSpec>({
       command: {
         name: "workspaces-unfocus",
         description: "remove a focus dir from this workspace",
+      },
+    },
+    "workspaces.stop-serving": {
+      chords: "s",
+      help: "stop serving this folder from the node",
+      command: {
+        name: "workspaces-stop-serving",
+        description: "the node stops serving this folder; it runs with the console",
       },
     },
   },
@@ -103,7 +119,8 @@ type Prompt =
   | { kind: "use"; choice: WorkspaceChoice }
   | { kind: "name" }
   | { kind: "focus"; choice: WorkspaceChoice }
-  | { kind: "unfocus"; choice: WorkspaceChoice; dir: string | undefined };
+  | { kind: "unfocus"; choice: WorkspaceChoice; dir: string | undefined }
+  | { kind: "stop-serving" };
 
 function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
   let root: HTMLElement | undefined;
@@ -116,6 +133,12 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
   const cursor = createCursor(() => rows().length);
   const [prompt, setPrompt] = createSignal<Prompt>();
   const [notice, setNotice] = createSignal<string>();
+  const node = nodeServingOf(props.shell.host);
+  const [serving, setServing] = createSignal<FolderServing>();
+  const learnServing = async (): Promise<void> => {
+    setServing(await node?.servingOf(props.shell.workspace));
+  };
+  void learnServing();
   const atCursor = (): WorkspaceRow | undefined => rows()[cursor.index()];
   const promptOf = <K extends Prompt["kind"]>(
     kind: K,
@@ -139,13 +162,13 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
       setNotice(`${choice.name} is remembered for the next launch`);
       return;
     }
-    setNotice(`reopening keywork on ${choice.name}…`);
+    setNotice(`reopening the server on ${choice.name}…`);
     const reopened = await props.shell.host.restartServer(props.shell.workspace);
     if (!reopened.ok) {
       setNotice(describeFailure(reopened.failure));
       return;
     }
-    setNotice(`keywork reopened on ${choice.name}`);
+    setNotice(`the server reopened on ${choice.name}`);
     await props.shell.store.refresh();
     await surfaces().load();
   };
@@ -174,6 +197,14 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
     await reload();
   };
 
+  const stopServing = async (): Promise<void> => {
+    setPrompt(undefined);
+    if (node === undefined) return;
+    const outcome = await node.stopServing(props.shell.workspace);
+    setNotice(outcome.ok ? stoppedServingNotice : describeFailure(outcome.failure));
+    await learnServing();
+  };
+
   props.onAction((action) => {
     if (prompt() !== undefined) {
       setPrompt(undefined);
@@ -199,6 +230,9 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
         if (row.kind === "dir") void unfocus(row.choice, row.dir);
         else setPrompt({ kind: "unfocus", choice: row.choice, dir: undefined });
         return;
+      case "workspaces.stop-serving":
+        if (serving() === "node") setPrompt({ kind: "stop-serving" });
+        return;
     }
   });
 
@@ -209,6 +243,14 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
           + new workspace
         </button>
         <span class="kw-ov-head-detail">enter opens · f focuses a dir</span>
+        <Show when={serving()}>
+          {(how) => (
+            <span class="kw-ov-head-detail kw-workspaces-serving">
+              this folder {servingLine(how())}
+              <Show when={how() === "node"}> · s stops serving</Show>
+            </span>
+          )}
+        </Show>
       </div>
       <Show
         when={rows().length > 0}
@@ -255,11 +297,18 @@ function WorkspacesList(props: PaneProps<WorkspacesSpec>) {
       <Show when={promptOf("use")}>
         {(ask) => (
           <ConfirmLine
-            question={`open ${ask().choice.name}? keywork serve restarts on it`}
+            question={`open ${ask().choice.name}? the server restarts on it`}
             onConfirm={() => void use(ask().choice)}
             onCancel={() => setPrompt(undefined)}
           />
         )}
+      </Show>
+      <Show when={promptOf("stop-serving")}>
+        <ConfirmLine
+          question={stopServingQuestion}
+          onConfirm={() => void stopServing()}
+          onCancel={() => setPrompt(undefined)}
+        />
       </Show>
       <Show when={promptOf("name")}>
         <DraftLine

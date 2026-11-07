@@ -226,8 +226,10 @@ async function driveRestore(stage: Stage): Promise<void> {
   await stage.prompt("now say done");
   await stage.until("turn.completed", 2);
   await persisted(stage);
+  const announcedBefore = stage.seen.filter((item) => item.type === "changes.updated").length;
   await answer("restored", post(stage, `${session}/restore`, { turn: 1 }));
   await stage.until("session.tree");
+  await stage.until("changes.updated", announcedBefore + 1);
   await answer("restoreUnknownTurn", post(stage, `${session}/restore`, { turn: 9 }));
   await answer("restoreMalformed", post(stage, `${session}/restore`, { turn: 0 }));
   await answer("redo", post(stage, `${session}/redo`));

@@ -1,0 +1,20 @@
+workshop · tam
+sealed microVM · running · up · raised 2026-11-04 18:30
+  ▸ cpus 2 and memory 4g are recorded, not applied: sbx documents no create flag for them
+display
+  watching · view only · 1 fps · frame at 12:00 · d closes it · taking over waits for the screen viewer
+terminal
+  no thread of tam runs in the workshop yet
+  typing into the workshop is not served by this node yet · the mirror shows the engine's own bash in it
+files
+  /home/agent/workspace inside the sealed microVM
+  not reachable from this console · the creature's threads read and write it
+egress
+  deny-all except the hosts named when it was raised · the log of refusals is not served by this node yet
+brokers
+  anthropic, openrouter · names only; the values stay on the node and the workshop sees sentinels
+disk and memory
+  disk     not reported by this node
+  memory   not reported by this node
+  threads  0
+  cost     unknown

@@ -32,7 +32,7 @@ import {
 import { createMemoryStore, inertGarden, type MemoryStore } from "../../shell/memory-store.ts";
 import type { Reveal } from "../../shell/needs-you-jumps.ts";
 import { inboxItem } from "../../shell/needs-you-testing.ts";
-import { holdTypingFocus } from "../overview/rows.test.tsx";
+import { holdTypingFocus } from "../overview/testing.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
 import type { ShellSeams } from "../registry.ts";
 import { noDecisionsLine } from "./decisions.ts";
@@ -475,6 +475,14 @@ describe("the inert state", () => {
       "ctrl+k pane.split",
     );
   });
+
+  it("says empty, never untrusted, for a trusted workspace nobody ran init in", async () => {
+    const { store } = harness({ ...inertGarden, trusted: true, inbox: [] });
+    mount(store);
+    await settle();
+    expect(screen.getByText(/memory is empty/)).toBeTruthy();
+    expect(screen.queryByText(/inert|untrusted/)).toBeNull();
+  });
 });
 
 describe("the staged helper", () => {
@@ -510,3 +518,48 @@ const memoryCss = readFileSync(
   join(process.cwd(), "packages/ui/src/panes/memory/memory.css"),
   "utf8",
 );
+
+describe("a note a creature's message staged", () => {
+  const empty: MemoryGarden = { ...inertGarden, trusted: true };
+  const fromWren: StagedItem = {
+    id: "w1",
+    kind: "note",
+    target: "message from wren K3GImfYB.md",
+    created: "2026-11-06T17:20:00.000Z",
+    source: "creature:wren",
+    for: "creature:cob",
+    content: "The five largest docs are listed in notes/largest.md\n",
+  };
+
+  it("shows at once with its source and the approve and discard keys, after a cold-start read saw nothing", async () => {
+    const { store, feed, setGarden } = harness(empty);
+    await store.refresh();
+    const act = mount(store);
+    await settle();
+    expect(document.querySelector(".kw-memory")?.textContent).toContain("memory is empty");
+
+    setGarden({ ...empty, inbox: [fromWren] });
+    feed.push([inboxEnvelope(1, 1)]);
+    await settle();
+    act("memory.inbox");
+
+    const row = document.querySelector('[data-row="inbox:w1"]');
+    expect(row?.textContent).toContain("note from creature:wren");
+    expect(row?.querySelector('[data-fact="keys"]')?.textContent).toBe(
+      "ctrl+k memory.approve approve · ctrl+k memory.discard discard · ctrl+k memory.forget forget its source",
+    );
+    expect(titleOf(store.state.inbox.count)).toBe("memory · 1 waiting");
+    expect(document.querySelector(".kw-memory")?.textContent).not.toContain("memory is empty");
+  });
+
+  it("reads the garden again when the pane opens, so a stale cold-start read never wins", async () => {
+    const { store, setGarden } = harness(empty);
+    await store.refresh();
+    setGarden({ ...empty, inbox: [fromWren] });
+    mount(store);
+    await settle();
+    expect(document.querySelector('[data-row="inbox:w1"]')?.textContent).toContain(
+      "note from creature:wren",
+    );
+  });
+});

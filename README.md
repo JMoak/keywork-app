@@ -4,14 +4,25 @@
 keyboard grammar and design language as [keywork](https://github.com/JMoak/keywork), mounted
 in a desktop window instead of a terminal.
 
-keywork-app is a client of `keywork serve`. It bundles the keywork binary as a sidecar,
-starts a server per workspace on loopback, and renders every pane from the typed event
+keywork-app is a client of `keywork serve`. Packaged apps register with one authorized shared
+runtime, attach to its workspace servers on loopback, and render panes from the typed event
 stream. No engine logic lives here.
 
-Status: M3.5 has landed (the page, flavors, composer, server feed, sidecar supervision, native
-window) and wave 4 is in progress. Read [`docs/README.md`](docs/README.md) for the architecture, the
-stack, and the milestone plan. [`AGENTS.md`](AGENTS.md) carries the conventions, which apply
-to humans and agents equally.
+The desktop library now supports two products. Keywork keeps its IDE and adds an optional
+Stead panel; Stead starts with a personal creature home before a project is selected. Both
+surfaces share home conversations, memory and live state. Product profiles keep application
+identity, settings, labels, protocol handlers and update feeds separate.
+
+`bun run pack:sdk` builds `@jmoak/keywork-desktop` as a compiled archive in `dist/sdk/`.
+Its `startDesktop` entry and immutable profiles are consumed by Stead without source checkout
+imports. Each candidate must pair the archive with the exact runtime version, contract and
+binary checksum used by the other product. Automatic update installation is held for manual
+compatibility review until coordinated engine upgrades are supported.
+
+Status: the two-product integration is prepared for Windows review. Public distribution still
+requires installer lifecycle acceptance, signing, and coordinated engine-upgrade handling.
+Read [`docs/README.md`](docs/README.md) for the architecture, stack and milestone plan.
+[`AGENTS.md`](AGENTS.md) carries the conventions, which apply to humans and agents equally.
 
 ## Development
 

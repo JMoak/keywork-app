@@ -1,0 +1,42 @@
+.kw-companion-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--kw-border);
+  color: var(--kw-text-dim);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-companion-switch button {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kw-companion-switch-state {
+  color: var(--kw-text-mid);
+  text-align: start;
+}
+
+.kw-companion-switch-state[aria-checked="true"] {
+  color: var(--kw-text);
+}
+
+.kw-companion-switch-key {
+  color: var(--kw-text-dim);
+}
+
+.kw-companion-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-companion-offer button {
+  color: var(--kw-accent);
+}

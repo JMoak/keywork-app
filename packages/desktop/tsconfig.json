@@ -16,6 +16,12 @@
     },
     {
       "path": "../ui"
+    },
+    {
+      "path": "../screen"
+    },
+    {
+      "path": "../product"
     }
   ]
 }

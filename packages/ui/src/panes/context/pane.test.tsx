@@ -157,7 +157,7 @@ describe("the context pane", () => {
       "compaction",
     ]);
     expect(text(container, ".kw-context-map-basis")).toEqual([
-      "conversation from the usage the provider reported at the last turn · the rest estimated from the text keywork sends · window declared in keywork.json",
+      "conversation from the usage the provider reported at the last turn · the rest estimated from the text the server sends · window declared in keywork.json",
     ]);
     expect(container.querySelector(".kw-context-map-finding")).toBeNull();
     expect(text(container, ".kw-ov-line")).toEqual([contextHints]);
@@ -179,7 +179,7 @@ describe("the context pane", () => {
     const { shell } = harness({ readings: { s1: past } });
     const { container } = mount(shell);
     expect(text(container, ".kw-context-map-finding")).toEqual([
-      "memory flush at 227k, compaction at 235k · past the window · keywork measures the conversation only",
+      "memory flush at 227k, compaction at 235k · past the window · the server measures the conversation only",
     ]);
     expect(inks(container).includes("compaction")).toBe(false);
   });

@@ -1,16 +1,23 @@
+import { keyworkProfile } from "@keywork-app/product";
+
 export const launchCheckDelayMs = 30_000;
 export const checkIntervalMs = 6 * 60 * 60 * 1000;
-export const updateFeed = { provider: "github", owner: "JMoak", repo: "keywork-app" } as const;
+export const updateFeed = keyworkProfile.updateFeed;
 
 export interface UpdateReady {
   version: string;
+  reviewRequired: true;
+}
+
+export interface UpdateCheck {
+  isUpdateAvailable: boolean;
+  updateInfo: { version: string };
 }
 
 export interface UpdateSource {
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
-  checkForUpdates(): Promise<unknown>;
-  onDownloaded(listener: (update: UpdateReady) => void): void;
+  checkForUpdates(): Promise<UpdateCheck | null>;
   onError(listener: (error: Error) => void): void;
 }
 
@@ -39,15 +46,15 @@ export function scheduleOf(now: number, lastCheckedAt: number | undefined): { du
 
 export function runUpdater(seams: UpdaterSeams): Updater {
   const { source } = seams;
-  source.autoDownload = true;
+  source.autoDownload = false;
   source.autoInstallOnAppQuit = false;
-  source.onDownloaded((update) => seams.announce(update));
   source.onError((error) => seams.log(`update check failed: ${error.message}`));
   seams.onAccept(() => {
-    source.autoInstallOnAppQuit = true;
+    throw new Error("Review the release's shared engine compatibility before installing.");
   });
 
   let lastCheckedAt: number | undefined;
+  let stopped = false;
   let cancel: () => void = () => {};
   const arm = (): void => {
     cancel = seams.schedule(check, scheduleOf(seams.now(), lastCheckedAt).dueInMs);
@@ -58,13 +65,23 @@ export function runUpdater(seams: UpdaterSeams): Updater {
       return;
     }
     lastCheckedAt = seams.now();
-    void source.checkForUpdates().catch(() => undefined);
+    void source
+      .checkForUpdates()
+      .then((result) => {
+        if (!stopped && result?.isUpdateAvailable === true && result.updateInfo.version !== "") {
+          seams.announce({ version: result.updateInfo.version, reviewRequired: true });
+        }
+      })
+      .catch(() => undefined);
     arm();
   };
   arm();
 
   return {
-    stop: () => cancel(),
+    stop: () => {
+      stopped = true;
+      cancel();
+    },
     get lastCheckedAt() {
       return lastCheckedAt;
     },

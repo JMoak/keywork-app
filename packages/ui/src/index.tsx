@@ -1,26 +1,19 @@
-import { render } from "solid-js/web";
-import { App } from "./app.tsx";
-import "./app.css";
-import { DevPage } from "./dev/dev-page.tsx";
-import { browserHost } from "./host/browser.ts";
-import { hostFromWindow } from "./host/port.ts";
-
-const root = document.getElementById("root");
-if (root === null) throw new Error("index.html has no #root");
-
-render(
-  () => (devPageRequested() ? <DevPage /> : <App host={hostFromWindow() ?? browserHost()} />),
-  root,
-);
-
-function devPageRequested(): boolean {
-  const { pathname, search } = window.location;
-  return pathname.endsWith("/dev") || new URLSearchParams(search).has("dev");
-}
-
-export { App } from "./app.tsx";
+export { App, type AppProps } from "./app.tsx";
+export { ProductProvider, useProductProfile } from "./chrome/product.ts";
 export { Composer } from "./composer/composer.tsx";
 export type { HostPort } from "./host/port.ts";
 export { ConversationPane } from "./page/pane.tsx";
 export { tierOf, type WidthTier } from "./page/tiers.ts";
+export type { ShellSeams } from "./panes/registry.ts";
+export type {
+  CreatureDiscussionDraft,
+  CreatureProjectActivity,
+  CreatureProjectBinding,
+  CreatureProjectDraft,
+  CreatureProjectsPort,
+  SteadHomeScope,
+  SteadProjectContext,
+  SteadProjectSessionView,
+  SteadSessionReference,
+} from "./panes/stead/home-scope.ts";
 export * from "./theme/index.ts";

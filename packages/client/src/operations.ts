@@ -1,9 +1,13 @@
 import type { OperationId } from "@keywork-app/protocol";
-import type { KeyworkClient } from "./client.ts";
+import type { ConsoleClient } from "./client.ts";
+import { creatureProjectOperations } from "./creature-projects.ts";
+import { ranchOperations } from "./ranch.ts";
 
-export type ClientMethod = Exclude<keyof KeyworkClient, "url">;
+export type ClientMethod = Exclude<keyof ConsoleClient, "url">;
 
 export const operationOfMethod = {
+  ...creatureProjectOperations,
+  ...ranchOperations,
   document: "getDocument",
   events: "streamEvents",
   sessions: "listSessions",
@@ -22,6 +26,8 @@ export const operationOfMethod = {
   moveLeaf: "moveSessionLeaf",
   changes: "readSessionChanges",
   changedFile: "readChangedFile",
+  hunkVerdicts: "readHunkVerdicts",
+  recordHunkVerdict: "recordHunkVerdict",
   listTrash: "listTrash",
   restoreSession: "restoreSession",
   discardTrashedSession: "discardTrashedSession",
@@ -44,6 +50,7 @@ export const operationOfMethod = {
   spill: "readSessionSpill",
   applyPreset: "applyPreset",
   asks: "listAsks",
+  routineNeeds: "listNeedsYou",
   answerAsk: "answerAsk",
   permissions: "listPermissions",
   grantWorkspaceRule: "grantWorkspaceRule",

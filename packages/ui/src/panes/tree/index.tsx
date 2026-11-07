@@ -51,6 +51,7 @@ export type TreeSpec = z.output<typeof treeSpec>;
 
 export const treePane = definePane<TreeSpec>({
   kind: "tree",
+  heading: "in sessions",
   spec: treeSpec,
   home: "left",
   attire: "house",

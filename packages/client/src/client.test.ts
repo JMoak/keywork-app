@@ -5,6 +5,13 @@ import type { StreamNotice } from "./sse.ts";
 
 const ticket = { url: "http://127.0.0.1:4770/", token: "t0k3n" };
 
+const verdict = {
+  path: "src/a.ts",
+  header: "@@ -1,3 +1,4 @@",
+  digest: "a1b2c3d4",
+  verdict: "keep",
+} as const;
+
 interface Call {
   url: string;
   method: string;
@@ -104,6 +111,28 @@ describe("keyworkClient routes", () => {
     expect(await client.moveLeaf("nope", "e1")).toBe("missing");
     expect(await client.changes("nope")).toBe("missing");
     expect(await client.changedFile("nope", "a.txt")).toBe("missing");
+    expect(await client.hunkVerdicts("nope")).toBe("missing");
+    expect(await client.recordHunkVerdict("nope", verdict)).toBe("missing");
+  });
+
+  it("reads and records hunk verdicts, and says when the server records none", async () => {
+    const mark = { index: 1, entryId: "v1", at: "t", ...verdict };
+    let wired = true;
+    const { calls, fetch } = recordingFetch((call) => {
+      if (call.method === "GET") return json(200, { verdicts: [mark] });
+      return wired ? json(201, mark) : json(501, { error: "verdicts are not wired" });
+    });
+    const client = keyworkClient(ticket, { fetch });
+    expect(await client.hunkVerdicts("s1")).toEqual({ verdicts: [mark] });
+    expect(await client.recordHunkVerdict("s1", verdict)).toEqual(mark);
+    wired = false;
+    expect(await client.recordHunkVerdict("s1", verdict)).toBe("unwired");
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
+      "GET /sessions/s1/changes/verdicts",
+      "POST /sessions/s1/changes/verdicts",
+      "POST /sessions/s1/changes/verdicts",
+    ]);
+    expect(JSON.parse(calls[1]?.body ?? "{}")).toEqual(verdict);
   });
 
   it("walks the tree routes: entries, fork, label, and leaf with their bodies", async () => {

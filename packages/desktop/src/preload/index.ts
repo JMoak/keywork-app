@@ -12,6 +12,9 @@ import {
   type RelayHead,
 } from "../shared/channels.ts";
 import { type ChunkQueue, chunkQueue } from "../shared/chunk-queue.ts";
+import { companionHostPort } from "./companion-host.ts";
+import { isScreenSenderWindow, screenPort, startScreenSender } from "./screen.ts";
+import { pushWornTheme } from "./worn-theme.ts";
 
 const streams = new Map<number, ChunkQueue>();
 let nextRequestId = 1;
@@ -116,58 +119,73 @@ function watchKeybindings(
   };
 }
 
-const host = {
-  about: () => ipcRenderer.invoke(hostChannels.about),
-  pickFolder: () => ipcRenderer.invoke(hostChannels.pickFolder),
-  recentWorkspaces: () => ipcRenderer.invoke(hostChannels.recentWorkspaces),
-  openWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.openWorkspace, path),
-  restartServer: (path: string) => ipcRenderer.invoke(hostChannels.restartServer, path),
-  closeWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.closeWorkspace, path),
-  listOpenWorkspaces: () => ipcRenderer.invoke(hostChannels.listOpenWorkspaces),
-  switchWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.switchWorkspace, path),
-  onOpenWorkspacesChanged: subscribe(hostChannels.openWorkspacesChanged),
-  onOpenRequested: subscribe<string>(hostChannels.openRequested),
-  openExternal: (url: string) => ipcRenderer.invoke(hostChannels.openExternal, url),
-  openInEditor: (target: EditorTarget) =>
-    ipcRenderer.invoke(hostChannels.openInEditor, target) as Promise<EditorOpened>,
-  writeClipboard: (text: string) => ipcRenderer.invoke(hostChannels.writeClipboard, text),
-  watchKeybindings,
-  notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
-  onNotificationActivated: subscribe(hostChannels.notificationActivated),
-  setNeedsYou: (count: number) => ipcRenderer.invoke(hostChannels.setNeedsYou, count),
-  saveAs: (suggestedName: string, text: string) =>
-    ipcRenderer.invoke(hostChannels.saveAs, { suggestedName, text }),
-  onServerLost: subscribe(hostChannels.serverLost),
-  onServerRegained: subscribe(hostChannels.serverRegained),
-  pty,
-  onUpdateReady: subscribe(hostChannels.updateReady),
-  acceptUpdate: () => ipcRenderer.invoke(hostChannels.acceptUpdate),
-  serverFetch: async (
-    workspace: string,
-    path: string,
-    init: { method?: string; headers?: Record<string, string>; body?: string },
-  ) => {
-    const requestId = nextRequestId++;
-    const queue = chunkQueue();
-    streams.set(requestId, queue);
-    const head = (await ipcRenderer.invoke(hostChannels.serverFetch, {
-      requestId,
-      workspace,
-      path,
-      method: init.method ?? "GET",
-      headers: init.headers ?? {},
-      body: init.body,
-    })) as RelayHead;
-    return {
-      ...head,
-      read: () => queue.read(),
-      cancel: () => {
-        ipcRenderer.send(hostChannels.serverAbort, requestId);
-        queue.end("cancelled");
-        streams.delete(requestId);
-      },
-    };
-  },
-};
+function consoleHost() {
+  return {
+    about: () => ipcRenderer.invoke(hostChannels.about),
+    pickFolder: () => ipcRenderer.invoke(hostChannels.pickFolder),
+    recentWorkspaces: () => ipcRenderer.invoke(hostChannels.recentWorkspaces),
+    openWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.openWorkspace, path),
+    openHome: () => ipcRenderer.invoke(hostChannels.openHome),
+    enableRuntime: () => ipcRenderer.invoke(hostChannels.enableRuntime),
+    restartServer: (path: string) => ipcRenderer.invoke(hostChannels.restartServer, path),
+    servingOf: (path: string) => ipcRenderer.invoke(hostChannels.servingOf, path),
+    stopServing: (path: string) => ipcRenderer.invoke(hostChannels.stopServing, path),
+    closeWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.closeWorkspace, path),
+    listOpenWorkspaces: () => ipcRenderer.invoke(hostChannels.listOpenWorkspaces),
+    switchWorkspace: (path: string) => ipcRenderer.invoke(hostChannels.switchWorkspace, path),
+    onOpenWorkspacesChanged: subscribe(hostChannels.openWorkspacesChanged),
+    onOpenRequested: subscribe<string>(hostChannels.openRequested),
+    openExternal: (url: string) => ipcRenderer.invoke(hostChannels.openExternal, url),
+    openInEditor: (target: EditorTarget) =>
+      ipcRenderer.invoke(hostChannels.openInEditor, target) as Promise<EditorOpened>,
+    writeClipboard: (text: string) => ipcRenderer.invoke(hostChannels.writeClipboard, text),
+    watchKeybindings,
+    notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
+    onNotificationActivated: subscribe(hostChannels.notificationActivated),
+    setNeedsYou: (count: number) => ipcRenderer.invoke(hostChannels.setNeedsYou, count),
+    saveAs: (suggestedName: string, text: string) =>
+      ipcRenderer.invoke(hostChannels.saveAs, { suggestedName, text }),
+    onServerLost: subscribe(hostChannels.serverLost),
+    onServerRegained: subscribe(hostChannels.serverRegained),
+    pty,
+    onUpdateReady: subscribe(hostChannels.updateReady),
+    acceptUpdate: () => ipcRenderer.invoke(hostChannels.acceptUpdate),
+    serverFetch: async (
+      workspace: string,
+      path: string,
+      init: { method?: string; headers?: Record<string, string>; body?: string },
+    ) => {
+      const requestId = nextRequestId++;
+      const queue = chunkQueue();
+      streams.set(requestId, queue);
+      const head = (await ipcRenderer.invoke(hostChannels.serverFetch, {
+        requestId,
+        workspace,
+        path,
+        method: init.method ?? "GET",
+        headers: init.headers ?? {},
+        body: init.body,
+      })) as RelayHead;
+      return {
+        ...head,
+        read: () => queue.read(),
+        cancel: () => {
+          ipcRenderer.send(hostChannels.serverAbort, requestId);
+          queue.end("cancelled");
+          streams.delete(requestId);
+        },
+      };
+    },
+  };
+}
 
-contextBridge.exposeInMainWorld("keyworkHost", host);
+if (isScreenSenderWindow(process.argv)) startScreenSender(ipcRenderer);
+else {
+  contextBridge.exposeInMainWorld("keyworkHost", {
+    productId: process.argv.includes("--keywork-product=stead") ? "stead" : "keywork",
+    ...consoleHost(),
+    companion: companionHostPort(ipcRenderer),
+    screen: screenPort(ipcRenderer),
+  });
+  pushWornTheme(ipcRenderer);
+}

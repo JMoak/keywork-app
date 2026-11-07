@@ -1,0 +1,17 @@
++ new chore  5 chores · 1 running · 1 off
+▾ Wren                     5 chores
+  ▒ Morning triage           tomorrow 09:00
+      weekdays at 09:00 (America/Chicago), until 2026-12-31 · to the conversation · notify only when it needs you · read-only
+  ▓ Docs index               running
+      every 2 hours · to docs/INDEX.md · notify every run, at the digest · write, 2 grants, accepted
+  ▒ Nightly tests            tomorrow 02:00
+      every day at 02:00 (America/Chicago) · to thread nightly · notify never; the log only · act, 1 grant, not accepted
+      Its act grants wait for you: read and accept them with a.
+  ░ Storehouse tidy          off
+      Sundays at 23:30 (America/Chicago) · to the conversation · notify only when it needs you · read-only
+      Off: disabled after 5 failed runs in a row; the last: the runner failed: exit 1. Turn it back on with t.
+  × broken                   unreadable
+      routines/broken.json does not parse: trigger.expr: not a five-field cron expression (minute hour day month weekday)
+▾ Tam                      0 chores
+  Digest times and quiet hours: this node does not serve them yet.
+  Node settings, read-only here: change them in the node's config. A run that needs you rings at once, after quiet hours.

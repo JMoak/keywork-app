@@ -20,6 +20,7 @@ DOM, fails a regression, and fails any value that loosened against `HEAD` withou
 | `T8.eventsPerFrame` | 800 | higher | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 | `T8.reducerStepsPerFrame` | 15 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
 | `T8.firstPaintElements` | 207 | lower | `packages/ui/src/shell/frame-tick-budget.test.tsx` |
+| `T9.screenGlassToGlassP50Ms` | 183 | lower | `scripts/textures/screen-latency.test.ts`, `check:textures` |
 
 ## T1: grapheme-correct editing
 
@@ -65,6 +66,20 @@ Every recorded fixture is streamed one character per event through `batchPerFram
 the busiest frame may take at most `reducerStepsPerFrame` reducer steps. The conversation pane's
 first paint over every fixture builds at most `firstPaintElements` DOM elements. Work is
 counted, so the numbers hold on any CI runner.
+
+## T9: a screen you can read as it happens
+
+The screen pane shows another machine's desktop over the tailnet, and a desktop that lags
+behind the hand moving it is not the same desktop. `scripts/textures/screen-latency.json` is
+the committed recording of one idle loopback run between two Electron instances on this
+machine: capture size, codec, candidate pair, and the glass-to-glass latency (p50, p95, probe
+count) measured by flashing a probe and timing its arrival. Only `bun run perf:screen` writes
+it; the loopback acceptance writes its own run under `artifacts/screen/runs/` and never moves
+the ratchet. The ratchet holds the recording's median; `check:textures` and
+`scripts/textures/screen-latency.test.ts` read the recording and fail a run that got slower.
+The budget in `docs/spec/product/SCREEN.md` is 120 ms; the idle measurement on moak-main is 183 ms
+(134 the first time, 167 on the morning of the second first-light run), so the number sits
+where it was measured and only falls from there.
 
 ## Moving a number
 

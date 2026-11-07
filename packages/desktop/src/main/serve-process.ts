@@ -8,9 +8,11 @@ import {
   type ServerTicket,
   serveTicket,
 } from "@keywork-app/client";
-import { protocolVersion } from "@keywork-app/protocol";
+import { contractVersion, protocolVersion } from "@keywork-app/protocol";
 
 export const expectedServerVersion = protocolVersion;
+
+export const expectedContract = contractVersion;
 
 export interface ChildHandle {
   readonly pid: number;
@@ -36,7 +38,28 @@ export interface SupervisorSeams {
 export interface ServeSpec {
   binary: string;
   cwd: string;
+  launchCwd?: string;
+  entry?: readonly string[] | undefined;
   args?: readonly string[] | undefined;
+  home?: boolean;
+}
+
+export type EngineOrigin = "sidecar" | "KEYWORK_BIN" | "sibling repo" | "PATH" | "ticket";
+
+export type NodeTicketOwner = "this-install" | "another-install" | "shared-runtime";
+
+export interface EngineSource {
+  origin: EngineOrigin;
+  from: string;
+  node?: NodeTicketOwner | undefined;
+}
+
+export interface ContractMismatch {
+  kind: "contract-mismatch";
+  expected: string;
+  actual: string | undefined;
+  ticket: ServerTicket;
+  source?: EngineSource | undefined;
 }
 
 export type ServeFailure =
@@ -46,6 +69,7 @@ export type ServeFailure =
   | { kind: "failed"; exitCode: number | null; detail: string }
   | { kind: "unreachable"; ticket: ServerTicket; detail: string }
   | { kind: "version-mismatch"; expected: string; actual: string; ticket: ServerTicket }
+  | ContractMismatch
   | { kind: "no-ticket"; detail: string }
   | { kind: "silent"; waitedMs: number; detail: string }
   | { kind: "gone"; url: string };
@@ -88,8 +112,8 @@ export function superviseServer(spec: ServeSpec, seams: SupervisorSeams): Server
     const port = await seams.freePort();
     const running = seams.spawn(
       spec.binary,
-      ["serve", "--port", String(port), ...(spec.args ?? [])],
-      spec.cwd,
+      serveArguments(spec, port),
+      spec.launchCwd ?? spec.cwd,
     );
     child = running;
     const stderr = collect(running.stderr);
@@ -172,6 +196,17 @@ export async function healthCheck(
   } catch (cause) {
     return { ok: false, failure: { kind: "unreachable", ticket, detail: messageOf(cause) } };
   }
+  if (document.contract !== expectedContract) {
+    return {
+      ok: false,
+      failure: {
+        kind: "contract-mismatch",
+        expected: expectedContract,
+        actual: document.contract,
+        ticket,
+      },
+    };
+  }
   if (document.version !== expectedServerVersion) {
     return {
       ok: false,
@@ -186,6 +221,21 @@ export async function healthCheck(
   return { ok: true, version: document.version };
 }
 
+export function serveArguments(spec: ServeSpec, port: number): string[] {
+  return [
+    ...(spec.entry ?? []),
+    "serve",
+    ...(spec.home ? ["--home"] : []),
+    "--port",
+    String(port),
+    ...(spec.args ?? []),
+  ];
+}
+
+export function withSource(failure: ServeFailure, source: EngineSource): ServeFailure {
+  return failure.kind === "contract-mismatch" ? { ...failure, source } : failure;
+}
+
 export function exitFailureOf(
   code: number | null,
   stderr: string,
@@ -193,10 +243,10 @@ export function exitFailureOf(
 ): ServeFailure {
   const detail = stderr.trim();
   if (code === null && detail === "") {
-    return { kind: "failed", exitCode: null, detail: "keywork could not be started" };
+    return { kind: "failed", exitCode: null, detail: "the engine could not be started" };
   }
   if (code === 0) {
-    return { kind: "no-ticket", detail: "keywork serve exited before announcing its address" };
+    return { kind: "no-ticket", detail: "`keywork serve` exited before announcing its address" };
   }
   if (code === 2) return { kind: "usage", detail };
   if (code === 3) return unresolvedFailure(detail);

@@ -116,7 +116,7 @@ describe("ConversationPane over the recorded fixtures", () => {
     expect(fold.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("carries the masthead headline from the first prompt", async () => {
+  it("carries the masthead headline from the first prompt, and the product name before one", async () => {
     const projection = await fixture("plain");
     expect(headline(projection)).toBe("say hello");
     expect(headline(emptyProjection)).toBe("keywork");

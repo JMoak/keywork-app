@@ -1,3 +1,4 @@
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { createSignal, onCleanup } from "solid-js";
 import type { HostPort, UpdateReady } from "../host/port.ts";
 import type { CommandSpec } from "../palette/commands.ts";
@@ -13,14 +14,22 @@ export interface UpdateOffer {
 export function createUpdateOffer(host: UpdateHost): UpdateOffer {
   const [waiting, setWaiting] = createSignal<UpdateReady>();
   const [accepted, setAccepted] = createSignal(false);
-  onCleanup(host.onUpdateReady((update) => setWaiting(update)));
+  onCleanup(
+    host.onUpdateReady((update) => {
+      if (!sameOffer(waiting(), update)) setAccepted(false);
+      setWaiting(update);
+    }),
+  );
   return {
     waiting,
     accepted,
     accept: () => {
-      if (waiting() === undefined || accepted()) return;
+      const update = waiting();
+      if (update === undefined || update.reviewRequired === true || accepted()) return;
       host.acceptUpdate().then(
-        () => setAccepted(true),
+        () => {
+          if (sameOffer(waiting(), update)) setAccepted(true);
+        },
         () => undefined,
       );
     },
@@ -28,6 +37,8 @@ export function createUpdateOffer(host: UpdateHost): UpdateOffer {
 }
 
 export function updateLine(update: UpdateReady, accepted: boolean): string {
+  if (update.reviewRequired === true)
+    return `update ${update.version} available · manual compatibility review required`;
   return accepted
     ? `update ${update.version} installs when you quit`
     : `update ${update.version} ready`;
@@ -35,14 +46,21 @@ export function updateLine(update: UpdateReady, accepted: boolean): string {
 
 export const acceptLabel = "install on quit";
 
-export function updateCommands(offer: UpdateOffer): CommandSpec[] {
+export function updateCommands(
+  offer: UpdateOffer,
+  profile: ProductProfile = keyworkProfile,
+): CommandSpec[] {
   const update = offer.waiting();
-  if (update === undefined || offer.accepted()) return [];
+  if (update === undefined || update.reviewRequired === true || offer.accepted()) return [];
   return [
     {
       name: "install-update",
-      description: `install keywork-app ${update.version} when you quit`,
+      description: `install ${profile.name} ${update.version} when you quit`,
       run: () => offer.accept(),
     },
   ];
+}
+
+function sameOffer(current: UpdateReady | undefined, update: UpdateReady): boolean {
+  return current?.version === update.version && current.reviewRequired === update.reviewRequired;
 }

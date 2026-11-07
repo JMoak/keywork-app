@@ -165,7 +165,7 @@ function workspaceCommands(seams: SurfaceCommandSeams): CommandSpec[] {
   return [
     {
       name: "workspace",
-      description: "reopen keywork on a named workspace, or open the workspaces pane",
+      description: "reopen the server on a named workspace, or open the workspaces pane",
       argument: { hint: "[slug|default]", choices: () => [...declared(), fallback] },
       run: (slug) => {
         if (slug === undefined) seams.summon("workspaces");
@@ -180,7 +180,7 @@ function workspaceCommands(seams: SurfaceCommandSeams): CommandSpec[] {
     },
     {
       name: "workspace-default",
-      description: "reopen keywork on the default workspace",
+      description: "reopen the server on the default workspace",
       run: () => void reopenOn(seams, null),
     },
   ];
@@ -319,7 +319,7 @@ async function reopenOn(seams: SurfaceCommandSeams, slug: string | null): Promis
   seams.say(`workspace → ${name} · reopening`);
   const reopened = await seams.reopen();
   if (!reopened.ok) return seams.say(describeFailure(reopened.failure));
-  seams.say(`keywork reopened on ${name}`);
+  seams.say(`the server reopened on ${name}`);
   await seams.store.refresh();
   await seams.store.surfaces.load();
 }

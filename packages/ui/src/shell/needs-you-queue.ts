@@ -1,5 +1,5 @@
-import type { ServerFeed } from "@keywork-app/client";
-import type { PendingAsk } from "@keywork-app/protocol";
+import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { PendingAsk, RoutineNeed, VerdictMark } from "@keywork-app/protocol";
 import { createMemo, createSignal } from "solid-js";
 import type { MemoryStore } from "./memory-store.ts";
 import { dismissible, type NeedsYouItem, orderNeedsYou, whereOf } from "./needs-you.ts";
@@ -7,8 +7,13 @@ import {
   emptyWireLedger,
   foldWire,
   freshAsks,
+  freshChores,
   memoryItems,
+  needsYouCount,
   reconcileAsks,
+  reconcileChores,
+  reconcileReviews,
+  type WireLedger,
   wireItems,
 } from "./needs-you-ledger.ts";
 import { onReconnected } from "./surfaces-store.ts";
@@ -39,9 +44,30 @@ export interface WaitingSeams {
   workspace: string;
   feed: Pick<ServerFeed, "subscribe" | "onNotice">;
   asks(): Promise<readonly PendingAsk[]>;
+  chores?: (() => Promise<readonly RoutineNeed[]>) | undefined;
+  reviews?: (() => Promise<readonly SessionVerdicts[]>) | undefined;
   memory: Pick<MemoryStore, "state" | "refresh">;
   sessionName(sessionId: string): string;
   now?: (() => string) | undefined;
+}
+
+export interface SessionVerdicts {
+  readonly sessionId: string;
+  readonly verdicts: readonly VerdictMark[];
+}
+
+export async function sessionVerdicts(
+  client: Pick<KeyworkClient, "sessions" | "hunkVerdicts">,
+): Promise<SessionVerdicts[]> {
+  const listed = await client.sessions();
+  const readings = await Promise.all(
+    listed.map(async ({ id }) => ({ sessionId: id, reading: await client.hunkVerdicts(id) })),
+  );
+  return readings.flatMap(({ sessionId, reading }) =>
+    reading === "missing" || reading.verdicts.length === 0
+      ? []
+      : [{ sessionId, verdicts: reading.verdicts }],
+  );
 }
 
 export function createNeedsYouQueue(): NeedsYouQueue {
@@ -80,7 +106,7 @@ export function createNeedsYouQueue(): NeedsYouQueue {
 
   return {
     items,
-    count: () => items().length,
+    count: () => needsYouCount(items()),
     head: () => items()[0],
     where: (item) =>
       whereOf(item, (sessionId) => sourceOf(item.workspace)?.sessionName(sessionId) ?? sessionId),
@@ -111,6 +137,14 @@ export function createWaiting(seams: WaitingSeams): WaitingSource {
         setWire((ledger) => reconcileAsks(ledger, workspace, pending, knownBeforeAsking)),
       () => undefined,
     );
+    seams
+      .chores?.()
+      .then((needs) => setWire((ledger) => reconcileChores(ledger, workspace, needs)))
+      .catch(() => undefined);
+    seams
+      .reviews?.()
+      .then((sessions) => setWire((ledger) => withReviews(ledger, workspace, sessions)))
+      .catch(() => undefined);
   };
 
   const stops = [
@@ -119,8 +153,8 @@ export function createWaiting(seams: WaitingSeams): WaitingSource {
       const after = foldWire(before, workspace, envelopes);
       if (after === before) return;
       setWire(after);
-      for (const ask of freshAsks(before, after)) {
-        for (const listener of [...listeners]) listener(ask);
+      for (const arrived of [...freshAsks(before, after), ...freshChores(before, after)]) {
+        for (const listener of [...listeners]) listener(arrived);
       }
     }),
     onReconnected(seams.feed, () => reconcile(new Set(wire().asks.keys()))),
@@ -144,4 +178,15 @@ export function createWaiting(seams: WaitingSeams): WaitingSource {
       listeners.clear();
     },
   };
+}
+
+function withReviews(
+  ledger: WireLedger,
+  workspace: string,
+  sessions: readonly SessionVerdicts[],
+): WireLedger {
+  return sessions.reduce(
+    (held, { sessionId, verdicts }) => reconcileReviews(held, workspace, sessionId, verdicts),
+    ledger,
+  );
 }

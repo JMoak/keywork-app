@@ -34,6 +34,29 @@ describe("the merge view", () => {
     expect(element.querySelectorAll(".cm-editor")).toHaveLength(0);
   });
 
+  it("names each hunk by its unified header and changed lines and knows which one the cursor is on", () => {
+    const element = host();
+    for (const layout of ["unified", "split"] as const) {
+      const mounted = mountMergeView(element, sides, layout);
+      expect(mounted.hunks()).toEqual([
+        { header: "@@ -2,1 +2,1 @@", removed: ["two"], added: ["2"], line: 2 },
+        { header: "@@ -4,0 +4,1 @@", removed: [], added: ["four"], line: 4 },
+      ]);
+      expect(mounted.hunkAt()).toBe(0);
+      mounted.goToHunk(1);
+      expect(mounted.hunkAt()).toBe(1);
+      mounted.goToHunk(0);
+      expect(mounted.hunkAt()).toBe(0);
+      mounted.goToHunk(7);
+      expect(mounted.hunkAt()).toBe(0);
+      mounted.nextHunk();
+      expect(mounted.hunkAt()).toBe(1);
+      mounted.previousHunk();
+      expect(mounted.hunkAt()).toBe(0);
+      mounted.destroy();
+    }
+  });
+
   it("mounts two editors side by side for the split layout", () => {
     const element = host();
     const mounted = mountMergeView(element, sides, "split");

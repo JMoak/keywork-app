@@ -38,6 +38,7 @@ export type BrowserSpec = z.output<typeof browserSpec>;
 
 export const browserPane = definePane<BrowserSpec>({
   kind: "browser",
+  heading: "in files",
   spec: browserSpec,
   home: "left",
   attire: "work",

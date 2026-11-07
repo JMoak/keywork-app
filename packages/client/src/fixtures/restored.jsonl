@@ -19,5 +19,5 @@
 {"id":19,"ts":"2026-09-07T12:00:04.750Z","sessionId":"s1","type":"changes.updated","payload":{"paths":[]}}
 {"id":20,"ts":"2026-09-07T12:00:05.000Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q5","quiet":false,"undoable":true,"redoable":true}}
 {"id":21,"ts":"2026-09-07T12:00:05.250Z","sessionId":"s1","type":"session.tree","payload":{"reason":"leaf","entryId":"q5"}}
-{"id":22,"ts":"2026-09-07T12:00:05.500Z","sessionId":"s1","type":"changes.updated","payload":{"paths":[]}}
+{"id":22,"ts":"2026-09-07T12:00:05.500Z","sessionId":"s1","type":"changes.updated","payload":{"paths":["notes.txt"],"turn":1}}
 {"id":23,"ts":"2026-09-07T12:00:05.750Z","sessionId":"s1","type":"session.state","payload":{"model":"mock/mock-model","thinking":false,"title":"(untitled session)","leafId":"q6","quiet":false,"undoable":true,"redoable":false}}

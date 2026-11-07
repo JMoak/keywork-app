@@ -42,6 +42,7 @@ export type ThemesSpec = z.output<typeof themesSpec>;
 
 export const themesPane = definePane<ThemesSpec>({
   kind: "themes",
+  heading: "in themes",
   spec: themesSpec,
   home: "right",
   attire: "house",

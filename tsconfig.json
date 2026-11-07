@@ -1,10 +1,29 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/protocol" },
-    { "path": "packages/client" },
-    { "path": "packages/ui" },
-    { "path": "packages/desktop" },
-    { "path": "scripts" }
+    {
+      "path": "packages/product"
+    },
+    {
+      "path": "packages/protocol"
+    },
+    {
+      "path": "packages/client"
+    },
+    {
+      "path": "packages/habitat"
+    },
+    {
+      "path": "packages/screen"
+    },
+    {
+      "path": "packages/ui"
+    },
+    {
+      "path": "packages/desktop"
+    },
+    {
+      "path": "scripts"
+    }
   ]
 }

@@ -7,7 +7,7 @@ import type {
 } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { coalesceEnvelopes } from "./coalesce.ts";
-import { project, projectAll } from "./project.ts";
+import { crateDeliveredLine, project, projectAll } from "./project.ts";
 import { toolRowText } from "./tool-row.ts";
 import { emptyProjection } from "./types.ts";
 
@@ -265,6 +265,35 @@ describe("coalesceEnvelopes", () => {
     const b = at("turn.delta", { delta: { type: "text", text: "b" }, replay: true });
     const c = { ...at("turn.delta", { delta: { type: "text", text: "c" } }), sessionId: "s2" };
     expect(coalesceEnvelopes([a, b, c])).toHaveLength(3);
+  });
+});
+
+describe("a creature's report lines", () => {
+  it("draws a thread's report as its one line, and the conversation's own label as the delivery, never the sentence twice", () => {
+    const report = (thread: string, replay = false) =>
+      at("extension.notice", {
+        extension: "creature",
+        level: "info",
+        message: "I wrote the five largest files to notes/largest.md.",
+        detail: { origin: { kind: "creature", creature: "hal", thread }, entryId: "e9" },
+        ...(replay && { replay }),
+      });
+    const lines = (state: ReturnType<typeof project>) =>
+      state.entries.flatMap((entry) => (entry.kind === "notice" ? [entry.text] : []));
+    expect(lines(projectAll(emptyProjection, [report("s1")]))).toEqual([crateDeliveredLine]);
+    expect(lines(projectAll(emptyProjection, [report("s1", true)]))).toEqual([crateDeliveredLine]);
+    expect(lines(projectAll(emptyProjection, [report("thread-2")]))).toEqual([
+      "I wrote the five largest files to notes/largest.md.",
+    ]);
+    const frame = at("extension.notice", {
+      extension: "creature",
+      level: "info",
+      message: "Hal reads the workspace and introduces itself.",
+      detail: { kind: "frame", origin: { kind: "creature", creature: "hal", thread: "s1" } },
+    });
+    expect(lines(projectAll(emptyProjection, [frame]))).toEqual([
+      "Hal reads the workspace and introduces itself.",
+    ]);
   });
 });
 

@@ -1,0 +1,77 @@
+[
+  {
+    "path": "packages/desktop/src/main/companion/foreground.ts",
+    "pattern": "^\\s*'Add-Type -Namespace Stead -Name Shell -MemberDefinition ",
+    "reason": "PowerShell CLR namespace used by the foreground probe."
+  },
+  {
+    "path": "packages/desktop/src/main/pty-ipc.ts",
+    "pattern": "program: z\\.enum\\(\\[\"shell\", \"keywork\"\\]\\)",
+    "reason": "the pty program id the renderer sends; main maps it to the engine binary and never shows it"
+  },
+  {
+    "path": "packages/desktop/src/main/pty.ts",
+    "pattern": "\\[\"keywork\", \\.\\.\\.request\\.args\\]",
+    "reason": "argv[0] of the engine command line, the binary's name; the pty title it forms is never rendered"
+  },
+  {
+    "path": "packages/desktop/src/main/system.ts",
+    "pattern": "\\[\"where\", \\[\"keywork\"\\]\\] : \\[\"which\", \\[\"keywork\"\\]\\]",
+    "reason": "the engine binary's name, looked up on PATH"
+  },
+  {
+    "path": "packages/ui/src/onboarding/index.tsx",
+    "pattern": "^\\s*target\\.summon\\(\"stead\"\\);$",
+    "reason": "Pane kind passed to the workspace shell."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/copy.ts",
+    "pattern": "^export const steadName = \"stead\";$",
+    "reason": "Name of the Stead feature inside both products."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/index.tsx",
+    "pattern": "^const steadSpec = z\\.object\\(\\{ kind: z\\.literal\\(\"stead\"\\) \\}\\);$",
+    "reason": "Persisted layout pane kind schema."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/index.tsx",
+    "pattern": "^\\s*kind: \"stead\",$",
+    "reason": "Registered layout pane kind."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/index.tsx",
+    "pattern": "^\\s*name: \"stead\",$",
+    "reason": "Palette command for the Stead feature."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/index.tsx",
+    "pattern": "^\\s*spec: \\(\\) => \\(\\{ kind: \"stead\" \\}\\),$",
+    "reason": "Pane kind produced by the Stead palette command."
+  },
+  {
+    "path": "packages/ui/src/panes/stead/index.tsx",
+    "pattern": "^\\s*aria-label=\"stead\"$",
+    "reason": "Accessible name of the Stead pane in both products."
+  },
+  {
+    "path": "packages/ui/src/panes/terminal/index.tsx",
+    "pattern": "program: \"keywork\" as const",
+    "reason": "the pty program id main maps to the engine binary; never rendered"
+  },
+  {
+    "path": "packages/ui/src/renderer.tsx",
+    "pattern": "^const profile = productProfiles\\[host\\?\\.productId \\?\\? \"keywork\"\\];$",
+    "reason": "Default product identifier when running the renderer outside the desktop host."
+  },
+  {
+    "path": "packages/ui/src/shell/workspace-view.tsx",
+    "pattern": "^\\s*act\\(tiler\\.summon\\(\\{ kind: \"stead\" \\}, screen\\(\\)\\)\\);$",
+    "reason": "Pane kind chosen by the creature-first profile."
+  },
+  {
+    "path": "packages/ui/src/shell/workspace-view.tsx",
+    "pattern": "^\\s*const outcome = tiler\\.summon\\(\\{ kind: \"stead\" \\}, screen\\(\\)\\);$",
+    "reason": "Pane kind restored by the creature-first profile."
+  }
+]

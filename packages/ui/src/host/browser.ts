@@ -1,3 +1,4 @@
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { echoPty } from "./echo-pty.ts";
 import type {
   HostPort,
@@ -10,6 +11,7 @@ import type {
 } from "./port.ts";
 
 export interface BrowserHostOptions {
+  profile?: ProductProfile;
   server?: { url: string; token: string } | undefined;
   recents?: readonly RecentWorkspace[] | undefined;
   fetch?: typeof fetch | undefined;
@@ -27,6 +29,7 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
   };
   const server = options.server ?? serverFromLocation();
   const transport = options.fetch ?? fetch;
+  const productName = (options.profile ?? keyworkProfile).name;
   const host: HostPort = {
     pty: echoPty(),
     about: async () => ({ shell: "browser", platform: navigator.platform, version: "dev" }),
@@ -99,7 +102,7 @@ export function browserHost(options: BrowserHostOptions = {}): HostPort {
     },
     setNeedsYou: async (count) => {
       for (const entry of open.values()) entry.needsYou = count;
-      document.title = count === 0 ? "keywork" : `(${count}) keywork`;
+      document.title = count === 0 ? productName : `(${count}) ${productName}`;
     },
     saveAs: async () => ({
       saved: false,

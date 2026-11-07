@@ -3,12 +3,13 @@
 > Every component, its exact pin as of 2026-09-07 (`npm view` on that day), and why it
 > won. Pins are re-verified at scaffold time; `scripts/check-pins.ts` keeps them exact after
 > that. Where keywork already pins a shared tool, the same version is used (AD11).
+> Cadence: pins ride the newest stable. From the stead root, `bun run deps:ride` moves Electron and the toolchain around it (electron-builder, electron-vite, electron-updater, Vite, Playwright) to npm `latest` on a green integration rail, and `--canary` tries the next pre-release in a scratch copy, so every Electron major, one every eight weeks, lands a few hours after its stable day (stead `adr.dependencies-ride-the-newest-stable`).
 
 ## Shell and main process
 
 | Layer | Choice | Version | Why | Considered |
 |---|---|---|---|---|
-| Shell | Electron | 44.2.0 | Bundled Chromium: identical rendering on Windows, Linux, macOS; the proven PTY and terminal stack; OpenCode's desktop is Electron and MIT | Tauri 2.11 (8 MB shell, but WebKitGTK on Linux and a Rust PTY under xterm without WebGL), embedding the TUI in xterm alone |
+| Shell | Electron | 45.2.3 | Bundled Chromium: identical rendering on Windows, Linux, macOS; the proven PTY and terminal stack; OpenCode's desktop is Electron and MIT. 45 (Chromium 156, Node 24.22) since 2026-11-05 for screen viewing: `display-capture` reaches the permission handler and `setDisplayMediaRequestHandler` answers capture in main (stead SCREEN-001 to SCREEN-005) | Tauri 2.11 (8 MB shell, but WebKitGTK on Linux and a Rust PTY under xterm without WebGL), embedding the TUI in xterm alone |
 | Build | electron-vite | 5.0.0 | One Vite config for main, preload, and renderer; HMR in the renderer | electron-forge's Vite plugin |
 | Packaging | electron-builder | 26.15.3 | NSIS, dmg, AppImage and deb; code signing and notarization; `extraResources` carries the keywork sidecar | electron-forge |
 | Updates | electron-updater (ships with electron-builder) | 26.15.3 | Signed updates from GitHub releases | none |

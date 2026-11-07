@@ -313,7 +313,7 @@ function refusalWords(refusal: GrantAheadRefusal): string {
     case "missing":
       return "not recorded · that session is gone";
     case "invalid":
-      return "not recorded · keywork could not read the rule";
+      return "not recorded · the engine could not read the rule";
   }
 }
 

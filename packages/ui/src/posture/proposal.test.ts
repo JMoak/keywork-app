@@ -11,7 +11,7 @@ const bash = (resource: string): PermissionRule => ({ action: "bash", resource, 
 describe("the proposed posture", () => {
   it("states the trusted reads keywork already applies, from the server's own bundle", () => {
     const proposal = proposalOf(factsWith({ permissions: recordedView }));
-    expect(proposal.reads).toBe("trusted reads · 40 commands without an ask · fixed in keywork");
+    expect(proposal.reads).toBe("trusted reads · 40 commands without an ask · fixed in the engine");
     expect(proposalOf(factsWith({ permissions: { ...recordedView, trusted: false } })).reads).toBe(
       "trusted reads · off until the workspace is trusted",
     );

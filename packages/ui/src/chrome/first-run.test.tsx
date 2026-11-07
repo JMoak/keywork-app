@@ -1,3 +1,4 @@
+import { steadProfile } from "@keywork-app/product";
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { appActions } from "../keys/actions.ts";
@@ -21,6 +22,19 @@ describe("the first-run lessons", () => {
       "ctrl+k /",
     ]);
     for (const action of firstRunActions) expect(appActions[action], action).toBeDefined();
+  });
+
+  it("teaches creature shortcuts in the Stead profile", () => {
+    const lessons = firstRunLessons(keys, steadProfile);
+    expect(lessons.map((lesson) => lesson.chord)).toEqual([
+      "ctrl+k 0",
+      "ctrl+k 1",
+      "ctrl+k s",
+      "ctrl+p",
+      "ctrl+k /",
+    ]);
+    expect(lessons[0]?.does).toContain("stead");
+    expect(lessons[1]?.does).toContain("creature");
   });
 
   it("follow a rebinding instead of hard-coding the chord", () => {

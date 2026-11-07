@@ -1,6 +1,7 @@
 import {
   type AirlockWaiting,
   type AskWaiting,
+  type DecidedForYou,
   type FailedTurn,
   type InboxWaiting,
   waitingKey,
@@ -44,6 +45,25 @@ export function inboxItem(id: string, overrides: Partial<InboxWaiting> = {}): In
     since: "2026-10-15T08:00:00.000Z",
     itemId: id,
     title: "entities/pricing.md",
+    ...overrides,
+  };
+}
+
+export function decidedItem(
+  recordId: string,
+  overrides: Partial<DecidedForYou> = {},
+): DecidedForYou {
+  const workspace = overrides.workspace ?? "C:/work";
+  return {
+    kind: "decided",
+    key: waitingKey(workspace, "decided", recordId),
+    workspace,
+    since: "2026-10-15T11:00:00.000Z",
+    sessionId: "s1",
+    recordId,
+    ruleClass: "shell.read",
+    tool: "bash",
+    creature: "wren",
     ...overrides,
   };
 }

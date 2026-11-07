@@ -6,9 +6,10 @@ import type { BindingSpec } from "../../keys/keymap.ts";
 import { type AskPick, denialFor } from "../../page/ask-card.tsx";
 import { askingWhy, readWhyKeys, whyLine } from "../../page/ask-card-why.ts";
 import { answerHeldAsk, type HeldAsk } from "../../shell/answer-ask.ts";
+import { useKeyboardScope } from "../../shell/keyboard-claim.ts";
 import type { NeedsYouItem } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
-import { keepKeyboardHome, returnKeyboardHome } from "../keyboard-home.ts";
+import { keepKeyboardHome } from "../keyboard-home.ts";
 import { createCursor } from "../overview/rows.tsx";
 import {
   definePane,
@@ -23,6 +24,7 @@ import {
   type DeskKeys,
   type DeskRow,
   type DeskSources,
+  decidedOfRow,
   deskDismissNotice,
   deskGroups,
   deskHead,
@@ -30,6 +32,8 @@ import {
   deskRows,
   deskTitle,
   nextWaiting,
+  overturnDecided,
+  overturnHint,
 } from "./desk.ts";
 import { DeskRowView } from "./desk-row.tsx";
 import "../overview/overview.css";
@@ -41,6 +45,7 @@ export type NeedsYouSpec = z.output<typeof needsYouSpec>;
 
 export const needsYouPane = definePane<NeedsYouSpec>({
   kind: "needs-you",
+  heading: "on the desk",
   spec: needsYouSpec,
   home: "main",
   attire: "house",
@@ -78,6 +83,12 @@ export const needsYouPane = definePane<NeedsYouSpec>({
       "dismiss it · never an ask",
       "desk-dismiss",
       "take this row off the desk; an ask is answered, never dismissed",
+    ),
+    "needs-you.overturn": deskAction(
+      "x",
+      "overturn a decision made for you",
+      "desk-overturn",
+      "overturn the call a promoted class decided for you; the class waits for you again",
     ),
     "needs-you.approve": deskAction(
       "y",
@@ -120,6 +131,7 @@ export function deskKeys(keys: KeyHints): DeskKeys {
     open: keys.chord("needs-you.open"),
     dismiss: keys.chord("needs-you.dismiss"),
     waiting: keys.chord("needs-you.waiting"),
+    overturn: keys.chord("needs-you.overturn"),
     approve: keys.chord("needs-you.approve"),
     once: keys.chord("needs-you.once"),
     session: keys.chord("needs-you.session"),
@@ -148,6 +160,7 @@ const answerPicks: Readonly<Record<string, AskPick>> = {
 };
 
 function Desk(props: PaneProps<NeedsYouSpec>) {
+  const keyboard = useKeyboardScope();
   let root: HTMLElement | undefined;
   keepKeyboardHome(
     () => root,
@@ -172,6 +185,7 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
   const footLine = (): string | undefined => {
     if (notice() !== undefined) return notice();
     if (rows().length === 0 || wordingHere()) return undefined;
+    if (decidedOfRow(current()) !== undefined) return overturnHint(keys());
     return sayingWhy() ? whyLine : deskHint(keys());
   };
 
@@ -190,6 +204,19 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
     if (row.kind === "waiting") props.shell.needsYou?.queue.dismiss(row.item);
     else if (row.state === "finished-unseen") props.shell.needsYou?.reads.read(row.summary);
     setNotice(deskDismissNotice(row, keys()));
+  };
+  const overturn = (row: DeskRow | undefined): void => {
+    const decided = decidedOfRow(row);
+    if (decided === undefined) {
+      setNotice(
+        `no decision made for you on this row · ${keys().waiting} goes to the next waiting`,
+      );
+      return;
+    }
+    void overturnDecided(props.shell.client, decided).then((answer) => {
+      if (answer.overturned) props.shell.needsYou?.queue.dismiss(decided);
+      setNotice(answer.line);
+    });
   };
   const toNextWaiting = (): void => {
     const next = nextWaiting(rows(), cursor.index());
@@ -213,7 +240,7 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
     setWording(undefined);
     const denial = denialFor("other", note);
     answer("deny", denial.reason, denial.note);
-    returnKeyboardHome();
+    keyboard?.returnHome();
   };
   readWhyKeys(
     () => root,
@@ -235,6 +262,8 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
         return go(current());
       case "needs-you.dismiss":
         return dismiss(current());
+      case "needs-you.overturn":
+        return overturn(current());
     }
   });
 

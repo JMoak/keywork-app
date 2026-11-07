@@ -82,6 +82,6 @@ function currentModelLine(alone: boolean): string {
 }
 
 function otherModelLine(sessions: number): string {
-  if (sessions === 0) return "keywork knows it";
+  if (sessions === 0) return "the server knows it";
   return sessions === 1 ? "another session runs it" : `${sessions} other sessions run it`;
 }

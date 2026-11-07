@@ -86,7 +86,7 @@ describe("the one quiet notice", () => {
         false,
       ),
     ).toBe(
-      "new manifests: Cargo.toml, go.mod · new bot: scribe · keywork now 0.3.0 · trust-setup proposes 9 rules",
+      "new manifests: Cargo.toml, go.mod · new bot: scribe · the engine is now 0.3.0 · trust-setup proposes 9 rules",
     );
   });
 

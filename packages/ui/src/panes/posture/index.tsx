@@ -27,6 +27,7 @@ export type PostureSpec = z.output<typeof postureSpec>;
 
 export const posturePane = definePane<PostureSpec>({
   kind: "posture",
+  heading: "in trust setup",
   spec: postureSpec,
   home: "right",
   attire: "house",
@@ -37,7 +38,7 @@ export const posturePane = definePane<PostureSpec>({
   summon: {
     action: "posture.summon",
     chords: "leader shift+u",
-    help: "trust setup: rules proposed from what keywork knows",
+    help: "trust setup: rules proposed from what the server knows",
     command: {
       name: "trust-setup",
       description: "propose permission rules from this workspace's manifests and mcp servers",
@@ -88,13 +89,13 @@ export function decisionNotice(offer: Offer, outcome: DecisionOutcome, keys: Key
   const rule = ruleText(offer.rule);
   switch (outcome.kind) {
     case "granted":
-      return `accepted ${rule} · keywork holds it for ${outcome.scope === "workspace" ? "every session" : "this session"}`;
+      return `accepted ${rule} · the server holds it for ${outcome.scope === "workspace" ? "every session" : "this session"}`;
     case "waiting":
       return `accepted ${rule} · no session is focused, so each session records it when its first ask is answered with ${keys.chord("ask.session")}`;
     case "refused":
       return `not recorded · ${rule} stays undecided`;
     case "held":
-      return `keywork already holds ${rule} · ${keys.chord("permissions.summon")} revokes it`;
+      return `the server already holds ${rule} · ${keys.chord("permissions.summon")} revokes it`;
     case "declined":
       return `declined ${rule} · it asks as before`;
   }
@@ -106,7 +107,7 @@ export function settledNotice(setup: TrustSetup): string {
   const tally = `settled · ${accepted.length} accepted · ${offers.length - accepted.length} declined`;
   if (accepted.length === 0) return `${tally} · the posture stays as it was`;
   const waiting = accepted.filter((offer) => setup.waitsForItsAsk(offer)).length;
-  if (waiting === 0) return `${tally} · keywork holds every accepted rule`;
+  if (waiting === 0) return `${tally} · the server holds every accepted rule`;
   return waiting === 1
     ? `${tally} · 1 waits for its first ask`
     : `${tally} · ${waiting} wait for their first ask`;
@@ -129,7 +130,7 @@ export function reviewLead(setup: TrustSetup, version: string | undefined): stri
 export function postureWaitLine(state: TrustState): string | undefined {
   if (state.kind === "unknown") return "reading whether this workspace is trusted";
   if (state.kind === "restarting")
-    return "keywork is picking up the trust · the posture reads once it has";
+    return "the server is picking up the trust · the posture reads once it has";
   return undefined;
 }
 
@@ -214,7 +215,7 @@ function Review(props: PaneProps<PostureSpec> & { setup: TrustSetup }) {
       </div>
       <Switch>
         <Match when={props.setup.reading().phase === "reading"}>
-          <p class="kw-setup-quiet">reading what keywork knows about this workspace</p>
+          <p class="kw-setup-quiet">reading what the server knows about this workspace</p>
         </Match>
         <Match when={failureOf(props.setup.reading())}>
           {(reason) => <NoticeLine text={reason()} tone="error" />}

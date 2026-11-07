@@ -22,6 +22,7 @@ import type { LayerTally, MemoryRow, MemoryRowKind, MemorySection } from "./rows
 export interface GardenProps {
   sections: readonly MemorySection[];
   cursor: string | undefined;
+  inboxKeys?: string;
   gardener: GardenerActivity | undefined;
   onSelect(row: MemoryRow): void;
   onOpen(row: MemoryRow): void;
@@ -60,7 +61,10 @@ export function Garden(props: GardenProps) {
                       onClick={() => props.onSelect(row)}
                       onDblClick={() => props.onOpen(row)}
                     >
-                      <RowBody row={row} />
+                      <RowBody
+                        row={row}
+                        keys={props.cursor === row.id ? props.inboxKeys : undefined}
+                      />
                     </button>
                   </li>
                 )}
@@ -73,7 +77,7 @@ export function Garden(props: GardenProps) {
   );
 }
 
-function RowBody(props: { row: MemoryRow }) {
+function RowBody(props: { row: MemoryRow; keys: string | undefined }) {
   const rowAs =
     <K extends MemoryRowKind>(kind: K) =>
     (): Extract<MemoryRow, { kind: K }> | undefined =>
@@ -88,7 +92,7 @@ function RowBody(props: { row: MemoryRow }) {
       <Match when={rowAs("date")()}>
         {(row) => <span class="kw-memory-title">{row().date}</span>}
       </Match>
-      <Match when={rowAs("inbox")()}>{(row) => <InboxRow row={row()} />}</Match>
+      <Match when={rowAs("inbox")()}>{(row) => <InboxRow row={row()} keys={props.keys} />}</Match>
       <Match when={rowAs("candidate")()}>{(row) => <CandidateRow row={row()} />}</Match>
       <Match when={rowAs("question")()}>{(row) => <QuestionRow row={row()} />}</Match>
       <Match when={rowAs("finish")()}>{(row) => <FinishRow row={row()} />}</Match>
@@ -166,7 +170,7 @@ function HitRow(props: { hit: MemoryQueryHit }) {
   );
 }
 
-function InboxRow(props: { row: Extract<MemoryRow, { kind: "inbox" }> }) {
+function InboxRow(props: { row: Extract<MemoryRow, { kind: "inbox" }>; keys: string | undefined }) {
   const view = () => props.row.view;
   return (
     <>
@@ -186,6 +190,13 @@ function InboxRow(props: { row: Extract<MemoryRow, { kind: "inbox" }> }) {
           )}
         </Show>
         <span class="kw-memory-fact">{relativeAge(props.row.item.created)}</span>
+        <Show when={props.keys}>
+          {(keys) => (
+            <span class="kw-memory-fact" data-fact="keys">
+              {keys()}
+            </span>
+          )}
+        </Show>
       </span>
     </>
   );

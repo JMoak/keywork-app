@@ -34,11 +34,11 @@ export function composerHold(standing: ServerStanding | undefined): string | und
 }
 
 export function backNotice(serverLabel: string): string {
-  return `keywork is back · ${serverLabel}`;
+  return `the server is back · ${serverLabel}`;
 }
 
 export function promptReturnedNotice(reason: string): string {
-  return `keywork didn't take that prompt · ${reason} · it's back in the composer`;
+  return `the server didn't take that prompt · ${reason} · it's back in the composer`;
 }
 
 function lostFor(failure: WorkspaceFailure, reattaching: boolean): ServerStanding {

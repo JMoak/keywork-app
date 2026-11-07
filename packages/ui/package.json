@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.tsx"
+    ".": "./src/index.tsx",
+    "./theme": "./src/theme/themes.ts",
+    "./bootstrap": "./src/bootstrap.tsx"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "screenshots": "playwright test --project screenshots",
+    "perf": "playwright test -c src/companion/e2e/playwright.config.ts --project perf",
     "screenshots:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
@@ -33,22 +36,25 @@
     "@fontsource-variable/jetbrains-mono": "5.3.0",
     "@fontsource-variable/source-serif-4": "5.3.1",
     "@keywork-app/client": "workspace:*",
+    "@keywork-app/habitat": "workspace:*",
     "@keywork-app/protocol": "workspace:*",
+    "@keywork-app/screen": "workspace:*",
     "@lezer/highlight": "1.2.5",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "6.0.0",
     "marked": "18.0.12",
     "solid-js": "1.9.15",
-    "zod": "4.5.4"
+    "zod": "4.5.4",
+    "@keywork-app/product": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.65.0",
     "@solidjs/testing-library": "0.8.10",
     "@tailwindcss/vite": "4.3.3",
     "happy-dom": "20.14.0",
     "tailwindcss": "4.3.3",
-    "vite": "7.3.6",
+    "vite": "8.3.6",
     "vite-plugin-solid": "2.11.14"
   }
 }

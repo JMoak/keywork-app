@@ -75,7 +75,7 @@ export function pastWindowLine(report: ContextReport): string | undefined {
   const past = fencesOf(report.thresholds).filter(({ at }) => at > report.window);
   if (past.length === 0) return undefined;
   const fences = past.map(({ fence, at }) => `${cellLabels[fence]} at ${formatTokens(at)}`);
-  return `${fences.join(", ")} · past the window · keywork measures the conversation only`;
+  return `${fences.join(", ")} · past the window · the server measures the conversation only`;
 }
 
 export function mapReadout(report: ContextReport): string {
@@ -91,7 +91,7 @@ export function partsReadout(parts: ContextParts): string {
 
 const largeWindow = 200_000;
 const reportedFrom = "from the usage the provider reported at the last turn";
-const estimatedFrom = "estimated from the text keywork sends";
+const estimatedFrom = "estimated from the text the server sends";
 
 interface PlacedFence {
   readonly fence: MapFence;

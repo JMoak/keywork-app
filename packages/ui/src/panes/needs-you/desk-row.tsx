@@ -5,14 +5,14 @@ import { arcHueRank, botNamed } from "../../chrome/identity.ts";
 import { hueStop } from "../../chrome/pane-frame.tsx";
 import { sessionName } from "../../chrome/session-name.ts";
 import { stampGlyph } from "../../chrome/stamp.ts";
+import { NeedsYouAnswers } from "../../companion/bubble.tsx";
 import {
   type ContextLevel,
   contextLevelOf,
   contextLevelOfReport,
 } from "../../instruments/context.ts";
 import { ContextGauge } from "../../instruments/gauge.tsx";
-import { type AskChords, type AskPick, answerLabel, askOffers } from "../../page/ask-card.tsx";
-import { askingWhy, reasonOffers, whyPrompt } from "../../page/ask-card-why.ts";
+import type { AskChords, AskPick } from "../../page/ask-card.tsx";
 import { NoteLine } from "../../page/note-line.tsx";
 import { askingRun } from "../../shell/answer-ask.ts";
 import { glossOf, kindMarks, type NeedsYouItem } from "../../shell/needs-you.ts";
@@ -85,7 +85,8 @@ export function DeskRowView(props: DeskRowProps) {
             <span class="kw-desk-line">{line()}</span>
             <Show when={!props.wording && asking()}>
               {(run) => (
-                <Answers
+                <NeedsYouAnswers
+                  placement="desk"
                   run={run()}
                   keys={props.keys}
                   onAnswer={(pick) => props.onAnswer(pick)}
@@ -156,51 +157,6 @@ function Wears(props: { theme: Theme }) {
         </For>
       </span>
       {props.theme.name}
-    </span>
-  );
-}
-
-interface AnswersProps {
-  run: ToolRun;
-  keys: AskChords;
-  onAnswer(pick: AskPick): void;
-  onReason(reason: DenyReason): void;
-}
-
-function Answers(props: AnswersProps) {
-  return (
-    <span class="kw-desk-answers">
-      <Show
-        when={askingWhy(props.run.callId)}
-        fallback={
-          <For each={askOffers(props.run)}>
-            {(offer) => (
-              <button
-                type="button"
-                class="kw-desk-answer"
-                data-tone={offer.choice.verdict === "denied" ? "deny" : "grant"}
-                onClick={() => props.onAnswer(offer.pick)}
-              >
-                {answerLabel(offer.choice)} <kbd>{props.keys[offer.pick]}</kbd>
-              </button>
-            )}
-          </For>
-        }
-      >
-        <span class="kw-desk-reason-prompt">{whyPrompt}</span>
-        <For each={reasonOffers}>
-          {(offer) => (
-            <button
-              type="button"
-              class="kw-desk-answer"
-              data-tone="deny"
-              onClick={() => props.onReason(offer.reason)}
-            >
-              {offer.label} <kbd>{offer.key}</kbd>
-            </button>
-          )}
-        </For>
-      </Show>
     </span>
   );
 }

@@ -12,7 +12,7 @@ import {
 import { postureStorageKey } from "../../posture/record.ts";
 import { createTrustSetup, type TrustSetup } from "../../posture/trust-setup.ts";
 import { inertFeed, inertTrust } from "../../shell/trust.test.ts";
-import { mountPane, overviewShell, rowTexts, settle } from "../overview/rows.test.tsx";
+import { mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { posturePane } from "./index.tsx";
 
@@ -118,7 +118,7 @@ describe("the trust setup pane", () => {
       "y accepts · n declines · a accepts the rest",
     );
     expect(container.querySelector(".kw-setup-reads")?.textContent).toBe(
-      "trusted reads · 1 command without an ask · fixed in keywork",
+      "trusted reads · 1 command without an ask · fixed in the engine",
     );
     expect(rowTexts(container)).toEqual([
       "bun install * every session",
@@ -145,7 +145,7 @@ describe("the trust setup pane", () => {
     await press(act, "posture.down", "posture.accept");
     expect(harness.facts.grants).toEqual(["workspace bash bun run *"]);
     expect(rowTexts(container)[1]).toBe("█ bun run * accepted");
-    expect(noticeOf(container)).toBe("accepted bun run * · keywork holds it for every session");
+    expect(noticeOf(container)).toBe("accepted bun run * · the server holds it for every session");
     expect(container.querySelector(".kw-ov-row[data-cursor] .kw-ov-name")?.textContent).toBe(
       "mcp filesystem__*",
     );
@@ -158,7 +158,7 @@ describe("the trust setup pane", () => {
     await press(act, "posture.down", "posture.down", "posture.accept");
     expect(harness.facts.grants).toEqual(["s1 mcp filesystem__*"]);
     expect(noticeOf(container)).toBe(
-      "accepted mcp filesystem__* · keywork holds it for this session",
+      "accepted mcp filesystem__* · the server holds it for this session",
     );
   });
 
@@ -191,7 +191,7 @@ describe("the trust setup pane", () => {
     await press(act, "posture.accept", "posture.up", "posture.decline");
     expect(rowTexts(container)[0]).toBe("█ bun install * accepted");
     expect(noticeOf(container)).toBe(
-      "keywork already holds bun install * · ctrl+k permissions.summon revokes it",
+      "the server already holds bun install * · ctrl+k permissions.summon revokes it",
     );
   });
 
@@ -232,7 +232,7 @@ describe("the trust setup pane", () => {
       "s1 mcp filesystem__*",
     ]);
     expect(noticeOf(container)).toBe(
-      "settled · 3 accepted · 0 declined · keywork holds every accepted rule",
+      "settled · 3 accepted · 0 declined · the server holds every accepted rule",
     );
   });
 

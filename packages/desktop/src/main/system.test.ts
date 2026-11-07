@@ -1,7 +1,15 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bundledBinary, keyworkTickets, launchableOf, spawnsThroughShell } from "./system.ts";
+import {
+  appRepoRoot,
+  bundledBinary,
+  keyworkTickets,
+  launchableOf,
+  siblingCheckout,
+  siblingKeyworkRepo,
+  spawnsThroughShell,
+} from "./system.ts";
 
 describe("system paths", () => {
   it("finds keywork's tickets for a workspace under the home directory, its own first", async () => {
@@ -22,6 +30,26 @@ describe("system paths", () => {
       "sidecar",
       "keywork",
     ]);
+  });
+});
+
+describe("the sibling checkout", () => {
+  const desktop = resolve("/src/stead/repos/keywork-app/packages/desktop");
+  const repoRoot = resolve("/src/stead/repos/keywork-app");
+
+  it("sits beside the app repo as ../keywork unless KEYWORK_REPO says otherwise, as check:contract finds it", () => {
+    expect(appRepoRoot(desktop)).toBe(repoRoot);
+    expect(siblingKeyworkRepo(repoRoot, {})).toBe(resolve("/src/stead/repos/keywork"));
+    expect(siblingKeyworkRepo(repoRoot, { KEYWORK_REPO: "/elsewhere/keywork" })).toBe(
+      resolve("/elsewhere/keywork"),
+    );
+  });
+
+  it("counts only when its CLI entry is on disk", async () => {
+    const root = resolve("/src/stead/repos/keywork");
+    const cli = join(root, "packages/cli/src/main.ts");
+    expect(await siblingCheckout(root, async (path) => path === cli)).toEqual({ root, cli });
+    expect(await siblingCheckout(root, async () => false)).toBeUndefined();
   });
 });
 

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { KeyworkClient } from "@keywork-app/client";
+import type { ConsoleClient } from "@keywork-app/client";
 import type { BusEnvelope, TreeListing } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,7 +8,7 @@ import treeRoot from "../../../../client/src/fixtures/tree-root.json?raw";
 import treeSrc from "../../../../client/src/fixtures/tree-src.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
-import { holdTypingFocus } from "../overview/rows.test.tsx";
+import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { browserPane, describeTreeRefusal, filterMissLine, markOf } from "./index.tsx";
 
@@ -36,7 +36,7 @@ function harness(): Harness {
       const listing = listings[path];
       return listing === undefined ? "missing" : listing;
     },
-  }) as unknown as KeyworkClient;
+  }) as unknown as ConsoleClient;
   const extras = inertShellExtras({ client, openPane: (spec) => void opened.push(spec) });
   extras.feed.subscribe = (listener) => {
     listeners.push(listener);

@@ -4,18 +4,22 @@ import type { ServerTheme, ThemesView } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import type { Theme } from "./schema.ts";
-import { gallery, keyworkDay, keyworkNight } from "./themes.ts";
+import {
+  formerWornThemeKey,
+  gallery,
+  keyworkDay,
+  keyworkNight,
+  systemBasisKey,
+  wornThemeKey,
+} from "./themes.ts";
 import {
   choicesOf,
   closetOf,
   createWardrobe,
-  formerWornThemeKey,
   resolveTheme,
-  systemBasisKey,
   type Wardrobe,
   type WardrobeOptions,
   wearRememberedTheme,
-  wornThemeKey,
 } from "./wardrobe.ts";
 
 const served = (

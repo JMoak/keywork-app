@@ -579,11 +579,11 @@ describe("the consequence on the card", () => {
     expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
   });
 
-  it("says in one dim line that keywork sent no preview, and keeps the arguments", () => {
+  it("says in one dim line that the server sent no preview, and keeps the arguments", () => {
     const { container } = mountCard(withoutPreview(askingRun("g4"), "edit"));
     expect(container.querySelector(".kw-ask-args")?.textContent).toContain("notes.txt");
     expect(container.querySelector(".kw-ask-unpreviewed")?.textContent).toBe(
-      "no preview from keywork · too large, binary, a memory note, or an edit that would not apply",
+      "no preview from the server · too large, binary, a memory note, or an edit that would not apply",
     );
     expect(container.querySelector(".kw-ask-diff")).toBeNull();
   });

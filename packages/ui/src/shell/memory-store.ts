@@ -19,6 +19,7 @@ import type {
   RevertReply,
   StagedItem,
 } from "@keywork-app/protocol";
+import { batch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { onReconnected } from "./surfaces-store.ts";
 
@@ -48,6 +49,7 @@ export interface AirlockIntents {
 
 export interface MemoryState {
   readonly garden: MemoryGarden;
+  readonly notes?: readonly MemoryNote[];
   readonly loaded: boolean;
   readonly revision: number;
   readonly inbox: InboxTally;
@@ -103,12 +105,14 @@ export function entryDecisionsIn(envelopes: Iterable<BusEnvelope>): [string, Mem
 export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): MemoryStore {
   const [state, setState] = createStore<{
     garden: MemoryGarden;
+    notes: MemoryNote[];
     loaded: boolean;
     revision: number;
     inbox: InboxTally;
     entryDecisions: Record<string, MemoryDecision>;
   }>({
     garden: structuredClone(inertGarden),
+    notes: [],
     loaded: false,
     revision: 0,
     inbox: { ...emptyInbox },
@@ -122,10 +126,17 @@ export function createMemoryStore(client: KeyworkClient, feed: ServerFeed): Memo
     if (changed) for (const listener of [...listeners]) listener(tally.count);
   };
 
+  const notesOf = async (garden: MemoryGarden): Promise<MemoryNote[]> =>
+    garden.trusted ? [...((await client.memoryNotes())?.notes ?? [])] : [];
+
   const refresh = async (): Promise<void> => {
     const garden = await client.memory();
-    setState("garden", reconcile(structuredClone(garden)));
-    setState("loaded", true);
+    const notes = await notesOf(garden);
+    batch(() => {
+      setState("garden", reconcile(structuredClone(garden)));
+      setState("notes", reconcile(structuredClone(notes)));
+      setState("loaded", true);
+    });
     setState("revision", (revision) => revision + 1);
     announce(inboxTallyOf(garden));
   };

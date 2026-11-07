@@ -57,6 +57,7 @@ export type FileState =
 
 export const filePane = definePane<FileSpec>({
   kind: "file",
+  heading: "in a file",
   spec: fileSpec,
   home: "main",
   attire: "work",

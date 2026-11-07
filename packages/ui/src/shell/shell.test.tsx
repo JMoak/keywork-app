@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { KeyworkClient } from "@keywork-app/client";
+import type { ConsoleClient, KeyworkClient } from "@keywork-app/client";
+import { steadProfile } from "@keywork-app/product";
 import type {
   BusEnvelope,
   ContextReport,
@@ -15,10 +16,7 @@ import { quietMark } from "../chrome/title-row.tsx";
 import { browserHost } from "../host/browser.ts";
 import { attireStorageKey, createAttire } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
-import { idleControlsClient } from "./controls-store.test.ts";
-import { inertMemoryClient } from "./memory-store.test.ts";
-import { emptySurfacesClient } from "./surfaces-store.test.ts";
-import { inertWorkspaceClient } from "./trust.test.ts";
+import { fakeClient } from "./client-testing.ts";
 
 afterEach(() => {
   cleanup();
@@ -55,8 +53,8 @@ interface AskedCommand {
 
 const deleteAsked: AskedCommand = { command: "rm -rf dist", rule: "rm -rf *" };
 
-function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?: string } = {}): {
-  client: KeyworkClient;
+function servedClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?: string } = {}): {
+  client: ConsoleClient;
   prompts: string[];
   aborts: string[];
   answers: string[];
@@ -83,9 +81,7 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
       else push(envelope);
     }
   };
-  const client: KeyworkClient = {
-    url: "http://127.0.0.1:4770",
-    document: async () => ({ version: "0.0.1", operationIds: [] }),
+  const client = fakeClient({
     sessions: async () => summaries,
     session: async (id) => (id === "s1" ? storedDetail : undefined),
     createSession: async () => {
@@ -108,31 +104,11 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
       aborts.push(id);
       return "aborted";
     },
-    inject: async () => "started",
-    entries: async () => undefined,
-    fork: async () => "missing",
-    labelEntry: async () => "missing",
-    moveLeaf: async () => "missing",
-    changes: async () => "missing",
-    ...inertMemoryClient(),
-    ...idleControlsClient(),
-    sendNow: async () => "missing",
-    moveQueued: async () => "missing",
-    cancelQueued: async () => "missing",
     setQuiet: async (id, on) => {
       if (!summaries.some((summary) => summary.id === id)) return "missing";
       emit([quietSwitched(id, on)]);
       return { quiet: on };
     },
-    spill: async () => "missing",
-    ...inertWorkspaceClient(),
-    ...emptySurfacesClient(),
-    changedFile: async () => "missing",
-    removeSession: async () => "missing",
-    listTrash: async () => [],
-    restoreSession: async () => "missing",
-    discardTrashedSession: async () => "missing",
-    purgeTrash: async () => ({ purged: 0 }),
     asks: async () => {
       const asked = options.asked ?? (options.pendingAsk ? deleteAsked : undefined);
       return asked === undefined
@@ -152,13 +128,6 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
       answers.push([callId, verdict, scope].filter((part) => part !== undefined).join(":"));
       return "settled" as const;
     },
-    permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
-    grantWorkspaceRule: async (rule) => ({ granted: rule }),
-    grantSessionRule: async (_sessionId, rule) => ({ granted: rule }),
-    revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
-    revokeSessionGrant: async (_sessionId, rule) => ({ revoked: rule }),
-    restoreTurn: async () => "missing",
-    previewRestore: async () => "missing",
     events: async function* (options) {
       options?.onOpen?.();
       for (;;) {
@@ -176,7 +145,7 @@ function fakeClient(options: { pendingAsk?: boolean; asked?: AskedCommand; arc?:
         });
       }
     },
-  };
+  });
   return { client, prompts, aborts, answers, emit };
 }
 
@@ -185,6 +154,22 @@ async function openTyped(path: string): Promise<void> {
   fireEvent.input(input, { target: { value: path } });
   fireEvent.submit(input.closest("form") as HTMLFormElement);
 }
+
+async function openWorkspace(path: string): Promise<void> {
+  await openTyped(path);
+  await screen.findByText("It printed served.");
+}
+
+const conversationOnlyLayout = JSON.stringify({
+  layout: {
+    version: 1,
+    tree: { kind: "leaf", id: "conversation-1" },
+    focused: "conversation-1",
+  },
+  specs: { "conversation-1": { kind: "conversation", sessionId: "s1" } },
+});
+
+const steadSummonedKey = "keywork.stead-summoned:C:/work";
 
 function press(key: string, modifiers: Partial<KeyboardEventInit> = {}): void {
   fireEvent.keyDown(document.body, { key, bubbles: true, ...modifiers });
@@ -224,12 +209,73 @@ function hostWithServer() {
 }
 
 describe("the app shell", () => {
-  it("opens a workspace, lists sessions, replays stored history, and streams live turns", async () => {
-    const fake = fakeClient();
+  it("starts in the session view and opens the optional Stead pane on request", async () => {
+    const fake = servedClient();
     render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    await openWorkspace("C:/work");
     await screen.findByText("run echo served", { selector: ".kw-tree-name" });
-    await screen.findByText("It printed served.");
+    expect(frameNamed("run echo served")?.dataset.focused).toBe("");
+    expect(frameNamed("stead")).toBeUndefined();
+    expect(screen.getByLabelText("prompt")).toBeTruthy();
+
+    pressLeader("0");
+    await waitFor(() => expect(frameNamed("stead")?.dataset.focused).toBe(""));
+    expect(frameNamed("run echo served")).toBeDefined();
+    expect(slotLeft(frameNamed("stead"))).toBeGreaterThan(slotLeft(frameNamed("sessions")));
+  });
+
+  it("restores a saved Keywork layout without summoning Stead for an empty creature list", async () => {
+    localStorage.setItem("keywork.layout:C:/work", conversationOnlyLayout);
+    const fake = servedClient();
+    const client = { ...fake.client, creatures: async () => [] };
+    render(() => <App host={hostWithServer()} connect={() => client} />);
+    await openWorkspace("C:/work");
+    await settle();
+    expect(frameNamed("stead")).toBeUndefined();
+    expect(localStorage.getItem(steadSummonedKey)).toBeNull();
+    expect(localStorage.getItem("keywork.layout:C:/work")).toBe(conversationOnlyLayout);
+  });
+
+  it("selects Stead explicitly and keeps its creature-first layout separate from Keywork", async () => {
+    localStorage.setItem("keywork.layout:C:/work", conversationOnlyLayout);
+    const fake = servedClient();
+    render(() => (
+      <App profile={steadProfile} host={hostWithServer()} connect={() => fake.client} />
+    ));
+    expect(screen.getByRole("heading", { name: "stead" })).toBeTruthy();
+    await openTyped("C:/work");
+    await waitFor(() => expect(frameNamed("stead")?.dataset.focused).toBe(""));
+    await screen.findByText("run echo served", { selector: ".kw-tree-name" });
+    expect(frameNamed("run echo served")).toBeUndefined();
+    expect(localStorage.getItem("stead.layout:C:/work")).toContain('"kind":"stead"');
+    expect(localStorage.getItem("keywork.layout:C:/work")).toBe(conversationOnlyLayout);
+  });
+
+  it("summons Stead once for a restored Stead layout without creatures", async () => {
+    localStorage.setItem("stead.layout:C:/work", conversationOnlyLayout);
+    const fake = servedClient();
+    const client = { ...fake.client, creatures: async () => [] };
+    const mount = () =>
+      render(() => <App profile={steadProfile} host={hostWithServer()} connect={() => client} />);
+    const first = mount();
+    await openTyped("C:/work");
+    await waitFor(() => expect(frameNamed("stead")?.dataset.focused).toBe(""));
+    const record = localStorage.getItem(steadSummonedKey);
+    expect(record).toMatch(/"summonedAt":"\d{4}-/);
+
+    first.unmount();
+    localStorage.setItem("stead.layout:C:/work", conversationOnlyLayout);
+    mount();
+    await openWorkspace("C:/work");
+    await settle();
+    expect(frameNamed("stead")).toBeUndefined();
+    expect(localStorage.getItem(steadSummonedKey)).toBe(record);
+  });
+
+  it("opens a workspace, lists sessions, replays stored history, and streams live turns", async () => {
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     expect(screen.getByText("bash echo served", { selector: ".kw-tool-span" })).toBeTruthy();
 
     const later = toolStream.map((envelope) => ({
@@ -245,10 +291,9 @@ describe("the app shell", () => {
   });
 
   it("sends the composer's prompt and interrupt to the server", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
     input.value = "hello there";
     fireEvent.input(input);
@@ -259,9 +304,9 @@ describe("the app shell", () => {
   });
 
   it("restores a pending ask from the server and answers it with the approve chord", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const card = await screen.findByRole("group", { name: "permission ask" });
     expect(card.textContent).toContain("rm -rf dist");
     expect(card.textContent).toContain("rm -rf *");
@@ -270,10 +315,9 @@ describe("the app shell", () => {
   });
 
   it("lets the ask card take the keys from a composer that just sent its prompt", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
     input.focus();
     input.value = "run echo served";
@@ -289,9 +333,9 @@ describe("the app shell", () => {
   });
 
   it("answers for the workspace with the global chord while a draft holds the composer", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const card = await screen.findByRole("group", { name: "permission ask" });
     expect(card.textContent).toContain("alt+w");
     const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
@@ -304,7 +348,7 @@ describe("the app shell", () => {
   });
 
   it("offers to restore the session a pane shows when the server moves it to the trash", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const restored: string[] = [];
     const client: KeyworkClient = {
       ...fake.client,
@@ -313,9 +357,8 @@ describe("the app shell", () => {
         return (await fake.client.sessions())[0] ?? "missing";
       },
     };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     fake.emit([
       {
         id: 200,
@@ -334,7 +377,7 @@ describe("the app shell", () => {
   });
 
   it("empties the trash from the sessions pane with shift+d behind a confirm", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const leftover: SessionSummary = {
       id: "s9",
       title: "old spike",
@@ -353,9 +396,8 @@ describe("the app shell", () => {
         return { purged: purges.at(-1) ?? 0 };
       },
     };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("t");
     await waitFor(() => expect(frameNamed("sessions")?.dataset.focused).toBe(""));
     press("D", { shiftKey: true });
@@ -382,8 +424,8 @@ describe("the app shell", () => {
         specs: { "conversation-1": { kind: "conversation", sessionId: "never-prompted" } },
       }),
     );
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openTyped("C:/work");
     await screen.findByText(/the session this pane showed is gone from the server/);
     const input = (await screen.findByLabelText("prompt")) as HTMLTextAreaElement;
@@ -395,10 +437,9 @@ describe("the app shell", () => {
 
   it("dresses a conversation in its arc's theme while the house panes keep the window's", async () => {
     wearOnArcBeforeRender("C:/work", "pricing", "nord");
-    const fake = fakeClient({ arc: "pricing" });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient({ arc: "pricing" });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     await waitFor(() => expect(frameNamed("run echo served")?.dataset.theme).toBe("nord"));
     expect(frameNamed("run echo served")?.dataset.attire).toBe("arc");
     expect(frameNamed("sessions")?.dataset.attire).toBeUndefined();
@@ -406,10 +447,9 @@ describe("the app shell", () => {
   });
 
   it("tags a conversation's title row with its arc while the sessions pane carries none", async () => {
-    const fake = fakeClient({ arc: "pricing" });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient({ arc: "pricing" });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const conversation = frameNamed("run echo served");
     await waitFor(() =>
       expect(conversation?.querySelector(".kw-frame-arc")?.textContent).toBe("#pricing"),
@@ -418,10 +458,9 @@ describe("the app shell", () => {
   });
 
   it("marks the focused pane with the leader and shows the mark in its title row", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("b");
     const conversation = frameNamed("run echo served");
     await waitFor(() => expect(conversation?.querySelector(".kw-frame-mark")).toBeTruthy());
@@ -430,9 +469,9 @@ describe("the app shell", () => {
   });
 
   it("quiets the focused session with the leader, marks its title row, and keeps approve to once", async () => {
-    const fake = fakeClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    const fake = servedClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const card = await screen.findByRole("group", { name: "permission ask" });
     expect(card.textContent).toContain("once ctrl+y");
     pressLeader("S", { shiftKey: true });
@@ -454,9 +493,9 @@ describe("the app shell", () => {
   });
 
   it("still approves once from anywhere in a quiet session", async () => {
-    const fake = fakeClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    const fake = servedClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     await screen.findByRole("group", { name: "permission ask" });
     pressLeader("S", { shiftKey: true });
     await waitFor(() =>
@@ -467,9 +506,9 @@ describe("the app shell", () => {
   });
 
   it("lets a delete in a quiet session stop and approve only once by default", async () => {
-    const fake = fakeClient({ asked: { command: "rm -rf dist", rule: "rm -rf dist" } });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
+    const fake = servedClient({ asked: { command: "rm -rf dist", rule: "rm -rf dist" } });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const card = await screen.findByRole("group", { name: "permission ask" });
     pressLeader("S", { shiftKey: true });
     await waitFor(() =>
@@ -481,7 +520,7 @@ describe("the app shell", () => {
   });
 
   it("brings the session back with the same chord and offers the revoke for the grants it left", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const held = { action: "bash", resource: "rm -rf dist", effect: "allow" as const };
     const revoked: string[] = [];
     const client: KeyworkClient = {
@@ -497,9 +536,8 @@ describe("the app shell", () => {
         return { revoked: rule };
       },
     };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("S", { shiftKey: true });
     await waitFor(() =>
       expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")).toBeTruthy(),
@@ -520,10 +558,9 @@ describe("the app shell", () => {
   });
 
   it("asks for a focused session before going quiet", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     press("1", { altKey: true });
     pressLeader("S", { shiftKey: true });
     await screen.findByText("no session is focused · quiet is kept per session");
@@ -531,10 +568,9 @@ describe("the app shell", () => {
   });
 
   it("retargets the open themes pane to the focused pane and wears the theme there alone", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("F", { shiftKey: true });
     await waitFor(() => expect(frameNamed("themes")?.dataset.focused).toBe(""));
     expect(themesHead()).toContain("the window");
@@ -555,14 +591,14 @@ describe("the app shell", () => {
   });
 
   it("says why when the server answers the open but its sessions cannot be read", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const failing: KeyworkClient = {
       ...fake.client,
       sessions: async () => {
         throw new Error("GET /sessions answered 500");
       },
     };
-    render(() => <App host={hostWithServer()} connect={() => failing} />);
+    render(() => <App host={hostWithServer()} connect={() => failing as ConsoleClient} />);
     await openTyped("C:/work");
     await screen.findByText("could not open C:/work · GET /sessions answered 500");
     expect(screen.queryByText(/starting keywork in/)).toBeNull();
@@ -576,7 +612,7 @@ describe("the app shell", () => {
         throw new Error("Error invoking remote method 'host:open-workspace'");
       },
     };
-    render(() => <App host={host} connect={() => fakeClient().client} />);
+    render(() => <App host={host} connect={() => servedClient().client} />);
     fireEvent.click(await screen.findByText("C:/work"));
     await screen.findByText(
       "could not open C:/work · Error invoking remote method 'host:open-workspace'",
@@ -585,7 +621,7 @@ describe("the app shell", () => {
   });
 
   it("shows the host's failure text when a workspace cannot open", async () => {
-    render(() => <App host={browserHost()} connect={() => fakeClient().client} />);
+    render(() => <App host={browserHost()} connect={() => servedClient().client} />);
     await openTyped("C:/work");
     await screen.findByText(/no server/);
   });
@@ -593,8 +629,8 @@ describe("the app shell", () => {
 
 describe("the needs-you flow", () => {
   it("lifts a waiting ask into the strip, and leader n hands its card the keys while leader shift+n goes back", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openTyped("C:/work");
     await waitFor(() =>
       expect(stripText()).toBe("█1 needs youask: rm -rf dist(run echo served)ctrl+k n"),
@@ -617,10 +653,9 @@ describe("the needs-you flow", () => {
   });
 
   it("says so when nothing waits and there is no jump to return from", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("n");
     await screen.findByText("nothing needs you", { selector: ".kw-status-notice" });
     pressLeader("N", { shiftKey: true });
@@ -630,8 +665,8 @@ describe("the needs-you flow", () => {
   });
 
   it("summons the desk on leader q, collapses the strip to its count, and jumps from a row", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openTyped("C:/work");
     await waitFor(() => expect(stripText()).toContain("ask: rm -rf dist"));
 
@@ -648,8 +683,8 @@ describe("the needs-you flow", () => {
   });
 
   it("answers the waiting ask from the desk with the card's keys, and the desk clears", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openTyped("C:/work");
     await waitFor(() => expect(stripText()).toContain("ask: rm -rf dist"));
 
@@ -672,10 +707,9 @@ describe("the needs-you flow", () => {
   });
 
   it("brings a session back to the desk when it moves unseen, and reads it once visited", async () => {
-    const fake = fakeClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    const fake = servedClient();
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     pressLeader("q");
     await waitFor(() => expect(frameNamed("desk")?.dataset.focused).toBe(""));
     expect(backOnTheDesk()).toEqual([]);
@@ -694,8 +728,8 @@ describe("the needs-you flow", () => {
   });
 
   it("hides the strip from the palette and remembers that across launches", async () => {
-    const fake = fakeClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client} />);
+    const fake = servedClient({ pendingAsk: true });
+    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openTyped("C:/work");
     await waitFor(() => expect(stripText()).toContain("1 needs you"));
     runCommand("needs-you-strip");
@@ -705,9 +739,9 @@ describe("the needs-you flow", () => {
 
     cleanup();
     render(() => (
-      <App host={hostWithServer()} connect={() => fakeClient({ pendingAsk: true }).client} />
+      <App host={hostWithServer()} connect={() => servedClient({ pendingAsk: true }).client} />
     ));
-    await openTyped("C:/work");
+    await openWorkspace("C:/work");
     await screen.findByRole("group", { name: "permission ask" });
     expect(document.querySelector(".kw-needs-you")).toBeNull();
     runCommand("needs-you-strip");
@@ -717,11 +751,14 @@ describe("the needs-you flow", () => {
 
 describe("the context map", () => {
   it("maps the focused session on leader shift+g, docked beside it, and closes on escape", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const client = { ...fake.client, context: async () => recordedContext };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
+    await openWorkspace("C:/work");
+    pressLeader("0");
+    await waitFor(() => expect(frameNamed("stead")?.dataset.focused).toBe(""));
+    pressLeader("x");
+    await waitFor(() => expect(frameNamed("run echo served")?.dataset.focused).toBe(""));
     pressLeader("G", { shiftKey: true });
     await waitFor(() => expect(frameNamed("context")?.dataset.focused).toBe(""));
     const map = frameNamed("context") as HTMLElement;
@@ -738,7 +775,7 @@ describe("the context map", () => {
   });
 
   it("opens from the conversation's gauge and the palette, and compacts with c", async () => {
-    const fake = fakeClient();
+    const fake = servedClient();
     const compacted: string[] = [];
     const client = {
       ...fake.client,
@@ -748,9 +785,8 @@ describe("the context map", () => {
         return { compacted: null, notices: [] };
       },
     };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openTyped("C:/work");
-    await screen.findByText("It printed served.");
+    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
+    await openWorkspace("C:/work");
     const gauge = await waitFor(() => {
       const button = frameNamed("run echo served")?.querySelector(".kw-frame-gauge");
       expect(button).toBeTruthy();
@@ -772,6 +808,8 @@ describe("the context map", () => {
 function slotLeft(frame: HTMLElement | undefined): number {
   return Number.parseFloat((frame?.closest(".kw-slot") as HTMLElement | null)?.style.left ?? "");
 }
+
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 function stripText(): string | undefined {
   return document.querySelector(".kw-needs-you")?.textContent ?? undefined;

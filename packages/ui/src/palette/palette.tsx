@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import type { LiveKeys } from "../keys/live.ts";
-import type { PaneKind } from "../panes/index.ts";
+import { definitionOf, type PaneKind, paneRegistry } from "../panes/index.ts";
 import { type CommandRegistry, fuzzyMatches } from "./commands.ts";
 import {
   argumentOf,
@@ -224,7 +224,7 @@ export function helpSections(
   return [
     { heading: "anywhere", rows: boundRows(keys, help, everywhere) },
     ...[...byPane].map(([kind, actions]) => ({
-      heading: paneHeadings[kind],
+      heading: definitionOf(kind).heading,
       rows: boundRows(keys, help, actions),
     })),
     { heading: "in the prompt", rows: composerKeys },
@@ -331,29 +331,10 @@ interface BoundRow {
   readonly help: string;
 }
 
-const paneHeadings: Readonly<Record<PaneKind, string>> = {
-  conversation: "in a session pane",
-  tree: "in sessions",
-  "needs-you": "on the desk",
-  diff: "in changes",
-  context: "in the context map",
-  memory: "in memory",
-  terminal: "in a terminal",
-  file: "in a file",
-  browser: "in files",
-  permissions: "in permissions",
-  posture: "in trust setup",
-  themes: "in themes",
-  bots: "in bots",
-  arcs: "in arcs",
-  workspaces: "in workspaces",
-  mcp: "in mcp",
-};
-
 const ordinalAction = /^focus\.pane\d$/;
 
 function isPaneKind(scope: string): scope is PaneKind {
-  return Object.hasOwn(paneHeadings, scope);
+  return paneRegistry.has(scope as PaneKind);
 }
 
 function boundRows(

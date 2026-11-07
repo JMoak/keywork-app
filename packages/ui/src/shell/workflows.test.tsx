@@ -1,13 +1,12 @@
-import type { KeyworkClient } from "@keywork-app/client";
-import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
+import type { ConsoleClient } from "@keywork-app/client";
+import type { SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
-import { idleControlsClient } from "./controls-store.test.ts";
-import { inertMemoryClient } from "./memory-store.test.ts";
-import { emptySurfacesClient } from "./surfaces-store.test.ts";
-import { inertWorkspaceClient } from "./trust.test.ts";
+import { fakeClient } from "./client-testing.ts";
+import { createTiler, refusalNotices } from "./tiler.ts";
 
 afterEach(() => {
   cleanup();
@@ -26,13 +25,10 @@ function type(text: string): void {
 
 const prompts: Array<[string, string]> = [];
 
-function quietClient(): KeyworkClient {
+function quietClient(): ConsoleClient {
   const summaries: SessionSummary[] = [];
-  return {
-    url: "http://127.0.0.1:4770",
-    document: async () => ({ version: "0.0.1", operationIds: [] }),
+  return fakeClient({
     sessions: async () => summaries,
-    session: async () => undefined,
     createSession: async () => {
       const created: SessionSummary = {
         id: `s${summaries.length + 1}`,
@@ -48,41 +44,7 @@ function quietClient(): KeyworkClient {
       prompts.push([id, text]);
       return "started";
     },
-    abort: async () => "idle",
-    events: async function* (): AsyncIterable<BusEnvelope> {
-      await new Promise(() => undefined);
-    },
-    inject: async () => "started",
-    entries: async () => undefined,
-    fork: async () => "missing",
-    labelEntry: async () => "missing",
-    moveLeaf: async () => "missing",
-    changes: async () => "missing",
-    ...inertMemoryClient(),
-    ...idleControlsClient(),
-    sendNow: async () => "missing",
-    moveQueued: async () => "missing",
-    cancelQueued: async () => "missing",
-    setQuiet: async () => "missing",
-    spill: async () => "missing",
-    ...emptySurfacesClient(),
-    ...inertWorkspaceClient(),
-    changedFile: async () => "missing",
-    removeSession: async () => "missing",
-    listTrash: async () => [],
-    restoreSession: async () => "missing",
-    discardTrashedSession: async () => "missing",
-    purgeTrash: async () => ({ purged: 0 }),
-    asks: async () => [],
-    answerAsk: async () => "settled" as const,
-    permissions: async () => ({ trusted: false, bundle: [], workspace: [], session: {} }),
-    grantWorkspaceRule: async (rule) => ({ granted: rule }),
-    grantSessionRule: async (_sessionId, rule) => ({ granted: rule }),
-    revokeWorkspaceGrant: async (rule) => ({ revoked: rule }),
-    revokeSessionGrant: async (_sessionId, rule) => ({ revoked: rule }),
-    restoreTurn: async () => "missing",
-    previewRestore: async () => "missing",
-  };
+  });
 }
 
 function press(key: string, modifiers: Partial<KeyboardEventInit> = {}): void {
@@ -132,6 +94,27 @@ describe("keyboard workflows", () => {
     press("x");
     await waitFor(() => expect(frames()).toHaveLength(2));
     expect(focusedName()).toBe("new session");
+  });
+
+  it("summons the changes pane for the session whose composer holds the keyboard", async () => {
+    await openWorkspace();
+    press("k", { ctrlKey: true });
+    press("s");
+    await waitFor(() => expect(focusedName()).toBe("session 1"));
+    const composer = document.querySelector(
+      ".kw-frame[data-focused] .kw-composer-input",
+    ) as HTMLTextAreaElement;
+    press("1", { altKey: true });
+    expect(focusedName()).toBe("sessions");
+
+    composer.focus();
+    expect(focusedName()).toBe("session 1");
+
+    press("k", { ctrlKey: true });
+    press("g");
+    await waitFor(() => expect(focusedName()).toBe("changes"));
+    const saved = JSON.parse(localStorage.getItem("keywork.layout:C:/work") ?? "{}");
+    expect(saved.specs["diff-1"]).toEqual({ kind: "diff", sessionId: "s1" });
   });
 
   it("lets a text burst on an armed leader fall through without firing verbs", async () => {
@@ -195,7 +178,77 @@ describe("keyboard workflows", () => {
     await waitFor(() => expect(screen.queryByLabelText("palette")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(composer()));
   });
+  it("says the tiler's no-room sentence in the status line when a chord summons a pane nothing can hold", async () => {
+    await openWorkspace();
+    await fillTheMain();
+    const open = frames().length;
+    press("k", { ctrlKey: true });
+    press("B", { shiftKey: true });
+    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
+    expect(frames()).toHaveLength(open);
+  });
+
+  it("says the same sentence when the palette summons a pane nothing can hold", async () => {
+    await openWorkspace();
+    await fillTheMain();
+    const open = frames().length;
+    press("p", { ctrlKey: true, shiftKey: true });
+    const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
+    palette.value = "/chores";
+    fireEvent.input(palette);
+    fireEvent.keyDown(palette, { key: "Enter" });
+    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
+    expect(frames()).toHaveLength(open);
+  });
+
+  it("focuses the optional Stead pane on both its first and subsequent summons", async () => {
+    await openWorkspace();
+    expect(focusedName()).toBe("new session");
+    expect(frames()).toHaveLength(2);
+    press("k", { ctrlKey: true });
+    press("0");
+    await waitFor(() => expect(focusedName()).toBe("stead"));
+    expect(frames()).toHaveLength(3);
+
+    press("2", { altKey: true });
+    expect(focusedName()).toBe("new session");
+    const composer = document.querySelector(
+      ".kw-frame[data-focused] .kw-composer-input",
+    ) as HTMLTextAreaElement;
+    composer.focus();
+    expect(document.activeElement).toBe(composer);
+    press("k", { ctrlKey: true });
+    press("0");
+    await waitFor(() => expect(focusedName()).toBe("stead"));
+    expect(frames()).toHaveLength(3);
+    await waitFor(() => expect(document.activeElement?.closest(".kw-stead")).not.toBeNull());
+    expect(document.activeElement).not.toBe(composer);
+  });
 });
+
+const noticeText = (): string | undefined =>
+  document.querySelector(".kw-status-notice")?.textContent ?? undefined;
+
+async function fillTheMain(): Promise<void> {
+  const room = createRoot((dispose) => {
+    const tiler = createTiler();
+    const screenOfTheApp = { width: 1280, height: 800 };
+    tiler.summon({ kind: "tree" }, screenOfTheApp);
+    tiler.open({ kind: "conversation" }, screenOfTheApp);
+    let fitted = 0;
+    while (tiler.open({ kind: "conversation", sessionId: `fit-${fitted}` }, screenOfTheApp).ok) {
+      fitted += 1;
+    }
+    dispose();
+    return fitted;
+  });
+  for (let split = 0; split < room; split++) {
+    const open = frames().length;
+    press("k", { ctrlKey: true });
+    press("s");
+    await waitFor(() => expect(frames()).toHaveLength(open + 1));
+  }
+}
 
 function pointer(type: string, target: EventTarget, x: number, y: number): void {
   target.dispatchEvent(

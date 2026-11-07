@@ -34,7 +34,7 @@ export interface Tiler {
   focused(): PaneId | undefined;
   focusedSpec(): PaneSpec | undefined;
   open(spec: PaneSpec, screen: Screen): Verdict;
-  summon(spec: PaneSpec, screen: Screen): Verdict;
+  summon(spec: PaneSpec, screen: Screen, argument?: string): Verdict;
   bind(id: PaneId, spec: PaneSpec): void;
   close(id: PaneId): Verdict;
   closeFocused(): Verdict;
@@ -99,6 +99,14 @@ export function createTiler(restored?: TilerState): Tiler {
     return touched(verdict);
   };
 
+  const showing = (wanted: PaneSpec): PaneId | undefined =>
+    layout.panes().find((id) => summonFinds(specs.get(id), wanted));
+
+  const newestOfKind = (kind: PaneKind): PaneId | undefined =>
+    [layout.focused(), ...layout.recentlyFocused(), ...layout.panes()].find(
+      (id) => id !== undefined && specs.get(id)?.kind === kind,
+    );
+
   return {
     version,
     layout,
@@ -139,11 +147,12 @@ export function createTiler(restored?: TilerState): Tiler {
       return id === undefined ? undefined : specs.get(id);
     },
     open,
-    summon: (spec, screen) => {
-      if (definitionOf(spec.kind).home === "main") return open(spec, screen);
-      const existing = layout.panes().find((id) => specs.get(id)?.kind === spec.kind);
+    summon: (spec, screen, argument) => {
+      const named = argument !== undefined && argument.trim() !== "";
+      const existing = showing(spec) ?? (named ? newestOfKind(spec.kind) : undefined);
       if (existing === undefined) return open(spec, screen);
-      if (summonRetargets(spec)) bind(existing, spec);
+      if (named || summonRetargets(spec) || followsAnotherSession(specs.get(existing), spec))
+        bind(existing, spec);
       return touched(layout.focus(existing));
     },
     bind,
@@ -234,8 +243,32 @@ function revive(layout: Layout, specs: Map<PaneId, PaneSpec>, state: TilerState)
   }
 }
 
+function summonFinds(shown: PaneSpec | undefined, wanted: PaneSpec): boolean {
+  if (shown === undefined || shown.kind !== wanted.kind) return false;
+  return definitionOf(wanted.kind).home !== "main" || sameSpec(shown, wanted);
+}
+
+function sameSpec(a: PaneSpec, b: PaneSpec): boolean {
+  return JSON.stringify(definedEntries(a)) === JSON.stringify(definedEntries(b));
+}
+
+function definedEntries(spec: PaneSpec): [string, unknown][] {
+  return Object.entries(spec)
+    .filter(([, value]) => value !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
+}
+
 function summonRetargets(spec: PaneSpec): boolean {
   return definitionOf(spec.kind).summon?.variants !== undefined;
+}
+
+function followsAnotherSession(shown: PaneSpec | undefined, wanted: PaneSpec): boolean {
+  const wantedSession = sessionNamed(wanted);
+  return wantedSession !== undefined && sessionNamed(shown) !== wantedSession;
+}
+
+function sessionNamed(spec: PaneSpec | undefined): string | undefined {
+  return spec !== undefined && "sessionId" in spec ? spec.sessionId : undefined;
 }
 
 function explained(verdict: Verdict, noRoom: string): Verdict {

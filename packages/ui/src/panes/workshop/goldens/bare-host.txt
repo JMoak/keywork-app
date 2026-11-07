@@ -1,0 +1,24 @@
+workshop · wren
+bare host · running · up · raised 2026-11-05 09:00
+  ▸ bare host: no VM boundary, no egress policy and no credential proxy; brokered credentials appear only as sentinels
+  ▸ commands run unconfined: windows has no sandbox keywork can use
+  ▸ to seal it: install the sbx CLI (on Windows, turn on Windows Hypervisor Platform first), then raise the workshop again
+display
+  no display · a bare host workshop has none
+terminal
+  2 threads of wren in the workshop · t mirrors the newest bash
+  working    fix the flaky trash test      11:58
+  idle       docs index                    11:35 (25m ago)
+  typing into the workshop is not served by this node yet · the mirror shows the engine's own bash in it
+files
+  C:\Users\keeper\.keywork\state\workshops\wren-0a1b2c\home
+  f opens it in your file browser
+egress
+  none · a bare host has no egress policy
+brokers
+  anthropic · names only; the values stay on the node and the workshop sees sentinels
+disk and memory
+  disk     not reported by this node
+  memory   not reported by this node
+  threads  2
+  cost     0.42 USD

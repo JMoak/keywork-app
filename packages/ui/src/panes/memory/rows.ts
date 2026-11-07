@@ -302,7 +302,7 @@ function stagedWriteView(item: StagedWrite): InboxView {
     group: "staged",
     title: item.target,
     provenance: "untrusted",
-    detail: item.kind,
+    detail: item.source === undefined ? item.kind : `${item.kind} from ${item.source}`,
     ...(item.kind === "note" && { note: noteNameOf(item.target) }),
   };
 }

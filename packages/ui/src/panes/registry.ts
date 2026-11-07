@@ -1,12 +1,14 @@
-import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
 import type { TitleBot } from "../chrome/identity.ts";
 import type { LifecycleState } from "../chrome/pane-frame.tsx";
+import type { CompanionController } from "../companion/floating.ts";
 import type { HostPort } from "../host/port.ts";
 import type { ContextLevel } from "../instruments/context.ts";
 import type { BindingSpec } from "../keys/keymap.ts";
 import type { DockSide, PaneId } from "../layout/index.ts";
+import type { OnboardingController } from "../onboarding/controller.ts";
 import type { ArgumentChoice, CommandRegistry } from "../palette/commands.ts";
 import type { TrustSetup } from "../posture/trust-setup.ts";
 import type { NeedsYouItem } from "../shell/needs-you.ts";
@@ -19,6 +21,8 @@ import type { SessionStore } from "../shell/session-store.ts";
 import type { TrustFlow } from "../shell/trust.ts";
 import type { Attire, Outfit } from "../theme/attire.ts";
 import type { Wardrobe } from "../theme/wardrobe.ts";
+import type { CreatureNames } from "./creature/names.ts";
+import type { SteadHomeScope } from "./stead/home-scope.ts";
 
 export type PaneHome = "main" | DockSide;
 
@@ -30,6 +34,7 @@ export interface PaneSpecBase {
 
 export interface PaneDefinition<Spec extends PaneSpecBase> {
   readonly kind: Spec["kind"];
+  readonly heading: string;
   readonly spec: z.ZodType<Spec>;
   readonly home: PaneHome;
   readonly attire: PaneAttire;
@@ -67,6 +72,7 @@ export interface PaneLocalAction {
 
 export interface ActionCommand {
   readonly name: string;
+  readonly label?: string;
   readonly description: string;
   readonly aliases?: readonly string[];
   readonly argument?: ActionArgument;
@@ -131,6 +137,13 @@ export interface SessionIntents {
 }
 
 export interface ShellSeams {
+  readonly steadHome?: SteadHomeScope | undefined;
+  readonly prepareSteadHome?: ((retry?: boolean) => void) | undefined;
+  readonly steadHomeFailure?: string | undefined;
+  currentIdeSession?(): string | undefined;
+  readonly companion?: CompanionController;
+  readonly onboarding?: OnboardingController;
+  readonly creatureNames?: CreatureNames;
   readonly store: SessionStore;
   readonly keys: KeyHints;
   readonly sessions: SessionIntents;
@@ -140,7 +153,7 @@ export interface ShellSeams {
   focusedPane(): PaneId | undefined;
   rebind<Spec extends PaneSpecBase>(paneId: PaneId, spec: Spec): void;
   unseen(view: PaneView<PaneSpecBase>, completed: number): boolean;
-  readonly client: KeyworkClient;
+  readonly client: ConsoleClient;
   readonly feed: ServerFeed;
   readonly trust: TrustFlow;
   readonly trustSetup?: TrustSetup;

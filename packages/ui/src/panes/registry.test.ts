@@ -7,6 +7,13 @@ import { Keymap } from "../keys/keymap.ts";
 import { CommandRegistry } from "../palette/commands.ts";
 import { ratchetValue } from "../shell/frame-tick-ratchets.ts";
 import { paneActions, paneDefinitions, paneRegistry, parsePaneSpec } from "./index.ts";
+import {
+  checkPaneDefinition,
+  chordsIn,
+  emptyStateMinWidthPx,
+  markedKeys,
+  narrowPanePx,
+} from "./testing.ts";
 
 const keymap = keymapFromConfig();
 const keys = {
@@ -115,6 +122,10 @@ describe("the pane inventory", () => {
     }
   });
 
+  it("passes checkPaneDefinition for every registered pane, as each pane's own test does", () => {
+    for (const definition of paneRegistry.values()) checkPaneDefinition(definition);
+  });
+
   it("binds every pane-local action to its own kind and keeps the table collision-free", () => {
     for (const [name, action] of Object.entries(paneActions)) {
       if (action.scope === undefined) continue;
@@ -123,24 +134,6 @@ describe("the pane inventory", () => {
     expect(() => new Keymap({ bindings: keymapBindings(), scopes: actionScopes })).not.toThrow();
   });
 });
-
-const narrowPanePx = 320;
-const emptyStatePaddingPx = 2 * 20;
-const widestMonoAdvancePx = 0.6 * 16;
-
-const markedKeys = {
-  chord: (action: string) => `⟦${action}⟧`,
-  leader: () => "⟦leader⟧",
-};
-
-function chordsIn(text: string): string[] {
-  return Array.from(text.matchAll(/⟦([^⟧]+)⟧/g), (match) => match[1] ?? "");
-}
-
-function emptyStateMinWidthPx(line: string): number {
-  const longestRun = Math.max(...line.split(/\s+/).map((run) => [...run].length));
-  return emptyStatePaddingPx + Math.ceil(longestRun * widestMonoAdvancePx);
-}
 
 const emptyStateCss = readFileSync(
   join(process.cwd(), "packages/ui/src/panes/empty-state.css"),

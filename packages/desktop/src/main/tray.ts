@@ -1,4 +1,5 @@
 import { deflateSync } from "node:zlib";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import type { MenuItemModel } from "./menu.ts";
 import type { OpenWorkspace } from "./windows.ts";
 
@@ -8,10 +9,14 @@ export interface TrayModel {
   menu: readonly MenuItemModel[];
 }
 
-export function trayModel(open: readonly OpenWorkspace[]): TrayModel {
+export function trayModel(
+  open: readonly OpenWorkspace[],
+  sharing: readonly string[] = [],
+  profile: ProductProfile = keyworkProfile,
+): TrayModel {
   const waiting = open.reduce((sum, entry) => sum + entry.needsYou, 0);
   return {
-    tooltip: waiting === 0 ? "keywork" : `keywork · ${needsYouPhrase(waiting)}`,
+    tooltip: waiting === 0 ? profile.name : `${profile.name} · ${needsYouPhrase(waiting)}`,
     badge: waiting === 0 ? undefined : needsYouPhrase(waiting),
     menu: [
       { kind: "action", label: "Open Folder…", action: "open-folder" },
@@ -24,10 +29,23 @@ export function trayModel(open: readonly OpenWorkspace[]): TrayModel {
           payload: entry.workspace,
         }),
       ),
+      ...stopSharingItems(sharing.length),
       { kind: "separator" },
       { kind: "action", label: "Quit", action: "quit" },
     ],
   };
+}
+
+export function stopSharingLabel(sessions: number): string {
+  return sessions === 1 ? "Stop sharing screen" : `Stop sharing screen (${sessions} viewers)`;
+}
+
+function stopSharingItems(sessions: number): MenuItemModel[] {
+  if (sessions === 0) return [];
+  return [
+    { kind: "separator" },
+    { kind: "action", label: stopSharingLabel(sessions), action: "screen-stop" },
+  ];
 }
 
 export type Ink = "black" | "white";

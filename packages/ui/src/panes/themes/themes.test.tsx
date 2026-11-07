@@ -9,7 +9,7 @@ import type { Theme } from "../../theme/schema.ts";
 import { keyworkNight } from "../../theme/themes.ts";
 import { createWardrobe, type Wardrobe } from "../../theme/wardrobe.ts";
 import { paneActions } from "../index.ts";
-import { mountPane, overviewShell } from "../overview/rows.test.tsx";
+import { mountPane, overviewShell } from "../overview/testing.tsx";
 import type { PaneMarks, ShellSeams } from "../registry.ts";
 import {
   onlyWindowFollowsNotice,

@@ -1,5 +1,6 @@
 import type {
   DailyEntry,
+  ForgetSourcePlan,
   MemoryAnswer,
   MemoryNote,
   MemoryWriteRefusal,
@@ -17,6 +18,7 @@ import {
 import { z } from "zod";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { sessionName } from "../../chrome/session-name.ts";
+import { hostFetch } from "../../host/transport.ts";
 import type { MemoryStore } from "../../shell/memory-store.ts";
 import { inboxNeedsYouAt } from "../../shell/needs-you.ts";
 import { EmptyState } from "../empty-state.tsx";
@@ -25,6 +27,15 @@ import { workingSession } from "../overview/working-session.ts";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
 import { DecisionLens } from "./decision-lens.tsx";
 import { decisionRows } from "./decisions.ts";
+import {
+  forgetCard,
+  forgetClient,
+  forgotLine,
+  refusedLine,
+  sourceOfNote,
+  sourceOfStaged,
+} from "./forget.ts";
+import { ForgetCard } from "./forget-card.tsx";
 import { Garden } from "./garden.tsx";
 import { DailyLens, LedgerLens } from "./ledger.tsx";
 import { NoteLens } from "./note.tsx";
@@ -52,12 +63,13 @@ export type MemoryLens =
 
 export const memoryPane = definePane<MemorySpec>({
   kind: "memory",
+  heading: "in memory",
   spec: memorySpec,
   home: "right",
   attire: "house",
   title: (_spec, shell) => titleOf(shell.store.memory.state.inbox.count),
   emptyState: (keys) =>
-    `nothing in the garden yet · ${keys.chord("pane.split")} starts a session that grows it`,
+    `memory is empty, nothing in the garden yet · ${keys.chord("pane.split")} starts a session that grows it`,
   component: MemorySlot,
   summon: {
     action: "memory.summon",
@@ -123,6 +135,14 @@ export const memoryPane = definePane<MemorySpec>({
         description: "open the focused note or day, or unfold the focused decision",
       },
     },
+    "memory.forget": {
+      chords: "x",
+      help: "forget what the focused note's source put in memory, after a dry run",
+      command: {
+        name: "forget-source",
+        description: "dry-run forgetting everything the focused note's source wrote, then confirm",
+      },
+    },
     "memory.editor": {
       chords: "o",
       help: "open the note's file in your editor",
@@ -149,7 +169,11 @@ export const memoryPane = definePane<MemorySpec>({
 });
 
 export function inertLine(keys: KeyHints): string {
-  return `memory is inert: this workspace is untrusted · run keywork trust in a terminal · ${keys.chord("terminal.summon")} opens one`;
+  return `memory is inert: this workspace is untrusted · run \`keywork trust\` in a terminal · ${keys.chord("terminal.summon")} opens one`;
+}
+
+export function inboxKeysLine(keys: KeyHints): string {
+  return `${keys.chord("memory.approve")} approve · ${keys.chord("memory.discard")} discard · ${keys.chord("memory.forget")} forget its source`;
 }
 
 export function titleOf(inboxCount: number): string {
@@ -176,13 +200,13 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const [notice, setNotice] = createSignal<string>();
   const [reverted, setReverted] = createSignal<Record<string, "reverted" | "needs-rebase">>({});
   const [unfolded, setUnfolded] = createSignal<Readonly<Record<string, boolean>>>({});
+  const [forgetting, setForgetting] = createSignal<ForgetSourcePlan>();
+  const forgetter = forgetClient(hostFetch(props.shell.host, props.shell.workspace));
   const decisionSession = workingSession(props.shell, props.shell.currentSession());
   let askInput: HTMLInputElement | undefined;
 
   const revision = () => (state().loaded ? state().revision : undefined);
-  const [notes] = createResource(revision, () =>
-    state().garden.trusted ? memory().notes() : Promise.resolve([]),
-  );
+  const notes = (): readonly MemoryNote[] => state().notes ?? [];
   const [dates] = createResource(revision, () =>
     state().garden.trusted ? memory().dailyDates() : Promise.resolve([]),
   );
@@ -227,7 +251,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
   const gardenEmpty = () => (notes() ?? []).length === 0;
   const inert = () => state().loaded && !state().garden.trusted;
 
-  if (!state().loaded) void memory().refresh();
+  void memory().refresh();
 
   const say = (text: string): void => {
     setNotice(text);
@@ -236,6 +260,7 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     on(lens, () => {
       setNotice(undefined);
       setCursor(undefined);
+      setForgetting(undefined);
     }),
   );
 
@@ -436,12 +461,60 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
     else void props.shell.openInEditor?.(file).catch(() => undefined);
   };
 
+  const focusedNote = (): MemoryNote | undefined => {
+    const current = lens();
+    if (current.kind === "note") return openedNote();
+    if (current.kind !== "garden") return undefined;
+    const row = focusedRow();
+    if (row?.kind === "note") return row.note;
+    if (row?.kind !== "hit") return undefined;
+    return (notes() ?? []).find(
+      (note) => note.name === row.hit.note && note.layer === row.hit.layer,
+    );
+  };
+
+  const focusedSource = (): string | undefined => {
+    const row = lens().kind === "garden" ? focusedRow() : undefined;
+    if (row?.kind === "inbox") return sourceOfStaged(row.item);
+    const note = focusedNote();
+    return note === undefined ? undefined : sourceOfNote(note);
+  };
+
+  const previewForget = (): void => {
+    const source = focusedSource();
+    if (source === undefined) {
+      say("this note names no source to forget by · focus a note that came from somewhere");
+      return;
+    }
+    void forgetter.preview(source).then((reading) => {
+      if (reading.ok) setForgetting(reading.value);
+      else say(refusedLine(reading));
+    });
+  };
+
+  const applyForget = (plan: ForgetSourcePlan): void => {
+    setForgetting(undefined);
+    root?.focus();
+    void forgetter.apply(plan.source, plan.digest).then((reading) => {
+      say(reading.ok ? forgotLine(reading.value) : refusedLine(reading));
+      if (reading.ok) void memory().refresh();
+    });
+  };
+
+  const keepEverything = (): void => {
+    setForgetting(undefined);
+    say("kept everything");
+    root?.focus();
+  };
+
   props.onAction((action) => {
     switch (action) {
       case "memory.ask":
         return ask();
       case "memory.editor":
         return openNoteFile();
+      case "memory.forget":
+        return previewForget();
       case "memory.approve":
         return approve(focusedRow());
       case "memory.discard":
@@ -538,12 +611,22 @@ function MemorySlot(props: PaneProps<MemorySpec>) {
           <Garden
             sections={sections()}
             cursor={focusedRow()?.id}
+            inboxKeys={inboxKeysLine(props.shell.keys)}
             gardener={state().garden.gardener}
             onSelect={(row) => setCursor(row.id)}
             onOpen={open}
           />
         </Match>
       </Switch>
+      <Show when={forgetting()} keyed>
+        {(plan) => (
+          <ForgetCard
+            view={forgetCard(plan)}
+            onForget={() => applyForget(plan)}
+            onKeep={keepEverything}
+          />
+        )}
+      </Show>
       <Show when={notice()}>{(text) => <p class="kw-memory-notice">{text()}</p>}</Show>
     </div>
   );

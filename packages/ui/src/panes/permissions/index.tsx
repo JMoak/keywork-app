@@ -18,6 +18,7 @@ export type PermissionsSpec = z.output<typeof permissionsSpec>;
 
 export const permissionsPane = definePane<PermissionsSpec>({
   kind: "permissions",
+  heading: "in permissions",
   spec: permissionsSpec,
   home: "right",
   attire: "house",

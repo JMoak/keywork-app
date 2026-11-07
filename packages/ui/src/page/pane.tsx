@@ -15,6 +15,7 @@ import {
   toolRowSpans,
   type UserEntry,
 } from "@keywork-app/client";
+import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import type {
   AnswerOutcome,
   AskScope,
@@ -37,11 +38,13 @@ import {
   Switch,
 } from "solid-js";
 import { createStore } from "solid-js/store";
+import { useProductProfile } from "../chrome/product.ts";
 import { AskCard, type AskChords } from "./ask-card.tsx";
 import { type BotLabel, childRowSpans, openChildHint, plainBot } from "./child-row.ts";
 import { followTail, type TailFollow } from "./follow.ts";
 import { LedgerLine, type LedgerVerbs, ledgerFacts, markText } from "./ledger.tsx";
 import { Markdown } from "./markdown.tsx";
+import { originLabel } from "./origin.ts";
 import "./page.css";
 
 export type AskAnswerHandler = (
@@ -101,6 +104,7 @@ export const openSpillHint: RowSpan = {
 };
 
 export function ConversationPane(props: ConversationPaneProps) {
+  const profile = useProductProfile();
   const [folds, setFolds] = createStore<Record<number, boolean>>({});
   const unfolded = (index: number): boolean => folds[index] === true;
   const toggle = (index: number): void => setFolds(index, !unfolded(index));
@@ -166,7 +170,7 @@ export function ConversationPane(props: ConversationPaneProps) {
         </For>
       </ol>
       <p class="kw-masthead-tier" aria-hidden="true">
-        <span class="kw-masthead-name">{props.title ?? headline(props.projection)}</span>
+        <span class="kw-masthead-name">{props.title ?? headline(props.projection, profile)}</span>
       </p>
     </section>
   );
@@ -176,11 +180,14 @@ export function lastSentPrompt(projection: SessionProjection): number {
   return projection.entries.findLastIndex((entry) => entry.kind === "user" && !entry.replay);
 }
 
-export function headline(projection: SessionProjection): string {
+export function headline(
+  projection: SessionProjection,
+  profile: ProductProfile = keyworkProfile,
+): string {
   const first = projection.entries.find(
     (entry) => entry.kind === "user" && summaryKindOf(projection, entry) === undefined,
   );
-  return first?.kind === "user" ? first.text : "keywork";
+  return first?.kind === "user" ? first.text : profile.name;
 }
 
 export function wordCount(text: string): string {
@@ -232,7 +239,7 @@ function Entry(props: EntryProps) {
             <p class="kw-user" data-forgotten={props.forgotten ? "" : undefined}>
               {user().text}
               <Show when={user().origin}>
-                {(origin) => <span class="kw-origin">via {origin().client}</span>}
+                {(origin) => <span class="kw-origin">{originLabel(origin())}</span>}
               </Show>
               <Show when={props.forgotten}>
                 <span class="kw-forgotten">{forgottenTag}</span>

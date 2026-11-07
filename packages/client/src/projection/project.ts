@@ -12,6 +12,7 @@ import {
   type ExtensionNotice,
   type ExtensionNoticeLevel,
   type MemoryDecision,
+  type ModelFallback,
   type PermissionAsk,
   type PermissionDecision,
   type SessionSettlement,
@@ -20,6 +21,7 @@ import {
   type Usage,
 } from "@keywork-app/protocol";
 import { withDecision } from "./decisions.ts";
+import { isReviewNotice } from "./review.ts";
 import { compactJson, toolSubject } from "./tool-row.ts";
 import type {
   AssistantEntry,
@@ -60,6 +62,14 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       return endTurn(settleUsage(state, envelope.payload.usage, replay));
     case "turn.interrupted":
       return notice(endTurn(state), "info", "· interrupted");
+    case "turn.waiting":
+      return notice(
+        state,
+        "info",
+        `· waiting · ${envelope.payload.reason} · attempt ${envelope.payload.attempt}`,
+      );
+    case "turn.resumed":
+      return notice(state, "info", `· resumed · attempt ${envelope.payload.attempt}`);
     case "queue.changed":
       return { ...state, queue: envelope.payload.queued };
     case "tool.started":
@@ -100,9 +110,26 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "surface.changed":
     case "session.removed":
     case "session.restored":
+    case "creature.changed":
+    case "routine.fired":
+    case "routine.finished":
+    case "routine.needs":
+    case "workshop.changed":
+    case "models.changed":
+    case "mesh.listener":
+    case "mesh.pairing":
+    case "mesh.pair":
+    case "mesh.grant":
+    case "mesh.revocation":
+    case "mesh.walked":
+    case "mesh.peers":
       return state;
+    case "model.fallback":
+      return replay ? state : notice(state, "info", fallbackLine(envelope.payload));
     case "extension.notice":
-      return replay ? state : notice(state, "info", extensionLine(envelope.payload));
+      return replay && !bareLine(envelope.payload)
+        ? state
+        : notice(state, "info", noticeLine(envelope.payload, envelope.sessionId));
     case "engine.error":
       return notice(
         endTurn({ ...state, lastError: envelope.payload.error.message }),
@@ -120,9 +147,10 @@ function startTurn(
 ): SessionProjection {
   const origin = payload.origin !== undefined && { origin: payload.origin };
   const settled = settleFlush(settleStream(state));
+  const framed = payload.origin?.kind === "creature";
   return {
     ...settled,
-    entries: [...settled.entries, promptEntry(state, payload, replay)],
+    entries: framed ? settled.entries : [...settled.entries, promptEntry(state, payload, replay)],
     turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
     usage: replay ? state.usage : withoutCacheMiss(state.usage),
   };
@@ -439,7 +467,34 @@ function settled(state: SessionProjection, settlement: SessionSettlement): Sessi
   return settlement.notices.reduce((current, text) => notice(current, "info", text), state);
 }
 
+function isCreatureReport(payload: ExtensionNotice): boolean {
+  return payload.extension === "creature";
+}
+
+function bareLine(payload: ExtensionNotice): boolean {
+  return isCreatureReport(payload) || isReviewNotice(payload);
+}
+
+export const crateDeliveredLine = "delivered · the crate is on the porch";
+
+function noticeLine(payload: ExtensionNotice, sessionId: string): string {
+  return labelsOwnTurn(payload, sessionId) ? crateDeliveredLine : extensionLine(payload);
+}
+
+function labelsOwnTurn(payload: ExtensionNotice, sessionId: string): boolean {
+  if (!isCreatureReport(payload)) return false;
+  const detail = payload.detail as
+    | { kind?: unknown; origin?: { kind?: unknown; thread?: unknown } | undefined }
+    | undefined;
+  return (
+    detail?.kind !== "frame" &&
+    detail?.origin?.kind === "creature" &&
+    detail.origin.thread === sessionId
+  );
+}
+
 function extensionLine(payload: ExtensionNotice): string {
+  if (bareLine(payload)) return payload.message;
   const detail = detailText(payload.detail);
   const said = `${extensionMarks[payload.level]} ${payload.extension} · ${payload.message}`;
   return detail === undefined ? said : `${said} · ${detail}`;
@@ -449,6 +504,11 @@ function detailText(detail: unknown): string | undefined {
   if (detail === undefined || detail === null) return undefined;
   const text = isFlatRecord(detail) ? fieldsText(detail) : scalarOrJson(detail);
   return text === "" ? undefined : clipped(text, detailLimit);
+}
+
+function fallbackLine(payload: ModelFallback): string {
+  const road = payload.cloud ? "out to the market road" : "to the next mill";
+  return `· ${payload.from} ${payload.trigger} · ${payload.class} fell back ${road} on ${payload.to}`;
 }
 
 function fieldsText(record: Readonly<Record<string, Scalar>>): string {

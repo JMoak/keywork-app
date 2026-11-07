@@ -34,7 +34,19 @@ export {
   type TerminalKey,
   terminalKeys,
 } from "./sections.ts";
-export { gallery, keyworkDay, keyworkNight, themeNamed } from "./themes.ts";
+export {
+  formerWornThemeKey,
+  gallery,
+  keyworkDay,
+  keyworkNight,
+  type Remembered,
+  rememberedTheme,
+  rememberedThemeKeys,
+  systemBasisKey,
+  systemPairing,
+  themeNamed,
+  wornThemeKey,
+} from "./themes.ts";
 export {
   applyTheme,
   dressElement,
@@ -53,9 +65,7 @@ export {
   closetOf,
   createWardrobe,
   type Fitting,
-  formerWornThemeKey,
   resolveTheme,
-  systemBasisKey,
   systemPrefersDark,
   type ThemeChoice,
   type ThemeSource,
@@ -63,5 +73,4 @@ export {
   type WardrobeOptions,
   watchSystemAppearance,
   wearRememberedTheme,
-  wornThemeKey,
 } from "./wardrobe.ts";

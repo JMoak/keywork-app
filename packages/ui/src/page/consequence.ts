@@ -45,7 +45,7 @@ export interface FileChange {
 export type AskShape = Pick<PermissionAsk, "tool" | "arguments" | "preview">;
 
 export const unpreviewedLine =
-  "no preview from keywork · too large, binary, a memory note, or an edit that would not apply";
+  "no preview from the server · too large, binary, a memory note, or an edit that would not apply";
 
 export function consequenceOf(ask: AskShape | undefined): Consequence {
   if (ask === undefined) return { kind: "arguments" };

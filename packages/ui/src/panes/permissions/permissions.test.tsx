@@ -1,4 +1,4 @@
-import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
 import type {
   BusEnvelope,
   PermissionRule,
@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import grantAnswers from "../../../../client/src/fixtures/grants.json";
 import { quietMark } from "../../chrome/title-row.tsx";
 import { inertFeed } from "../../shell/trust.test.ts";
-import { mountPane, overviewShell, settle } from "../overview/rows.test.tsx";
+import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import {
   bundleRuleText,
@@ -71,7 +71,7 @@ function permissionsShell(
       sessionRevoked.push([sessionId, rule]);
       return revoke(rule);
     },
-  } as unknown as KeyworkClient;
+  } as unknown as ConsoleClient;
   const feed: ServerFeed = {
     ...inertFeed(),
     subscribe: (listener) => {

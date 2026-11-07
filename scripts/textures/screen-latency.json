@@ -1,0 +1,84 @@
+{
+  "measuredAt": "2026-11-06T17:52:41.255Z",
+  "conditions": "idle",
+  "electron": "45.2.3",
+  "capture": {
+    "width": 2560,
+    "height": 1440
+  },
+  "codec": "video/H265",
+  "pair": "host/host",
+  "glassToGlassMs": {
+    "p50": 167,
+    "p95": 184,
+    "count": 150
+  },
+  "budgetMs": 120,
+  "run": "artifacts/screen/runs/perf-1793987548006.json",
+  "fixed": {
+    "display": {
+      "label": "LG TV SSCR2",
+      "size": {
+        "width": 1920,
+        "height": 1080
+      },
+      "scaleFactor": 2,
+      "pixels": {
+        "width": 3840,
+        "height": 2160
+      },
+      "refreshHz": 60
+    },
+    "captured": {
+      "width": 3840,
+      "height": 2160
+    },
+    "encoded": {
+      "width": 2560,
+      "height": 1440
+    },
+    "codec": "video/H265",
+    "warmupFrames": 60,
+    "probes": 150
+  },
+  "stages": {
+    "frames": {
+      "glassToCapture": {
+        "p50": 131.900146484375,
+        "p95": 148.900146484375,
+        "count": 150
+      },
+      "captureToReceive": {
+        "p50": 15.699951171875,
+        "p95": 40.199951171875,
+        "count": 150
+      },
+      "receiveToPresent": {
+        "p50": 0.5,
+        "p95": 4.2998046875,
+        "count": 150
+      },
+      "presentToGlass": {
+        "p50": 17,
+        "p95": 23.599853515625,
+        "count": 150
+      }
+    },
+    "sender": {
+      "encodeMs": 11.7,
+      "sendDelayMs": 1.8,
+      "encoder": "MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT)"
+    },
+    "receiver": {
+      "jitterBufferMs": 3.7,
+      "jitterTargetMs": 101.4,
+      "decodeMs": 0.4
+    },
+    "networkMs": 2.2
+  },
+  "load": {
+    "beforeBusyPercent": 6.7,
+    "duringBusyPercent": 16.7,
+    "others": []
+  }
+}

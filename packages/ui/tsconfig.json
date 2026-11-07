@@ -16,6 +16,12 @@
     },
     {
       "path": "../client"
+    },
+    {
+      "path": "../habitat"
+    },
+    {
+      "path": "../product"
     }
   ]
 }

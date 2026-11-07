@@ -1,0 +1,32 @@
+[portrait Wren, idle · skin kid · 192px x 208px]
+Wren @wren
+Working on docs index since HH:MM.
+r rename · b body · m models · c conversation · p pause · d delete
+body  kid · seed 7
+workshop  ws-wren · sbx · up w opens it
+strong  anthropic/claude-sonnet-4-5
+loop  inherit · workspace, then user
+decide  ollama/qwen3:8b
+vision  inherit · workspace, then user
+## threads
+conversation
+░ conversation idle $0.12 · 3m
+threads
+▓ docs index working thread · 1 child · $0.30 · 1m
+░ nightly tests blocked routine · $0.04 · 2h
+children
+░ lint sweep completed $0.01
+## usage
+ | sessions | cost (USD)
+today | 3 | 0.46
+this week | 4 | 0.46 (1 unpriced)
+chores  2 chores · 1 off · next: nightly tests at HH:MM t opens the chore board
+memory  12 notes in its layer · 1 in the inbox n opens the memory pane
+## Remembered
+2026-11-01 the workshop was raised workshop
+## Craft
+Nothing learned about its craft yet · what it learns about doing its own work lands here
+## your calls, shadowed
+Nothing is enforced: keeper.would-approve runs in shadow, every ask still waits for the keeper, and no recommendation ever reaches a session.
+bash 38 rows · agreement 92% · would act 20 · estimated
+rm 12 rows · agreement 100% · would act 0 · one-way door, stays ask-only
