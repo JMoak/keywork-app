@@ -21,7 +21,9 @@ export {
   type ElectronCompanionSeams,
   electronCompanionPorts,
   startElectronCompanion,
+  startForegroundFeed,
 } from "./electron.ts";
+export { type ForegroundFeed, notificationStates } from "./foreground.ts";
 export {
   type CompanionPreferences,
   companionPreferencesSchema,

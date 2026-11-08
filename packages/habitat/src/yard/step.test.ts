@@ -9,12 +9,19 @@ import { type YardContext, type YardRule, type YardState, yardOf } from "./types
 
 const asked: YardContext = { ...calm, ...askedIn("s1", noon - 30 * second) };
 
-function yardWith(count: number, rung: "card" | "unfold" = "unfold"): YardState {
+const eachItsOwn = (index: number): string => `creature-${index + 1}`;
+
+function yardWith(
+  count: number,
+  rung: "card" | "unfold" = "unfold",
+  creatureOf: (index: number) => string = () => "bea",
+): YardState {
   const settings = Array.from({ length: count }, (_, index) =>
     proposed(
       index + 1,
       aSetting({
         id: `n${index + 1}`,
+        creature: creatureOf(index),
         rung,
         at: isoAt(noon + index * second),
         what: { kind: "note", ref: `note ${index + 1}` },
@@ -38,7 +45,7 @@ describe("stepping the yard", () => {
   });
 
   it("unfolds six in ten minutes, then holds the rest as cards and lists them in the digest", () => {
-    const stepped = stepYard(yardWith(8), asked, noon + 10 * second);
+    const stepped = stepYard(yardWith(8, "unfold", eachItsOwn), asked, noon + 10 * second);
     const rungs = Object.values(stepped.settings).map((setting) => setting.shown);
     expect(rungs.filter((rung) => rung === "unfold")).toHaveLength(unfoldBudget.unfolds);
     expect(digestOf(stepped).map((setting) => setting.id)).toEqual(["n8", "n7"]);

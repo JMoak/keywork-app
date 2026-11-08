@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { type ConsoleClient, keyworkClient } from "@keywork-app/client";
 import { keyworkNight } from "@keywork-app/ui/theme";
 import { app, BrowserWindow, dialog, protocol } from "electron";
-import { startElectronCompanion } from "./companion/index.ts";
+import { startElectronCompanion, startForegroundFeed } from "./companion/index.ts";
 import {
   launchFrom,
   type OpenRequest,
@@ -38,16 +38,28 @@ import {
   wireScreen,
 } from "./screen/index.ts";
 import { type DesktopShell, desktopShell } from "./shell.ts";
+import { wireSurroundings } from "./surroundings-electron.ts";
 import { fileSeams } from "./system.ts";
 import { trayModel } from "./tray.ts";
 import { startUpdater } from "./updater-electron.ts";
+import { userDataDirFor, userDataDirSwitch } from "./user-data.ts";
 import { windowStateBook } from "./window-state.ts";
 import { quitGate } from "./windows.ts";
 import type { WorkspaceHost } from "./workspace.ts";
 
 export function startDesktop(profile: ProductProfile): void {
   app.setName(profile.name);
-  app.setPath("userData", join(app.getPath("appData"), profile.userDataName));
+  app.setPath(
+    "userData",
+    userDataDirFor(
+      {
+        appData: app.getPath("appData"),
+        switchValue: app.commandLine.getSwitchValue(userDataDirSwitch),
+        environment: process.env,
+      },
+      profile,
+    ),
+  );
   const protocolScheme = profile.protocolScheme;
 
   const nativeChords: Chords = {
@@ -92,6 +104,7 @@ export function startDesktop(profile: ProductProfile): void {
       });
       const dev = !app.isPackaged;
       const tray = trayMark(process.platform);
+      const foreground = startForegroundFeed(process.platform);
       const signaling = {
         nodeFile: () => fileSeams.readText(join(homedir(), ".keywork", "node.json")),
         houseFile: () =>
@@ -105,12 +118,24 @@ export function startDesktop(profile: ProductProfile): void {
         logPath: join(userData, "screen-sessions.jsonl"),
         endpointFor: signalingRoutes(signaling),
         inbound: inboundSignaling(signaling),
-        onSharingChanged: () => refreshTray(),
+        onSharingChanged: () => {
+          refreshTray();
+          surroundings.changed();
+        },
         inputHelper: process.env.KEYWORK_INPUT_HELPER,
         audit: async (record) => {
           await askAnyServer(workspaces, (client) => client.recordScreenAudit(record));
         },
         palettes: themedIndicatorPalettes(keyworkNight),
+      });
+      const sharer = screen.host.sharer;
+      const surroundings = wireSurroundings({
+        foreground,
+        sharedDisplays: () =>
+          sharer
+            .sessions()
+            .filter((sessionId) => sharer.isCapturing(sessionId))
+            .flatMap((sessionId) => sharer.captureTarget(sessionId)?.id ?? []),
       });
       const companionReady = startElectronCompanion({
         profile,
@@ -120,6 +145,7 @@ export function startDesktop(profile: ProductProfile): void {
         userData,
         preload: join(import.meta.dirname, "../preload/companion.js"),
         sessionType: process.env.XDG_SESSION_TYPE,
+        foreground,
       });
 
       const act = (action: MenuAction, payload?: string): void => {
@@ -146,13 +172,18 @@ export function startDesktop(profile: ProductProfile): void {
 
       const host = registerHostHandlers(workspaces, desktop, () => void refreshMenu(), profile);
       desktop.onOpenWorkspacesChanged(refreshTray);
-      screen.host.sharer.onEnded(refreshTray);
+      screen.host.sharer.onEnded(() => {
+        refreshTray();
+        surroundings.changed();
+      });
       await refreshMenu();
       refreshTray();
 
       const gate = quitGate(async () => {
         host.abortRelays();
         (await companionReady).dispose();
+        surroundings.dispose();
+        foreground?.stop();
         await screen.dispose();
         tray.destroy();
         return workspaces.closeAll();

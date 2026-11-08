@@ -10,6 +10,7 @@ import {
   ptyChannels,
   type RelayEnd,
   type RelayHead,
+  type Surroundings,
 } from "../shared/channels.ts";
 import { type ChunkQueue, chunkQueue } from "../shared/chunk-queue.ts";
 import { companionHostPort } from "./companion-host.ts";
@@ -150,6 +151,10 @@ function consoleHost() {
     pty,
     onUpdateReady: subscribe(hostChannels.updateReady),
     acceptUpdate: () => ipcRenderer.invoke(hostChannels.acceptUpdate),
+    surroundings: {
+      read: () => ipcRenderer.invoke(hostChannels.surroundings) as Promise<Surroundings>,
+      onChange: subscribe<Surroundings>(hostChannels.surroundingsChanged),
+    },
     serverFetch: async (
       workspace: string,
       path: string,

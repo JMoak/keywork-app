@@ -11,9 +11,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
-import type { HostPort } from "../host/port.ts";
+import type { HostPort, SurroundingsPort } from "../host/port.ts";
 import { fakeClient } from "../shell/client-testing.ts";
-import { aSetting, proposed, settled } from "./testing.ts";
+import { aSetting, eventFeed, proposed, settled } from "./testing.ts";
 
 afterEach(() => {
   cleanup();
@@ -108,6 +108,7 @@ describe("the yard under the stead profile", () => {
           aSetting({
             ...delivery,
             id: `delivery-${index}`,
+            creature: `creature-${index}`,
             what: { kind: "diff", ref: `change-${index}`, title: `change ${index}` },
           }),
         ),
@@ -166,6 +167,30 @@ describe("the yard under the stead profile", () => {
 
     key("Escape");
     expect(document.activeElement).toBe(composer);
+  });
+
+  it("waits for the keeper to finish writing before a delivery in the thread unfolds", async () => {
+    const yard = await openYard();
+    const composer = typing();
+    fireEvent.input(composer, { target: { value: "half a thought" } });
+    yard.emit([proposed(1, { ...delivery, at: new Date().toISOString() })]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.querySelector('[data-setting="delivery"]')).toBeNull();
+    fireEvent.input(composer, { target: { value: "" } });
+    await waitFor(() => expect(satelliteOf("delivery").dataset.rung).toBe("unfold"));
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it("keeps a delivery on the rail while the host says another application is fullscreen", async () => {
+    const elsewhere = { fullscreen: false, fullscreenElsewhere: true, displayShared: false };
+    const yard = await openYard(steadProfile, {
+      read: async () => elsewhere,
+      onChange: () => () => undefined,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    yard.emit([proposed(1, delivery)]);
+    await waitFor(() => cardCalled("the parser fix"));
+    expect(document.querySelector('.kw-yard-satellite[data-setting="delivery"]')).toBeNull();
   });
 
   it("keeps a pinned panel out and folds it once it is unpinned", async () => {
@@ -227,6 +252,28 @@ describe("the yard under the stead profile", () => {
     expect(document.querySelector(".kw-yard-rail")).toBeNull();
   });
 
+  it("saves a hand-raised rule with the console's preferences and follows it in the next sitting", async () => {
+    const first = await openYard();
+    first.emit([proposed(1, note)]);
+    await waitFor(() => cardCalled("the nightly chore found two stale branches"));
+    pressLeader("y");
+    key("Enter");
+    await waitFor(() => satelliteOf("note"));
+    expect(JSON.parse(localStorage.getItem("keywork.yard-rules") ?? "[]")).toEqual([
+      { creature: "wren", kind: "note", rung: "unfold", lasts: "while-present" },
+    ]);
+
+    cleanup();
+    const next = await openYard();
+    next.emit([
+      proposed(
+        1,
+        aSetting({ ...note, id: "another-note", what: { kind: "note", ref: "a second note" } }),
+      ),
+    ]);
+    await waitFor(() => expect(satelliteOf("another-note").dataset.rung).toBe("unfold"));
+  });
+
   it("keeps the classic tiles one chord away", async () => {
     const yard = await openYard();
     yard.emit([proposed(1, delivery)]);
@@ -269,6 +316,16 @@ describe("the yard under the keywork profile", () => {
     expect(hub.querySelectorAll(".kw-seam")).toHaveLength(0);
   });
 
+  it("keeps the focused conversation as the hub when the keeper focuses another tile", async () => {
+    await openYard(keyworkProfile);
+    pressLeader("Y", { shiftKey: true });
+    await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
+    pressLeader("h");
+    await waitFor(() => expect(hubNames()).toEqual(["Wren at home", "sessions"]));
+    pressLeader("l");
+    await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
+  });
+
   it("answers from the same rail with the same keys", async () => {
     const yard = await openYard(keyworkProfile);
     const composer = typing();
@@ -294,7 +351,10 @@ interface YardHarness {
   readonly listed: ReturnType<typeof vi.fn>;
 }
 
-async function openYard(profile: ProductProfile = steadProfile): Promise<YardHarness> {
+async function openYard(
+  profile: ProductProfile = steadProfile,
+  surroundings?: SurroundingsPort,
+): Promise<YardHarness> {
   const feed = eventFeed();
   const answered: Array<[string, string]> = [];
   const listed = vi.fn(async () => [] as Setting[]);
@@ -328,7 +388,8 @@ async function openYard(profile: ProductProfile = steadProfile): Promise<YardHar
     },
   });
   host.openExternal = async () => undefined;
-  render(() => <App profile={profile} host={host} connect={() => client} />);
+  const hosted: HostPort = surroundings === undefined ? host : { ...host, surroundings };
+  render(() => <App profile={profile} host={hosted} connect={() => client} />);
   if (profile.startup === "creature") {
     await screen.findByText("Wren at home", { selector: ".kw-frame-name" });
   } else {
@@ -338,36 +399,6 @@ async function openYard(profile: ProductProfile = steadProfile): Promise<YardHar
     await screen.findByText("Wren at home", { selector: ".kw-frame-name" });
   }
   return { emit: feed.emit, answered, listed };
-}
-
-function eventFeed() {
-  let push: ((envelope: BusEnvelope) => void) | undefined;
-  const queue: BusEnvelope[] = [];
-  return {
-    emit: (envelopes: readonly BusEnvelope[]): void => {
-      for (const envelope of envelopes) {
-        if (push === undefined) queue.push(envelope);
-        else push(envelope);
-      }
-    },
-    events: async function* (options?: { onOpen?: () => void }): AsyncIterable<BusEnvelope> {
-      options?.onOpen?.();
-      for (;;) {
-        const next = queue.shift();
-        if (next !== undefined) {
-          yield next;
-          continue;
-        }
-        await new Promise<void>((resolve) => {
-          push = (envelope) => {
-            queue.push(envelope);
-            push = undefined;
-            resolve();
-          };
-        });
-      }
-    },
-  };
 }
 
 function reading(): WorkspaceView {
@@ -420,6 +451,13 @@ function cardTitled(title: string): HTMLElement | undefined {
   return [...document.querySelectorAll<HTMLElement>(".kw-yard-card")].find(
     (card) => card.querySelector(".kw-yard-card-title")?.textContent === title,
   );
+}
+
+function hubNames(): Array<string | null> {
+  const hub = document.querySelector(".kw-yard-hub") as HTMLElement;
+  return [...hub.querySelectorAll<HTMLElement>(".kw-slot")]
+    .toSorted((a, b) => Number.parseFloat(a.style.left) - Number.parseFloat(b.style.left))
+    .map((slot) => slot.querySelector(".kw-frame-name")?.textContent ?? null);
 }
 
 function frameNamed(name: string): HTMLElement | undefined {

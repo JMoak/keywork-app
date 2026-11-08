@@ -1,10 +1,25 @@
-import type { ProposedRung } from "@keywork-app/protocol";
+import type { ProposedRung, Rung } from "@keywork-app/protocol";
+import { minute, parseTs } from "../clock/clock.ts";
 import type { HabitatState } from "../world/types.ts";
-import { byDepth, depthOf } from "./depth.ts";
-import { admitUnfold, decideShow, recordedShow, showReasons, spendsUnfold } from "./gate.ts";
+import { byDepth, depthHalfLife, depthOf } from "./depth.ts";
+import {
+  admitUnfold,
+  awayReasons,
+  breakpointReasons,
+  budgetReasons,
+  decideShow,
+  outsideFocus,
+  recordedShow,
+  ruleOf,
+  showReasons,
+  spendsUnfold,
+  unfoldBudget,
+} from "./gate.ts";
 import {
   byArrival,
+  ownerOf,
   rankOf,
+  type Unfolded,
   type YardContext,
   type YardDecision,
   type YardRule,
@@ -13,13 +28,19 @@ import {
   yardOf,
 } from "./types.ts";
 
+export const breakpointWaitMs = 2 * minute;
+
+export const foldBackAfterMs = depthHalfLife;
+
 export function stepYard(yard: YardState, context: YardContext, at: number): YardState {
   const ruled = sameRules(yard.rules, context.rules) ? yard : { ...yard, rules: context.rules };
-  const judged = awaitingGate(ruled).reduce(
+  const railStill = context.railFocused === true;
+  const folded = railStill ? ruled : foldBackIgnored(ruled, context, at);
+  const judged = awaitingGate(folded).reduce(
     (current, setting) => judge(current, setting, context, at),
-    ruled,
+    folded,
   );
-  return rescored(judged, context, at);
+  return railStill ? judged : rescored(judged, context, at);
 }
 
 export function withYardStep(state: HabitatState, context: YardContext, at: number): HabitatState {
@@ -36,42 +57,153 @@ export function moveByHand(yard: YardState, id: string, rung: ProposedRung, at: 
   return moved(offStage, held, rung, at);
 }
 
-export function digestOf(yard: YardState): readonly YardSetting[] {
+export function digestOf(yard: YardState, returnedAt?: number): readonly YardSetting[] {
   const latest = new Map(yard.decisions.map((decision) => [decision.id, decision]));
+  const folded = (decision: YardDecision | undefined): boolean =>
+    decision !== undefined &&
+    (budgetReasons.has(decision.reason) || heldWhileAway(decision, returnedAt));
   return Object.values(yard.settings)
-    .filter(
-      (setting) =>
-        setting.shown === "card" && latest.get(setting.id)?.reason === showReasons.budget,
-    )
+    .filter((setting) => setting.shown === "card" && folded(latest.get(setting.id)))
     .sort(byDepth);
+}
+
+export function nextChangeAt(yard: YardState, at: number): number | undefined {
+  const { played, lastUnfolds = [] } = yard.budget;
+  const moments = [
+    ...Object.values(yard.settings).flatMap(changesOf),
+    ...played.map((time) => time + unfoldBudget.windowMs),
+    ...lastUnfolds.map((last) => last.at + unfoldBudget.cooldownMs),
+  ].filter((moment) => moment > at);
+  return moments.length === 0 ? undefined : Math.min(...moments);
+}
+
+export function awaitsBreakpoint(
+  decision: YardDecision,
+  setting: YardSetting,
+  at: number,
+): boolean {
+  return breakpointReasons.has(decision.reason) && at - parseTs(setting.at) < breakpointWaitMs;
 }
 
 function judge(yard: YardState, setting: YardSetting, context: YardContext, at: number): YardState {
   const decision = decideShow(setting, context, yard.budget, at);
+  if (awaitsBreakpoint(decision, setting, at)) return yard;
+  const unfolding = { at, focus: context.focusedThread, byHand: false };
+  const decided: YardSetting = {
+    ...reshown(yard, setting, decision.rung, unfolding),
+    ruled: setting.ruled === true || ruleOf(setting, context) !== undefined,
+  };
+  const spent = { owner: ownerOf(setting), outside: outsideFocus(setting, context) };
   return {
     ...yard,
-    settings: { ...yard.settings, [setting.id]: { ...setting, shown: decision.rung } },
-    budget: spendsUnfold(decision.rung) ? admitUnfold(yard.budget, at) : yard.budget,
+    settings: { ...yard.settings, [setting.id]: decided },
+    budget: spendsUnfold(decision.rung) ? admitUnfold(yard.budget, at, spent) : yard.budget,
     decisions: recordedShow(yard.decisions, decision),
   };
 }
 
 function moved(yard: YardState, setting: YardSetting, rung: ProposedRung, at: number): YardState {
+  const unfolding = { at, focus: undefined, byHand: true };
+  return recordedMove(
+    yard,
+    { ...reshown(yard, setting, rung, unfolding), ruled: true },
+    { verdict: rankOf(rung) < rankOf(setting.shown) ? "reduce" : "play", reason: showReasons.hand },
+    at,
+  );
+}
+
+function foldBackIgnored(yard: YardState, context: YardContext, at: number): YardState {
+  return Object.values(yard.settings)
+    .filter((setting) => ignoredUnfold(setting, context, at))
+    .sort(byArrival)
+    .reduce(
+      (current, setting) =>
+        recordedMove(
+          current,
+          reshown(current, setting, "card", undefined),
+          { verdict: "reduce", reason: showReasons.foldedBack },
+          at,
+        ),
+      yard,
+    );
+}
+
+function ignoredUnfold(setting: YardSetting, context: YardContext, at: number): boolean {
+  const unfolded = foldableUnfold(setting);
+  return (
+    unfolded !== undefined &&
+    (unfolded.focus !== context.focusedThread || at - unfolded.at >= foldBackAfterMs)
+  );
+}
+
+function foldableUnfold(setting: YardSetting): Unfolded | undefined {
+  const { unfolded } = setting;
+  const gatePlayed = unfolded !== undefined && !unfolded.byHand;
+  return setting.shown === "unfold" && setting.state === "live" && gatePlayed
+    ? unfolded
+    : undefined;
+}
+
+function changesOf(setting: YardSetting): number[] {
+  if (setting.shown === "glyph") return [parseTs(setting.at) + breakpointWaitMs];
+  const unfolded = foldableUnfold(setting);
+  return unfolded === undefined ? [] : [unfolded.at + foldBackAfterMs];
+}
+
+function recordedMove(
+  yard: YardState,
+  setting: YardSetting,
+  outcome: Pick<YardDecision, "verdict" | "reason">,
+  at: number,
+): YardState {
   const decision: YardDecision = {
     at,
     id: setting.id,
     creature: setting.creature,
     kind: setting.what.kind,
     proposed: setting.rung,
-    rung,
-    verdict: rankOf(rung) < rankOf(setting.shown) ? "reduce" : "play",
-    reason: showReasons.hand,
+    rung: setting.shown,
+    ...outcome,
   };
   return {
     ...yard,
-    settings: { ...yard.settings, [setting.id]: { ...setting, shown: rung } },
+    settings: { ...yard.settings, [setting.id]: setting },
     decisions: recordedShow(yard.decisions, decision),
   };
+}
+
+function reshown(
+  yard: YardState,
+  setting: YardSetting,
+  rung: Rung,
+  unfolding: Omit<Unfolded, "slot"> | undefined,
+): YardSetting {
+  const { unfolded, ...rest } = setting;
+  if (!satellite(rung) || unfolding === undefined) return { ...rest, shown: rung };
+  return {
+    ...rest,
+    shown: rung,
+    unfolded: { ...unfolding, slot: unfolded?.slot ?? freeSlotOf(yard) },
+  };
+}
+
+function freeSlotOf(yard: YardState): number {
+  const taken = new Set(
+    Object.values(yard.settings).flatMap((setting) =>
+      setting.unfolded !== undefined && satellite(setting.shown) ? [setting.unfolded.slot] : [],
+    ),
+  );
+  let slot = 0;
+  while (taken.has(slot)) slot += 1;
+  return slot;
+}
+
+function satellite(rung: Rung): boolean {
+  return rankOf(rung) >= rankOf("unfold");
+}
+
+function heldWhileAway(decision: YardDecision, returnedAt: number | undefined): boolean {
+  return returnedAt !== undefined && awayReasons.has(decision.reason) && decision.at <= returnedAt;
 }
 
 function rescored(yard: YardState, context: YardContext, at: number): YardState {
@@ -105,6 +237,7 @@ function sameRule(a: YardRule, b: YardRule | undefined): boolean {
     a.creature === b.creature &&
     a.kind === b.kind &&
     a.rung === b.rung &&
-    a.lasts === b.lasts
+    a.lasts === b.lasts &&
+    a.thread === b.thread
   );
 }

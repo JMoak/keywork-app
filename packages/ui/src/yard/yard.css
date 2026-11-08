@@ -55,10 +55,39 @@
   color: var(--kw-text-dim);
 }
 
+.kw-yard-rail-head {
+  border: 0;
+  font: inherit;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+
 .kw-yard-rail[data-active] .kw-yard-rail-head {
   white-space: normal;
   color: var(--kw-text);
   box-shadow: inset 0 -2px 0 var(--kw-border-focus);
+}
+.kw-yard-rail-head[data-cursor] {
+  background: var(--kw-panel-lift);
+}
+
+.kw-yard-decisions {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  overflow: auto;
+  list-style: none;
+  color: var(--kw-text-mid);
+  background: var(--kw-panel);
+  box-shadow: inset 2px 0 0 var(--kw-border);
+}
+.kw-yard-decisions > li {
+  padding: 0.125rem 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .kw-yard-card {
@@ -81,6 +110,12 @@
 .kw-yard-card[data-pinned] .kw-yard-card-title::after {
   content: " · pinned";
   color: var(--kw-text-dim);
+}
+.kw-yard-card[data-group] {
+  box-shadow:
+    inset 2px 0 0 var(--kw-border),
+    3px 3px 0 -1px var(--kw-panel),
+    3px 3px 0 0 var(--kw-border);
 }
 .kw-yard-card[data-cursor] {
   background: var(--kw-panel-lift);
@@ -111,6 +146,14 @@
 
 .kw-yard-satellite[data-cursor] > .kw-frame {
   box-shadow: 0 0 0 2px var(--kw-border-focus);
+}
+
+.kw-yard-satellite[data-withdrawn] > .kw-frame,
+.kw-yard-card[data-withdrawn] {
+  opacity: 0.6;
+}
+.kw-yard-card[data-withdrawn] .kw-yard-card-by {
+  color: var(--kw-text-mid);
 }
 
 .kw-slot[data-lantern] .kw-frame-name::after {

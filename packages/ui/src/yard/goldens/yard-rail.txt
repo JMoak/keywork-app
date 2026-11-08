@@ -1,0 +1,25 @@
+yard yard
+hub 0,0 1140×900
+rail 1152,16 272×464 · in hand
+  head 0,0 272×40 j k move · enter opens · x dismisses · p pins · esc returns
+  card 0,52 272×64 · cursor
+    the nightly chore found two stale branches
+    Wren set out a note
+    set out because you asked about it this morning
+  card 0,128 272×64
+    https://example.com/parser-spec
+    a link from fix the parser
+    set out because you asked about it this morning
+  card 0,204 272×64
+    this week's spend is under the cap
+    Tam set out a note
+    set out because you asked about it this morning
+  card 0,280 272×64
+    the preview deploy is green
+    Wren set out a note
+    set out because you asked about it this morning
+  card 0,356 272×64
+    two new lint warnings in scripts
+    Ada set out a note
+    set out because you asked about it this morning
+  fold 0,432 272×32 2 more folded

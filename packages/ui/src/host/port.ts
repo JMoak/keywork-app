@@ -41,6 +41,18 @@ export interface HostPort {
   readonly pty: PtyPort;
   readonly companion?: CompanionHost | undefined;
   readonly screen?: ScreenPort | undefined;
+  readonly surroundings?: SurroundingsPort | undefined;
+}
+
+export interface SurroundingsPort {
+  read(): Promise<Surroundings>;
+  onChange(listener: (surroundings: Surroundings) => void): () => void;
+}
+
+export interface Surroundings {
+  readonly fullscreen: boolean;
+  readonly fullscreenElsewhere: boolean;
+  readonly displayShared: boolean;
 }
 
 export interface PtyPort {

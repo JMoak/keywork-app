@@ -392,6 +392,7 @@ function homeShell(
     ...(surface.companion !== undefined && { companion: surface.companion }),
     ...(surface.creatureNames !== undefined && { creatureNames: surface.creatureNames }),
     ...(surface.needsYou !== undefined && { needsYou: surface.needsYou }),
+    ...(surface.drafts !== undefined && { drafts: surface.drafts }),
     currentSession: () => undefined,
     focusedPane: surface.focusedPane,
     openPane,

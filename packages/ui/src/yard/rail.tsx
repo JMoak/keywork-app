@@ -1,8 +1,17 @@
+import { yardIds } from "@keywork-app/habitat";
 import type { KeeperShowOutcome, Rung } from "@keywork-app/protocol";
-import { createEffect, For, type JSX, on, Show } from "solid-js";
+import { createEffect, createSignal, For, type JSX, on, Show } from "solid-js";
 import type { Rect } from "../layout/index.ts";
 import { pinAnswer } from "./answers.ts";
-import { emptyRail, foldedLine, heldBackLine, railHint, railLabel } from "./copy.ts";
+import {
+  decisionsHead,
+  emptyRail,
+  foldedLine,
+  heldBackLine,
+  noDecisions,
+  railHint,
+  railLabel,
+} from "./copy.ts";
 import "./yard.css";
 
 export interface RailEntry {
@@ -12,11 +21,18 @@ export interface RailEntry {
   readonly why: string;
   readonly shown: Rung;
   readonly pinned: boolean;
+  readonly withdrawn?: boolean | undefined;
+  readonly grouped?: number | undefined;
 }
 
 export interface RailCardSpot {
   readonly id: string;
   readonly rect: Rect;
+}
+
+export interface YardCardView {
+  readonly line: string;
+  readonly decisions: readonly string[];
 }
 
 export interface RailProps {
@@ -26,6 +42,8 @@ export interface RailProps {
   fold: Rect | undefined;
   folded: number;
   heldBack: number;
+  card?: YardCardView | undefined;
+  log?: Rect | undefined;
   active: boolean;
   cursor: string | undefined;
   onCursor(id: string): void;
@@ -36,14 +54,28 @@ export interface RailProps {
 
 export function Rail(props: RailProps) {
   let list: HTMLDivElement | undefined;
+  const [logOpen, setLogOpen] = createSignal(false);
+  const onHead = (): boolean => props.card !== undefined && props.cursor === yardIds.card;
   const current = (): RailEntry | undefined =>
-    props.entries.find((entry) => entry.id === props.cursor) ?? props.entries[0];
+    onHead()
+      ? undefined
+      : (props.entries.find((entry) => entry.id === props.cursor) ?? props.entries[0]);
   const entryOf = (id: string): RailEntry | undefined =>
     props.entries.find((entry) => entry.id === id);
+  const order = (): string[] => [
+    ...(props.card === undefined ? [] : [yardIds.card]),
+    ...props.entries.map((entry) => entry.id),
+  ];
   const step = (delta: number): void => {
-    const at = props.entries.findIndex((entry) => entry.id === current()?.id);
-    const next = props.entries[Math.min(Math.max(0, at + delta), props.entries.length - 1)];
-    if (next !== undefined) props.onCursor(next.id);
+    const ids = order();
+    const at = ids.indexOf((onHead() ? yardIds.card : current()?.id) ?? "");
+    const next = ids[Math.min(Math.max(0, at + delta), ids.length - 1)];
+    if (next !== undefined) props.onCursor(next);
+  };
+  const enter = (): void => {
+    if (onHead()) return void setLogOpen((open) => !open);
+    const entry = current();
+    if (entry !== undefined) props.onEnter(entry);
   };
   const withCurrent = (act: (entry: RailEntry) => void) => (): void => {
     const entry = current();
@@ -54,7 +86,7 @@ export function Rail(props: RailProps) {
     ArrowDown: () => step(1),
     k: () => step(-1),
     ArrowUp: () => step(-1),
-    Enter: withCurrent((entry) => props.onEnter(entry)),
+    Enter: enter,
     x: withCurrent((entry) => props.onAnswer(entry, "dismissed")),
     p: withCurrent((entry) => props.onAnswer(entry, pinAnswer(entry.pinned))),
     Escape: () => props.onReturn(),
@@ -71,6 +103,7 @@ export function Rail(props: RailProps) {
     on(
       () => props.active,
       (active) => {
+        if (!active) setLogOpen(false);
         if (active && list !== undefined && !list.contains(document.activeElement)) {
           list.focus({ preventScroll: true });
         }
@@ -86,16 +119,42 @@ export function Rail(props: RailProps) {
       tabIndex={-1}
       aria-label={railLabel}
       aria-activedescendant={
-        props.active && current() !== undefined ? railEntryId(current()?.id) : undefined
+        props.active && (onHead() || current() !== undefined)
+          ? railEntryId(onHead() ? yardIds.card : current()?.id)
+          : undefined
       }
       data-active={props.active ? "" : undefined}
       data-keys-owned
       onKeyDown={onKeyDown}
     >
-      <p class="kw-yard-rail-head" style={rectStyle(props.head)}>
-        {headLine(props)}
-      </p>
-      <For each={props.cards}>
+      <button
+        type="button"
+        tabIndex={-1}
+        id={railEntryId(yardIds.card)}
+        class="kw-yard-rail-head"
+        role="option"
+        aria-selected={props.active && onHead()}
+        data-cursor={props.active && onHead() ? "" : undefined}
+        data-open={logOpen() ? "" : undefined}
+        style={rectStyle(props.head)}
+        onClick={() => {
+          if (props.card === undefined) return;
+          props.onCursor(yardIds.card);
+          setLogOpen((open) => !open);
+        }}
+      >
+        {headLine(props, onHead(), logOpen())}
+      </button>
+      <Show when={logOpen() && props.card}>
+        {(card) => (
+          <ol class="kw-yard-decisions" aria-label={decisionsHead} style={rectStyle(props.log)}>
+            <For each={card().decisions} fallback={<li>{noDecisions}</li>}>
+              {(line) => <li>{line}</li>}
+            </For>
+          </ol>
+        )}
+      </Show>
+      <For each={logOpen() ? [] : props.cards}>
         {(spot) => (
           <Show when={entryOf(spot.id)}>
             {(entry) => (
@@ -121,9 +180,11 @@ export function Rail(props: RailProps) {
   );
 }
 
-function headLine(props: RailProps): string {
-  if (props.active) return railHint;
+function headLine(props: RailProps, onHead: boolean, logOpen: boolean): string {
+  if (logOpen) return decisionsHead;
+  if (props.active && !onHead) return railHint;
   if (props.heldBack > 0) return heldBackLine(props.heldBack);
+  if (props.card !== undefined) return props.card.line;
   return props.entries.length === 0 ? emptyRail : railLabel;
 }
 
@@ -149,6 +210,8 @@ function RailCardView(props: RailCardViewProps) {
       aria-selected={props.cursor}
       data-rung={props.entry.shown}
       data-pinned={props.entry.pinned ? "" : undefined}
+      data-withdrawn={props.entry.withdrawn ? "" : undefined}
+      data-group={props.entry.grouped}
       data-cursor={props.cursor ? "" : undefined}
       style={rectStyle(props.rect)}
       onClick={() => props.onPick()}

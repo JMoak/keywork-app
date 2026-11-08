@@ -63,12 +63,18 @@ export interface ElectronCompanionSeams {
   sessionType: string | undefined;
   waylandDisplay?: string | undefined;
   ozonePlatform?: string | undefined;
+  foreground?: ForegroundFeed | undefined;
+}
+
+export function startForegroundFeed(platform: NodeJS.Platform): ForegroundFeed | undefined {
+  return platform === "win32" ? foregroundFeed(spawnLines) : undefined;
 }
 
 export async function startElectronCompanion(
   seams: ElectronCompanionSeams,
 ): Promise<CompanionService> {
-  const foreground = seams.platform === "win32" ? foregroundFeed(spawnLines) : undefined;
+  const owned = seams.foreground === undefined ? startForegroundFeed(seams.platform) : undefined;
+  const foreground = seams.foreground ?? owned;
   const unwitness =
     foreground === undefined
       ? () => undefined
@@ -84,7 +90,7 @@ export async function startElectronCompanion(
       service.dispose();
       unfollow();
       unwitness();
-      foreground?.stop();
+      owned?.stop();
     },
   };
 }

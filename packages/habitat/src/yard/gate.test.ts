@@ -80,11 +80,13 @@ describe("the show gate", () => {
     );
   });
 
-  it("gives cards only when hidden, fullscreen, in do not disturb or in quiet hours", () => {
+  it("gives cards only when hidden, in do not disturb or in quiet hours, never for its own fullscreen (item 15)", () => {
+    expect(decided({ rung: "unfold" }, { ...asked, fullscreen: true })).toBe(
+      "play:unfold:you asked, it shows",
+    );
     const cases: readonly [Partial<YardContext>, string][] = [
       [{ visible: false }, "not shown"],
       [{ tier: "hidden" }, "not shown"],
-      [{ fullscreen: true }, "fullscreen"],
       [{ doNotDisturb: true }, "do not disturb"],
       [{ quietHours: true }, "quiet hours"],
     ];
@@ -111,8 +113,8 @@ describe("the show gate", () => {
     expect(decided({ rung: "stage" })).toBe("hold:card:a card unless you asked");
     const stageRule: YardRule = { creature: "bea", kind: "note", rung: "stage", lasts: "always" };
     expect(decided({ rung: "card" }, { rules: [stageRule] })).toBe("play:stage:your rule");
-    expect(decided({ rung: "stage" }, { rules: [stageRule], fullscreen: true })).toBe(
-      "hold:card:fullscreen",
+    expect(decided({ rung: "stage" }, { rules: [stageRule], fullscreenElsewhere: true })).toBe(
+      "hold:card:another app fullscreen",
     );
     expect(decided({ rung: "stage" }, { rules: [stageRule] }, spentBudget(6))).toBe(
       "hold:card:unfold budget",
@@ -180,6 +182,7 @@ const contextArb: fc.Arbitrary<YardContext> = fc.record({
   visible: fc.boolean(),
   focused: fc.boolean(),
   fullscreen: fc.boolean(),
+  fullscreenElsewhere: fc.boolean(),
   doNotDisturb: fc.boolean(),
   tier: fc.constantFrom("interact", "active", "ambient", "rest", "hidden"),
   reducedMotion: fc.boolean(),
@@ -226,7 +229,7 @@ describe("the show gate, for any setting, context and budget", () => {
         const decision = decideShow(settingOf(drawn), context, budget, noon);
         const opened = rankOf(decision.rung) >= rankOf("unfold");
         const away = !context.visible || context.tier === "hidden";
-        const busy = context.fullscreen || context.doNotDisturb || context.quietHours;
+        const busy = context.fullscreenElsewhere || context.doNotDisturb || context.quietHours;
         if (away || busy || unfoldsSpent(budget, noon) >= unfoldBudget.unfolds) {
           expect(opened).toBe(false);
         }

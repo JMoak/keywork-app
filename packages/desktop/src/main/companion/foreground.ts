@@ -90,18 +90,24 @@ export function windowsForegroundProbe(spawn: ProbeSpawn, everySeconds = 5): For
 export interface ForegroundFeed {
   probe: ForegroundProbe;
   window(): string | undefined;
+  notificationState(): number | undefined;
+  onChange(listener: () => void): () => void;
   noteForeground(handle: string): void;
   stop(): void;
 }
 
 export function foregroundFeed(spawn: ProbeSpawn, everySeconds = 5): ForegroundFeed {
   const listeners = new Set<(state: ForegroundState) => void>();
+  const watchers = new Set<() => void>();
   let state: ForegroundState | undefined;
   let window: string | undefined;
+  let notification: number | undefined;
   const child = spawn("powershell.exe", powershellArguments(probeScript(everySeconds)));
   child.onLine((line) => {
     window = parseWindowLine(line) ?? window;
     const code = parseProbeLine(line);
+    notification = code ?? notification;
+    for (const watcher of [...watchers]) watcher();
     if (code === undefined || foregroundOf(code) === state) return;
     state = foregroundOf(code);
     for (const listener of [...listeners]) listener(state);
@@ -115,11 +121,17 @@ export function foregroundFeed(spawn: ProbeSpawn, everySeconds = 5): ForegroundF
       },
     },
     window: () => window,
+    notificationState: () => notification,
+    onChange: (watcher) => {
+      watchers.add(watcher);
+      return () => watchers.delete(watcher);
+    },
     noteForeground: (handle) => {
       window = handle;
     },
     stop: () => {
       listeners.clear();
+      watchers.clear();
       child.kill();
     },
   };

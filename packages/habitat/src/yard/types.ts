@@ -7,8 +7,9 @@ import type { SessionId, Slug } from "../world/types.ts";
 export interface YardState {
   readonly settings: Readonly<Record<string, YardSetting>>;
   readonly rules: readonly YardRule[];
-  readonly budget: Budget;
+  readonly budget: YardBudget;
   readonly decisions: readonly YardDecision[];
+  readonly ruledThings?: readonly string[] | undefined;
 }
 
 export interface YardSetting extends Setting {
@@ -16,6 +17,25 @@ export interface YardSetting extends Setting {
   readonly depth: number;
   readonly seenAt?: string | undefined;
   readonly pinnedAt?: string | undefined;
+  readonly unfolded?: Unfolded | undefined;
+  readonly ruled?: boolean | undefined;
+}
+
+export interface Unfolded {
+  readonly at: number;
+  readonly slot: number;
+  readonly focus: SessionId | undefined;
+  readonly byHand: boolean;
+}
+
+export interface YardBudget extends Budget {
+  readonly lastUnfolds?: readonly OwnerUnfold[] | undefined;
+  readonly outside?: readonly number[] | undefined;
+}
+
+export interface OwnerUnfold {
+  readonly owner: YardOwner;
+  readonly at: number;
 }
 
 export type RuleLasts = "while-present" | "always";
@@ -25,12 +45,19 @@ export interface YardRule {
   readonly kind: SettingKind;
   readonly rung: Rung;
   readonly lasts: RuleLasts;
+  readonly thread?: SessionId | undefined;
 }
 
 export interface YardContext extends GateContext {
   readonly focusedThread: SessionId | undefined;
   readonly keeperSpokeAt: Readonly<Record<SessionId, number>>;
   readonly rules: readonly YardRule[];
+  readonly draftOpen?: boolean | undefined;
+  readonly streaming?: boolean | undefined;
+  readonly displayShared?: boolean | undefined;
+  readonly fullscreenElsewhere?: boolean | undefined;
+  readonly railFocused?: boolean | undefined;
+  readonly returnedAt?: number | undefined;
 }
 
 export interface YardDecision {
@@ -58,6 +85,7 @@ export interface Placement {
   readonly rect: Rect;
   readonly rung: Rung;
   readonly layer: Layer;
+  readonly slot?: number | undefined;
 }
 
 export interface YardLayout {
@@ -111,4 +139,16 @@ export function belongsTo(
   return owner.kind === "creature"
     ? setting.creature === owner.slug
     : setting.creature === null && setting.sessionId === owner.sessionId;
+}
+
+export function ownerKeyOf(owner: YardOwner): string {
+  return owner.kind === "creature" ? `creature:${owner.slug}` : `thread:${owner.sessionId}`;
+}
+
+export function sameOwner(a: YardOwner, b: YardOwner): boolean {
+  return ownerKeyOf(a) === ownerKeyOf(b);
+}
+
+export function thingOf(setting: Pick<Setting, "creature" | "sessionId" | "what">): string {
+  return [ownerKeyOf(ownerOf(setting)), setting.what.kind, setting.what.ref].join("\n");
 }

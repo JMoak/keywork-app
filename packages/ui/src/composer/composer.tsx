@@ -24,6 +24,7 @@ export interface ComposerProps {
   onInterrupt: () => void;
   queueKeys?: QueueKeys | undefined;
   inputRef?: ((input: HTMLTextAreaElement) => void) | undefined;
+  onDraft?: ((open: boolean) => void) | undefined;
 }
 
 export type ComposerIntent = "steer" | "queue" | "now" | "interrupt" | "newline" | "none";
@@ -44,6 +45,12 @@ export function Composer(props: ComposerProps) {
   const keyboard = useKeyboardScope();
   const [draft, setDraft] = createSignal("");
   const pastes = createPasteVault();
+  createEffect(
+    on(
+      () => draft().trim() !== "",
+      (open) => props.onDraft?.(open),
+    ),
+  );
   createEffect(
     on(
       () => props.seed,

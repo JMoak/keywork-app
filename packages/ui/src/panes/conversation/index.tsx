@@ -309,6 +309,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     if (id !== undefined) void props.shell.store.controls.watchReadings(id);
   });
 
+  const [drafting, setDrafting] = createSignal(false);
+  createEffect(() =>
+    props.shell.drafts?.mark(props.id, drafting() ? props.spec.sessionId : undefined),
+  );
+  onCleanup(() => props.shell.drafts?.mark(props.id, undefined));
+
   createEffect(() => {
     const id = props.spec.sessionId;
     if (id === undefined || !props.shell.store.gone(id)) return;
@@ -454,6 +460,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         inputRef={(input) => {
           composerInput = input;
         }}
+        onDraft={setDrafting}
       />
     </div>
   );

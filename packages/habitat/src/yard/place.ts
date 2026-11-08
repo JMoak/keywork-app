@@ -1,3 +1,4 @@
+import type { SettingKind } from "@keywork-app/protocol";
 import { byDepth } from "./depth.ts";
 import {
   type Placement,
@@ -12,9 +13,11 @@ export const yardMetrics = {
   margin: 16,
   gap: 12,
   readable: { width: 480, height: 320, shortSideShare: 0.4, aspect: 1.5 },
+  code: { columns: 80, column: 8.4, gutter: 48 },
   rail: { width: 272, head: 40, card: 64, fold: 32, length: 5 },
   node: { height: 96 },
   hub: { share: 0.3, min: 360, max: 640 },
+  slots: 6,
 } as const;
 
 export const yardIds = { hub: "yard:hub", card: "yard:card", fold: "yard:fold" } as const;
@@ -22,6 +25,12 @@ export const yardIds = { hub: "yard:hub", card: "yard:card", fold: "yard:fold" }
 export type Side = "right" | "left" | "below" | "above";
 
 export const ring: readonly Side[] = ["right", "left", "below", "above"];
+
+export const codeKinds: ReadonlySet<SettingKind> = new Set<SettingKind>(["file", "diff"]);
+
+export const codeWidth = Math.round(
+  yardMetrics.code.columns * yardMetrics.code.column + yardMetrics.code.gutter,
+);
 
 export function placeYard(input: YardLayout): readonly Placement[] {
   const hub: Placement = { id: yardIds.hub, rect: input.hub, rung: "glyph", layer: "mid" };
@@ -48,6 +57,11 @@ export function readableSize(viewport: Rect): { readonly width: number; readonly
   return { width: Math.max(readable.width, Math.round(height * readable.aspect)), height };
 }
 
+export function unfoldWidth(kind: SettingKind, viewport: Rect): number {
+  const floor = readableSize(viewport).width;
+  return codeKinds.has(kind) ? Math.max(floor, codeWidth) : floor;
+}
+
 export function defaultHub(viewport: Rect): Rect {
   const { hub, gap, rail } = yardMetrics;
   const inner = innerOf(viewport);
@@ -70,6 +84,15 @@ interface Rail {
   readonly cards: readonly Rect[];
   readonly fold: Rect;
   readonly region: Rect;
+}
+
+interface Beside {
+  readonly rect: Rect;
+  readonly side: Side;
+}
+
+interface Slot extends Beside {
+  readonly wide: Rect | undefined;
 }
 
 function onTheLadder(setting: YardSetting): boolean {
@@ -125,15 +148,87 @@ function satellitesOf(
   ladder: readonly YardSetting[],
   reserved: readonly Rect[],
 ): Placement[] {
-  const size = readableSize(input.viewport);
-  const satellites: Placement[] = [];
-  for (const setting of ladder) {
-    if (rankOf(setting.shown) < rankOf("unfold")) continue;
-    const taken = [...reserved, ...satellites.map((placement) => placement.rect)];
-    const rect = besideHub(input.viewport, input.hub, size, taken);
-    if (rect !== undefined) satellites.push({ id: setting.id, rect, rung: "unfold", layer: "mid" });
+  const unfolds = ladder.filter((setting) => rankOf(setting.shown) >= rankOf("unfold"));
+  if (unfolds.length === 0) return [];
+  const slots = ringSlots(input.viewport, input.hub, reserved);
+  return slotted(unfolds.slice(0, slots.length), slots.length).flatMap(([setting, index]) => {
+    const slot = slots[index];
+    if (slot === undefined) return [];
+    const rect = codeKinds.has(setting.what.kind) ? (slot.wide ?? slot.rect) : slot.rect;
+    return [{ id: setting.id, rect, rung: "unfold", layer: "mid", slot: index }];
+  });
+}
+
+function ringSlots(viewport: Rect, hub: Rect, reserved: readonly Rect[]): readonly Slot[] {
+  const size = readableSize(viewport);
+  const floors: Beside[] = [];
+  while (floors.length < yardMetrics.slots) {
+    const taken = [...reserved, ...floors.map((floor) => floor.rect)];
+    const next = besideHub(viewport, hub, size, taken);
+    if (next === undefined) break;
+    floors.push(next);
   }
-  return satellites;
+  const slots: Slot[] = [];
+  for (const floor of floors) {
+    const others = floors.filter((other) => other !== floor).map((other) => other.rect);
+    const wides = slots.flatMap((slot) => (slot.wide === undefined ? [] : [slot.wide]));
+    slots.push({
+      ...floor,
+      wide: widened(viewport, hub, floor, [...reserved, ...others, ...wides]),
+    });
+  }
+  return slots;
+}
+
+function widened(
+  viewport: Rect,
+  hub: Rect,
+  floor: Beside,
+  blocked: readonly Rect[],
+): Rect | undefined {
+  const { rect, side } = floor;
+  if (codeWidth <= rect.width) return undefined;
+  const inner = innerOf(viewport);
+  const growingRight = { ...rect, width: codeWidth };
+  const growingLeft = { ...rect, x: right(rect) - codeWidth, width: codeWidth };
+  const awayFromHub: Readonly<Record<Side, readonly Rect[]>> = {
+    right: [growingRight],
+    left: [growingLeft],
+    below: [growingRight, growingLeft],
+    above: [growingRight, growingLeft],
+  };
+  return awayFromHub[side].find(
+    (wide) =>
+      within(wide, inner) &&
+      adjacent(wide, hub, side) &&
+      blocked.every((other) => !overlaps(wide, other)),
+  );
+}
+
+function slotted(
+  chosen: readonly YardSetting[],
+  count: number,
+): readonly (readonly [YardSetting, number])[] {
+  const kept = new Map<number, YardSetting>();
+  for (const setting of chosen) {
+    const slot = setting.unfolded?.slot;
+    if (slot !== undefined && slot < count && !kept.has(slot)) kept.set(slot, setting);
+  }
+  const keeping = new Set(kept.values());
+  const free = Array.from({ length: count }, (_, slot) => slot).filter((slot) => !kept.has(slot));
+  const newcomers = chosen.filter((setting) => !keeping.has(setting)).toSorted(byUnfolding);
+  return [
+    ...[...kept].map(([slot, setting]) => [setting, slot] as const),
+    ...newcomers.flatMap((setting, index) => {
+      const slot = free[index];
+      return slot === undefined ? [] : [[setting, slot] as const];
+    }),
+  ].sort(([, a], [, b]) => a - b);
+}
+
+function byUnfolding(a: YardSetting, b: YardSetting): number {
+  const since = (setting: YardSetting): number => setting.unfolded?.at ?? Number.POSITIVE_INFINITY;
+  return since(a) === since(b) ? byDepth(a, b) : since(a) - since(b);
 }
 
 function railPlacements(rail: Rail | undefined, cards: readonly YardSetting[]): Placement[] {
@@ -212,15 +307,16 @@ function besideHub(
   hub: Rect,
   size: { readonly width: number; readonly height: number },
   taken: readonly Rect[],
-): Rect | undefined {
+): Beside | undefined {
   const inner = innerOf(viewport);
   const fits = (rect: Rect, side: Side): boolean =>
     within(rect, inner) &&
     adjacent(rect, hub, side) &&
     taken.every((other) => !overlaps(rect, other));
-  return firstOf(ring, (side) =>
-    candidatesOn(side, inner, hub, size, taken).find((rect) => fits(rect, side)),
-  );
+  return firstOf(ring, (side) => {
+    const rect = candidatesOn(side, inner, hub, size, taken).find((held) => fits(held, side));
+    return rect === undefined ? undefined : { rect, side };
+  });
 }
 
 function candidatesOn(

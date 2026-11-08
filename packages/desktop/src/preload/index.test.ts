@@ -40,4 +40,11 @@ describe("the preload bridge", () => {
       [hostChannels.saveAs, [{ suggestedName: "lights.html", text: "<html>" }]],
     ]);
   });
+
+  it("asks main what surrounds the window on its own channel", async () => {
+    const host = exposed.get("keyworkHost") as { surroundings: { read(): Promise<unknown> } };
+    invoked.length = 0;
+    await host.surroundings.read();
+    expect(invoked).toEqual([[hostChannels.surroundings, []]]);
+  });
 });

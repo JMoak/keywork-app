@@ -89,6 +89,7 @@ import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts"
 import { createWardrobe } from "../theme/wardrobe.ts";
 import { createYardSurface, Yard } from "../yard/index.ts";
 import { answerHeldAsk } from "./answer-ask.ts";
+import { createDraftLedger } from "./drafts.ts";
 import {
   creaturesListed,
   recordSteadSummoned,
@@ -197,6 +198,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
   const quiet = props.store.quiet;
+  const drafts = createDraftLedger();
   const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
@@ -328,10 +330,18 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     return outfit?.source === "window" ? undefined : outfit;
   };
   const [lastIdeSession, setLastIdeSession] = createSignal<string>();
+  const [hubConversation, setHubConversation] = createSignal<PaneId>();
   createEffect(() => {
     const spec = tiler.focusedSpec();
-    if (spec?.kind === "conversation") setLastIdeSession(spec.sessionId);
+    if (spec?.kind !== "conversation") return;
+    setLastIdeSession(spec.sessionId);
+    setHubConversation(tiler.focused());
   });
+  const hubThread = (): string | undefined => {
+    const pane = hubConversation();
+    const spec = pane === undefined ? undefined : tiler.spec(pane);
+    return spec?.kind === "conversation" ? spec.sessionId : undefined;
+  };
   const reads = createSessionReads();
   createEffect(() => reads.sight(props.store.state.summaries));
   createEffect(() => {
@@ -362,6 +372,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     attire,
     marks,
     quiet,
+    drafts,
     needsYou: {
       queue: props.needsYou,
       reads,
@@ -510,8 +521,16 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const yard = createYardSurface({
     firstFrame: profile.firstFrame,
     shell,
+    home: () => {
+      const scope = steadHome();
+      return scope === undefined || scope.shell.workspace === props.workspace
+        ? undefined
+        : shellForStead(shell, scope);
+    },
     host: props.host,
-    focusedThread: focusedSession,
+    focusedThread: () =>
+      focusedSession() ?? (profile.startup === "creature" ? undefined : hubThread()),
+    storage,
     chord: shell.keys.chord,
     say,
     returnHome: () => {
@@ -800,7 +819,9 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   };
 
   const slots = createMemo(() =>
-    focusedPaneHub() ? focusedAlone(tiler.slots(screen()), screen()) : tiler.slots(screen()),
+    focusedPaneHub()
+      ? conversationHub(tiler.slots(screen()), screen(), hubConversation())
+      : tiler.slots(screen()),
   );
   const scene = createMemo((): Scene => {
     const tiled = { ...tiler.scene(screen()), seamReach: gapSeamReach(gapCells(), rootRemPx()) };
@@ -950,6 +971,8 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         on={yard.control.on()}
         settings={yard.settings()}
         heldBack={yard.heldBack()}
+        withdrawn={yard.withdrawn}
+        card={yard.card()}
         railActive={yard.control.railActive()}
         reducedMotion={yard.reducedMotion()}
         shell={shell}
@@ -1038,10 +1061,22 @@ function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
 }
 
-function focusedAlone(slots: readonly PaneSlot[], screen: Screen): PaneSlot[] {
-  return slots
-    .filter((slot) => slot.focused)
-    .map((slot) => ({ ...slot, rect: { x: 0, y: 0, width: screen.width, height: screen.height } }));
+function conversationHub(
+  slots: readonly PaneSlot[],
+  screen: Screen,
+  conversation: PaneId | undefined,
+): PaneSlot[] {
+  const focused = slots.find((slot) => slot.focused);
+  const hub =
+    slots.find((slot) => slot.id === conversation && slot.spec.kind === "conversation") ?? focused;
+  const whole = { x: 0, y: 0, width: screen.width, height: screen.height };
+  if (hub === undefined) return [];
+  if (focused === undefined || focused.id === hub.id) return [{ ...hub, rect: whole }];
+  const half = Math.round(whole.width / 2);
+  return [
+    { ...hub, rect: { ...whole, width: half } },
+    { ...focused, rect: { ...whole, x: half, width: whole.width - half } },
+  ];
 }
 
 function rectStyle(rect: { x: number; y: number; width: number; height: number }) {

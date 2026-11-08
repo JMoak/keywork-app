@@ -46,3 +46,33 @@ export function settled(
     payload: { id: setting.id, outcome, by: "keeper" },
   };
 }
+
+export function eventFeed() {
+  let push: ((envelope: BusEnvelope) => void) | undefined;
+  const queue: BusEnvelope[] = [];
+  return {
+    emit: (envelopes: readonly BusEnvelope[]): void => {
+      for (const envelope of envelopes) {
+        if (push === undefined) queue.push(envelope);
+        else push(envelope);
+      }
+    },
+    events: async function* (options?: { onOpen?: () => void }): AsyncIterable<BusEnvelope> {
+      options?.onOpen?.();
+      for (;;) {
+        const next = queue.shift();
+        if (next !== undefined) {
+          yield next;
+          continue;
+        }
+        await new Promise<void>((resolve) => {
+          push = (envelope) => {
+            queue.push(envelope);
+            push = undefined;
+            resolve();
+          };
+        });
+      }
+    },
+  };
+}

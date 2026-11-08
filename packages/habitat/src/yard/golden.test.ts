@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { minute, second } from "../clock/clock.ts";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
+import { grouped } from "./flood.ts";
 import { defaultHub, placeYard, yardIds } from "./place.ts";
 import { withYardStep } from "./step.ts";
 import { aSetting, calm, isoAt, noon, proposed, settled } from "./testing.ts";
@@ -93,8 +94,8 @@ describe("the yard's goldens: three viewports by four scenarios", () => {
       it(`${scenario} on the ${name}`, () => {
         const at = noon + minute;
         const habitat = withYardStep(projectAll(emptyHabitat(), stream), context, at);
-        const settings = Object.values(yardOf(habitat).settings).filter((setting) =>
-          belongsTo(setting, bea),
+        const settings = grouped(
+          Object.values(yardOf(habitat).settings).filter((setting) => belongsTo(setting, bea)),
         );
         const placed = placeYard({
           viewport,
@@ -151,5 +152,6 @@ function markOf(placement: Placement, index: number): string {
 
 function line(placement: Placement): string {
   const { x, y, width, height } = placement.rect;
-  return `${placement.id} ${placement.rung} ${placement.layer} ${x},${y} ${width}x${height}`;
+  const slot = placement.slot === undefined ? "" : ` slot ${placement.slot}`;
+  return `${placement.id} ${placement.rung} ${placement.layer} ${x},${y} ${width}x${height}${slot}`;
 }

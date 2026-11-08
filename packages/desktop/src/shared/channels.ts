@@ -31,7 +31,15 @@ export const hostChannels = {
   updateReady: "host:update-ready",
   acceptUpdate: "host:accept-update",
   saveAs: "host:save-as",
+  surroundings: "host:surroundings",
+  surroundingsChanged: "host:surroundings-changed",
 } as const;
+
+export interface Surroundings {
+  fullscreen: boolean;
+  fullscreenElsewhere: boolean;
+  displayShared: boolean;
+}
 
 export interface KeybindingsWatch {
   id: number;

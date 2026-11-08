@@ -11,6 +11,7 @@ import type { DockSide, PaneId } from "../layout/index.ts";
 import type { OnboardingController } from "../onboarding/controller.ts";
 import type { ArgumentChoice, CommandRegistry } from "../palette/commands.ts";
 import type { TrustSetup } from "../posture/trust-setup.ts";
+import type { DraftLedger } from "../shell/drafts.ts";
 import type { NeedsYouItem } from "../shell/needs-you.ts";
 import type { Reveal } from "../shell/needs-you-jumps.ts";
 import type { NeedsYouQueue } from "../shell/needs-you-queue.ts";
@@ -161,6 +162,7 @@ export interface ShellSeams {
   readonly attire?: Attire;
   readonly marks?: PaneMarks;
   readonly quiet?: QuietPosture;
+  readonly drafts?: DraftLedger;
   readonly needsYou?: NeedsYouSeams;
   readonly commands?: CommandRegistry;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;

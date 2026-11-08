@@ -1,3 +1,4 @@
+export { type YardCard, type YardCooldown, yardCard } from "./card.ts";
 export {
   byDepth,
   depthHalfLife,
@@ -6,18 +7,31 @@ export {
   kindWeights,
   pinnedDepth,
 } from "./depth.ts";
+export { floodSize, grouped, groupsOf, type YardGroup } from "./flood.ts";
 export { askedWithinMs, type FocusRelation, focusRelationOf } from "./focus.ts";
 export {
   admitUnfold,
+  awayReasons,
+  breakpointReasons,
+  budgetReasons,
+  cooldownsOf,
   decideShow,
+  keeperPresent,
+  nextUnfoldFreeAt,
+  outsideFocus,
   recordedShow,
+  ruleFromHand,
   ruleOf,
   showReasons,
   spendsUnfold,
+  type UnfoldBy,
   unfoldBudget,
+  unfoldsOutsideSpent,
   unfoldsSpent,
 } from "./gate.ts";
 export {
+  codeKinds,
+  codeWidth,
   defaultHub,
   foldedOf,
   overlaps,
@@ -25,22 +39,38 @@ export {
   readableSize,
   ring,
   type Side,
+  unfoldWidth,
   yardIds,
   yardMetrics,
 } from "./place.ts";
-export { digestOf, moveByHand, stepYard, withYardStep } from "./step.ts";
+export {
+  awaitsBreakpoint,
+  breakpointWaitMs,
+  digestOf,
+  foldBackAfterMs,
+  moveByHand,
+  nextChangeAt,
+  stepYard,
+  withYardStep,
+} from "./step.ts";
 export {
   belongsTo,
   byArrival,
   byId,
   emptyYard,
   type Layer,
+  type OwnerUnfold,
+  ownerKeyOf,
   ownerOf,
   type Placement,
   type Rect,
   type RuleLasts,
   rankOf,
+  sameOwner,
   stillShown,
+  thingOf,
+  type Unfolded,
+  type YardBudget,
   type YardContext,
   type YardDecision,
   type YardLayout,

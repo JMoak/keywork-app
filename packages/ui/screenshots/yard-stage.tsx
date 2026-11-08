@@ -1,4 +1,4 @@
-import type { YardSetting } from "@keywork-app/habitat";
+import type { YardCard, YardDecision, YardSetting } from "@keywork-app/habitat";
 import type { JSX } from "solid-js";
 import type { ShellSeams } from "../src/panes/registry.ts";
 import { Yard } from "../src/yard/index.ts";
@@ -21,10 +21,12 @@ export function YardStage(props: { scene: YardScene; hub: JSX.Element }) {
     <Yard
       on={true}
       settings={settingsOf(props.scene)}
+      card={cardOf(props.scene)}
+      offsetMinutes={0}
       railActive={props.scene === "yard-rail"}
       reducedMotion={true}
       shell={{} as ShellSeams}
-      ownerOf={(setting) => (setting.creature === null ? "fix the parser" : "Wren")}
+      ownerOf={ownerOf}
       onEnter={() => undefined}
       onAnswer={() => undefined}
       onReturn={() => undefined}
@@ -38,18 +40,24 @@ export function YardStage(props: { scene: YardScene; hub: JSX.Element }) {
   );
 }
 
+function ownerOf(setting: YardSetting): string {
+  if (setting.creature === null) return "fix the parser";
+  return `${setting.creature.slice(0, 1).toUpperCase()}${setting.creature.slice(1)}`;
+}
+
 function settingsOf(scene: YardScene): readonly YardSetting[] {
   const cards = [
     staged("branches", "card", 6, "note", "the nightly chore found two stale branches"),
     staged("spec", "card", 5, "url", "https://example.com/parser-spec", null),
-    staged("budget", "card", 4, "note", "this week's spend is under the cap"),
+    staged("budget", "card", 4, "note", "this week's spend is under the cap", "tam"),
     staged("deploy", "card", 3, "note", "the preview deploy is green"),
-    staged("lint", "card", 2, "note", "two new lint warnings in scripts"),
-    staged("docs", "card", 1, "note", "the events doc gained the show events"),
+    staged("lint", "card", 2, "note", "two new lint warnings in scripts", "ada"),
+    staged("docs", "card", 1, "note", "the events doc gained the show events", "tam"),
     staged("rename", "card", 0.5, "note", "a rename is waiting on your word"),
   ];
   switch (scene) {
     case "yard-cards":
+      return [...cards, staged("tidy", "card", 0.25, "note", "the notes folder could use a tidy")];
     case "yard-rail":
       return cards;
     case "yard-unfold":
@@ -57,6 +65,32 @@ function settingsOf(scene: YardScene): readonly YardSetting[] {
     case "yard-stage":
       return [staged("summary", "stage", 9, "note", summary), ...cards.slice(0, 2)];
   }
+}
+
+function cardOf(scene: YardScene): YardCard {
+  const unfolded = scene === "yard-unfold" || scene === "yard-stage";
+  return {
+    id: "yard:card",
+    used: unfolded ? 1 : 0,
+    limit: 6,
+    windowMs: 600_000,
+    nextFreeAt: Date.UTC(2026, 10, 8, 9, 0),
+    cooldowns: [],
+    decisions: unfolded ? [decided("summary", "unfold", "you asked, it shows")] : [],
+  };
+}
+
+function decided(id: string, rung: YardDecision["rung"], reason: string): YardDecision {
+  return {
+    at: Date.UTC(2026, 10, 8, 9, 0),
+    id,
+    creature: "wren",
+    kind: "note",
+    proposed: rung === "card" ? "unfold" : rung,
+    rung,
+    verdict: "play",
+    reason,
+  };
 }
 
 const summary = [

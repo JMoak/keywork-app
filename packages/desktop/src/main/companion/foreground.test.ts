@@ -117,6 +117,28 @@ describe("the OS foreground window", () => {
     expect([spawned, killed]).toEqual([1, 1]);
   });
 
+  it("keeps the raw notification state and tells a watcher about every probe line", () => {
+    let listener: ((line: string) => void) | undefined;
+    const feed = foregroundFeed(() => ({
+      onLine: (next) => {
+        listener = next;
+      },
+      kill: () => undefined,
+    }));
+    let heard = 0;
+    const stop = feed.onChange(() => {
+      heard += 1;
+    });
+    expect(feed.notificationState()).toBeUndefined();
+    listener?.("4");
+    listener?.("window 777");
+    expect(feed.notificationState()).toBe(4);
+    stop();
+    listener?.("2");
+    expect([feed.notificationState(), heard]).toEqual([2, 2]);
+    feed.stop();
+  });
+
   it("takes a focus event as the foreground at once, until the next probe line says otherwise", () => {
     let listener: ((line: string) => void) | undefined;
     const feed = foregroundFeed(() => ({
