@@ -15,6 +15,7 @@ import type { ModelFallback, ModelsChanged } from "./models.ts";
 import type { AskScope, DenyReason, PermissionRule } from "./permissions.ts";
 import type { RoutineFinished, RoutineFired, RoutineNeeds } from "./routines.ts";
 import type { CompactionEntry } from "./sessions.ts";
+import type { ShowProposed, ShowSettled } from "./show.ts";
 import type { WorkshopChange } from "./workshops.ts";
 import type { SurfaceKind } from "./workspace.ts";
 
@@ -68,6 +69,8 @@ export const serverEventTypes = [
   "mesh.revocation",
   "mesh.walked",
   "mesh.peers",
+  "show.proposed",
+  "show.settled",
 ] as const;
 
 export type ServerEventType = (typeof serverEventTypes)[number];
@@ -117,6 +120,8 @@ export interface ServerPayloads {
   "mesh.revocation": MeshRevocationChange;
   "mesh.walked": MeshWalk;
   "mesh.peers": MeshPeersChange;
+  "show.proposed": ShowProposed;
+  "show.settled": ShowSettled;
 }
 
 export interface InboxTally {

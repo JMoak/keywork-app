@@ -30,6 +30,7 @@ import { stagedAsks } from "./ask-stage.ts";
 import { contextStage } from "./context-stage.tsx";
 import { DeskStage } from "./desk-stage.tsx";
 import { turnLedgerPane } from "./turn-ledger-stage.tsx";
+import { isYardScene, type YardScene, YardStage } from "./yard-stage.tsx";
 
 type ChromeScene =
   | "workspace"
@@ -42,7 +43,8 @@ type ChromeScene =
   | "desk"
   | "context"
   | "asks"
-  | "turn-ledger";
+  | "turn-ledger"
+  | YardScene;
 
 interface Dressing {
   readonly outfit?: Outfit | undefined;
@@ -68,7 +70,27 @@ function Gallery() {
       <Match when={scene === "desk"}>
         <DeskStage />
       </Match>
+      <Match when={isYardScene(scene) && scene}>{(yard) => <YardWorkspace scene={yard()} />}</Match>
     </Switch>
+  );
+}
+
+function YardWorkspace(props: { scene: YardScene }) {
+  return (
+    <div class="kw-workspace">
+      <YardStage scene={props.scene} hub={transcriptPane({})} />
+      <StatusLine
+        serverLabel="127.0.0.1:4770"
+        projection={projected("prose")}
+        usage={usageLine(projected("prose").usage)}
+        preset="careful"
+        trust={undefined}
+        leader={undefined}
+        notice={undefined}
+        gap={undefined}
+        lost={undefined}
+      />
+    </div>
   );
 }
 

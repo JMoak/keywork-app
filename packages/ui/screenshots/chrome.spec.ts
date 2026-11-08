@@ -138,6 +138,21 @@ async function themesOf(page: Page): Promise<string[]> {
   return ((await page.locator("body").getAttribute("data-themes")) ?? "").split(" ");
 }
 
+for (const scene of ["yard-cards", "yard-unfold", "yard-rail", "yard-stage"] as const) {
+  for (const theme of ["keywork-night", "keywork-day"]) {
+    test(`the yard stage ${scene} in ${theme}`, async ({ page }) => {
+      await page.setViewportSize(widths.wide);
+      await page.goto(`${chromeGalleryUrl}?scene=${scene}&theme=${theme}`);
+      await settled(page, theme);
+      await expect(page.locator(".kw-yard[data-mode='yard']")).toHaveCount(1);
+      await page.screenshot({
+        path: `${stagesDirectory}/stage--${scene}--${theme}.png`,
+        animations: "disabled",
+      });
+    });
+  }
+}
+
 async function settled(page: Page, theme: string): Promise<void> {
   await expect(page.locator(`html[data-theme="${theme}"]`)).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);

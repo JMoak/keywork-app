@@ -13,11 +13,12 @@ import { modelRoutes } from "./models.ts";
 import { permissionRoutes } from "./permissions.ts";
 import { routineFileBody, routineRoutes } from "./routines.ts";
 import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
+import { showAnswerBody, showRoutes } from "./show.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.2.0";
+export const protocolVersion = "0.2.1";
 
-export const contractVersion = "1.26";
+export const contractVersion = "1.27";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -53,6 +54,7 @@ export const requestBodies: Readonly<Record<string, readonly string[]>> = {
   previewMemoryForget: forgetSourceBody,
   applyMemoryForget: forgetApplyBody,
   sendCreatureMessage: creatureMessageBody,
+  answerSetting: showAnswerBody,
 };
 
 export const routes = [
@@ -146,6 +148,7 @@ export const routes = [
   ...modelRoutes,
   ...workshopRoutes,
   ...meshRoutes,
+  ...showRoutes,
 ] as const satisfies readonly RouteShape[];
 
 export type OperationId = (typeof routes)[number]["operationId"];

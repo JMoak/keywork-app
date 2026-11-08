@@ -5,6 +5,7 @@ import type {
   RoutineNeed,
   RoutineView,
   SessionRow,
+  Setting,
 } from "@keywork-app/protocol";
 import type {
   DecidedForKeeper,
@@ -95,7 +96,8 @@ export type KeeperNotice =
       readonly type: "keeper.sessions";
       readonly ts: string;
       readonly sessions: readonly SessionRow[];
-    };
+    }
+  | { readonly type: "keeper.show"; readonly ts: string; readonly settings: readonly Setting[] };
 
 export interface CreatureSummary {
   readonly slug: Slug;

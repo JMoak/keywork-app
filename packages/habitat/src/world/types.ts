@@ -1,4 +1,5 @@
 import type { InboxTally, RoutineNeedKind } from "@keywork-app/protocol";
+import type { YardState } from "../yard/types.ts";
 
 export type Slug = string;
 export type SessionId = string;
@@ -19,6 +20,7 @@ export interface HabitatState {
   readonly porch: Porch;
   readonly landmarks: readonly Landmark[];
   readonly history: readonly Happening[];
+  readonly yard?: YardState | undefined;
 }
 
 export interface House {

@@ -161,6 +161,7 @@ export {
 } from "./projection/types.ts";
 export { type RanchClient, ranchOperations, ranchRoutes, servedRefusalOf } from "./ranch.ts";
 export { parseServeLine, type ServeLine, serveTicket } from "./serve-output.ts";
+export { type ShowClient, showOperations } from "./show.ts";
 export {
   envelopeOf,
   type FrameReader,

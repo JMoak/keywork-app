@@ -6,6 +6,12 @@ import { onboardingAction, onboardingActionId } from "../onboarding/index.tsx";
 import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { ActionCommand } from "../panes/registry.ts";
+import {
+  yardRailAction,
+  yardRailActionId,
+  yardToggleAction,
+  yardToggleActionId,
+} from "../yard/actions.ts";
 import { type BindingSpec, everyPane } from "./keymap.ts";
 
 export type FocusContext = "pane" | "composer" | "overlay";
@@ -38,6 +44,8 @@ export interface ActionTarget {
   nextNeedsYou(): void;
   returnFromNeedsYou(): void;
   toggleNeedsYouStrip(): void;
+  focusYardRail(): void;
+  toggleYard(): void;
 }
 
 export interface AppAction {
@@ -54,6 +62,8 @@ export const coreActions: Record<string, AppAction> = {
   [onboardingActionId]: onboardingAction,
   [companionToggleActionId]: companionToggleAction,
   [companionSwitchActionId]: companionSwitchAction,
+  [yardRailActionId]: yardRailAction,
+  [yardToggleActionId]: yardToggleAction,
   "pane.close": {
     chords: "leader x",
     help: "close focused pane",

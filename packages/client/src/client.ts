@@ -107,6 +107,7 @@ import type {
 } from "@keywork-app/protocol";
 import { type CreatureProjectsClient, creatureProjectClient } from "./creature-projects.ts";
 import { type RanchClient, ranchRoutes } from "./ranch.ts";
+import { type ShowClient, showRoutes } from "./show.ts";
 import {
   envelopeOf,
   type FrameReader,
@@ -222,7 +223,7 @@ export interface KeyworkClient {
   themes(): Promise<ThemesView>;
 }
 
-export type ConsoleClient = KeyworkClient & RanchClient & CreatureProjectsClient;
+export type ConsoleClient = KeyworkClient & RanchClient & CreatureProjectsClient & ShowClient;
 
 export interface ServerDocument {
   version: string;
@@ -435,6 +436,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): ConsoleC
     ...surfaceRoutes(request),
     ...ranchRoutes(request),
     ...creatureProjectClient(request),
+    ...showRoutes(request),
     events: (options = {}) =>
       resumingEvents(
         options,

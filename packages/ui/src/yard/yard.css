@@ -1,0 +1,132 @@
+.kw-yard {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kw-yard-hub {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+}
+
+.kw-yard-hub > .kw-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.kw-yard-satellite {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: calc(var(--kw-gap, 0) * var(--kw-cell) / 2);
+}
+.kw-yard-satellite[data-layer="front"] {
+  z-index: 2;
+}
+
+.kw-yard-rail-slot {
+  position: absolute;
+  z-index: 1;
+}
+
+.kw-yard-rail {
+  position: absolute;
+  inset: 0;
+  font-family: var(--kw-font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--kw-text-mid);
+  outline: none;
+}
+
+.kw-yard-rail-head,
+.kw-yard-folded {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 0.75rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--kw-text-dim);
+}
+
+.kw-yard-rail[data-active] .kw-yard-rail-head {
+  white-space: normal;
+  color: var(--kw-text);
+  box-shadow: inset 0 -2px 0 var(--kw-border-focus);
+}
+
+.kw-yard-card {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  overflow: hidden;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: var(--kw-panel);
+  box-shadow: inset 2px 0 0 var(--kw-border);
+  cursor: pointer;
+}
+.kw-yard-card[data-pinned] .kw-yard-card-title::after {
+  content: " · pinned";
+  color: var(--kw-text-dim);
+}
+.kw-yard-card[data-cursor] {
+  background: var(--kw-panel-lift);
+  box-shadow:
+    inset 2px 0 0 var(--kw-accent),
+    inset 0 0 0 1px var(--kw-border-focus);
+}
+
+.kw-yard-card-title,
+.kw-yard-card-by,
+.kw-yard-card-why {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-yard-card-title {
+  color: var(--kw-text);
+}
+
+.kw-yard-card-by {
+  color: var(--kw-text-dim);
+}
+
+.kw-yard-card-why {
+  color: var(--kw-text-mid);
+}
+
+.kw-yard-satellite[data-cursor] > .kw-frame {
+  box-shadow: 0 0 0 2px var(--kw-border-focus);
+}
+
+.kw-slot[data-lantern] .kw-frame-name::after {
+  content: " ◆";
+  color: var(--kw-accent);
+}
+
+.kw-yard-note {
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  font-family: var(--kw-font-prose);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--kw-text);
+  background: var(--kw-background);
+}

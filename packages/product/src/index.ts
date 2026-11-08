@@ -10,6 +10,7 @@ export interface ProductProfile {
   readonly screenKillChord: string;
   readonly updateFeed: GithubUpdateFeed;
   readonly startup: "ide" | "creature";
+  readonly firstFrame: "yard" | "tiles";
 }
 
 export interface GithubUpdateFeed {
@@ -18,15 +19,21 @@ export interface GithubUpdateFeed {
   readonly repo: string;
 }
 
-export const keyworkProfile: ProductProfile = defineProduct("keywork", "keywork-app", "ide");
-export const steadProfile: ProductProfile = defineProduct("stead", "stead", "creature");
+export const keyworkProfile: ProductProfile = defineProduct("keywork", "keywork-app", {
+  startup: "ide",
+  firstFrame: "tiles",
+});
+export const steadProfile: ProductProfile = defineProduct("stead", "stead", {
+  startup: "creature",
+  firstFrame: "yard",
+});
 
 export const productProfiles = Object.freeze({ keywork: keyworkProfile, stead: steadProfile });
 
 function defineProduct(
   id: ProductId,
   repository: string,
-  startup: ProductProfile["startup"],
+  surface: Pick<ProductProfile, "startup" | "firstFrame">,
 ): ProductProfile {
   return Object.freeze({
     id,
@@ -37,6 +44,7 @@ function defineProduct(
     executableName: id,
     screenKillChord: `CommandOrControl+Alt+Shift+${id === "keywork" ? "X" : "Y"}`,
     updateFeed: Object.freeze({ provider: "github", owner: "JMoak", repo: repository }),
-    startup,
+    startup: surface.startup,
+    firstFrame: surface.firstFrame,
   });
 }

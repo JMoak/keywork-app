@@ -14,9 +14,12 @@ import type {
   RoutineNeed,
   RoutineView,
   SessionRow,
+  Setting,
   WorkshopChange,
 } from "@keywork-app/protocol";
 import { day, hour, minute, parseTs } from "../clock/clock.ts";
+import { type YardState, yardOf } from "../yard/types.ts";
+import { proposeSetting, seatSettings, settleSetting } from "../yard/wire.ts";
 import {
   type CreatureSummary,
   type GrantSummary,
@@ -73,6 +76,14 @@ export function withSessions(
     (current, row) => withThread(current, row.id, at, (thread) => seatRow(thread, row, at)),
     state,
   );
+}
+
+export function withSettings(
+  state: HabitatState,
+  settings: readonly Setting[],
+  at: string,
+): HabitatState {
+  return withYard(state, (yard) => seatSettings(yard, settings, at));
 }
 
 export function withCreatures(
@@ -166,6 +177,10 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
       }));
     case "creature.changed":
       return creatureChanged(state, envelope.payload, at);
+    case "show.proposed":
+      return setOut(state, envelope.payload.setting, at);
+    case "show.settled":
+      return withYard(state, (yard) => settleSetting(yard, envelope.payload, at));
     case "routine.fired":
       return fireChore(
         state,
@@ -318,6 +333,8 @@ function absorbKeeper(state: HabitatState, notice: KeeperNotice): HabitatState {
       return { ...state, porch: { ...state.porch, decided: standingOf(notice.standing) } };
     case "keeper.routines":
       return postBoard(state, notice.creature, notice.routines, notice.ts);
+    case "keeper.show":
+      return withSettings(state, notice.settings, notice.ts);
   }
 }
 
@@ -1053,6 +1070,17 @@ function byNextRun(a: Creature["chores"][number], b: Creature["chores"][number])
       (b.nextAt === undefined ? Number.POSITIVE_INFINITY : parseTs(b.nextAt)) ||
     a.id.localeCompare(b.id)
   );
+}
+
+function setOut(state: HabitatState, setting: Setting, at: string): HabitatState {
+  const proposed = withYard(state, (yard) => proposeSetting(yard, setting));
+  return setting.creature === null ? touch(proposed, setting.sessionId, at) : proposed;
+}
+
+function withYard(state: HabitatState, change: (yard: YardState) => YardState): HabitatState {
+  const yard = yardOf(state);
+  const changed = change(yard);
+  return changed === yard ? state : { ...state, yard: changed };
 }
 
 function withCreature(

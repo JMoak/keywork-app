@@ -8,6 +8,7 @@ export default defineConfig({
         test: {
           name: "node",
           include: [
+            "packages/product/src/**/*.test.ts",
             "packages/protocol/src/**/*.test.ts",
             "packages/client/src/**/*.test.ts",
             "packages/habitat/src/**/*.test.ts",

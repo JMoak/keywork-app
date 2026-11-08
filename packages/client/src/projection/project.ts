@@ -123,6 +123,8 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "mesh.revocation":
     case "mesh.walked":
     case "mesh.peers":
+    case "show.proposed":
+    case "show.settled":
       return state;
     case "model.fallback":
       return replay ? state : notice(state, "info", fallbackLine(envelope.payload));

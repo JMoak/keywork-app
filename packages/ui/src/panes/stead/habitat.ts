@@ -17,6 +17,7 @@ import type {
   RoutineView,
   ServedRefusal,
   SessionRow,
+  Setting,
 } from "@keywork-app/protocol";
 import { type Accessor, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import type { DecidedForYou } from "../../shell/needs-you.ts";
@@ -30,12 +31,22 @@ export interface HabitatSeams {
   decided?: (() => readonly DecidedForYou[]) | undefined;
   routines?: ((creature: string) => Promise<readonly RoutineView[] | ServedRefusal>) | undefined;
   creatures?: (() => Promise<readonly CreatureOnTheWire[] | ServedRefusal>) | undefined;
+  settings?: (() => Promise<readonly Setting[] | ServedRefusal>) | undefined;
   readonly feed: Pick<ServerFeed, "subscribe">;
   now(): number;
   readonly offsetMinutes: number;
 }
 
+export interface HabitatWorld {
+  readonly state: Accessor<HabitatState>;
+  update(change: (held: HabitatState) => HabitatState): void;
+}
+
 export function createHabitatState(seams: HabitatSeams): Accessor<HabitatState> {
+  return createHabitatWorld(seams).state;
+}
+
+export function createHabitatWorld(seams: HabitatSeams): HabitatWorld {
   const stamp = (): string => new Date(seams.now()).toISOString();
   const rows = createMemo(() => seams.rows().map(readEveryField));
   const bots = createMemo(() => seams.bots().map(readEveryField));
@@ -121,7 +132,20 @@ export function createHabitatState(seams: HabitatSeams): Accessor<HabitatState> 
       }),
     );
   }
-  return state;
+  const settings = seams.settings;
+  if (settings !== undefined) {
+    const asked = stamp();
+    void Promise.resolve()
+      .then(() => settings())
+      .then(
+        (listed) => {
+          if (!Array.isArray(listed)) return;
+          setState((held) => project(held, { type: "keeper.show", ts: asked, settings: listed }));
+        },
+        () => undefined,
+      );
+  }
+  return { state, update: (change) => setState(change) };
 }
 
 export function seatCreatures(

@@ -87,6 +87,7 @@ import { postureStorageKey } from "../posture/record.ts";
 import { createTrustSetup, followTrustArrival } from "../posture/trust-setup.ts";
 import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
+import { createYardSurface, Yard } from "../yard/index.ts";
 import { answerHeldAsk } from "./answer-ask.ts";
 import {
   creaturesListed,
@@ -506,6 +507,18 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   };
 
   const steadHome = createMemo(() => props.steadHome?.(shell));
+  const yard = createYardSurface({
+    firstFrame: profile.firstFrame,
+    shell,
+    host: props.host,
+    focusedThread: focusedSession,
+    chord: shell.keys.chord,
+    say,
+    returnHome: () => {
+      if (!keyboard.restore()) keyboard.returnHome();
+    },
+  });
+  const focusedPaneHub = (): boolean => yard.control.on() && profile.startup !== "creature";
 
   const target: ActionTarget = {
     requestOnboarding: () => (steadHome()?.shell.onboarding ?? onboarding).request(),
@@ -549,6 +562,8 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           ? "needs-you strip shown"
           : stripHiddenNotice(keys.describe("needs-you.summon")),
       ),
+    focusYardRail: yard.control.focusRail,
+    toggleYard: yard.control.toggle,
   };
 
   onCleanup(followActivations(props.host, { workspace: props.workspace, show: jumps.toTrigger }));
@@ -670,6 +685,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     )
       return;
     if (eventTarget instanceof Element && !workspaceOwnsKey(workspaceRoot, eventTarget)) return;
+    if (eventTarget instanceof Element && eventTarget.closest("[data-keys-owned]") !== null) return;
     const chords = chordsOfKey(event);
     if (chords.length === 0) return;
     const focus = keyFocusOf(
@@ -783,13 +799,14 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     return () => showContext(sessionId);
   };
 
-  const slots = createMemo(() => tiler.slots(screen()));
-  const scene = createMemo(
-    (): Scene => ({
-      ...tiler.scene(screen()),
-      seamReach: gapSeamReach(gapCells(), rootRemPx()),
-    }),
+  const slots = createMemo(() =>
+    focusedPaneHub() ? focusedAlone(tiler.slots(screen()), screen()) : tiler.slots(screen()),
   );
+  const scene = createMemo((): Scene => {
+    const tiled = { ...tiler.scene(screen()), seamReach: gapSeamReach(gapCells(), rootRemPx()) };
+    if (!focusedPaneHub()) return tiled;
+    return { ...tiled, rects: new Map(slots().map((slot) => [slot.id, slot.rect])), seams: [] };
+  });
   const pointer = () => gestures()?.state() ?? { phase: "idle" };
   const activeSeam = () => {
     const state = pointer();
@@ -826,7 +843,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const PaneSlotView = (view: { slot: PaneSlot }) => {
     const slot = () => view.slot;
     return (
-      <div class="kw-slot" data-pane-id={slot().id} style={rectStyle(slot().rect)}>
+      <div
+        class="kw-slot"
+        data-pane-id={slot().id}
+        data-lantern={yard.lanternOn(slot().spec) ? "" : undefined}
+        style={rectStyle(slot().rect)}
+      >
         <PaneFrame
           name={titleOf(slot())}
           state={lifecycleOf(slot())}
@@ -873,54 +895,71 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     );
   };
 
+  const stageView = (
+    <div class="kw-stage" ref={stage} data-gesture={pointer().phase}>
+      <For each={paneIds()}>
+        {(id) => {
+          const lastSlot = createMemo((previous) => slotOf(id) ?? previous, slotOf(id));
+          return (
+            <Show when={slotOf(id) !== undefined}>
+              <PaneSlotView slot={lastSlot() as PaneSlot} />
+            </Show>
+          );
+        }}
+      </For>
+      <Show when={tiler.emptyMain(screen())}>
+        {(rect) => (
+          <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
+            <p class="kw-empty">{keys.describe("pane.split")} opens a session here</p>
+            <Show when={props.store.state.summaries.length === 0}>
+              <FirstRun keys={shell.keys} />
+            </Show>
+          </div>
+        )}
+      </Show>
+      <For each={scene().seams}>
+        {(seam) => (
+          <div
+            class="kw-seam"
+            data-axis={seam.axis}
+            data-active={sameSeam(activeSeam(), seam) ? "" : undefined}
+            style={rectStyle(seamZoneRect(seam, scene().seamReach))}
+          />
+        )}
+      </For>
+      <Show when={dragging()}>
+        {(drag) => (
+          <For each={dropZones()}>
+            {([zone, rect]) => (
+              <div
+                class="kw-drop"
+                data-zone={zone}
+                data-hot={drag().over === zone ? "" : undefined}
+                style={rectStyle(rect)}
+              />
+            )}
+          </For>
+        )}
+      </Show>
+    </div>
+  );
+
   return (
     <div class="kw-workspace" ref={workspaceRoot}>
-      <div class="kw-stage" ref={stage} data-gesture={pointer().phase}>
-        <For each={paneIds()}>
-          {(id) => {
-            const lastSlot = createMemo((previous) => slotOf(id) ?? previous, slotOf(id));
-            return (
-              <Show when={slotOf(id) !== undefined}>
-                <PaneSlotView slot={lastSlot() as PaneSlot} />
-              </Show>
-            );
-          }}
-        </For>
-        <Show when={tiler.emptyMain(screen())}>
-          {(rect) => (
-            <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
-              <p class="kw-empty">{keys.describe("pane.split")} opens a session here</p>
-              <Show when={props.store.state.summaries.length === 0}>
-                <FirstRun keys={shell.keys} />
-              </Show>
-            </div>
-          )}
-        </Show>
-        <For each={scene().seams}>
-          {(seam) => (
-            <div
-              class="kw-seam"
-              data-axis={seam.axis}
-              data-active={sameSeam(activeSeam(), seam) ? "" : undefined}
-              style={rectStyle(seamZoneRect(seam, scene().seamReach))}
-            />
-          )}
-        </For>
-        <Show when={dragging()}>
-          {(drag) => (
-            <For each={dropZones()}>
-              {([zone, rect]) => (
-                <div
-                  class="kw-drop"
-                  data-zone={zone}
-                  data-hot={drag().over === zone ? "" : undefined}
-                  style={rectStyle(rect)}
-                />
-              )}
-            </For>
-          )}
-        </Show>
-      </div>
+      <Yard
+        on={yard.control.on()}
+        settings={yard.settings()}
+        heldBack={yard.heldBack()}
+        railActive={yard.control.railActive()}
+        reducedMotion={yard.reducedMotion()}
+        shell={shell}
+        ownerOf={yard.ownerOf}
+        onEnter={yard.enter}
+        onAnswer={yard.answer}
+        onReturn={yard.control.leaveRail}
+      >
+        {stageView}
+      </Yard>
       <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
       <NeedsYouStrip
         line={stripLine({
@@ -997,6 +1036,12 @@ function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   }
   if (state.kind === "stale") return "trust recorded · the attached server needs a restart";
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
+}
+
+function focusedAlone(slots: readonly PaneSlot[], screen: Screen): PaneSlot[] {
+  return slots
+    .filter((slot) => slot.focused)
+    .map((slot) => ({ ...slot, rect: { x: 0, y: 0, width: screen.width, height: screen.height } }));
 }
 
 function rectStyle(rect: { x: number; y: number; width: number; height: number }) {
