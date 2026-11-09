@@ -44,6 +44,7 @@ function goldenText(container: HTMLElement): string {
   const lines = [
     `yard ${yard?.dataset.mode ?? "absent"}`,
     `hub ${rectOf(container.querySelector(".kw-yard-hub"))}`,
+    ...crumbLines(container),
     ...[...container.querySelectorAll<HTMLElement>(".kw-yard-satellite")].flatMap(satelliteLines),
     ...railLines(container),
   ];
@@ -52,7 +53,7 @@ function goldenText(container: HTMLElement): string {
 
 function satelliteLines(satellite: HTMLElement): string[] {
   return [
-    `${satellite.dataset.rung} ${satellite.dataset.layer} ${rectOf(satellite)}`,
+    `${satellite.dataset.rung} ${satellite.dataset.size} ${satellite.dataset.layer} ${rectOf(satellite)}`,
     `  ${textOf(satellite.querySelector(".kw-frame-name"))} · ${textOf(satellite.querySelector(".kw-frame-turn"))}`,
   ];
 }
@@ -79,13 +80,26 @@ function cardLines(card: HTMLElement): string[] {
     card.dataset.cursor === undefined ? [] : ["cursor"],
     card.dataset.group === undefined ? [] : [`group of ${card.dataset.group}`],
     card.dataset.pinned === undefined ? [] : ["pinned"],
+    card.dataset.plot === undefined ? [] : [`plot of ${card.dataset.plot}`],
+    card.dataset.level === undefined ? [] : [`level ${card.dataset.level}`],
+    card.dataset.rung === "card" ? [] : [`shown ${card.dataset.rung}`],
   ].flat();
   return [
     `  card ${rectOf(card)}${marks.length === 0 ? "" : ` · ${marks.join(" · ")}`}`,
     `    ${textOf(card.querySelector(".kw-yard-card-title"))}`,
     `    ${textOf(card.querySelector(".kw-yard-card-by"))}`,
-    `    ${textOf(card.querySelector(".kw-yard-card-why"))}`,
+    ...whyLines(card),
   ];
+}
+
+function whyLines(card: HTMLElement): string[] {
+  const why = card.querySelector(".kw-yard-card-why");
+  return why === null ? [] : [`    ${textOf(why)}`];
+}
+
+function crumbLines(container: HTMLElement): string[] {
+  const crumb = container.querySelector(".kw-yard-crumb");
+  return crumb === null ? [] : [`crumb ${rectOf(crumb)} ${textOf(crumb)}`];
 }
 
 function rectOf(element: Element | null): string {

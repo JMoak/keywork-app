@@ -4,17 +4,21 @@ import type {
   Setting,
   ShowAnswer,
   ShowListing,
+  ShowOpened,
+  ShowOpening,
 } from "@keywork-app/protocol";
 import { type RanchRequest, servedRefusalOf } from "./ranch.ts";
 
 export interface ShowClient {
   settings(): Promise<readonly Setting[] | ServedRefusal>;
   answerSetting(id: string, outcome: KeeperShowOutcome): Promise<ServedRefusal | undefined>;
+  openSetting(opening: ShowOpening): Promise<Setting | ServedRefusal>;
 }
 
 export const showOperations = {
   settings: "listSettings",
   answerSetting: "answerSetting",
+  openSetting: "openSetting",
 } as const satisfies Record<keyof ShowClient, string>;
 
 export function showRoutes(request: RanchRequest): ShowClient {
@@ -28,6 +32,10 @@ export function showRoutes(request: RanchRequest): ShowClient {
       return servedRefusalOf(
         await request("POST", `/show/${encodeURIComponent(id)}/answer`, answer),
       );
+    },
+    openSetting: async (opening) => {
+      const response = await request("POST", "/show", opening);
+      return (await servedRefusalOf(response)) ?? ((await response.json()) as ShowOpened).setting;
     },
   };
 }

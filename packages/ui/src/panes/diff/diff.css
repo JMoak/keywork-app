@@ -16,6 +16,7 @@
 }
 
 .kw-diff-back,
+.kw-diff-show,
 .kw-diff-editor,
 .kw-diff-file-row {
   font: inherit;
@@ -27,6 +28,7 @@
 }
 
 .kw-diff-back,
+.kw-diff-show,
 .kw-diff-editor {
   color: var(--kw-accent);
 }

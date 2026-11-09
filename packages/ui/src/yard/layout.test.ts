@@ -1,4 +1,4 @@
-import { defaultHub, yardIds, yardMetrics } from "@keywork-app/habitat";
+import { defaultHub, placeYard, yardIds, yardMetrics } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import type { Rect } from "../layout/index.ts";
 import { yardLayout } from "./layout.ts";
@@ -81,6 +81,15 @@ describe("the yard's layout", () => {
     const layout = yardLayout({ viewport, settings: [], railWanted: true, prefs });
     expect(layout.rail?.cards).toEqual([]);
     expect(layout.rail?.region.x).toBe(layout.hub.width + yardMetrics.gap);
+  });
+
+  it("hands the panel the keeper is inside to placement, so it never yields under them", () => {
+    const settings = ["a", "b"].map((id, index) =>
+      aYardSetting({ id, shown: "unfold", depth: 9 - index, what: { kind: "note", ref: id } }),
+    );
+    const inside = yardLayout({ viewport, settings, railWanted: false, prefs, inside: "b" });
+    const placed = placeYard({ viewport, hub: inside.hub, settings, prefs, inside: "b" });
+    expect(inside.satellites).toEqual(placed.filter((placement) => placement.rung === "unfold"));
   });
 });
 

@@ -1,6 +1,8 @@
 import { type Accessor, createSignal } from "solid-js";
 import { yardToggleActionId } from "./actions.ts";
-import { tilesShownLine, yardShownLine } from "./copy.ts";
+import { nowShownLine, tilesShownLine, trailShownLine, yardShownLine } from "./copy.ts";
+
+export type RailView = "now" | "trail";
 
 export interface YardControlOptions {
   readonly firstFrame: "yard" | "tiles";
@@ -12,14 +14,20 @@ export interface YardControlOptions {
 export interface YardControl {
   readonly on: Accessor<boolean>;
   readonly railActive: Accessor<boolean>;
+  readonly view: Accessor<RailView>;
+  readonly railAt: Accessor<string | undefined>;
   toggle(): void;
-  focusRail(): void;
+  toggleView(): void;
+  focusRail(at?: string): void;
   leaveRail(): void;
+  railLeftFor(next: EventTarget | null): void;
 }
 
 export function createYardControl(options: YardControlOptions): YardControl {
   const [on, setOn] = createSignal(options.firstFrame === "yard");
   const [railActive, setRailActive] = createSignal(false);
+  const [view, setView] = createSignal<RailView>("now");
+  const [railAt, setRailAt] = createSignal<string | undefined>(undefined, { equals: false });
   let returnTo: HTMLElement | undefined;
 
   const leaveRail = (): void => {
@@ -34,6 +42,8 @@ export function createYardControl(options: YardControlOptions): YardControl {
   return {
     on,
     railActive,
+    view,
+    railAt,
     toggle: () => {
       leaveRail();
       const next = !on();
@@ -41,12 +51,23 @@ export function createYardControl(options: YardControlOptions): YardControl {
       setOn(next);
       options.say(next ? yardShownLine(chord) : tilesShownLine(chord));
     },
-    focusRail: () => {
+    toggleView: () => {
+      const next = view() === "now" ? "trail" : "now";
+      setView(next);
+      options.say(next === "trail" ? trailShownLine : nowShownLine);
+    },
+    focusRail: (at) => {
       if (!railActive()) returnTo = activeElementOf(document);
+      setRailAt(at);
       setOn(true);
       setRailActive(true);
     },
     leaveRail,
+    railLeftFor: (next) => {
+      if (!(next instanceof HTMLElement)) return leaveRail();
+      returnTo = undefined;
+      setRailActive(false);
+    },
   };
 }
 

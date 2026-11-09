@@ -99,6 +99,42 @@ describe("the yard's own card", () => {
   });
 });
 
+describe("the attention the yard's own card reports", () => {
+  it("lists what the keeper attended, with its size and a plain reason, above the decisions", () => {
+    const attended = [{ id: "a", size: "working" as const, score: 9, reason: "you are in it" }];
+    renderYard([card("a", 5)], { card: { ...spentCard, attended } });
+    keyOnRail("k");
+    keyOnRail("Enter");
+    expect(decisionLines()[0]).toBe("attended · a · working · you are in it");
+    expect(decisionLines()).toHaveLength(3);
+  });
+});
+
+describe("the return digest", () => {
+  it("names the plots that folded while the keeper was away, beside what was held back", () => {
+    render(() => (
+      <Yard
+        on={true}
+        settings={[card("a", 5)]}
+        heldBack={1}
+        foldedAway={["the sum and its test → sum.ts"]}
+        railActive={false}
+        reducedMotion={true}
+        shell={{} as ShellSeams}
+        ownerOf={() => "Wren"}
+        onEnter={() => undefined}
+        onAnswer={() => undefined}
+        onReturn={() => undefined}
+      >
+        <div class="kw-stage" />
+      </Yard>
+    ));
+    expect(railHead().textContent).toBe(
+      "while you were away · 1 held back as a card · the sum and its test → sum.ts folded",
+    );
+  });
+});
+
 describe("a flood from one owner", () => {
   it("gathers four or more cards into one, opens it with Enter and dismisses it whole with x", () => {
     const answered: Array<[string, string]> = [];
@@ -132,6 +168,7 @@ describe("a flood from one owner", () => {
 
 const spentCard: YardCard = {
   id: "yard:card",
+  attended: [],
   used: 6,
   limit: 6,
   windowMs: 600_000,

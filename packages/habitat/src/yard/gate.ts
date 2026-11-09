@@ -4,6 +4,7 @@ import { decisionLogLimit, type Verdict } from "../creature/gate.ts";
 import { focusRelationOf } from "./focus.ts";
 import {
   type OwnerUnfold,
+  originOf,
   ownerOf,
   type RuleLasts,
   rankOf,
@@ -27,6 +28,7 @@ export const showReasons = {
   proposed: "as proposed",
   rule: "your rule",
   hand: "by hand",
+  opened: "you opened it",
   asked: "you asked, it shows",
   delivery: "a delivery in your thread",
   unasked: "a card unless you asked",
@@ -37,6 +39,7 @@ export const showReasons = {
   writing: "while you write",
   streaming: "while a reply arrives",
   foldedBack: "folded back",
+  foldedAway: "folded back while you were away",
   notShown: "not shown",
   fullscreenElsewhere: "another app fullscreen",
   displayShared: "screen shared",
@@ -84,6 +87,9 @@ export function decideShow(
     verdict,
     reason,
   });
+  if (originOf(setting) === "keeper") {
+    return decided(atLeastLantern(proposed), "play", showReasons.opened);
+  }
   const wanted = atLeastLantern(rule?.rung ?? proposed);
   if (rankOf(wanted) <= rankOf("card")) {
     return decided(
@@ -161,6 +167,15 @@ export function admitUnfold(budget: YardBudget, at: number, by?: UnfoldBy): Yard
 
 export function spendsUnfold(rung: Rung): boolean {
   return rankOf(rung) >= rankOf("unfold");
+}
+
+export function spendsBudget(
+  setting: Pick<YardSetting, "origin" | "folded">,
+  decision: Pick<YardDecision, "rung">,
+): boolean {
+  return (
+    spendsUnfold(decision.rung) && originOf(setting) === "creature" && setting.folded === undefined
+  );
 }
 
 export function recordedShow(

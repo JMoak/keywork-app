@@ -1,15 +1,24 @@
-import type { Setting, ShowSettled } from "@keywork-app/protocol";
+import type { Setting, SettingState, ShowOutcome, ShowSettled } from "@keywork-app/protocol";
 import { parseTs } from "../clock/clock.ts";
 import { decisionLogLimit } from "../creature/gate.ts";
-import { stillShown, thingOf, type YardSetting, type YardState } from "./types.ts";
+import { keptAncestors, markOf, reparented, withAncestor } from "./lineage.ts";
+import {
+  departedFold,
+  foldedOnLeaving,
+  foldUndone,
+  hasLiveDescendants,
+  joinedFold,
+} from "./plot.ts";
+import { byArrival, stillShown, thingOf, type YardSetting, type YardState } from "./types.ts";
 
 export function proposeSetting(yard: YardState, setting: Setting): YardState {
-  if (!stillShown(setting)) return withoutSetting(yard, setting.id);
+  if (!stillShown(setting)) return departed(yard, setting.id, leavingAs(setting.state));
   const prior = yard.settings[setting.id];
-  const held = yardSettingOf(setting, prior);
-  return prior === undefined && ruleSurvives(yard, held)
-    ? withRuleCarried(yard, held)
-    : withSetting(yard, held);
+  const continued = prior === undefined ? continuing(yard, setting) : yard;
+  const held = arrivedIn(continued, setting, prior);
+  return prior === undefined && ruleSurvives(continued, held)
+    ? withRuleCarried(continued, held)
+    : withSetting(continued, held);
 }
 
 export function settleSetting(yard: YardState, settled: ShowSettled, at: string): YardState {
@@ -24,7 +33,7 @@ export function settleSetting(yard: YardState, settled: ShowSettled, at: string)
     };
     return withSetting(yard, pinned);
   }
-  const without = withoutSetting(yard, held.id);
+  const without = departed(yard, held.id, leavingBy(settled));
   return replacedByItsOwner(held, settled) ? rememberRuled(without, thingOf(held)) : without;
 }
 
@@ -36,16 +45,16 @@ export function seatSettings(yard: YardState, rows: readonly Setting[], at: stri
   const unlistedButNewer = Object.values(yard.settings).filter(
     (held) => !listedIds.has(held.id) && parseTs(held.at) > listing,
   );
-  const seated = listed.map((row) => yardSettingOf(row, yard.settings[row.id]));
-  return {
+  const seated = listed.map((row) => arrivedIn(yard, row, yard.settings[row.id]));
+  return keptAncestors({
     ...yard,
     settings: Object.fromEntries(
       [...unlistedButNewer, ...seated].map((setting) => [setting.id, setting]),
     ),
-  };
+  });
 }
 
-function yardSettingOf(setting: Setting, prior: YardSetting | undefined): YardSetting {
+function arrivedIn(yard: YardState, setting: Setting, prior: YardSetting | undefined): YardSetting {
   const pinned = setting.state === "pinned";
   return {
     ...setting,
@@ -55,7 +64,48 @@ function yardSettingOf(setting: Setting, prior: YardSetting | undefined): YardSe
     pinnedAt: pinned ? (prior?.pinnedAt ?? setting.at) : undefined,
     unfolded: prior?.unfolded,
     ruled: prior?.ruled,
+    attention: prior?.attention,
+    size: prior?.size,
+    folded: prior === undefined ? joinedFold(yard, setting) : prior.folded,
   };
+}
+
+type Leaving = "seen" | "dismissed" | "withdrawn" | "withdrawn by its owner";
+
+function departed(yard: YardState, id: string, leaving: Leaving): YardState {
+  const held = yard.settings[id];
+  if (held === undefined) return yard;
+  const without = withoutSetting(yard, id);
+  if (!hasLiveDescendants(yard, id)) return keptAncestors(without);
+  const mark = markOf(held, leaving === "withdrawn by its owner");
+  const kept = withAncestor(without, mark);
+  if (leaving === "seen") return kept;
+  return leaving === "dismissed" ? foldedOnLeaving(kept, mark) : departedFold(kept, mark);
+}
+
+function leavingBy(settled: ShowSettled): Leaving {
+  if (withdrawnByItsOwner(settled)) return "withdrawn by its owner";
+  return settled.outcome === "unpinned" ? "seen" : leavingAs(settled.outcome);
+}
+
+function leavingAs(outcome: SettingState | ShowOutcome): Leaving {
+  return outcome === "dismissed" || outcome === "withdrawn" ? outcome : "seen";
+}
+
+function continuing(yard: YardState, setting: Setting): YardState {
+  const predecessor = predecessorOf(yard, setting);
+  if (predecessor === undefined) return yard;
+  const unfolded = foldUndone(yard, yard.ancestors?.[predecessor]);
+  return reparented(unfolded, predecessor, setting.id);
+}
+
+function predecessorOf(yard: YardState, setting: Setting): string | undefined {
+  if (setting.replaces !== undefined) return setting.replaces ?? undefined;
+  const thing = thingOf(setting);
+  return Object.values(yard.ancestors ?? {})
+    .filter((mark) => mark.replaceable === true && thingOf(mark) === thing)
+    .sort(byArrival)
+    .at(-1)?.id;
 }
 
 function ruleSurvives(yard: YardState, setting: YardSetting): boolean {
@@ -71,7 +121,11 @@ function withRuleCarried(yard: YardState, replacement: YardSetting): YardState {
 }
 
 function replacedByItsOwner(held: YardSetting, settled: ShowSettled): boolean {
-  return held.ruled === true && settled.outcome === "withdrawn" && settled.by === "creature";
+  return held.ruled === true && withdrawnByItsOwner(settled);
+}
+
+function withdrawnByItsOwner(settled: ShowSettled): boolean {
+  return settled.outcome === "withdrawn" && settled.by === "creature";
 }
 
 function rememberRuled(yard: YardState, thing: string): YardState {

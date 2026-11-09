@@ -1,10 +1,17 @@
-import type { KeeperShowOutcome, Setting, SettingKind } from "@keywork-app/protocol";
+import type {
+  KeeperShowOutcome,
+  Setting,
+  SettingKind,
+  SettingSubject,
+} from "@keywork-app/protocol";
 
 export const railLabel = "the yard's rail";
 
 export const emptyRail = "nothing set out";
 
-export const railHint = "j k move · enter opens · x dismisses · p pins · esc returns";
+export const railHint = "j k move · enter opens · x dismisses · p pins · t trail · esc returns";
+
+export const trailHint = "j k move · [ ] walk the chain · enter opens · t now · esc returns";
 
 export const kindWords: Readonly<Record<SettingKind, string>> = {
   file: "a file",
@@ -36,6 +43,10 @@ export function budgetLine(
   return `${card.used} of ${card.limit} unfolds · ${next}`;
 }
 
+export function attendedLine(title: string, size: string, reason: string): string {
+  return `attended · ${title} · ${size} · ${reason}`;
+}
+
 export function decisionLine(
   decision: { readonly at: number; readonly rung: string; readonly reason: string },
   what: string,
@@ -48,8 +59,12 @@ export function groupLine(owner: string, count: number, creatureLess: boolean): 
   return creatureLess ? `${count} things from ${owner}` : `${owner} set out ${count} things`;
 }
 
-export function heldBackLine(count: number): string {
-  return `while you were away · ${count} held back as ${count === 1 ? "a card" : "cards"}`;
+export function awayLine(heldBack: number, folded: readonly string[]): string {
+  const parts = [
+    ...(heldBack > 0 ? [`${heldBack} held back as ${heldBack === 1 ? "a card" : "cards"}`] : []),
+    ...(folded.length > 0 ? [`${folded.join(" and ")} folded`] : []),
+  ];
+  return `while you were away · ${parts.join(" · ")}`;
 }
 
 export function foldedLine(count: number): string {
@@ -59,6 +74,10 @@ export function foldedLine(count: number): string {
 export function setOutLine(setting: Pick<Setting, "creature" | "what">, owner: string): string {
   const what = kindWords[setting.what.kind];
   return setting.creature === null ? `${what} from ${owner}` : `${owner} set out ${what}`;
+}
+
+export function openedByYouLine(parentTitle: string | undefined): string {
+  return parentTitle === undefined ? "you opened it" : `you opened it from ${parentTitle}`;
 }
 
 export function yardShownLine(tilesChord: string): string {
@@ -75,4 +94,36 @@ export const withdrawnMark = "withdrawn";
 
 export function unansweredLine(detail: string): string {
   return `not answered · ${detail}`;
+}
+
+export function openedLine(what: Pick<SettingSubject, "kind">): string {
+  return `${kindWords[what.kind]} opens beside it`;
+}
+
+export function unopenedLine(detail: string): string {
+  return `not opened · ${detail}`;
+}
+
+export const trailLabel = "the trail to the focused panel";
+
+export const trailShownLine = "the trail · newest branch first";
+
+export const nowShownLine = "now · by depth";
+
+export const chainEndLine = "the end of this chain";
+
+export const chainRootLine = "the root of this chain";
+
+export function walkedLine(chain: string, title: string): string {
+  return `${chain} · at ${title}`;
+}
+
+export function plotLine(members: number): string {
+  return `${members} panels folded as one`;
+}
+
+export const plotHint = "enter restores · x dismisses them all";
+
+export function restoredLine(chain: string): string {
+  return `${chain} · restored`;
 }

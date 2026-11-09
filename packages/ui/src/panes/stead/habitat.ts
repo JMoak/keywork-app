@@ -4,6 +4,7 @@ import {
   coldStart,
   type DecidedForKeeper,
   type HabitatState,
+  type KeeperNotice,
   project,
   projectAll,
   withCreatures,
@@ -32,9 +33,16 @@ export interface HabitatSeams {
   routines?: ((creature: string) => Promise<readonly RoutineView[] | ServedRefusal>) | undefined;
   creatures?: (() => Promise<readonly CreatureOnTheWire[] | ServedRefusal>) | undefined;
   settings?: (() => Promise<readonly Setting[] | ServedRefusal>) | undefined;
+  readonly attention?: AttentionSource | undefined;
   readonly feed: Pick<ServerFeed, "subscribe">;
   now(): number;
   readonly offsetMinutes: number;
+}
+
+export interface AttentionSource {
+  subscribe(
+    listener: (notice: Extract<KeeperNotice, { type: "keeper.attend" }>) => void,
+  ): () => void;
 }
 
 export interface HabitatWorld {
@@ -103,6 +111,10 @@ export function createHabitatWorld(seams: HabitatSeams): HabitatWorld {
     }),
   );
   onCleanup(seams.feed.subscribe((batch) => setState((held) => projectAll(held, batch))));
+  const attention = seams.attention;
+  if (attention !== undefined) {
+    onCleanup(attention.subscribe((notice) => setState((held) => project(held, notice))));
+  }
   const readBoard = boardReader(seams.routines, (creature, routines) =>
     setState((held) => project(held, { type: "keeper.routines", ts: stamp(), creature, routines })),
   );

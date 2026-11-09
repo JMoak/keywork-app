@@ -1,18 +1,23 @@
 import type { BusEnvelope, Setting } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { minute, second } from "../clock/clock.ts";
+import type { HabitatInput } from "../world/inputs.ts";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
+import { attend } from "./attention.ts";
 import { grouped } from "./flood.ts";
+import { chainOf } from "./lineage.ts";
 import { defaultHub, placeYard, yardIds } from "./place.ts";
-import { withYardStep } from "./step.ts";
+import { moveByHand, restorePlot, withYardStep } from "./step.ts";
 import { aSetting, calm, isoAt, noon, proposed, settled } from "./testing.ts";
 import {
+  type AttendKind,
   belongsTo,
   type Placement,
   type Rect,
   type YardContext,
   type YardOwner,
+  type YardState,
   yardOf,
 } from "./types.ts";
 
@@ -120,6 +125,73 @@ describe("the yard's goldens: three viewports by four scenarios", () => {
   }
 });
 
+describe("the yard's goldens: a plot grows, folds and restores", () => {
+  const diff = aSetting({
+    id: "set-1",
+    rung: "unfold",
+    what: { kind: "diff", ref: "cs-41", title: "The fix" },
+    at: isoAt(noon + second),
+  });
+  const opened = (id: string, from: string, ref: string, seconds: number): Setting =>
+    aSetting({
+      id,
+      from,
+      origin: "keeper",
+      rung: "unfold",
+      why: "",
+      what: { kind: "file", ref },
+      at: isoAt(noon + seconds * second),
+    });
+  const stream: readonly HabitatInput[] = [
+    proposed(1, diff),
+    proposed(2, opened("set-f", "set-1", "src/yard/place.ts", 20)),
+    proposed(3, opened("set-t", "set-f", "src/yard/place.test.ts", 30)),
+  ];
+  const attended: readonly HabitatInput[] = [
+    attendAt("set-f", "enter", 60),
+    ...Array.from({ length: 22 }, (_, index) => attendAt("set-f", "interact", 61 + index * 2)),
+  ];
+
+  for (const [name, viewport] of Object.entries(viewports)) {
+    it(`on the ${name}`, () => {
+      const settled = withYardStep(projectAll(emptyHabitat(), stream), askedContext, noon + minute);
+      const grown = yardOf(projectAll(settled, attended));
+      const left = attend(grown, { id: "set-f", kind: "leave", at: noon + 2 * minute });
+      const folded = moveByHand(left, "set-1", "card", noon + 3 * minute);
+      const restored = restorePlot(folded, "plot:set-1", noon + 4 * minute);
+      const placed = (yard: YardState) =>
+        placeYard({
+          viewport,
+          hub: defaultHub(viewport),
+          settings: Object.values(yard.settings),
+          prefs: { reducedMotion: false, tier: "active" },
+          inside: yard.visit?.id,
+        });
+      expect(placed(restored)).toEqual(placed(left));
+      expect(chainOf(folded, "plot:set-1")).toBe("The fix → place.ts → place.test.ts");
+      expect(
+        Object.fromEntries(
+          [
+            ["grown, the keeper in the file", grown],
+            ["folded by hand", folded],
+            ["restored", restored],
+          ].map(([stage, yard]) => {
+            const stagePlacements = placed(yard as YardState);
+            return [
+              stage,
+              { sketch: sketch(viewport, stagePlacements), placements: stagePlacements.map(line) },
+            ];
+          }),
+        ),
+      ).toMatchSnapshot();
+    });
+  }
+});
+
+function attendAt(id: string, kind: AttendKind, seconds: number): HabitatInput {
+  return { type: "keeper.attend", ts: isoAt(noon + seconds * second), id, kind };
+}
+
 const columns = 96;
 const rows = 27;
 
@@ -146,12 +218,15 @@ function markOf(placement: Placement, index: number): string {
   if (placement.id === yardIds.card) return "y";
   if (placement.id === yardIds.fold) return "f";
   if (placement.rung === "stage") return "S";
-  if (placement.rung === "unfold") return String(index);
+  if (placement.rung === "unfold") return placement.size === "card" ? "k" : String(index);
+  if (placement.id.startsWith("plot:")) return "p";
   return "c";
 }
 
 function line(placement: Placement): string {
   const { x, y, width, height } = placement.rect;
   const slot = placement.slot === undefined ? "" : ` slot ${placement.slot}`;
-  return `${placement.id} ${placement.rung} ${placement.layer} ${x},${y} ${width}x${height}${slot}`;
+  const parent = placement.parent === null ? "" : ` from ${placement.parent}`;
+  const { id, rung, size, layer } = placement;
+  return `${id} ${rung} ${size} ${layer} ${x},${y} ${width}x${height}${slot}${parent}`;
 }

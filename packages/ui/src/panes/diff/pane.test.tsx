@@ -31,6 +31,7 @@ const recordedFile = JSON.parse(fixture("changed-file.json")) as ChangedFileRead
 
 interface Recorded {
   rebound: PaneSpecBase[];
+  opened: PaneSpecBase[];
   reads: number;
   fileReads: string[];
   editor: Array<[string, number]>;
@@ -107,6 +108,9 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
     rebind: (_paneId, spec) => {
       recorded.rebound.push(spec);
     },
+    openPane: (spec) => {
+      recorded.opened.push(spec);
+    },
     unseen: () => false,
     ...(seams.openInEditor && {
       openInEditor: async (path: string, line: number) => {
@@ -135,6 +139,7 @@ function mount(spec: DiffSpec, recorded: Recorded, shell = shellSeams(recorded))
 
 const recording = (): Recorded => ({
   rebound: [],
+  opened: [],
   reads: 0,
   fileReads: [],
   editor: [],
@@ -372,6 +377,24 @@ describe("the changes pane's undo and redo", () => {
       typeof action.chords === "string" ? [action.chords] : [...action.chords],
     );
     expect(new Set(chords).size).toBe(chords.length);
+  });
+});
+
+describe("showing the changed file itself", () => {
+  it("opens the file under the cursor from the list, and the open file from its diff", async () => {
+    const recorded = recording();
+    const fromList = mount({ kind: "diff", sessionId: "s1" }, recorded);
+    await settle();
+    fromList("diff.down");
+    fromList("diff.file");
+    cleanup();
+    mount({ kind: "diff", sessionId: "s1", path: "src/a.ts" }, recorded);
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "the file" }));
+    expect(recorded.opened).toEqual([
+      { kind: "file", path: "src/b.ts" },
+      { kind: "file", path: "src/a.ts" },
+    ]);
   });
 });
 

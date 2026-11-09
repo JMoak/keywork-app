@@ -1,12 +1,17 @@
 import {
+  chainOf,
   digestOf,
   type HabitatState,
   moveByHand,
   nextChangeAt,
   ownerOf,
+  type PlotCard,
   type PowerTier,
+  plotCardsOf,
+  plotsFoldedWhileAway,
   projectAll,
   proposeSetting,
+  restorePlot,
   ruleFromHand,
   stillShown,
   withYardStep,
@@ -29,15 +34,18 @@ import {
 import { sessionName } from "../chrome/session-name.ts";
 import type { ShellSeams } from "../panes/index.ts";
 import {
+  type AttentionSource,
   createHabitatWorld,
   type HabitatWorld,
   houseOffsetMinutes,
   seatCreatures,
 } from "../panes/stead/habitat.ts";
 import { answerSetting } from "./answers.ts";
+import { type AttendNotice, createAttentionFeed } from "./attention.ts";
 import { createKeeperVoice } from "./context.ts";
 import type { YardRuleBook } from "./rules.ts";
 import type { KeeperSignals } from "./signals.ts";
+import { type YardLineage, yardLineageOf } from "./trail.ts";
 import { wakeWhenTheYardChanges } from "./wake.ts";
 
 export interface YardModelSeams {
@@ -54,11 +62,17 @@ export interface YardModelSeams {
 export interface YardModel {
   readonly settings: Accessor<readonly YardSetting[]>;
   readonly heldBack: Accessor<number>;
+  readonly foldedAway: Accessor<readonly string[]>;
+  readonly inside: Accessor<string | undefined>;
   readonly card: Accessor<YardCard>;
+  readonly plots: Accessor<readonly PlotCard[]>;
+  readonly lineage: YardLineage;
+  attend(notice: AttendNotice): void;
   withdrawn(id: string): boolean;
   shellOf(setting: YardSetting): ShellSeams;
   ownerOf(setting: YardSetting): string;
   raiseByHand(setting: YardSetting): void;
+  restorePlot(plot: PlotCard): void;
   answer(setting: YardSetting, outcome: KeeperShowOutcome): Promise<string | undefined>;
 }
 
@@ -89,15 +103,23 @@ export function createYardModel(seams: YardModelSeams): YardModel {
   };
   const withdrawals = createWithdrawals();
   onCleanup(seams.shell.feed.subscribe(withdrawals.note));
-  const { world, clock } = createYardWorld(seams, keeperContext);
+  const attention = createAttentionFeed();
+  const { world, clock } = createYardWorld(seams, keeperContext, attention);
+  const yard = createMemo(() => yardOf(world.state()));
   const home = followHome(seams.home, world, withdrawals.note);
   const shellOf = (setting: YardSetting): ShellSeams =>
     home.owns(setting.id) ? (seams.home() ?? seams.shell) : seams.shell;
 
   return {
-    settings: () => Object.values(yardOf(world.state()).settings).filter(stillShown),
-    heldBack: () => digestOf(yardOf(world.state()), seams.signals().returnedAt).length,
-    card: () => yardCard(yardOf(world.state()), clock()),
+    settings: () => Object.values(yard().settings).filter(stillShown),
+    heldBack: () => digestOf(yard(), seams.signals().returnedAt).length,
+    foldedAway: () =>
+      plotsFoldedWhileAway(yard(), seams.signals().returnedAt).map((plot) => chainOf(yard(), plot)),
+    inside: () => yard().visit?.id,
+    card: () => yardCard(yard(), clock()),
+    plots: () => plotCardsOf(Object.values(yard().settings)),
+    lineage: yardLineageOf(yard),
+    attend: attention.attend,
     withdrawn: withdrawals.has,
     shellOf,
     ownerOf: (setting) => {
@@ -106,6 +128,8 @@ export function createYardModel(seams: YardModelSeams): YardModel {
       const store = shellOf(setting).store;
       return sessionName(store.summary(owner.sessionId), store.projection(owner.sessionId));
     },
+    restorePlot: (plot) =>
+      world.update((held) => ({ ...held, yard: restorePlot(yardOf(held), plot.id, seams.now()) })),
     raiseByHand: (setting) => {
       world.update((held) => ({
         ...held,
@@ -136,7 +160,11 @@ export function withdrawnIn(batch: readonly BusEnvelope[]): string[] {
   );
 }
 
-function createYardWorld(seams: YardModelSeams, keeperContext: Accessor<KeeperContext>) {
+function createYardWorld(
+  seams: YardModelSeams,
+  keeperContext: Accessor<KeeperContext>,
+  attention: AttentionSource,
+) {
   const { shell } = seams;
   const world = createHabitatWorld({
     rows: () => shell.store.state.summaries,
@@ -144,6 +172,7 @@ function createYardWorld(seams: YardModelSeams, keeperContext: Accessor<KeeperCo
     currentSession: seams.focusedThread,
     creatures: () => shell.client.creatures(),
     settings: () => shell.client.settings(),
+    attention,
     feed: shell.feed,
     now: seams.now,
     offsetMinutes: houseOffsetMinutes(),

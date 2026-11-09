@@ -7,6 +7,7 @@ import type {
   SessionRow,
   Setting,
 } from "@keywork-app/protocol";
+import type { AttendKind } from "../yard/types.ts";
 import type {
   DecidedForKeeper,
   NodeId,
@@ -97,7 +98,13 @@ export type KeeperNotice =
       readonly ts: string;
       readonly sessions: readonly SessionRow[];
     }
-  | { readonly type: "keeper.show"; readonly ts: string; readonly settings: readonly Setting[] };
+  | { readonly type: "keeper.show"; readonly ts: string; readonly settings: readonly Setting[] }
+  | {
+      readonly type: "keeper.attend";
+      readonly ts: string;
+      readonly id: string;
+      readonly kind: AttendKind;
+    };
 
 export interface CreatureSummary {
   readonly slug: Slug;
@@ -143,14 +150,28 @@ export interface RoutineSummary {
   readonly title: string;
 }
 
+export type KeeperNoticeType = KeeperNotice["type"];
+
+export const keeperNoticeTypes: readonly KeeperNoticeType[] = Object.keys({
+  "keeper.viewed": true,
+  "keeper.presence": true,
+  "keeper.asks": true,
+  "keeper.chores": true,
+  "keeper.decided": true,
+  "keeper.routines": true,
+  "keeper.sessions": true,
+  "keeper.show": true,
+  "keeper.attend": true,
+} satisfies Record<KeeperNoticeType, true>) as KeeperNoticeType[];
+
 export function isKeeperNotice(input: HabitatInput): input is KeeperNotice {
-  return !("id" in input);
+  return (keeperNoticeTypes as readonly string[]).includes(input.type);
 }
 
 export function isBusEnvelope(input: HabitatInput): input is BusEnvelope {
-  return "id" in input && "sessionId" in input;
+  return !isKeeperNotice(input) && "sessionId" in input;
 }
 
 export function isRanchEvent(input: HabitatInput): input is RanchEvent {
-  return "id" in input && !("sessionId" in input);
+  return !isKeeperNotice(input) && !("sessionId" in input);
 }

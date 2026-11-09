@@ -1,7 +1,7 @@
 yard yard
 hub 0,0 1140×900
 rail 1152,16 272×464 · in hand
-  head 0,0 272×40 j k move · enter opens · x dismisses · p pins · esc returns
+  head 0,0 272×40 j k move · enter opens · x dismisses · p pins · t trail · esc returns
   card 0,52 272×64 · cursor
     the nightly chore found two stale branches
     Wren set out a note

@@ -7,10 +7,17 @@ import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { ActionCommand } from "../panes/registry.ts";
 import {
+  type TrailStep,
+  yardLeafwardAction,
+  yardLeafwardActionId,
   yardRailAction,
   yardRailActionId,
+  yardRootwardAction,
+  yardRootwardActionId,
   yardToggleAction,
   yardToggleActionId,
+  yardTrailAction,
+  yardTrailActionId,
 } from "../yard/actions.ts";
 import { type BindingSpec, everyPane } from "./keymap.ts";
 
@@ -46,6 +53,8 @@ export interface ActionTarget {
   toggleNeedsYouStrip(): void;
   focusYardRail(): void;
   toggleYard(): void;
+  toggleYardTrail(): void;
+  walkYardTrail(step: TrailStep): void;
 }
 
 export interface AppAction {
@@ -64,6 +73,9 @@ export const coreActions: Record<string, AppAction> = {
   [companionSwitchActionId]: companionSwitchAction,
   [yardRailActionId]: yardRailAction,
   [yardToggleActionId]: yardToggleAction,
+  [yardTrailActionId]: yardTrailAction,
+  [yardRootwardActionId]: yardRootwardAction,
+  [yardLeafwardActionId]: yardLeafwardAction,
   "pane.close": {
     chords: "leader x",
     help: "close focused pane",

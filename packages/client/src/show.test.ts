@@ -62,6 +62,33 @@ describe("the yard's routes", () => {
     ]);
   });
 
+  it("posts the keeper's own opening to POST /show as an unfolded child of the panel it came from", async () => {
+    const opened = { ...setting, id: "set-2", what: { kind: "file", ref: "src/app.test.ts" } };
+    const server = serving(() => json(200, { setting: opened }));
+    const client = keyworkClient(ticket, { fetch: server.fetch });
+    const opening = {
+      what: { kind: "file", ref: "src/app.test.ts" },
+      from: "set-1",
+      rung: "unfold",
+    } as const;
+    expect(await client.openSetting(opening)).toEqual(opened);
+    expect(server.calls).toEqual([
+      { url: "http://127.0.0.1:4770/show", method: "POST", body: JSON.stringify(opening) },
+    ]);
+  });
+
+  it("returns the server's refusal of an opening from a panel it does not know", async () => {
+    const server = serving(() => json(404, { error: "no live setting or session set-9" }));
+    const client = keyworkClient(ticket, { fetch: server.fetch });
+    expect(
+      await client.openSetting({
+        what: { kind: "url", ref: "https://example.com" },
+        from: "set-9",
+        rung: "unfold",
+      }),
+    ).toEqual({ refused: "missing", detail: "no live setting or session set-9" });
+  });
+
   it("returns the server's refusal in its own words", async () => {
     const server = serving(() =>
       json(409, { error: "setting set-1 is pinned; unpin or dismiss it" }),

@@ -79,6 +79,11 @@ export const diffPane = definePane<DiffSpec>({
       help: "open the file's diff",
       command: { name: "diff-open", description: "show this file before and after" },
     },
+    "diff.file": {
+      chords: "f",
+      help: "show the file itself",
+      command: { name: "diff-file", description: "show the changed file as it reads now" },
+    },
     "diff.back": {
       chords: "escape",
       help: "back to the file list",
@@ -234,6 +239,9 @@ function FilesLevel(props: LevelProps) {
     if (file === undefined) return;
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId, path: file.path });
   };
+  const showFile = (file: ChangedPath | undefined): void => {
+    if (file !== undefined) props.shell.openPane({ kind: "file", path: file.path });
+  };
 
   let root: HTMLElement | undefined;
   keepKeyboardHome(
@@ -267,6 +275,9 @@ function FilesLevel(props: LevelProps) {
           break;
         case "diff.open":
           open(files()[cursor()]);
+          break;
+        case "diff.file":
+          showFile(files()[cursor()]);
           break;
         case "diff.refresh":
           void props.shell.store.openChanges(props.sessionId, { force: true });
@@ -454,6 +465,9 @@ function FileLevel(props: LevelProps & { path: string }) {
         case "diff.back":
           back();
           break;
+        case "diff.file":
+          props.shell.openPane({ kind: "file", path: props.path });
+          break;
         case "diff.next":
           go(at() + 1);
           break;
@@ -487,6 +501,13 @@ function FileLevel(props: LevelProps & { path: string }) {
         </button>
         <span class="kw-diff-head-path">{props.path}</span>
         <span class="kw-diff-head-hunks">{hunkWord(hunks().length)}</span>
+        <button
+          type="button"
+          class="kw-diff-show"
+          onClick={() => props.shell.openPane({ kind: "file", path: props.path })}
+        >
+          the file
+        </button>
         <Show when={props.shell.openInEditor}>
           {(openInEditor) => (
             <button

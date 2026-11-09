@@ -44,5 +44,5 @@ function liveCardsByOwner(settings: readonly YardSetting[]): Map<string, YardSet
 }
 
 function liveCard(setting: YardSetting): boolean {
-  return setting.state === "live" && setting.shown === "card";
+  return setting.state === "live" && setting.shown === "card" && setting.folded === undefined;
 }

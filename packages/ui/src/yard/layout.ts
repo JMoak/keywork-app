@@ -1,10 +1,13 @@
 import {
-  byDepth,
   defaultHub,
   foldedOf,
+  hiddenInPlots,
   type MotionPrefs,
+  overlaps,
   type Placement,
+  type PlotCard,
   placeYard,
+  plotCardsOf,
   rankOf,
   stillShown,
   type YardSetting,
@@ -19,14 +22,17 @@ export interface YardLayoutInput {
   readonly settings: readonly YardSetting[];
   readonly railWanted: boolean;
   readonly prefs: MotionPrefs;
+  readonly inside?: string | undefined;
 }
 
 export interface YardLayout {
   readonly hub: Rect;
   readonly rail: RailLayout | undefined;
   readonly satellites: readonly Placement[];
-  readonly selectable: readonly YardSetting[];
+  readonly selectable: readonly YardEntry[];
 }
+
+export type YardEntry = YardSetting | PlotCard;
 
 export interface RailLayout {
   readonly region: Rect;
@@ -37,28 +43,65 @@ export interface RailLayout {
 }
 
 export function yardLayout(input: YardLayoutInput): YardLayout {
-  const ladder = input.settings.filter(onTheLadder).toSorted(byDepth);
-  const hub = hubFor(input.viewport, ladder, input.railWanted);
+  const hidden = hiddenInPlots(input.settings);
+  const ladder = input.settings.filter(
+    (setting) => onTheLadder(setting) && !hidden.has(setting.id),
+  );
+  const plots = plotCardsOf(input.settings);
+  const hub = hubFor(input.viewport, ladder, plots.length > 0 || input.railWanted);
   const placements = placeYard({
     viewport: input.viewport,
     hub,
-    settings: ladder,
+    settings: input.settings,
     prefs: input.prefs,
+    inside: input.inside,
   });
-  const byId = new Map(ladder.map((setting) => [setting.id, setting]));
+  const entries = new Map<string, YardEntry>(
+    [...ladder, ...plots].map((entry) => [entry.id, entry]),
+  );
   const satellites = placements.filter(
-    (placement) => byId.has(placement.id) && reaches(placement.rung, "unfold"),
+    (placement) => entries.has(placement.id) && reaches(placement.rung, "unfold"),
   );
   const cards = placements.filter(
-    (placement) => byId.has(placement.id) && placement.rung === "card",
+    (placement) => entries.has(placement.id) && placement.rung === "card",
   );
-  const placed = [...satellites, ...cards].flatMap((placement) => byId.get(placement.id) ?? []);
+  const placed = [...satellites, ...cards].flatMap((placement) => entries.get(placement.id) ?? []);
+  const folded = foldedOf(placements, input.settings).length;
   return {
     hub: placements.find((placement) => placement.id === yardIds.hub)?.rect ?? hub,
-    rail: railOf(placements, cards, foldedOf(placements, ladder).length, hub, input.railWanted),
+    rail: railOf(placements, cards, folded, hub, input.railWanted),
     satellites,
     selectable: placed,
   };
+}
+
+export function isPlot(entry: YardEntry): entry is PlotCard {
+  return "members" in entry;
+}
+
+export interface RailRows {
+  readonly region: Rect;
+  readonly rows: readonly Rect[];
+  readonly fold: Rect;
+}
+
+export function railRowsBeneath(head: Rect, viewport: Rect, blocked: readonly Rect[]): RailRows {
+  const { gap, margin, rail } = yardMetrics;
+  const floor = viewport.y + viewport.height - margin;
+  const clear = (rect: Rect): boolean =>
+    rect.y + rect.height <= floor && blocked.every((other) => !overlaps(rect, other));
+  const rowAt = (index: number): Rect => ({
+    ...head,
+    y: head.y + head.height + gap + index * (rail.card + gap),
+    height: rail.card,
+  });
+  const foldAt = (index: number): Rect => ({ ...rowAt(index), height: rail.fold });
+  const rows: Rect[] = [];
+  while (rows.length < rail.length && clear(rowAt(rows.length)) && clear(foldAt(rows.length + 1))) {
+    rows.push(rowAt(rows.length));
+  }
+  const fold = foldAt(rows.length);
+  return { region: boundsOf([head, ...rows, fold]), rows, fold };
 }
 
 export function reaches(rung: Rung, floor: Rung): boolean {

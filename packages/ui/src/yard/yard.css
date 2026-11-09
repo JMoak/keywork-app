@@ -173,3 +173,32 @@
   color: var(--kw-text);
   background: var(--kw-background);
 }
+
+.kw-yard-crumb {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 0.25rem;
+  overflow: hidden;
+  font-family: var(--kw-font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--kw-text-mid);
+  pointer-events: none;
+}
+
+.kw-yard-card[data-level="1"] {
+  box-shadow: inset 10px 0 0 -8px var(--kw-border);
+  padding-left: 1.25rem;
+}
+.kw-yard-card[data-level="2"],
+.kw-yard-card[data-level="3"] {
+  padding-left: 1.875rem;
+}
+
+.kw-yard-satellite[data-size="card"] .kw-frame-body {
+  visibility: hidden;
+}

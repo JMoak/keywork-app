@@ -13,12 +13,12 @@ import { modelRoutes } from "./models.ts";
 import { permissionRoutes } from "./permissions.ts";
 import { routineFileBody, routineRoutes } from "./routines.ts";
 import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
-import { showAnswerBody, showRoutes } from "./show.ts";
+import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.2.1";
 
-export const contractVersion = "1.27";
+export const contractVersion = "1.28";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -55,6 +55,7 @@ export const requestBodies: Readonly<Record<string, readonly string[]>> = {
   applyMemoryForget: forgetApplyBody,
   sendCreatureMessage: creatureMessageBody,
   answerSetting: showAnswerBody,
+  openSetting: showOpeningBody,
 };
 
 export const routes = [

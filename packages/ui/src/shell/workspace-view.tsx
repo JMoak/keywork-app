@@ -202,9 +202,18 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
+  let overlayLeftPanel: string | undefined;
+  const openOverlay = (next: Overlay): void => {
+    if (overlay() === undefined) overlayLeftPanel = yard.panels.inside();
+    setOverlay(next);
+  };
   createEffect(
     on(overlay, (open, wasOpen) => {
-      if (open === undefined && wasOpen !== undefined && !keyboard.restore()) keyboard.returnHome();
+      if (open !== undefined || wasOpen === undefined) return;
+      const panel = overlayLeftPanel;
+      overlayLeftPanel = undefined;
+      if (panel !== undefined && yard.panels.focus(panel)) return;
+      if (!keyboard.restore()) keyboard.returnHome();
     }),
   );
   const [leaderArmed, setLeaderArmed] = createSignal(false);
@@ -442,7 +451,9 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
 
   const summon = async (definition: PaneDefinition<PaneSpec>, variant?: string): Promise<void> => {
     if (definition.summon === undefined) return;
-    act(tiler.summon(await definition.summon.spec(shell, variant), screen(), variant));
+    const spec = await definition.summon.spec(shell, variant);
+    if (yard.openFromPanel(spec)) return;
+    act(tiler.summon(spec, screen(), variant));
     if (!keyboard.restore()) keyboard.returnHome();
   };
   followTrustArrival(trust.state, {
@@ -512,7 +523,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     const pane = tiler.focused();
     const spec = tiler.focusedSpec();
     const commands = spec === undefined ? [] : trayOf(spec.kind);
-    if (pane !== undefined && commands.length > 0) setOverlay({ kind: "tray", pane, commands });
+    if (pane !== undefined && commands.length > 0) openOverlay({ kind: "tray", pane, commands });
     else if (spec === undefined) say("no pane is focused · nothing to list");
     else say(`${paneTitle(spec)} has no commands of its own`);
   };
@@ -555,6 +566,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     resizePane: (delta) => act(tiler.resizePane(delta, screen())),
     summon: (kind, argument) => void summon(definitionOf(kind), argument),
     paneAction: (action, argument) => {
+      if (yard.panels.deliver(action, argument)) return;
       const id = tiler.focused();
       if (id !== undefined) deliverToPane(id, action, argument);
     },
@@ -563,9 +575,13 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     answerAsk: answerFocusedAsk,
     toggleQuiet: () => void toggleFocusedQuiet(),
     toggleHelp: () =>
-      setOverlay((current) => (current?.kind === "help" ? undefined : { kind: "help" })),
+      overlay()?.kind === "help" ? setOverlay(undefined) : openOverlay({ kind: "help" }),
     openPalette: (query) =>
-      setOverlay({ kind: "palette", query, scope: tiler.focusedSpec()?.kind }),
+      openOverlay({
+        kind: "palette",
+        query,
+        scope: yard.panels.kindAt(document.activeElement) ?? tiler.focusedSpec()?.kind,
+      }),
     trustWorkspace: () => void trust.accept(),
     toggleMark: toggleFocusedMark,
     clearMarks,
@@ -581,8 +597,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           ? "needs-you strip shown"
           : stripHiddenNotice(keys.describe("needs-you.summon")),
       ),
-    focusYardRail: yard.control.focusRail,
+    focusYardRail: () => yard.control.focusRail(),
     toggleYard: yard.control.toggle,
+    toggleYardTrail: yard.control.toggleView,
+    walkYardTrail: yard.walk,
   };
 
   onCleanup(followActivations(props.host, { workspace: props.workspace, show: jumps.toTrigger }));
@@ -708,7 +726,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     const chords = chordsOfKey(event);
     if (chords.length === 0) return;
     const focus = keyFocusOf(
-      presentedHome()?.kind ?? tiler.focusedSpec()?.kind,
+      yard.panels.kindAt(eventTarget) ?? presentedHome()?.kind ?? tiler.focusedSpec()?.kind,
       event.target,
       keymap,
     );
@@ -971,14 +989,26 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         on={yard.control.on()}
         settings={yard.settings()}
         heldBack={yard.heldBack()}
+        foldedAway={yard.foldedAway()}
+        inside={yard.inside()}
         withdrawn={yard.withdrawn}
         card={yard.card()}
         railActive={yard.control.railActive()}
         reducedMotion={yard.reducedMotion()}
         shell={shell}
         ownerOf={yard.ownerOf}
+        panels={yard.panels}
+        lineage={yard.lineage}
+        view={yard.control.view()}
+        railAt={yard.control.railAt()}
         onEnter={yard.enter}
         onAnswer={yard.answer}
+        onOpen={yard.open}
+        onInteract={yard.interacted}
+        onToggleView={yard.control.toggleView}
+        onWalk={yard.walkFrom}
+        onRestore={yard.restore}
+        onRailLeft={yard.control.railLeftFor}
         onReturn={yard.control.leaveRail}
       >
         {stageView}

@@ -1,22 +1,50 @@
 import type { YardCard, YardDecision, YardSetting } from "@keywork-app/habitat";
-import type { JSX } from "solid-js";
+import { type JSX, Show } from "solid-js";
 import type { ShellSeams } from "../src/panes/registry.ts";
 import { Yard } from "../src/yard/index.ts";
+import { plotStageOf } from "./plot-stage.ts";
+import { type CardScene, isPlotScene, type YardScene } from "./yard-scenes.ts";
 
-export type YardScene = "yard-cards" | "yard-unfold" | "yard-rail" | "yard-stage";
-
-export const yardScenes: readonly YardScene[] = [
-  "yard-cards",
-  "yard-unfold",
-  "yard-rail",
-  "yard-stage",
-];
-
-export function isYardScene(scene: string): scene is YardScene {
-  return (yardScenes as readonly string[]).includes(scene);
-}
+export { isYardScene, type YardScene, yardScenes } from "./yard-scenes.ts";
 
 export function YardStage(props: { scene: YardScene; hub: JSX.Element }) {
+  const hub = (
+    <div class="kw-stage">
+      <div class="kw-slot" style={{ left: "0px", top: "0px", width: "100%", height: "100%" }}>
+        {props.hub}
+      </div>
+    </div>
+  );
+  return (
+    <Show
+      when={isPlotScene(props.scene) ? plotStageOf(props.scene) : undefined}
+      fallback={<CardStage scene={props.scene as CardScene}>{hub}</CardStage>}
+    >
+      {(stage) => (
+        <Yard
+          on={true}
+          settings={stage().settings}
+          card={cardOf(props.scene)}
+          offsetMinutes={0}
+          railActive={stage().railActive}
+          railAt={stage().railAt}
+          view={stage().view}
+          lineage={stage().lineage}
+          reducedMotion={true}
+          shell={{} as ShellSeams}
+          ownerOf={ownerOf}
+          onEnter={() => undefined}
+          onAnswer={() => undefined}
+          onReturn={() => undefined}
+        >
+          {hub}
+        </Yard>
+      )}
+    </Show>
+  );
+}
+
+function CardStage(props: { scene: CardScene; children: JSX.Element }) {
   return (
     <Yard
       on={true}
@@ -31,11 +59,7 @@ export function YardStage(props: { scene: YardScene; hub: JSX.Element }) {
       onAnswer={() => undefined}
       onReturn={() => undefined}
     >
-      <div class="kw-stage">
-        <div class="kw-slot" style={{ left: "0px", top: "0px", width: "100%", height: "100%" }}>
-          {props.hub}
-        </div>
-      </div>
+      {props.children}
     </Yard>
   );
 }
@@ -45,7 +69,7 @@ function ownerOf(setting: YardSetting): string {
   return `${setting.creature.slice(0, 1).toUpperCase()}${setting.creature.slice(1)}`;
 }
 
-function settingsOf(scene: YardScene): readonly YardSetting[] {
+function settingsOf(scene: CardScene): readonly YardSetting[] {
   const cards = [
     staged("branches", "card", 6, "note", "the nightly chore found two stale branches"),
     staged("spec", "card", 5, "url", "https://example.com/parser-spec", null),
@@ -68,7 +92,7 @@ function settingsOf(scene: YardScene): readonly YardSetting[] {
 }
 
 function cardOf(scene: YardScene): YardCard {
-  const unfolded = scene === "yard-unfold" || scene === "yard-stage";
+  const unfolded = scene !== "yard-cards" && scene !== "yard-rail";
   return {
     id: "yard:card",
     used: unfolded ? 1 : 0,
@@ -76,6 +100,7 @@ function cardOf(scene: YardScene): YardCard {
     windowMs: 600_000,
     nextFreeAt: Date.UTC(2026, 10, 8, 9, 0),
     cooldowns: [],
+    attended: [],
     decisions: unfolded ? [decided("summary", "unfold", "you asked, it shows")] : [],
   };
 }

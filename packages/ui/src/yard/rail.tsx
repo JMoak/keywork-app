@@ -2,15 +2,18 @@ import { yardIds } from "@keywork-app/habitat";
 import type { KeeperShowOutcome, Rung } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, type JSX, on, Show } from "solid-js";
 import type { Rect } from "../layout/index.ts";
+import type { TrailStep } from "./actions.ts";
 import { pinAnswer } from "./answers.ts";
+import type { RailView } from "./control.ts";
 import {
+  awayLine,
   decisionsHead,
   emptyRail,
   foldedLine,
-  heldBackLine,
   noDecisions,
   railHint,
   railLabel,
+  trailHint,
 } from "./copy.ts";
 import "./yard.css";
 
@@ -23,6 +26,8 @@ export interface RailEntry {
   readonly pinned: boolean;
   readonly withdrawn?: boolean | undefined;
   readonly grouped?: number | undefined;
+  readonly plot?: number | undefined;
+  readonly level?: number | undefined;
 }
 
 export interface RailCardSpot {
@@ -32,7 +37,7 @@ export interface RailCardSpot {
 
 export interface YardCardView {
   readonly line: string;
-  readonly decisions: readonly string[];
+  readonly log: readonly string[];
 }
 
 export interface RailProps {
@@ -42,13 +47,18 @@ export interface RailProps {
   fold: Rect | undefined;
   folded: number;
   heldBack: number;
+  foldedAway?: readonly string[] | undefined;
   card?: YardCardView | undefined;
   log?: Rect | undefined;
   active: boolean;
+  view?: RailView | undefined;
   cursor: string | undefined;
   onCursor(id: string): void;
   onEnter(entry: RailEntry): void;
   onAnswer(entry: RailEntry, outcome: KeeperShowOutcome): void;
+  onToggleView?: (() => void) | undefined;
+  onWalk?: ((entry: RailEntry, step: TrailStep) => void) | undefined;
+  onLeave?: ((next: EventTarget | null) => void) | undefined;
   onReturn(): void;
 }
 
@@ -89,6 +99,9 @@ export function Rail(props: RailProps) {
     Enter: enter,
     x: withCurrent((entry) => props.onAnswer(entry, "dismissed")),
     p: withCurrent((entry) => props.onAnswer(entry, pinAnswer(entry.pinned))),
+    t: () => props.onToggleView?.(),
+    "[": withCurrent((entry) => props.onWalk?.(entry, "rootward")),
+    "]": withCurrent((entry) => props.onWalk?.(entry, "leafward")),
     Escape: () => props.onReturn(),
   };
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -118,6 +131,7 @@ export function Rail(props: RailProps) {
       role="listbox"
       tabIndex={-1}
       aria-label={railLabel}
+      data-view={props.view ?? "now"}
       aria-activedescendant={
         props.active && (onHead() || current() !== undefined)
           ? railEntryId(onHead() ? yardIds.card : current()?.id)
@@ -126,6 +140,12 @@ export function Rail(props: RailProps) {
       data-active={props.active ? "" : undefined}
       data-keys-owned
       onKeyDown={onKeyDown}
+      onFocusOut={(event) => {
+        const next = event.relatedTarget;
+        if (props.active && !(next instanceof Node && event.currentTarget.contains(next))) {
+          props.onLeave?.(next);
+        }
+      }}
     >
       <button
         type="button"
@@ -148,7 +168,7 @@ export function Rail(props: RailProps) {
       <Show when={logOpen() && props.card}>
         {(card) => (
           <ol class="kw-yard-decisions" aria-label={decisionsHead} style={rectStyle(props.log)}>
-            <For each={card().decisions} fallback={<li>{noDecisions}</li>}>
+            <For each={card().log} fallback={<li>{noDecisions}</li>}>
               {(line) => <li>{line}</li>}
             </For>
           </ol>
@@ -182,8 +202,9 @@ export function Rail(props: RailProps) {
 
 function headLine(props: RailProps, onHead: boolean, logOpen: boolean): string {
   if (logOpen) return decisionsHead;
-  if (props.active && !onHead) return railHint;
-  if (props.heldBack > 0) return heldBackLine(props.heldBack);
+  if (props.active && !onHead) return props.view === "trail" ? trailHint : railHint;
+  const folded = props.foldedAway ?? [];
+  if (props.heldBack > 0 || folded.length > 0) return awayLine(props.heldBack, folded);
   if (props.card !== undefined) return props.card.line;
   return props.entries.length === 0 ? emptyRail : railLabel;
 }
@@ -212,13 +233,17 @@ function RailCardView(props: RailCardViewProps) {
       data-pinned={props.entry.pinned ? "" : undefined}
       data-withdrawn={props.entry.withdrawn ? "" : undefined}
       data-group={props.entry.grouped}
+      data-plot={props.entry.plot}
+      data-level={props.entry.level}
       data-cursor={props.cursor ? "" : undefined}
       style={rectStyle(props.rect)}
       onClick={() => props.onPick()}
     >
       <span class="kw-yard-card-title">{props.entry.title}</span>
       <span class="kw-yard-card-by">{props.entry.by}</span>
-      <span class="kw-yard-card-why">{props.entry.why}</span>
+      <Show when={props.entry.why !== ""}>
+        <span class="kw-yard-card-why">{props.entry.why}</span>
+      </Show>
     </button>
   );
 }

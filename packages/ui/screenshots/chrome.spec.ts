@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { chromeGalleryUrl } from "../playwright.config.ts";
+import { yardScenes } from "./yard-scenes.ts";
 
 const platformNames: Record<string, string> = { win32: "windows", darwin: "macos", linux: "linux" };
 const platform = platformNames[process.platform] ?? process.platform;
@@ -138,7 +139,7 @@ async function themesOf(page: Page): Promise<string[]> {
   return ((await page.locator("body").getAttribute("data-themes")) ?? "").split(" ");
 }
 
-for (const scene of ["yard-cards", "yard-unfold", "yard-rail", "yard-stage"] as const) {
+for (const scene of yardScenes) {
   for (const theme of ["keywork-night", "keywork-day"]) {
     test(`the yard stage ${scene} in ${theme}`, async ({ page }) => {
       await page.setViewportSize(widths.wide);

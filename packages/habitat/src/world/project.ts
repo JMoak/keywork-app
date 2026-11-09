@@ -18,6 +18,7 @@ import type {
   WorkshopChange,
 } from "@keywork-app/protocol";
 import { day, hour, minute, parseTs } from "../clock/clock.ts";
+import { attend } from "../yard/attention.ts";
 import { type YardState, yardOf } from "../yard/types.ts";
 import { proposeSetting, seatSettings, settleSetting } from "../yard/wire.ts";
 import {
@@ -335,6 +336,10 @@ function absorbKeeper(state: HabitatState, notice: KeeperNotice): HabitatState {
       return postBoard(state, notice.creature, notice.routines, notice.ts);
     case "keeper.show":
       return withSettings(state, notice.settings, notice.ts);
+    case "keeper.attend":
+      return withYard(state, (yard) =>
+        attend(yard, { id: notice.id, kind: notice.kind, at: parseTs(notice.ts) }),
+      );
   }
 }
 

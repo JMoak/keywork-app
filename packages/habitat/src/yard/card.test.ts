@@ -26,6 +26,7 @@ describe("the yard's own card", () => {
       nextFreeAt: noon,
       cooldowns: [],
       decisions: [],
+      attended: [],
     });
   });
 

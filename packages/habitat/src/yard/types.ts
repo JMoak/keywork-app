@@ -1,4 +1,10 @@
-import { type Rung, rungs, type Setting, type SettingKind } from "@keywork-app/protocol";
+import {
+  type Rung,
+  rungs,
+  type Setting,
+  type SettingKind,
+  type SettingOrigin,
+} from "@keywork-app/protocol";
 import { parseTs } from "../clock/clock.ts";
 import type { Budget, GateContext, Verdict } from "../creature/gate.ts";
 import type { MotionPrefs } from "../pose/pose.ts";
@@ -10,6 +16,9 @@ export interface YardState {
   readonly budget: YardBudget;
   readonly decisions: readonly YardDecision[];
   readonly ruledThings?: readonly string[] | undefined;
+  readonly ancestors?: Readonly<Record<string, TrailMark>> | undefined;
+  readonly visit?: Visit | undefined;
+  readonly awaySince?: number | undefined;
 }
 
 export interface YardSetting extends Setting {
@@ -19,6 +28,9 @@ export interface YardSetting extends Setting {
   readonly pinnedAt?: string | undefined;
   readonly unfolded?: Unfolded | undefined;
   readonly ruled?: boolean | undefined;
+  readonly attention?: Attention | undefined;
+  readonly size?: Size | undefined;
+  readonly folded?: string | undefined;
 }
 
 export interface Unfolded {
@@ -26,6 +38,35 @@ export interface Unfolded {
   readonly slot: number;
   readonly focus: SessionId | undefined;
   readonly byHand: boolean;
+  readonly lane?: number | undefined;
+}
+
+export type Size = "card" | "readable" | "working";
+
+export const sizes: readonly Size[] = ["card", "readable", "working"];
+
+export type AttendKind = "enter" | "leave" | "interact";
+
+export interface Attention {
+  readonly dwellMs: number;
+  readonly entries: number;
+  readonly interactions: number;
+  readonly lastAt: number;
+  readonly score: number;
+  readonly interactedAt?: number | undefined;
+}
+
+export interface Visit {
+  readonly id: string;
+  readonly since: number;
+  readonly counted: boolean;
+}
+
+export interface TrailMark
+  extends Pick<Setting, "id" | "from" | "what" | "at" | "creature" | "sessionId"> {
+  readonly replaceable?: boolean | undefined;
+  readonly pendingFold?: boolean | undefined;
+  readonly foldedOnLeaving?: readonly string[] | undefined;
 }
 
 export interface YardBudget extends Budget {
@@ -86,6 +127,8 @@ export interface Placement {
   readonly rung: Rung;
   readonly layer: Layer;
   readonly slot?: number | undefined;
+  readonly size: Size;
+  readonly parent: string | null;
 }
 
 export interface YardLayout {
@@ -93,6 +136,7 @@ export interface YardLayout {
   readonly hub: Rect;
   readonly settings: readonly YardSetting[];
   readonly prefs: MotionPrefs;
+  readonly inside?: string | undefined;
 }
 
 export const emptyYard: YardState = {
@@ -114,7 +158,19 @@ export function stillShown(setting: Pick<Setting, "state">): boolean {
   return setting.state === "live" || setting.state === "pinned";
 }
 
-export function byArrival(a: YardSetting, b: YardSetting): number {
+export function sizeOf(setting: Pick<YardSetting, "size">): Size {
+  return setting.size ?? "readable";
+}
+
+export function originOf(setting: Pick<Setting, "origin">): SettingOrigin {
+  return setting.origin ?? "creature";
+}
+
+export function fromOf(setting: Pick<Setting, "from">): string | null {
+  return setting.from ?? null;
+}
+
+export function byArrival(a: Pick<Setting, "at" | "id">, b: Pick<Setting, "at" | "id">): number {
   return parseTs(a.at) - parseTs(b.at) || byId(a, b);
 }
 

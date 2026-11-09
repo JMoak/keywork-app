@@ -22,6 +22,10 @@ export const settingStates = ["live", "seen", "pinned", "dismissed", "withdrawn"
 
 export type SettingState = (typeof settingStates)[number];
 
+export const settingOrigins = ["creature", "keeper"] as const;
+
+export type SettingOrigin = (typeof settingOrigins)[number];
+
 export interface Setting {
   id: string;
   creature: string | null;
@@ -32,6 +36,11 @@ export interface Setting {
   at: string;
   until: SettingUntil;
   state: SettingState;
+  // Since contract 1.28; an older engine sends none of these: read `from` and `replaces` as null,
+  // `origin` as creature.
+  from?: string | null | undefined;
+  origin?: SettingOrigin | undefined;
+  replaces?: string | null | undefined;
 }
 
 export const showOutcomes = ["seen", "pinned", "unpinned", "dismissed", "withdrawn"] as const;
@@ -64,9 +73,22 @@ export interface ShowAnswered {
   setting: Setting;
 }
 
+export interface ShowOpening {
+  what: SettingSubject;
+  from: string;
+  rung: "unfold";
+}
+
+export interface ShowOpened {
+  setting: Setting;
+}
+
 export const showAnswerBody = ["outcome"] as const;
+
+export const showOpeningBody = ["what", "from", "rung"] as const;
 
 export const showRoutes = [
   { method: "GET", path: "/show", operationId: "listSettings" },
+  { method: "POST", path: "/show", operationId: "openSetting" },
   { method: "POST", path: "/show/{id}/answer", operationId: "answerSetting" },
 ] as const;

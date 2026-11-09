@@ -7,11 +7,15 @@
 // request in the conversation, `y` on the ask, the chores pane's buttons and the chord it prints.
 //
 //   bun run --cwd packages/desktop build      (once: the smoke runs packages/desktop/out)
-//   bun run smoke:first-light [--keep]
+//   bun run smoke:first-light [--keep] [--trail]
 //
 // Prints one line per step and exits 0 when every step is observed. The first regressed step
 // stops the run: its name, the check that failed and a screenshot beside report.json in the
 // scratch folder, which is then kept; exit 1. --keep keeps the scratch folder after a pass too.
+// --trail runs the yard's trail alone, under the console's own keywork profile: the yard one
+// chord from tiles, a session's model sets out a diff, the keeper opens a file from it and a
+// test from the file, and the plot folds as one card and restores; every stage is shot into
+// artifacts/e2e/trail.
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -25,7 +29,16 @@ import {
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { delivered, introduction, notePath } from "./scripted-engine.mjs";
+import {
+  changeTitle,
+  delivered,
+  introduction,
+  notePath,
+  setOut,
+  sumPath,
+  sumTestPath,
+  trailRequest,
+} from "./scripted-engine.mjs";
 
 const desktopRoot = resolve(import.meta.dirname, "../..");
 const repoRoot = resolve(desktopRoot, "../..");
@@ -38,11 +51,18 @@ const { _electron: electron } = requireFromUi("@playwright/test");
 const requireFromDesktop = createRequire(join(desktopRoot, "package.json"));
 const electronBinary = requireFromDesktop("electron");
 
-const steps = [
+const firstLight = [
   { id: "2", name: "the stead first, a creature made and introduced", run: stepTwo },
   { id: "3", name: "one turn writes a file, asks, delivers", run: stepThree },
   { id: "4", name: "a read-only chore completes, a write chore parks", run: stepFour },
 ];
+const trailStep = {
+  id: "trail",
+  name: "a diff set out, a file and a test opened from it, the plot folds and restores",
+  run: stepTrail,
+};
+const steps = process.argv.includes("--trail") ? [trailStep] : firstLight;
+const trailShots = join(repoRoot, "artifacts", "e2e", "trail");
 
 const readOnlyChore = {
   title: "look around",
@@ -252,6 +272,195 @@ async function stepFour(world) {
   return `${readOnlyChore.title}: run ${completed.process}; ${writeChore.title}: ${parked.status}, no session, ${needs.length} needs-you item (${needs[0].kind}), pane reads 2 chores · 1 needs you`;
 }
 
+async function stepTrail(world) {
+  const { page } = world;
+  mkdirSync(trailShots, { recursive: true });
+  await page.waitForSelector("[aria-label=prompt]", { timeout: 120_000 });
+  await pressLeader(page, "Shift+Y");
+  await page.waitForSelector(".kw-yard[data-mode='yard']", { timeout: 15_000 });
+  await page.click("[aria-label=prompt]");
+  await page.keyboard.type(trailRequest, { delay: 5 });
+  await page.keyboard.press("Enter");
+  for (const path of [sumPath, sumTestPath]) await approveWrite(page, path);
+  const diff = await settingOut(page, (setting) => setting.what.title === changeTitle);
+  await page.waitForSelector(panelOf(diff.id), { timeout: 30_000 });
+  await until(page, async () => {
+    const reading = await served(page, `/sessions/${diff.sessionId}`);
+    return lastAssistantText(reading) === setOut ? reading : undefined;
+  });
+  const keptTyping = await page.evaluate(focusOutsideTheYard);
+  expect(keptTyping, "the diff unfolding took the keeper's focus");
+  const shots = [await trailShot(page, "1-diff-set-out.png")];
+
+  await page.click(`${panelOf(diff.id)} .kw-diff-file-row:has-text("${sumPath}")`);
+  await page
+    .waitForSelector(`${panelOf(diff.id)} .kw-diff[aria-label="file diff"]`, { timeout: 10_000 })
+    .catch(async () => {
+      const seen = await page.evaluate(panelReading, diff.id);
+      throw new Error(`the diff panel did not open ${sumPath}: ${seen}`);
+    });
+  await page.click(`${panelOf(diff.id)} button.kw-diff-show`);
+  const file = await settingOut(page, (setting) => setting.what.ref === sumPath);
+  expectOpenedFrom(file, diff);
+  await page.waitForSelector(panelOf(file.id), { timeout: 15_000 });
+  shots.push(await trailShot(page, "2-file-from-the-diff.png"));
+
+  await page.click(`${panelOf(file.id)} .kw-file-facts`);
+  const fileHeld = await page.evaluate(panelHoldingFocus);
+  expect(fileHeld === file.id, `a press on the file panel left focus in ${fileHeld}`);
+  await page.keyboard.press("Control+p");
+  await page.keyboard.type(`/open ${sumTestPath}`, { delay: 5 });
+  await page.keyboard.press("Enter");
+  const test = await settingOut(page, (setting) => setting.what.ref === sumTestPath, 15_000).catch(
+    async () => {
+      const said = await page.textContent(".kw-status-notice").catch(() => null);
+      throw new Error(
+        `/open from the file panel set nothing out: the console said "${said}", focus in ${await page.evaluate(panelHoldingFocus)}`,
+      );
+    },
+  );
+  expectOpenedFrom(test, file);
+  await page.waitForSelector(entryOf(test.id), { timeout: 15_000 });
+  await pressLeader(page, "]");
+  await page.waitForFunction(landedOn, test.id, { timeout: 5_000 }).catch(() => {
+    throw new Error("leader ] did not walk from the file to the test");
+  });
+  const chain = await page.textContent(".kw-yard-crumb");
+  expect(chain?.split(" → ").length === 3, `the hub head reads "${chain}", not a chain of three`);
+  shots.push(await trailShot(page, "3-test-from-the-file.png"));
+
+  await pressLeader(page, "y");
+  for (let walked = 0; walked < 3 && !(await railCursorOn(page, diff.id)); walked += 1) {
+    await page.keyboard.press("[");
+  }
+  expect(
+    await railCursorOn(page, diff.id),
+    "[ on the rail never reached the diff the plot grew from",
+  );
+  await page.keyboard.press("x");
+  const plot = await page.waitForSelector(".kw-yard-card[data-plot]", { timeout: 15_000 });
+  await page.waitForSelector(entryOf(test.id), { state: "detached", timeout: 15_000 });
+  const plotTitle = await plot.$eval(".kw-yard-card-title", (title) => title.textContent);
+  expect(plotTitle === chain, `the plot card reads "${plotTitle}", not "${chain}"`);
+  shots.push(await trailShot(page, "4-the-plot-folded.png"));
+
+  await pressLeader(page, "y");
+  for (let moved = 0; moved < 8 && !(await railCursorOnPlot(page)); moved += 1) {
+    await page.keyboard.press("j");
+  }
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(entryOf(test.id), { timeout: 15_000 }).catch(async () => {
+    const said = await page.textContent(".kw-status-notice").catch(() => null);
+    const rail = await page.evaluate(railReading);
+    throw new Error(`Enter on the plot card restored nothing: the console said "${said}"; ${rail}`);
+  });
+  await page.waitForSelector(entryOf(file.id), { timeout: 15_000 });
+  const restored = await page.evaluate(drawnAs, [file.id, test.id]);
+  shots.push(await trailShot(page, "5-the-plot-restored.png"));
+  return `"${changeTitle}" unfolded without taking focus; ${sumPath} opened from it and ${sumTestPath} from that, each keeper-origin with from; leader ] walked to the test and the hub head read "${chain}"; x on the seed folded the plot into one card of that name; Enter restored it (${restored}); shots ${shots.join(", ")}`;
+}
+
+async function approveWrite(page, path) {
+  await page.waitForSelector("fieldset.kw-ask", { timeout: 60_000 }).catch(() => {
+    throw new Error(`no ask arrived for the write to ${path}`);
+  });
+  const call = await page.getAttribute("fieldset.kw-ask", "data-call-id");
+  await page.keyboard.press("Control+y");
+  await page.waitForSelector(`fieldset.kw-ask[data-call-id="${call}"]`, {
+    state: "detached",
+    timeout: 30_000,
+  });
+}
+
+async function settingOut(page, matches, timeout) {
+  return until(page, async () => (await served(page, "/show")).settings.find(matches), timeout);
+}
+
+function expectOpenedFrom(setting, parent) {
+  expect(
+    setting.origin === "keeper" && setting.from === parent.id,
+    `${setting.what.ref} came out ${setting.origin} from ${setting.from}, not keeper from ${parent.id}`,
+  );
+}
+
+function panelOf(id) {
+  return `.kw-yard-satellite[data-setting="${id}"]`;
+}
+
+async function pressLeader(page, key) {
+  await page.keyboard.press("Control+k");
+  await page.keyboard.press(key);
+}
+
+async function railCursorOn(page, id) {
+  return page.evaluate((wanted) => {
+    const rail = document.querySelector(".kw-yard-rail");
+    return rail?.getAttribute("aria-activedescendant") === `kw-yard-entry-${wanted}`;
+  }, id);
+}
+
+async function railCursorOnPlot(page) {
+  return page.evaluate(
+    () => document.querySelector(".kw-yard-card[data-plot][data-cursor]") !== null,
+  );
+}
+
+async function trailShot(page, name) {
+  const path = join(trailShots, name);
+  await page.screenshot({ path });
+  return path;
+}
+
+function focusOutsideTheYard() {
+  return document.activeElement?.closest(".kw-yard-satellite, .kw-yard-rail") == null;
+}
+
+function panelReading(id) {
+  const panel = document.querySelector(`.kw-yard-satellite[data-setting="${id}"]`);
+  const pane = panel?.querySelector(".kw-diff")?.getAttribute("aria-label");
+  const focus = document.activeElement;
+  return `pane "${pane}", focus on ${focus?.tagName}.${focus?.className} inside the panel: ${panel?.contains(focus)}, size ${panel?.getAttribute("data-size")}`;
+}
+
+function railReading() {
+  const cards = [...document.querySelectorAll(".kw-yard-card")].map(
+    (card) =>
+      `${card.querySelector(".kw-yard-card-title")?.textContent}${card.hasAttribute("data-cursor") ? " (cursor)" : ""}`,
+  );
+  const focus = document.activeElement;
+  return `rail cards [${cards.join(" | ")}], focus on ${focus?.tagName}.${focus?.className}`;
+}
+
+function panelHoldingFocus() {
+  return (
+    document.activeElement?.closest(".kw-yard-satellite")?.getAttribute("data-setting") ??
+    "nothing in the yard"
+  );
+}
+
+function entryOf(id) {
+  return `[id="kw-yard-entry-${id}"]`;
+}
+
+function landedOn(id) {
+  const rail = document.querySelector(".kw-yard-rail");
+  const onRail =
+    document.activeElement === rail &&
+    rail?.getAttribute("aria-activedescendant") === `kw-yard-entry-${id}`;
+  const panel = document.activeElement?.closest(".kw-yard-satellite")?.getAttribute("data-setting");
+  return onRail || panel === id;
+}
+
+function drawnAs(ids) {
+  return ids
+    .map((id) => {
+      const entry = document.getElementById(`kw-yard-entry-${id}`);
+      const where = entry?.classList.contains("kw-yard-satellite") ? "panel" : "card";
+      return `${id} as a ${where}${entry?.getAttribute("data-size") ? ` (${entry.getAttribute("data-size")})` : ""}`;
+    })
+    .join(", ");
+}
+
 async function openChores(page) {
   await page.keyboard.press("Control+p");
   await page.keyboard.type("/chores", { delay: 5 });
@@ -442,6 +651,9 @@ function scratchFolder() {
     report: join(root, "report.json"),
   };
   for (const folder of [scratch.workspace, scratch.home, scratch.userData]) mkdirSync(folder);
+  for (const known of ["Roaming", "Local"]) {
+    mkdirSync(join(scratch.home, "AppData", known), { recursive: true });
+  }
   scratch.launcher = engineLauncher(root);
   openedFolder = scratch.workspace;
   return scratch;

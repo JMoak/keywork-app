@@ -19,6 +19,11 @@ export const introduction =
   "I am your creature, made a moment ago in this folder. I could take on three things here: read what the folder holds and say what it is, keep a short notes file current, and run a read-only look each morning. I can reach this folder through a bare host workshop; I cannot reach the network or any other machine.";
 export const delivered = `I wrote the first-light note to ${notePath}.`;
 export const lookedAround = "This folder holds one notes file and nothing that needs you.";
+export const trailRequest = "add a sum with its test, then set the change out for me";
+export const sumPath = "src/sum.js";
+export const sumTestPath = "src/sum.test.js";
+export const changeTitle = "the sum and its test";
+export const setOut = "The change is set out beside us.";
 
 const keyworkRepo = resolve(
   process.env.KEYWORK_REPO ?? join(import.meta.dirname, "../../../../../keywork"),
@@ -92,9 +97,10 @@ function refusingProvider(binding) {
 }
 
 function turnFor(messages) {
+  const prompt = lastUserText(messages);
+  if (prompt.includes(trailRequest)) return trailTurn(messages);
   const last = messages.at(-1);
   if (last?.role === "tool") return { kind: "after-tool", deltas: words(delivered) };
-  const prompt = lastUserText(messages);
   if (prompt.toLowerCase().includes(introductionMarker)) {
     return { kind: "introduction", deltas: words(introduction) };
   }
@@ -105,15 +111,54 @@ function turnFor(messages) {
 }
 
 function writeCall(at) {
-  return {
-    type: "tool-call",
-    call: {
-      type: "tool-call",
-      callId: `first-light-write-${at}`,
-      name: "write",
-      arguments: { path: notePath, content: "first light: the creature wrote this note.\n" },
-    },
-  };
+  return toolCall(`first-light-write-${at}`, "write", {
+    path: notePath,
+    content: "first light: the creature wrote this note.\n",
+  });
+}
+
+const trailSteps = [
+  {
+    kind: "trail-sum",
+    call: (at) =>
+      toolCall(`trail-sum-${at}`, "write", {
+        path: sumPath,
+        content: "export const sum = (a, b) => a + b;\n",
+      }),
+  },
+  {
+    kind: "trail-test",
+    call: (at) =>
+      toolCall(`trail-test-${at}`, "write", {
+        path: sumTestPath,
+        content: `import { sum } from "./sum.js";\n\nif (sum(2, 3) !== 5) throw new Error("sum");\n`,
+      }),
+  },
+  {
+    kind: "trail-show",
+    call: (at) =>
+      toolCall(`trail-show-${at}`, "show", {
+        what: { kind: "diff", ref: "the sum change", title: changeTitle },
+        rung: "unfold",
+        why: "the sum and its test are written; read them here",
+      }),
+  },
+];
+
+function trailTurn(messages) {
+  const answered = toolResultsSinceLastPrompt(messages);
+  const step = trailSteps[answered];
+  if (step === undefined) return { kind: "trail-set-out", deltas: words(setOut) };
+  return { kind: step.kind, deltas: [step.call(messages.length), done()] };
+}
+
+function toolResultsSinceLastPrompt(messages) {
+  const prompt = messages.findLastIndex((message) => message.role === "user");
+  return messages.slice(prompt + 1).filter((message) => message.role === "tool").length;
+}
+
+function toolCall(callId, name, args) {
+  return { type: "tool-call", call: { type: "tool-call", callId, name, arguments: args } };
 }
 
 function words(text) {
