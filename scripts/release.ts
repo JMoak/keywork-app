@@ -31,9 +31,6 @@ export async function planRelease(input: ReleaseInput): Promise<ReleasePlan | un
   if (input.refType === "tag") {
     const version = versionOfTag(input.refName);
     if (latest === version) return undefined;
-    if (latest === undefined && version !== "0.2.2") {
-      throw new Error("Publish v0.2.2 before releasing another desktop version");
-    }
     if (latest !== undefined && !gt(version, latest)) {
       throw new Error(`Tag ${input.refName} cannot replace newer published v${latest}`);
     }

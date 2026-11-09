@@ -32,17 +32,21 @@ up. Nothing is written on a mismatch. `--all` fans every platform out into
 
 ## Automatic releases
 
-Every merge or direct commit to `main` runs the shared three-platform CI checks once.
+Every merge or direct commit to `main` runs the shared Linux CI checks once.
+PRs use that same test suite. Explicit release tags skip the repeated full test suite;
+every release still type-checks and builds its installers on all three native platforms.
 The release planner examines commits since the latest published, reachable stable release:
 `fix` and `perf` select a patch, `feat` selects a minor, and conventional breaking
 changes select a major. Maintenance-only histories do not publish. Reverted unreleased
 changes cancel out; an ordinary revert does not independently request a release. Squash
 merges need a conventional title because that title becomes the retained commit.
 
-The first release is explicitly `v0.2.2`. Main waits until that release is published;
-it never interprets the repository's entire old feature history as a new version. Publish
-the matching keywork `v0.2.2` binaries first so the app's unchanged sidecar pin resolves.
-Create the initial app tag at the approved commit and push it to start the release workflow.
+The first published release uses an explicit stable tag at or above `v0.2.2`. Main waits
+until a baseline is published; it never interprets the repository's entire old feature
+history as a new version. The app's unchanged sidecar pin resolves to keywork `v0.2.2`.
+The initial desktop `v0.2.2` attempt failed during packaging; publish the corrected build
+as `v0.2.3` while retaining the original tag. Push the tag at the approved commit to start
+the release workflow.
 
 When a release is due, the workflow assigns its version to the desktop manifest in each
 build workspace. Electron, updater metadata, and the SDK all consume that version; the SDK

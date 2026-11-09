@@ -1,5 +1,6 @@
 appId: dev.keywork.app
 productName: keywork
+executableName: keywork
 directories:
   output: release
   buildResources: resources
@@ -16,7 +17,6 @@ extraResources:
       - "**/*"
 win:
   target: nsis
-  executableName: keywork
 nsis:
   oneClick: true
   perMachine: false

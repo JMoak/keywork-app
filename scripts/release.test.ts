@@ -16,7 +16,7 @@ const commits = (...messages: string[]) =>
   messages.map((message, index) => ({ hash: String(index), message }));
 
 describe("planRelease", () => {
-  it("waits for the first published v0.2.2 instead of analyzing historical features", async () => {
+  it("waits for an explicitly tagged baseline instead of analyzing historical features", async () => {
     await expect(
       planRelease({ refType: "branch", refName: "main", commits: commits("feat: old work") }),
     ).resolves.toBeUndefined();
@@ -24,9 +24,10 @@ describe("planRelease", () => {
       version: "0.2.2",
       tag: "v0.2.2",
     });
-    await expect(planRelease({ refType: "tag", refName: "v0.3.0", commits: [] })).rejects.toThrow(
-      "Publish v0.2.2",
-    );
+    await expect(planRelease({ refType: "tag", refName: "v0.2.3", commits: [] })).resolves.toEqual({
+      version: "0.2.3",
+      tag: "v0.2.3",
+    });
   });
 
   it.each([
