@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assignDesktopVersion,
+  type GithubRequest,
   obsoleteSdkAssets,
   planRelease,
+  releaseForTag,
   requireTagCommit,
   versionOfTag,
 } from "./release.ts";
@@ -166,5 +168,113 @@ describe("reverted changes", () => {
     await expect(
       planRelease({ refType: "branch", refName: "main", latestTag: "v0.2.2", commits: [reverted] }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("draft release recovery", () => {
+  const repository = "JMoak/keywork-app";
+  const tag = "v0.2.2";
+  const published = { tag_name: tag, draft: false, prerelease: false, assets: [] };
+  const draft = {
+    ...published,
+    draft: true,
+    assets: [{ name: "sdk-abcdef012345.tgz" }, { name: "sdk-abcdef012345.tgz.sha256" }],
+  };
+  const fullPage = Array.from({ length: 100 }, (_, index) => ({
+    ...published,
+    tag_name: `v0.1.${index}`,
+  }));
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("returns a published release without listing drafts", async () => {
+    const request = vi.fn<GithubRequest>().mockResolvedValue(Response.json(published));
+    await expect(releaseForTag(repository, tag, request)).resolves.toEqual(published);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers an authenticated draft and its assets after the tag lookup returns 404", async () => {
+    vi.stubEnv("GH_TOKEN", "test-release-token");
+    const request = vi
+      .fn<GithubRequest>()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json([{ ...published, tag_name: "v0.2.1" }, draft]));
+    await expect(releaseForTag(repository, tag, request)).resolves.toEqual(draft);
+    expect(request).toHaveBeenCalledTimes(2);
+    for (const [, init] of request.mock.calls) {
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test-release-token");
+      expect(init?.method).toBe("GET");
+    }
+  });
+
+  it("finds drafts beyond the first page", async () => {
+    const request = vi
+      .fn<GithubRequest>()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(fullPage))
+      .mockResolvedValueOnce(Response.json([draft]));
+    await expect(releaseForTag(repository, tag, request)).resolves.toEqual(draft);
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      `https://api.github.com/repos/${repository}/releases/tags/${tag}`,
+      `https://api.github.com/repos/${repository}/releases?per_page=100&page=1`,
+      `https://api.github.com/repos/${repository}/releases?per_page=100&page=2`,
+    ]);
+  });
+
+  it("reports absence only after exhausting a successful listing", async () => {
+    const request = vi
+      .fn<GithubRequest>()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(fullPage))
+      .mockResolvedValueOnce(Response.json([]));
+    await expect(releaseForTag(repository, tag, request)).resolves.toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([401, 403, 429, 500])("does not hide a tag lookup HTTP %s", async (status) => {
+    const request = vi.fn<GithubRequest>().mockResolvedValue(new Response(null, { status }));
+    await expect(releaseForTag(repository, tag, request)).rejects.toThrow(`HTTP ${status}`);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([401, 403, 404, 429, 500])(
+    "does not treat a listing HTTP %s as absence",
+    async (status) => {
+      const request = vi
+        .fn<GithubRequest>()
+        .mockResolvedValueOnce(new Response(null, { status: 404 }))
+        .mockResolvedValueOnce(new Response(null, { status }));
+      await expect(releaseForTag(repository, tag, request)).rejects.toThrow();
+    },
+  );
+
+  it("rejects malformed or mismatched published release metadata", async () => {
+    for (const data of [
+      null,
+      { ...published, tag_name: "v0.2.1" },
+      { ...published, assets: null },
+    ]) {
+      const request = vi.fn<GithubRequest>().mockResolvedValue(Response.json(data));
+      await expect(releaseForTag(repository, tag, request)).rejects.toThrow();
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("rejects malformed listings instead of creating another release", async () => {
+    for (const data of [null, {}, [null], [{ ...draft, assets: [{ name: 1 }] }]]) {
+      const request = vi
+        .fn<GithubRequest>()
+        .mockResolvedValueOnce(new Response(null, { status: 404 }))
+        .mockResolvedValueOnce(Response.json(data));
+      await expect(releaseForTag(repository, tag, request)).rejects.toThrow("invalid");
+    }
+  });
+
+  it("propagates network failures in both lookups", async () => {
+    const request = vi.fn<GithubRequest>().mockRejectedValue(new Error("offline"));
+    await expect(releaseForTag(repository, tag, request)).rejects.toThrow("offline");
+    request.mockReset().mockResolvedValueOnce(new Response(null, { status: 404 }));
+    request.mockRejectedValueOnce(new Error("offline"));
+    await expect(releaseForTag(repository, tag, request)).rejects.toThrow("offline");
   });
 });

@@ -10,6 +10,15 @@ export interface ReleasePlan {
   tag: string;
 }
 
+export interface GithubRelease {
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+  assets: { name: string }[];
+}
+
+export type GithubRequest = (url: string, init?: RequestInit) => Promise<Response>;
+
 export interface ReleaseInput {
   refType: string;
   refName: string;
@@ -77,6 +86,32 @@ export function obsoleteSdkAssets(
   return existing.filter(
     (name) => /^sdk-[a-f0-9]{12}\.tgz(?:\.sha256)?$/.test(name) && !incoming.includes(name),
   );
+}
+
+export async function releaseForTag(
+  repository: string,
+  tag: string,
+  request: GithubRequest = fetch,
+): Promise<GithubRelease | undefined> {
+  const published = await github<unknown>(repository, `releases/tags/${tag}`, undefined, request);
+  if (published !== undefined) {
+    const release = parseGithubRelease(published);
+    if (release.tag_name !== tag) throw new Error(`GitHub returned another release for ${tag}`);
+    return release;
+  }
+  for (let page = 1; ; page++) {
+    const entries = await github<unknown>(
+      repository,
+      `releases?per_page=100&page=${page}`,
+      undefined,
+      request,
+    );
+    if (!Array.isArray(entries)) throw new Error("GitHub returned an invalid releases list");
+    const releases = entries.map(parseGithubRelease);
+    const release = releases.find((candidate) => candidate.tag_name === tag);
+    if (release !== undefined) return release;
+    if (releases.length < 100) return undefined;
+  }
 }
 
 async function run(): Promise<void> {
@@ -151,10 +186,7 @@ async function publishRelease(repository: string, tag: string, sha: string): Pro
   } else {
     await github(repository, "git/refs", { ref: `refs/tags/${tag}`, sha });
   }
-  const release = await github<{ draft: boolean; prerelease: boolean; assets: { name: string }[] }>(
-    repository,
-    `releases/tags/${tag}`,
-  );
+  const release = await releaseForTag(repository, tag);
   if (release !== undefined && !release.draft) {
     if (release.prerelease) throw new Error(`${tag} is already published as a prerelease`);
     console.log(`${tag} is already published; its assets remain unchanged`);
@@ -194,8 +226,43 @@ async function publishRelease(repository: string, tag: string, sha: string): Pro
   );
 }
 
-async function github<T>(repository: string, route: string, body?: object): Promise<T | undefined> {
-  const response = await fetch(`https://api.github.com/repos/${repository}/${route}`, {
+function parseGithubRelease(value: unknown): GithubRelease {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("tag_name" in value) ||
+    typeof value.tag_name !== "string" ||
+    !("draft" in value) ||
+    typeof value.draft !== "boolean" ||
+    !("prerelease" in value) ||
+    typeof value.prerelease !== "boolean" ||
+    !("assets" in value) ||
+    !Array.isArray(value.assets) ||
+    !value.assets.every(isReleaseAsset)
+  ) {
+    throw new Error("GitHub returned invalid release metadata");
+  }
+  return {
+    tag_name: value.tag_name,
+    draft: value.draft,
+    prerelease: value.prerelease,
+    assets: value.assets,
+  };
+}
+
+function isReleaseAsset(value: unknown): value is { name: string } {
+  return (
+    typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
+  );
+}
+
+async function github<T>(
+  repository: string,
+  route: string,
+  body?: object,
+  request: GithubRequest = fetch,
+): Promise<T | undefined> {
+  const response = await request(`https://api.github.com/repos/${repository}/${route}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {
       Accept: "application/vnd.github+json",
