@@ -1,8 +1,7 @@
 # Cutting a keywork-app release
 
-> The release rail (M5.2, M5.3). `MIRROR:keywork docs/release.md`: the same shape, the same
-> tag ritual, the same 60-second install clock, read on the desktop installers instead of a
-> single binary.
+> The release rail (M5.2, M5.3): conventional commits on main, three native installers,
+> a checksum-named SDK, and the 60-second install clock.
 
 ## What ships
 
@@ -31,18 +30,45 @@ up. Nothing is written on a mismatch. `--all` fans every platform out into
 `sidecar/<platform>-<arch>/` for a multi-platform package. Bumping the sidecar is bumping
 `protocolVersion`, which is also what the app's version check against `/doc` expects.
 
-## The ritual
+## Automatic releases
 
-1. Bump `version` in `packages/desktop/package.json` (that manifest is the release version;
-   electron-updater compares it against the published `latest*.yml`).
-2. Commit, then tag: `git tag v0.1.0 && git push origin v0.1.0`.
-3. `release.yml` runs: check + test on all three runners → sidecar fetched by checksum →
-   `electron-vite build` → `electron-builder --publish never` → per-artifact `.sha256` →
-   a publish job that re-verifies every checksum, writes `SHA256SUMS`, runs the install clock,
-   and creates a **draft** GitHub release with every artifact and the sums.
-4. Read the install clock in the publish job log (`install → --version took …ms`). The job
-   fails above 60 s; when the runner cannot exercise the installer headlessly it warns instead.
-5. Review the draft and publish it. The updater only sees published releases.
+Every merge or direct commit to `main` runs the shared three-platform CI checks once.
+The release planner examines commits since the latest published, reachable stable release:
+`fix` and `perf` select a patch, `feat` selects a minor, and conventional breaking
+changes select a major. Maintenance-only histories do not publish. Reverted unreleased
+changes cancel out; an ordinary revert does not independently request a release. Squash
+merges need a conventional title because that title becomes the retained commit.
+
+The first release is explicitly `v0.2.2`. Main waits until that release is published;
+it never interprets the repository's entire old feature history as a new version. Publish
+the matching keywork `v0.2.2` binaries first so the app's unchanged sidecar pin resolves.
+Create the initial app tag at the approved commit and push it to start the release workflow.
+
+When a release is due, the workflow assigns its version to the desktop manifest in each
+build workspace. Electron, updater metadata, and the SDK all consume that version; the SDK
+packer also verifies the expected release tag. The repository does not receive version-bump
+commits, and the engine/protocol pin is independent of the desktop release version.
+
+After CI passes, all three platforms fetch and verify the pinned sidecar, build and package
+the app, and checksum their installers. The Linux build also packs the SDK. The publish job
+verifies every checksum, writes `SHA256SUMS`, and runs the install clock. It then creates or
+verifies the release tag at the tested commit, uploads assets into a draft, and publishes the
+completed release as GitHub's latest. This all happens in one workflow; it does not depend on
+a token-created tag starting a second workflow. Only the publish job has write access.
+
+Read the install clock in the publish job log. The job fails above 60 seconds; when the runner
+cannot exercise the installer headlessly it reports that the clock was not measured.
+
+## Retry and tagged builds
+
+Rerun the original failed workflow to recover an unfinished release. Existing tags must still
+point to that run's tested commit. Draft assets may be replaced during recovery; obsolete
+checksum-named SDK assets are removed before the draft becomes public. Published releases
+and their assets are left unchanged.
+
+A tag-triggered run assigns the version from its tag before building, so future tags reproduce
+the correct version even when the committed desktop manifest still shows `0.2.2`. Manual
+workflow runs on main use the same conventional-commit planner. Release runs are serialized.
 
 ## Signing secrets
 

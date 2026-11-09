@@ -58,7 +58,10 @@ describe("the SDK release asset", () => {
       match[1]?.replace("*", sha256.slice(0, 12)),
     );
     expect(uploads).toEqual([`dist/sdk/${asset}`, `dist/sdk/${asset}.sha256`]);
-    expect(workflow).toContain("bun run pack:sdk $expect");
-    expect(workflow).toContain("needs: [build, sdk]");
+    expect(workflow).toContain(
+      `bun scripts/pack-sdk.ts --expect-tag '\${{ needs.plan.outputs.tag }}'`,
+    );
+    expect(workflow).toContain("needs: [plan, verify]");
+    expect(workflow).toContain("needs: [plan, build]");
   });
 });
