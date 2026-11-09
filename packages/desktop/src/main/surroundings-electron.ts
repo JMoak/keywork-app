@@ -1,8 +1,13 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, type Display, ipcMain, screen } from "electron";
 import { hostChannels } from "../shared/channels.ts";
 import { ownWindows } from "./companion/electron.ts";
-import { type ForegroundFeed, holdsForeground } from "./companion/foreground.ts";
-import { type SurroundingsWindow, surroundingsRelay } from "./surroundings.ts";
+import { type ForegroundFeed, holdsForeground, type ScreenRect } from "./companion/foreground.ts";
+import {
+  type DisplayArea,
+  displaysCoveredBy,
+  type SurroundingsWindow,
+  surroundingsRelay,
+} from "./surroundings.ts";
 
 export interface SurroundingsWiringSeams {
   readonly foreground: ForegroundFeed | undefined;
@@ -22,6 +27,8 @@ export function wireSurroundings(seams: SurroundingsWiringSeams): SurroundingsWi
     notificationState: () => foreground?.notificationState(),
     foregroundIsOurs: () =>
       foreground === undefined ? undefined : holdsForeground(foreground.window(), ownWindows()),
+    coveredDisplays: () =>
+      displaysCoveredBy(dipRectOf(foreground?.bounds()), screen.getAllDisplays().map(areaOf)),
     sharedDisplays: seams.sharedDisplays,
   });
   const push = (): void => relay.push();
@@ -55,6 +62,14 @@ function followWindow(window: BrowserWindow, push: () => void): void {
   window.on("enter-html-full-screen", push);
   window.on("leave-html-full-screen", push);
   window.on("move", push);
+}
+
+function dipRectOf(physical: ScreenRect | undefined): ScreenRect | undefined {
+  return physical === undefined ? undefined : screen.screenToDipRect(null, physical);
+}
+
+function areaOf(display: Display): DisplayArea {
+  return { id: String(display.id), bounds: display.bounds };
 }
 
 function surroundingsWindowOf(window: BrowserWindow): SurroundingsWindow {

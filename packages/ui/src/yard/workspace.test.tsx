@@ -1,6 +1,6 @@
 import { keyworkProfile, steadProfile } from "@keywork-app/product";
 import { cleanup, fireEvent, screen, waitFor } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cardCalled,
   cardTitled,
@@ -304,6 +304,25 @@ describe("the yard under the keywork profile", () => {
     await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
   });
 
+  it("makes a tile squeezed beside the conversation a tab in the hub, never a sliver", async () => {
+    const stage = stageMeasuring(640, 868);
+    await openYard(keyworkProfile);
+    stage.mockRestore();
+    pressLeader("Y", { shiftKey: true });
+    await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
+    pressLeader("h");
+    const tabs = await waitFor(() => screen.getAllByRole("tab"));
+    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
+      ["Wren at home", "false"],
+      ["sessions", "true"],
+    ]);
+    const conversation = document.querySelector(".kw-slot:has(.kw-conversation)");
+    expect(conversation?.hasAttribute("hidden")).toBe(true);
+    fireEvent.click(tabs[0] as HTMLElement);
+    await waitFor(() => expect(screen.queryAllByRole("tab")).toEqual([]));
+    expect(hubNames()).toEqual(["Wren at home"]);
+  });
+
   it("answers from the same rail with the same keys", async () => {
     const yard = await openYard(keyworkProfile);
     const composer = typing();
@@ -322,3 +341,31 @@ describe("the yard under the keywork profile", () => {
     expect(document.activeElement).toBe(composer);
   });
 });
+
+function stageMeasuring(width: number, height: number) {
+  const measured = (side: number) =>
+    function (this: Element): number {
+      return this.classList.contains("kw-stage") ? side : 0;
+    };
+  const wide = vi
+    .spyOn(owning("clientWidth"), "clientWidth", "get")
+    .mockImplementation(measured(width));
+  const tall = vi
+    .spyOn(owning("clientHeight"), "clientHeight", "get")
+    .mockImplementation(measured(height));
+  return {
+    mockRestore: () => {
+      wide.mockRestore();
+      tall.mockRestore();
+    },
+  };
+}
+
+function owning(property: "clientWidth" | "clientHeight"): HTMLElement {
+  let holder: object | null = HTMLDivElement.prototype;
+  while (holder !== null && Object.getOwnPropertyDescriptor(holder, property) === undefined) {
+    holder = Object.getPrototypeOf(holder);
+  }
+  if (holder === null) throw new Error(`no prototype defines ${property}`);
+  return holder as HTMLElement;
+}

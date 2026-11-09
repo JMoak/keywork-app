@@ -15,6 +15,7 @@ import {
   ruleFromHand,
   stillShown,
   withYardStep,
+  withYardWake,
   type YardCard,
   type YardContext,
   type YardSetting,
@@ -104,9 +105,12 @@ export function createYardModel(seams: YardModelSeams): YardModel {
   const withdrawals = createWithdrawals();
   onCleanup(seams.shell.feed.subscribe(withdrawals.note));
   const attention = createAttentionFeed();
-  const { world, clock } = createYardWorld(seams, keeperContext, attention);
+  const { world, clock, step } = createYardWorld(seams, keeperContext, attention);
   const yard = createMemo(() => yardOf(world.state()));
-  const home = followHome(seams.home, world, withdrawals.note);
+  const home = followHome(seams.home, world, (batch) => {
+    withdrawals.note(batch);
+    step();
+  });
   const shellOf = (setting: YardSetting): ShellSeams =>
     home.owns(setting.id) ? (seams.home() ?? seams.shell) : seams.shell;
 
@@ -180,11 +184,12 @@ function createYardWorld(
   const voice = createKeeperVoice(shell.feed);
   const [clock, setClock] = createSignal(seams.now());
   const context = (): YardContext => ({ ...keeperContext(), keeperSpokeAt: voice() });
-  const step = (): void => {
+  const advance = (by: typeof withYardStep): void => {
     const at = seams.now();
     setClock(at);
-    world.update((held) => withYardStep(held, untrack(context), at));
+    world.update((held) => by(held, untrack(context), at));
   };
+  const step = (): void => advance(withYardStep);
   const awaiting = createMemo(() =>
     Object.values(yardOf(world.state()).settings)
       .filter((setting) => setting.shown === "glyph")
@@ -192,13 +197,19 @@ function createYardWorld(
       .join(" "),
   );
   createEffect(on([awaiting, context], step));
+  onCleanup(
+    shell.feed.subscribe((batch) => {
+      if (showEventsIn(batch).length > 0) step();
+    }),
+  );
+  onCleanup(attention.subscribe(step));
   wakeWhenTheYardChanges({
     yard: createMemo(() => yardOf(world.state())),
     changesAt: nextChangeAt,
     now: seams.now,
-    step,
+    wake: () => advance(withYardWake),
   });
-  return { world, clock };
+  return { world, clock, step };
 }
 
 interface HomeSource {
@@ -208,7 +219,7 @@ interface HomeSource {
 function followHome(
   home: Accessor<ShellSeams | undefined>,
   world: HabitatWorld,
-  noteWithdrawals: (batch: readonly BusEnvelope[]) => void,
+  projected: (batch: readonly BusEnvelope[]) => void,
 ): HomeSource {
   const [owned, setOwned] = createSignal<ReadonlySet<string>>(new Set());
   const own = (ids: readonly string[]): void => {
@@ -218,8 +229,8 @@ function followHome(
     const shows = showEventsIn(batch);
     if (shows.length === 0) return;
     own(proposedIn(shows));
-    noteWithdrawals(shows);
     world.update((held) => projectAll(held, shows));
+    projected(shows);
   };
   const homeFeed = createMemo(() => home()?.feed);
   createEffect(

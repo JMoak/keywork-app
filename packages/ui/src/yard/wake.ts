@@ -7,7 +7,7 @@ export interface YardWakeSeams {
   readonly yard: Accessor<YardState>;
   readonly changesAt: ChangesAt;
   now(): number;
-  step(): void;
+  wake(): void;
 }
 
 export const soonestWakeMs = 100;
@@ -26,7 +26,7 @@ export function wakeWhenTheYardChanges(seams: YardWakeSeams): void {
     timer = setTimeout(wake, Math.max(soonestWakeMs, next - at));
   };
   const wake = (): void => {
-    seams.step();
+    seams.wake();
     schedule(untrack(seams.yard));
   };
   createEffect(() => schedule(seams.yard()));

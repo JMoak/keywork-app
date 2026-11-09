@@ -12,6 +12,7 @@ export interface YardPanels {
   settingOf(id: string | undefined): YardSetting | undefined;
   deliver(action: string, argument?: string): boolean;
   focus(id: string): boolean;
+  focusWhenMounted(id: string): void;
 }
 
 export interface MountedPanel {
@@ -22,11 +23,21 @@ export interface MountedPanel {
 
 export const panelSelector = ".kw-yard-satellite[data-setting]";
 
+export const overlaySelector = ".kw-overlay";
+
 export function createYardPanels(): YardPanels {
   const [inside, setInside] = createSignal<string>();
   const mounted = new Map<string, MountedPanel>();
   const handlers = new Map<string, PaneActionHandler>();
   const lastFocused = new Map<string, HTMLElement>();
+  let awaited: string | undefined;
+  const focus = (id: string): boolean => {
+    const panel = mounted.get(id);
+    if (panel === undefined) return false;
+    const target = focusTargetIn(panel.element, lastFocused.get(id));
+    target?.focus({ preventScroll: true });
+    return target !== undefined;
+  };
   const release =
     <Value>(held: Map<string, Value>, id: string, value: Value) =>
     (): void => {
@@ -37,6 +48,10 @@ export function createYardPanels(): YardPanels {
     inside,
     mount: (id, panel) => {
       mounted.set(id, panel);
+      if (awaited === id) {
+        awaited = undefined;
+        focus(id);
+      }
       const forget = release(mounted, id, panel);
       return () => {
         forget();
@@ -49,6 +64,7 @@ export function createYardPanels(): YardPanels {
       return release(handlers, id, handler);
     },
     focusWithin: (id, within, target) => {
+      if (within && id !== awaited) awaited = undefined;
       if (within && target instanceof HTMLElement) lastFocused.set(id, target);
       setInside((held) => (within ? id : held === id ? undefined : held));
     },
@@ -64,13 +80,18 @@ export function createYardPanels(): YardPanels {
       return handler !== undefined;
     },
     focus: (id) => {
-      const panel = mounted.get(id);
-      if (panel === undefined) return false;
-      const target = focusTargetIn(panel.element, lastFocused.get(id));
-      target?.focus({ preventScroll: true });
-      return target !== undefined;
+      awaited = undefined;
+      return focus(id);
+    },
+    focusWhenMounted: (id) => {
+      awaited = focus(id) ? undefined : id;
     },
   };
+}
+
+export function keptByThePanel(panel: Element, next: EventTarget | null): boolean {
+  if (!(next instanceof Element)) return false;
+  return panel.contains(next) || next.closest(overlaySelector) !== null;
 }
 
 export function panelIdAt(target: EventTarget | null): string | undefined {

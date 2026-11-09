@@ -5,16 +5,16 @@ import { createRoot, type JSX } from "solid-js";
 import { expect } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import {
-  emptySurfacesClient,
-  fakeFeed,
-  fixtureSurfacesClient,
-} from "../../shell/surfaces-store.test.ts";
-import {
   createSurfacesStore,
   type SurfacesClient,
   type SurfacesStore,
 } from "../../shell/surfaces-store.ts";
-import { inertShellExtras } from "../../shell/trust.test.ts";
+import {
+  emptySurfacesClient,
+  fakeFeed,
+  fixtureSurfacesClient,
+} from "../../shell/surfaces-store-testing.ts";
+import { inertShellExtras } from "../../shell/trust-testing.ts";
 import type { PaneProps, PaneSpecBase, ShellSeams } from "../registry.ts";
 
 export interface OverviewHarness {

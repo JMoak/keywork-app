@@ -7,7 +7,7 @@ import type { Rect } from "../layout/index.ts";
 import { definitionOf, type PaneSpec, type ShellSeams } from "../panes/index.ts";
 import { watchInteractions } from "./attention.ts";
 import { linkOpened, panelShell } from "./openings.ts";
-import type { YardPanels } from "./panels.ts";
+import { keptByThePanel, type YardPanels } from "./panels.ts";
 import { railEntryId, rectStyle } from "./rail.tsx";
 import { satelliteOf, satellitePaneId, titleOfSetting } from "./satellites.ts";
 
@@ -82,8 +82,7 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
       onClick={openLink}
       onFocusIn={(event) => props.panels.focusWithin(props.setting.id, true, event.target)}
       onFocusOut={(event) => {
-        const next = event.relatedTarget;
-        if (!(next instanceof Node && event.currentTarget.contains(next))) {
+        if (!keptByThePanel(event.currentTarget, event.relatedTarget)) {
           props.panels.focusWithin(props.setting.id, false);
         }
       }}

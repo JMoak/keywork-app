@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { factsWith, mcpServer } from "./facts.test.ts";
+import { factsWith, mcpServer } from "./facts-testing.ts";
 import {
   differenceNotice,
   type Fingerprint,

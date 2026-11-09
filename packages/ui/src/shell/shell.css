@@ -206,3 +206,31 @@
 .kw-stage[data-gesture="resizing"] {
   user-select: none;
 }
+
+.kw-hub-tabs {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--kw-panel);
+}
+
+.kw-hub-tab {
+  min-width: 0;
+  max-width: 50%;
+  padding: 0 0.75rem;
+  overflow: hidden;
+  border: 0;
+  font: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--kw-text-dim);
+  background: none;
+  cursor: pointer;
+}
+
+.kw-hub-tab[aria-selected="true"] {
+  color: var(--kw-text);
+  box-shadow: inset 0 -2px 0 var(--kw-accent);
+}

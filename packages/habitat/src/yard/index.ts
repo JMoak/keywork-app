@@ -27,6 +27,7 @@ export {
 } from "./depth.ts";
 export { floodSize, grouped, groupsOf, type YardGroup } from "./flood.ts";
 export { askedWithinMs, type FocusRelation, focusRelationOf } from "./focus.ts";
+export { foldBackAfterMs } from "./fold-back.ts";
 export {
   admitUnfold,
   awayReasons,
@@ -108,13 +109,13 @@ export {
   awaitsBreakpoint,
   breakpointWaitMs,
   digestOf,
-  foldBackAfterMs,
   moveByHand,
-  nextChangeAt,
   plotsFoldedWhileAway,
   restorePlot,
   stepYard,
+  wakeYard,
   withYardStep,
+  withYardWake,
 } from "./step.ts";
 export {
   type AttendKind,
@@ -152,4 +153,5 @@ export {
   type YardState,
   yardOf,
 } from "./types.ts";
+export { nextChangeAt } from "./wake.ts";
 export { proposeSetting, seatSettings, settleSetting } from "./wire.ts";

@@ -4,6 +4,7 @@ export const plotScenes = [
   "yard-plot-seed",
   "yard-plot-file",
   "yard-plot-test",
+  "yard-plot-entered",
   "yard-plot-folded",
   "yard-plot-restored",
   "yard-trail",

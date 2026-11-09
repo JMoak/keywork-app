@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fileWhole from "../../../../client/src/fixtures/file.json?raw";
 import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
-import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
+import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
 import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { describeRefusal, type FileSpec, filePane } from "./index.tsx";

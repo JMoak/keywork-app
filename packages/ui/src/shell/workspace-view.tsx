@@ -89,6 +89,7 @@ import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts"
 import { createWardrobe } from "../theme/wardrobe.ts";
 import { createYardSurface, Yard } from "../yard/index.ts";
 import { answerHeldAsk } from "./answer-ask.ts";
+import { conversationHub, hubTabsHeight, tabbedOut } from "./conversation-hub.ts";
 import { createDraftLedger } from "./drafts.ts";
 import {
   creaturesListed,
@@ -107,6 +108,7 @@ import { createPaneMarks } from "./marks.ts";
 import { choreAcceptedLine, heldChoresAmong } from "./needs-you.ts";
 import { createJumps, type NeedsYouPlace } from "./needs-you-jumps.ts";
 import type { NeedsYouQueue } from "./needs-you-queue.ts";
+import { connectingPane, OpenFailureCard, type OpenFailureNotice } from "./open-failure.tsx";
 import { decidedAmong, overturnStanding } from "./overturn.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import { toggleSessionQuiet } from "./quiet.ts";
@@ -129,6 +131,7 @@ export interface WorkspaceViewProps {
   prepareSteadHome?: ((retry?: boolean) => void) | undefined;
   steadHomeFailure?: string | undefined;
   steadHome?: ((shell: ShellSeams) => SteadHomeScope | undefined) | undefined;
+  openFailure?: OpenFailureNotice | undefined;
   host: HostPort;
   workspace: string;
   serverLabel: string;
@@ -820,6 +823,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   });
 
   const titleOf = (slot: PaneSlot): string => paneTitle(slot.spec);
+  const titleOfPane = (id: PaneId): string => {
+    const slot = slots().find((held) => held.id === id);
+    return slot === undefined ? "" : titleOf(slot);
+  };
   const lifecycleOf = (slot: PaneSlot): LifecycleState =>
     definitionOf(slot.spec.kind).lifecycle?.(slot, shell) ?? "idle";
   const adornmentsOf = (slot: PaneSlot) =>
@@ -836,11 +843,17 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     return () => showContext(sessionId);
   };
 
-  const slots = createMemo(() =>
+  const hub = createMemo(() =>
     focusedPaneHub()
       ? conversationHub(tiler.slots(screen()), screen(), hubConversation())
-      : tiler.slots(screen()),
+      : undefined,
   );
+  const slots = createMemo(() => hub()?.slots ?? tiler.slots(screen()));
+  const hubTabs = () => hub()?.tabs ?? [];
+  const tabbedAway = (id: PaneId): boolean => {
+    const shown = hub();
+    return shown !== undefined && tabbedOut(shown, id);
+  };
   const scene = createMemo((): Scene => {
     const tiled = { ...tiler.scene(screen()), seamReach: gapSeamReach(gapCells(), rootRemPx()) };
     if (!focusedPaneHub()) return tiled;
@@ -886,6 +899,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         class="kw-slot"
         data-pane-id={slot().id}
         data-lantern={yard.lanternOn(slot().spec) ? "" : undefined}
+        hidden={tabbedAway(slot().id) ? true : undefined}
         style={rectStyle(slot().rect)}
       >
         <PaneFrame
@@ -946,6 +960,28 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           );
         }}
       </For>
+      <Show when={hubTabs().length > 0}>
+        <div
+          class="kw-hub-tabs"
+          role="tablist"
+          aria-label="the hub's tiles"
+          style={rectStyle({ x: 0, y: 0, width: screen().width, height: hubTabsHeight })}
+        >
+          <For each={hubTabs()}>
+            {(tab) => (
+              <button
+                type="button"
+                role="tab"
+                class="kw-hub-tab"
+                aria-selected={tab.active}
+                onClick={() => act(tiler.focus(tab.id))}
+              >
+                {titleOfPane(tab.id)}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
       <Show when={tiler.emptyMain(screen())}>
         {(rect) => (
           <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
@@ -1014,6 +1050,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         {stageView}
       </Yard>
       <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
+      <OpenFailureCard
+        notice={props.openFailure}
+        onConnect={() => shell.openPane(connectingPane)}
+      />
       <NeedsYouStrip
         line={stripLine({
           shown: strip.shown(),
@@ -1089,24 +1129,6 @@ function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   }
   if (state.kind === "stale") return "trust recorded · the attached server needs a restart";
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
-}
-
-function conversationHub(
-  slots: readonly PaneSlot[],
-  screen: Screen,
-  conversation: PaneId | undefined,
-): PaneSlot[] {
-  const focused = slots.find((slot) => slot.focused);
-  const hub =
-    slots.find((slot) => slot.id === conversation && slot.spec.kind === "conversation") ?? focused;
-  const whole = { x: 0, y: 0, width: screen.width, height: screen.height };
-  if (hub === undefined) return [];
-  if (focused === undefined || focused.id === hub.id) return [{ ...hub, rect: whole }];
-  const half = Math.round(whole.width / 2);
-  return [
-    { ...hub, rect: { ...whole, width: half } },
-    { ...focused, rect: { ...whole, x: half, width: whole.width - half } },
-  ];
 }
 
 function rectStyle(rect: { x: number; y: number; width: number; height: number }) {

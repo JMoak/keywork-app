@@ -1,6 +1,7 @@
 // First-light driver: launches the built console (packages/desktop/out) through Playwright's
 // Electron harness and keeps it open behind a loopback control port, so a runbook step can
-// look, press, type and take a screenshot into artifacts/first-light/ one request at a time.
+// look, press, type and take a screenshot into keywork-app's artifacts/first-light/ one request
+// at a time.
 //
 //   FIRST_LIGHT_RUN=run-2 node packages/desktop/e2e/first-light/driver.mjs <workspace> [port]
 //
@@ -14,8 +15,7 @@ import { join, resolve } from "node:path";
 
 const desktopRoot = resolve(import.meta.dirname, "../..");
 const repoRoot = resolve(desktopRoot, "../..");
-const steadRoot = resolve(repoRoot, "../..");
-const shots = join(steadRoot, "artifacts", "first-light", process.env.FIRST_LIGHT_RUN ?? "");
+const shots = join(repoRoot, "artifacts", "first-light", process.env.FIRST_LIGHT_RUN ?? "");
 const requireFromUi = createRequire(join(repoRoot, "packages", "ui", "package.json"));
 const { _electron: electron } = requireFromUi("@playwright/test");
 const requireFromDesktop = createRequire(join(desktopRoot, "package.json"));

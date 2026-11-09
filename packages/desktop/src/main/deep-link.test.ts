@@ -4,6 +4,7 @@ import {
   launchFrom,
   openUrlFor,
   protocolHandlerFor,
+  registerProtocolSwitch,
   requestFromArgv,
   requestFromUrl,
 } from "./deep-link.ts";
@@ -118,14 +119,27 @@ describe("protocolHandlerFor", () => {
     });
   });
 
-  it("registers a plain dev launch with its app path", () => {
-    expect(protocolHandlerFor(launchFrom([electron, "."], true))).toEqual({
+  it("never lets an unpackaged launch claim the handler by itself", () => {
+    expect(protocolHandlerFor(launchFrom([electron, "."], true))).toEqual({ kind: "untouched" });
+    expect(protocolHandlerFor(launchFrom([electron, ".", "--", "C:\\work"], true))).toEqual({
+      kind: "untouched",
+    });
+  });
+
+  it(`registers an unpackaged launch with its app path only when --${registerProtocolSwitch} asks`, () => {
+    const asking = `--${registerProtocolSwitch}`;
+    expect(protocolHandlerFor(launchFrom([electron, ".", asking], true))).toEqual({
       kind: "dev-app",
       appPath: ".",
     });
-    expect(protocolHandlerFor(launchFrom([electron, ".", "--", "C:\\work"], true))).toEqual({
-      kind: "dev-app",
-      appPath: ".",
+    expect(
+      protocolHandlerFor(
+        launchFrom([electron, asking, "--inspect=9229", "out/main/index.js"], true),
+      ),
+    ).toEqual({ kind: "dev-app", appPath: "out/main/index.js" });
+    expect(protocolHandlerFor(launchFrom([electron, asking], true))).toEqual({ kind: "untouched" });
+    expect(protocolHandlerFor(launchFrom(["keywork.exe", "--updated", asking], false))).toEqual({
+      kind: "this-executable",
     });
   });
 

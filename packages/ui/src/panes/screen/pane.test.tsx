@@ -2,7 +2,7 @@ import { cleanup, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
-import { inertShellExtras } from "../../shell/trust.test.ts";
+import { inertShellExtras } from "../../shell/trust-testing.ts";
 import type { ShellSeams } from "../registry.ts";
 import { checkPaneDefinition } from "../testing.ts";
 import { desktopOnlyLine, type ScreenSpec, screenPane } from "./index.tsx";

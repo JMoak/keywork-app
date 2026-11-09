@@ -23,13 +23,13 @@ import decidedFixture from "../../../../client/src/fixtures/decided.jsonl?raw";
 import gardenFixture from "../../../../client/src/fixtures/memory-garden.json";
 import { parseJsonl } from "../../dev/replay.ts";
 import { browserHost } from "../../host/browser.ts";
+import { createMemoryStore, inertGarden, type MemoryStore } from "../../shell/memory-store.ts";
 import {
   feedOf,
   inboxEnvelope,
   inertMemoryClient,
   stagedNote,
-} from "../../shell/memory-store.test.ts";
-import { createMemoryStore, inertGarden, type MemoryStore } from "../../shell/memory-store.ts";
+} from "../../shell/memory-store-testing.ts";
 import type { Reveal } from "../../shell/needs-you-jumps.ts";
 import { inboxItem } from "../../shell/needs-you-testing.ts";
 import { holdTypingFocus } from "../overview/testing.tsx";

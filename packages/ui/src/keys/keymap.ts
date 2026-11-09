@@ -52,8 +52,9 @@ export class Keymap {
   }
 
   rebind(options: KeymapOptions): void {
+    const leader = this.table.leader;
     this.table = compile(options);
-    this.disarm();
+    if (!chordsEqual(leader, this.table.leader)) this.disarm();
   }
 
   press(

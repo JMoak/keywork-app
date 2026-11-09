@@ -18,32 +18,11 @@ import {
   createControlsStore,
   modelsOffered,
 } from "./controls-store.ts";
+import { idleControlsClient } from "./controls-store-testing.ts";
 
 const recordedContext = recordedAnswers.context.body as ContextReport;
 const recordedCost = recordedAnswers.cost.body as CostReport;
 const recordedFailure = recordedAnswers.modelUnknown.body.failure as ResolutionFailure;
-
-export function idleControlsClient(): ControlsClient {
-  return {
-    setModel: async () => "missing",
-    setThinking: async () => "missing",
-    setEffort: async () => "missing",
-    compact: async () => "missing",
-    undo: async () => "missing",
-    redo: async () => "missing",
-    restoreTurn: async () => "missing",
-    context: async () => "missing",
-    cost: async () => "missing",
-    exportSession: async () => "missing",
-    rename: async () => "missing",
-    flush: async () => "missing",
-    forget: async () => "missing",
-    applyPreset: async () => ({
-      refused: "unavailable",
-      detail: "this process has no preset switch",
-    }),
-  };
-}
 
 function manualFeed() {
   const listeners: Array<(envelopes: readonly BusEnvelope[]) => void> = [];

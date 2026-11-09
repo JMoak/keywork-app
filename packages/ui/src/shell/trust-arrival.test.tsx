@@ -6,7 +6,7 @@ import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 import { postureStorageKey } from "../posture/record.ts";
 import { fakeClient } from "./client-testing.ts";
-import { undecidedWorkspace } from "./trust.test.ts";
+import { undecidedWorkspace } from "./trust-testing.ts";
 
 afterEach(() => {
   cleanup();

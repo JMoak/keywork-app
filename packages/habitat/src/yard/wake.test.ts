@@ -5,10 +5,20 @@ import { hour, minute, second } from "../clock/clock.ts";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
 import { yardCard } from "./card.ts";
+import { byDepth } from "./depth.ts";
+import { foldBackAfterMs } from "./fold-back.ts";
 import { unfoldBudget } from "./gate.ts";
-import { breakpointWaitMs, foldBackAfterMs, moveByHand, nextChangeAt, stepYard } from "./step.ts";
+import { breakpointWaitMs, moveByHand, stepYard, wakeYard } from "./step.ts";
 import { aSetting, askedIn, calm, isoAt, noon, proposed } from "./testing.ts";
-import { emptyYard, type YardContext, type YardRule, type YardState, yardOf } from "./types.ts";
+import {
+  emptyYard,
+  type YardContext,
+  type YardRule,
+  type YardSetting,
+  type YardState,
+  yardOf,
+} from "./types.ts";
+import { nextChangeAt } from "./wake.ts";
 
 const asked: YardContext = { ...calm, ...askedIn("s1", noon - 30 * second) };
 
@@ -55,6 +65,68 @@ describe("the next moment the yard changes by itself", () => {
     expect(nextChangeAt(unfolded, noon + hour)).toBeUndefined();
   });
 });
+
+describe("a wake, which lets time pass and nothing else", () => {
+  const crossing = [
+    aSetting({
+      id: "fresh-diff",
+      sessionId: "s2",
+      what: { kind: "diff", ref: "d" },
+      at: isoAt(noon),
+    }),
+    aSetting({
+      id: "old-report",
+      creature: "vey",
+      what: { kind: "report", ref: "r" },
+      at: isoAt(noon - 2 * hour),
+    }),
+    aSetting({ id: "unfold", creature: "wren", rung: "unfold", at: isoAt(noon) }),
+  ];
+
+  it("holds the rail's order while two depths cross, and re-sorts it at the next step", () => {
+    const stepped = stepYard(yardWith(crossing), asked, noon);
+    expect(railOrderOf(stepped)).toEqual(["fresh-diff", "old-report"]);
+    const wakeAt = nextChangeAt(stepped, noon + unfoldBudget.cooldownMs);
+    expect(wakeAt).toBe(noon + foldBackAfterMs);
+    const woken = wakeYard(stepped, asked, wakeAt ?? 0);
+    expect(woken.settings.unfold?.shown).toBe("card");
+    expect(railOrderOf(woken)).toEqual(["unfold", "fresh-diff", "old-report"]);
+    expect(railOrderOf(stepYard(woken, asked, wakeAt ?? 0))).toEqual([
+      "unfold",
+      "old-report",
+      "fresh-diff",
+    ]);
+  });
+
+  it("never changes a depth, for any yard at any later moment", () => {
+    fc.assert(
+      fc.property(scenarioArb, fc.integer({ min: 0, max: 2 * hour }), (scenario, later) => {
+        const context: YardContext = {
+          ...calm,
+          visible: scenario.visible,
+          focusedThread: "s1",
+          keeperSpokeAt: { s1: noon + scenario.spoke },
+          draftOpen: scenario.draftOpen,
+          streaming: scenario.streaming,
+          rules: scenario.rules,
+        };
+        const yard = stepYard(yardWith(settingsOf(scenario.first, "a", noon)), context, noon);
+        const woken = wakeYard(yard, context, noon + later);
+        for (const [id, setting] of Object.entries(woken.settings)) {
+          expect(setting.depth, id).toBe(yard.settings[id]?.depth ?? 0);
+        }
+      }),
+      { numRuns: 200 },
+    );
+  });
+});
+
+function railOrderOf(yard: YardState): string[] {
+  return Object.values(yard.settings)
+    .filter((setting: YardSetting) => setting.shown === "card")
+    .sort(byDepth)
+    .map((setting) => setting.id);
+}
 
 function view(yard: YardState, at: number) {
   const card = yardCard(yard, at);
@@ -146,12 +218,12 @@ describe("the next moment the yard changes, for any yard stepped under one conte
         const settled = view(yard, lastAt);
         const next = nextChangeAt(yard, lastAt);
         if (next === undefined) {
-          expect(view(stepYard(yard, context, lastAt + hour), lastAt + hour)).toEqual(settled);
+          expect(view(wakeYard(yard, context, lastAt + hour), lastAt + hour)).toEqual(settled);
           return;
         }
         expect(next).toBeGreaterThan(lastAt);
-        expect(view(stepYard(yard, context, next - 1), next - 1)).toEqual(settled);
-        expect(view(stepYard(yard, context, next), next)).not.toEqual(settled);
+        expect(view(wakeYard(yard, context, next - 1), next - 1)).toEqual(settled);
+        expect(view(wakeYard(yard, context, next), next)).not.toEqual(settled);
       }),
       { numRuns: 300 },
     );

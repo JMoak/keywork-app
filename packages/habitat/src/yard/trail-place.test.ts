@@ -46,6 +46,12 @@ function child(id: string, from: string, depth: number, slot: number, lane = 0):
   });
 }
 
+function seed(id: string, depth: number, slot: number): YardSetting {
+  return satellite(id, depth, {
+    unfolded: { at: 100 - depth, slot, focus: undefined, byHand: true },
+  });
+}
+
 function place(
   settings: readonly YardSetting[],
   viewport: Rect = desktop,
@@ -96,6 +102,47 @@ describe("children beside their parent", () => {
     expect(find(withChild, "o").rect).toEqual(find(alone, "o").rect);
     expect(find(withChild, "f").rung).toBe("card");
   });
+  it("are never displaced by a newcomer: a seed finding no free space waits on the rail", () => {
+    const settings = [satellite("d", 9), child("f", "d", 8, 1, 1)];
+    const before = find(place(settings, laptop), "f");
+    expect(before).toMatchObject({ rung: "unfold", parent: "d", rect: { x: 784, y: 348 } });
+    const after = place([...settings, seed("n", 1, 1)], laptop);
+    expect(find(after, "f")).toEqual(before);
+    expect(find(after, "n")).toMatchObject({ rung: "card", layer: "front" });
+  });
+});
+
+describe("space within a plot", () => {
+  const deeper = [...plot, child("u", "t", 6, 3)];
+
+  it("goes to the member the keeper is in: a third member waiting as a card takes its parent's space", () => {
+    const placed = place(plot, laptop, "t");
+    expect(find(placed, "f")).toMatchObject({
+      rung: "unfold",
+      size: "card",
+      rect: { x: 784, y: 348, width: 272, height: 64 },
+    });
+    expect(find(placed, "t")).toMatchObject({
+      rung: "unfold",
+      size: "readable",
+      parent: "f",
+      rect: { x: 784, y: 424, width: 480, height: 244 },
+    });
+    expect(find(placed, "d")).toMatchObject({ size: "readable", rect: { x: 784, y: 16 } });
+  });
+
+  it("restores the previous arrangement when the keeper leaves", () => {
+    expect(place(plot, laptop, undefined)).toEqual(place(plot, laptop, "d"));
+    expect(find(place(plot, laptop), "f")).toMatchObject({ size: "readable", rect: { y: 348 } });
+    expect(find(place(plot, laptop), "t")).toMatchObject({ rung: "card", parent: "f" });
+  });
+
+  it("hands a deeper member the nearest seated ancestor's space", () => {
+    const placed = place(deeper, laptop, "u");
+    expect(find(placed, "u")).toMatchObject({ rung: "unfold", rect: { x: 784, y: 424 } });
+    expect(find(placed, "f")).toMatchObject({ size: "card", rect: { x: 784, y: 348 } });
+    expect(find(placed, "t")).toMatchObject({ rung: "card", parent: "f" });
+  });
 });
 
 describe("plot cards on the rail", () => {
@@ -137,7 +184,7 @@ describe("sizes in the yard", () => {
   const working = (setting: YardSetting): YardSetting => ({ ...setting, size: "working" });
 
   it("grow the panel the keeper is in to the full height beside the hub, its neighbour yielding to a card", () => {
-    const settings = [satellite("d", 9), working(child("f", "d", 8, 1))];
+    const settings = [satellite("d", 9), working(seed("f", 8, 1))];
     const placed = place(settings, desktop, "f");
     const grown = find(placed, "f");
     expect(grown).toMatchObject({
@@ -151,7 +198,7 @@ describe("sizes in the yard", () => {
   });
 
   it("grow into free space in any direction but the hub's, upward included (item 19)", () => {
-    const settings = [working(satellite("d", 9)), child("f", "d", 8, 1)];
+    const settings = [working(satellite("d", 9)), seed("f", 8, 1)];
     const placed = place(settings);
     expect(find(placed, "d")).toMatchObject({
       size: "working",
@@ -162,7 +209,7 @@ describe("sizes in the yard", () => {
   });
 
   it("stay readable where the free rectangle is under one and a half times readable", () => {
-    const settings = [satellite("d", 9), working(child("f", "d", 8, 1))];
+    const settings = [satellite("d", 9), working(seed("f", 8, 1))];
     const placed = place(settings, laptop);
     expect(find(placed, "f")).toMatchObject({
       size: "readable",
@@ -172,15 +219,15 @@ describe("sizes in the yard", () => {
   });
 
   it("never make the panel the keeper is in yield", () => {
-    const settings = [working(satellite("d", 9)), child("f", "d", 8, 1)];
+    const settings = [working(satellite("d", 9)), seed("f", 8, 1)];
     const placed = place(settings, laptop, "f");
     expect(find(placed, "f")).toMatchObject({ size: "readable", rung: "unfold" });
     expect(find(placed, "d").size).toBe("readable");
   });
 
   it("send a yielding panel with no free corner to the rail", () => {
-    const settings = [working(satellite("d", 9)), child("f", "d", 8, 1)];
-    expect(find(place(settings, laptop), "f")).toMatchObject({ rung: "card", parent: "d" });
+    const settings = [working(satellite("d", 9)), seed("f", 8, 1)];
+    expect(find(place(settings, laptop), "f")).toMatchObject({ rung: "card", layer: "front" });
   });
 
   it("read the hub as working, the rail as cards, a stage as working and the corner hub as a card", () => {
@@ -288,6 +335,32 @@ describe("the yard with trails, for any viewport and settings", () => {
     );
   });
 
+  it("never displaces anyone for a newcomer, seed or child, however deep it is", () => {
+    fc.assert(
+      fc.property(
+        yardArb,
+        fc.nat(),
+        fc.integer({ min: -5, max: 40 }),
+        fc.boolean(),
+        ({ viewport, settings, inside }, pick, depth, asChild) => {
+          const readable = settings.map(({ size: _size, ...rest }) => rest);
+          const parent = readable[pick % readable.length];
+          const newcomer =
+            asChild && parent !== undefined
+              ? child("newcomer", parent.id, depth, 99, pick % 3)
+              : seed("newcomer", depth, 99);
+          const before = place(readable, viewport, inside);
+          const after = place([...readable, newcomer], viewport, inside);
+          for (const held of before.filter((placement) => placement.rung === "unfold")) {
+            const now = after.find((placement) => placement.id === held.id);
+            expect(now && placeOf(now), held.id).toEqual(placeOf(held));
+          }
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+
   it("moves nothing that outranks a satellite whose size changes; only those below it yield", () => {
     fc.assert(
       fc.property(yardArb, fc.nat(), ({ viewport, settings, inside }, pick) => {
@@ -314,6 +387,10 @@ describe("the yard with trails, for any viewport and settings", () => {
     );
   });
 });
+
+function placeOf({ rect, slot, size, rung, layer }: Placement) {
+  return { rect, slot, size, rung, layer };
+}
 
 function precedenceOf(settings: readonly YardSetting[], inside: string): (id: string) => number {
   const order = settings

@@ -91,6 +91,7 @@ export function Rail(props: RailProps) {
     const entry = current();
     if (entry !== undefined) act(entry);
   };
+  const walk = (step: TrailStep) => withCurrent((entry) => props.onWalk?.(entry, step));
   const keyed: Readonly<Record<string, () => void>> = {
     j: () => step(1),
     ArrowDown: () => step(1),
@@ -100,8 +101,10 @@ export function Rail(props: RailProps) {
     x: withCurrent((entry) => props.onAnswer(entry, "dismissed")),
     p: withCurrent((entry) => props.onAnswer(entry, pinAnswer(entry.pinned))),
     t: () => props.onToggleView?.(),
-    "[": withCurrent((entry) => props.onWalk?.(entry, "rootward")),
-    "]": withCurrent((entry) => props.onWalk?.(entry, "leafward")),
+    "[": walk("rootward"),
+    "{": walk("rootward"),
+    "]": walk("leafward"),
+    "}": walk("leafward"),
     Escape: () => props.onReturn(),
   };
   const onKeyDown = (event: KeyboardEvent): void => {

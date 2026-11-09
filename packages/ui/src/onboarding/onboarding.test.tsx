@@ -13,7 +13,7 @@ import type { HostPort } from "../host/port.ts";
 import { keymapFromConfig } from "../keys/config.ts";
 import type { ShellSeams } from "../panes/registry.ts";
 import { createKeyboardScope, KeyboardScopeProvider } from "../shell/keyboard-claim.ts";
-import { inertFeed, inertTrust } from "../shell/trust.test.ts";
+import { inertFeed, inertTrust } from "../shell/trust-testing.ts";
 import { createOnboardingController, type OnboardingController } from "./controller.ts";
 import {
   connectKey,

@@ -8,7 +8,7 @@ import {
   factsHarness,
   memoryStorage,
   type WorkspaceFixture,
-} from "./facts.test.ts";
+} from "./facts-testing.ts";
 import { type Offer, offerKey } from "./proposal.ts";
 import { type PostureRecord, postureStorageKey, rememberedPosture } from "./record.ts";
 import { createTrustSetup, type TrustSetup, trustArrivals } from "./trust-setup.ts";

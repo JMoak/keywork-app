@@ -1,12 +1,6 @@
-import {
-  Compartment,
-  EditorState,
-  type Extension,
-  StateEffect,
-  StateField,
-} from "@codemirror/state";
+import { Compartment, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, lineNumbers } from "@codemirror/view";
-import { codeHighlighting, codeTheme } from "../../theme/code.ts";
+import { codeHighlighting, codeTheme, readOnlyCode } from "../../theme/code.ts";
 import { dressInLanguage } from "../../theme/languages.ts";
 
 export interface TextMount {
@@ -70,8 +64,6 @@ export function mountTextView(
 }
 
 export const textTheme: Extension = [codeTheme, codeHighlighting];
-
-const readOnly: Extension = [EditorState.readOnly.of(true), EditorView.editable.of(false)];
 
 interface Search {
   readonly query: string;
@@ -140,7 +132,7 @@ function build(host: HTMLElement, text: string, numbering: LineNumbering, path?:
   const view = new EditorView({
     doc: text,
     extensions: [
-      readOnly,
+      readOnlyCode,
       textTheme,
       found,
       lineNumbers({ formatNumber: (line) => numbering.label(line - 1) }),

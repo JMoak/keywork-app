@@ -28,6 +28,7 @@ export function YardStage(props: { scene: YardScene; hub: JSX.Element }) {
           offsetMinutes={0}
           railActive={stage().railActive}
           railAt={stage().railAt}
+          inside={stage().inside}
           view={stage().view}
           lineage={stage().lineage}
           reducedMotion={true}

@@ -8,6 +8,7 @@ import {
   notificationStates,
   parseProbeLine,
   parseWindowLine,
+  perMonitorDpiAwareV2,
   powershellArguments,
   probeScript,
   windowsForegroundProbe,
@@ -83,9 +84,58 @@ describe("the OS foreground window", () => {
     const script = probeScript(5);
     expect(script).toContain("GetForegroundWindow");
     expect(script).toContain("$window -ne $lastWindow");
-    expect(parseWindowLine("window 1311054\r")).toBe("1311054");
+    expect(parseWindowLine("window 1311054\r")).toEqual({ handle: "1311054", bounds: undefined });
     expect(parseWindowLine("5")).toBeUndefined();
     expect(parseProbeLine("window 1311054")).toBeUndefined();
+  });
+
+  it("prints the foreground window's rectangle in physical pixels, per-monitor DPI aware", () => {
+    const script = probeScript(5);
+    expect(script).toContain("SetThreadDpiAwarenessContext");
+    expect(script).toContain(`[IntPtr]::new(${perMonitorDpiAwareV2})`);
+    expect(perMonitorDpiAwareV2).toBe(-4);
+    expect(script).toContain("GetWindowRect($foreground, [ref]$bounds)");
+    expect(script.indexOf("SetThreadDpiAwarenessContext($perMonitorAware)")).toBeLessThan(
+      script.indexOf("GetWindowRect($foreground"),
+    );
+  });
+
+  it("reads the rectangle beside the handle as left, top, right and bottom", () => {
+    expect(parseWindowLine("window 1311054 -13 -13 3853 2077\r")).toEqual({
+      handle: "1311054",
+      bounds: { x: -13, y: -13, width: 3866, height: 2090 },
+    });
+    expect(parseWindowLine("window 77 -3840 0 0 2160")?.bounds).toEqual({
+      x: -3840,
+      y: 0,
+      width: 3840,
+      height: 2160,
+    });
+    for (const noRect of ["window 77 0 0 1920", "window 77 0 0 0 1080", "window 77 a b c d"]) {
+      expect(parseWindowLine(noRect), noRect).toEqual({ handle: "77", bounds: undefined });
+    }
+    expect(parseWindowLine("window x 0 0 1920 1080")).toBeUndefined();
+  });
+
+  it("keeps the foreground's rectangle with its handle, and forgets it when the console takes focus", () => {
+    let listener: ((line: string) => void) | undefined;
+    const feed = foregroundFeed(() => ({
+      onLine: (next) => {
+        listener = next;
+      },
+      kill: () => undefined,
+    }));
+    expect(feed.bounds()).toBeUndefined();
+    listener?.("window 777 0 0 1920 1080");
+    expect(feed.bounds()).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+    listener?.("5");
+    expect(feed.bounds()).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+    listener?.("window 777");
+    expect(feed.bounds()).toBeUndefined();
+    listener?.("window 777 1920 0 3840 1080");
+    feed.noteForeground("4242");
+    expect([feed.window(), feed.bounds()]).toEqual(["4242", undefined]);
+    feed.stop();
   });
 
   it("feeds one process to every listener and remembers the foreground window", () => {

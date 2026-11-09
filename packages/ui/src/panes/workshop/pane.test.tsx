@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type CompanionController, createCompanionController } from "../../companion/floating.ts";
 import { browserHost } from "../../host/browser.ts";
 import type { HostPort, ServerRequestInit, ServerResponseHead } from "../../host/port.ts";
-import { inertFeed, inertShellExtras } from "../../shell/trust.test.ts";
+import { inertFeed, inertShellExtras } from "../../shell/trust-testing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { houseOffsetMinutes } from "../stead/habitat.ts";
 import { raisedWord } from "./copy.ts";

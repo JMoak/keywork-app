@@ -42,24 +42,14 @@ import { wireSurroundings } from "./surroundings-electron.ts";
 import { fileSeams } from "./system.ts";
 import { trayModel } from "./tray.ts";
 import { startUpdater } from "./updater-electron.ts";
-import { userDataDirFor, userDataDirSwitch } from "./user-data.ts";
+import { userDataDirFor, userDataSourcesOf } from "./user-data.ts";
 import { windowStateBook } from "./window-state.ts";
 import { quitGate } from "./windows.ts";
 import type { WorkspaceHost } from "./workspace.ts";
 
 export function startDesktop(profile: ProductProfile): void {
   app.setName(profile.name);
-  app.setPath(
-    "userData",
-    userDataDirFor(
-      {
-        appData: app.getPath("appData"),
-        switchValue: app.commandLine.getSwitchValue(userDataDirSwitch),
-        environment: process.env,
-      },
-      profile,
-    ),
-  );
+  app.setPath("userData", userDataDirFor(userDataSourcesOf(app, process.env), profile));
   const protocolScheme = profile.protocolScheme;
 
   const nativeChords: Chords = {

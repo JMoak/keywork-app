@@ -8,6 +8,8 @@
 //
 // FIRST_LIGHT_LOG names a file that gains one JSON line per provider turn, per refused fetch,
 // and one with this process's pid, so the smoke can say what the engine was asked and stop it.
+// FIRST_LIGHT_KEYLESS names a folder served with no seam at all: keywork's own CLI resolves its
+// inference from the scratch home, finds no model, and refuses the project in its own words.
 import { appendFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -35,6 +37,10 @@ export async function serveScripted(argv) {
   record({ engine: process.pid });
   refuseTheNetwork();
   const cli = await import(keyworkModule("packages/cli/src/main.ts"));
+  if (servesTheKeylessFolder()) {
+    record({ keyless: process.cwd() });
+    return cli.main(argv);
+  }
   const inference = await import(keyworkModule("packages/cli/src/inference/runtime.ts"));
   return cli.main([...argv, "--model", scriptedReference], {
     composeInference: (inputs) => withScriptedProvider(inference.composeInference(inputs)),
@@ -186,6 +192,14 @@ function refuseTheNetwork() {
 
 function isLoopback(hostname) {
   return hostname === "localhost" || hostname === "[::1]" || hostname.startsWith("127.");
+}
+
+function servesTheKeylessFolder() {
+  const keyless = process.env.FIRST_LIGHT_KEYLESS;
+  if (keyless === undefined || keyless === "") return false;
+  const same = (path) =>
+    process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path);
+  return same(process.cwd()) === same(keyless);
 }
 
 function keyworkModule(relative) {

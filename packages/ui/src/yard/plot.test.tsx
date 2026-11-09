@@ -61,6 +61,26 @@ describe("a plot growing from what the creature set out", () => {
     );
   });
 
+  it("hands a member waiting on the rail its parent's space when the keeper enters it, and gives it back on leaving", async () => {
+    const run = await openPlot();
+    run.emit([proposed(2, file), proposed(3, test)]);
+    const waiting = await waitFor(() => railCardOf("test"));
+    expect(waiting.querySelector(".kw-yard-card-by")?.textContent).toBe(
+      "you opened it from src/sum.ts",
+    );
+    const fileSpace = satelliteOf("file").style.cssText;
+    enterFromRail("test");
+    await waitFor(() => expect(panelHolding()).toBe("test"));
+    expect(satelliteOf("file").dataset.size).toBe("card");
+    expect(waitingOnTheRail("test")).toBeUndefined();
+    typing();
+    await waitFor(() => expect(waitingOnTheRail("test")).toBeDefined());
+    expect(satelliteOf("file").dataset.size).toBe("readable");
+    await waitFor(() => expect(satelliteOf("file").style.cssText).toBe(fileSpace), {
+      timeout: 4000,
+    });
+  });
+
   it("keeps a panel's pane steady while the keeper's attention moves its setting, so a press lands", async () => {
     const run = await openPlot();
     const row = await waitFor(() => {
@@ -88,22 +108,22 @@ describe("a plot growing from what the creature set out", () => {
     );
   });
 
-  it("walks the chain with leader ] and leader [, to a panel or its card, back to the conversation", async () => {
+  it("walks the chain with leader shift+] and leader shift+[, to a panel or its card, back to the conversation", async () => {
     const run = await openPlot();
     focusInside("diff", ".kw-diff");
     run.emit([proposed(2, file), proposed(3, test)]);
     await waitFor(() => expect(drawnAnywhere(["diff", "file", "test"])).toBe(true));
     focusOn("test");
-    pressLeader("[");
+    walk("rootward");
     expect(landedOn("file")).toBe(true);
     await screen.findByText(/at src\/sum.ts$/);
-    pressLeader("[");
+    walk("rootward");
     expect(landedOn("diff")).toBe(true);
-    pressLeader("]");
+    walk("leafward");
     expect(landedOn("file")).toBe(true);
-    pressLeader("]");
+    walk("leafward");
     expect(landedOn("test")).toBe(true);
-    pressLeader("]");
+    walk("leafward");
     expect(landedOn("test")).toBe(true);
     await screen.findByText("the end of this chain");
   });
@@ -111,9 +131,18 @@ describe("a plot growing from what the creature set out", () => {
   it("walks rootward from the seed back to the conversation it grew from", async () => {
     await openPlot();
     focusInside("diff", ".kw-diff");
-    pressLeader("[");
+    walk("rootward");
     await waitFor(() => expect(panelHolding()).toBeUndefined());
     expect(document.activeElement?.closest(".kw-yard-hub")).toBeTruthy();
+  });
+
+  it("walks back out to the seed from inside the conversation, where leader ] stays a preset", async () => {
+    await openPlot();
+    focusInside("diff", ".kw-diff");
+    walk("rootward");
+    await waitFor(() => expect(document.activeElement?.closest(".kw-conversation")).toBeTruthy());
+    walk("leafward");
+    await waitFor(() => expect(panelHolding()).toBe("diff"));
   });
 
   it("folds into one card named by its chain when the seed is dismissed, and restores it on Enter", async () => {
@@ -136,6 +165,7 @@ describe("a plot growing from what the creature set out", () => {
     key("Enter");
     await waitFor(() => satelliteOf("file"));
     await waitFor(() => satelliteOf("test"));
+    expect(document.querySelector(".kw-yard-card[data-plot]")).toBeNull();
     expect(run.answered).toEqual([]);
   });
 
@@ -232,6 +262,11 @@ function openFromPalette(command: string): void {
   fireEvent.keyDown(input, { key: "Enter" });
 }
 
+function walk(step: "rootward" | "leafward"): void {
+  const typed = step === "rootward" ? "{" : "}";
+  pressLeader(typed, { shiftKey: true });
+}
+
 function drawnAnywhere(ids: readonly string[]): boolean {
   return ids.every((id) => document.getElementById(`kw-yard-entry-${id}`) !== null);
 }
@@ -262,6 +297,24 @@ function plotCard(): HTMLElement {
   const found = document.querySelector<HTMLElement>(".kw-yard-card[data-plot]");
   if (found === null) throw new Error("no plot card on the rail");
   return found;
+}
+
+function railCardOf(id: string): HTMLElement {
+  const found = waitingOnTheRail(id);
+  if (found === undefined) throw new Error(`no rail card for ${id}`);
+  return found;
+}
+
+function waitingOnTheRail(id: string): HTMLElement | undefined {
+  return [...document.querySelectorAll<HTMLElement>(".kw-yard-card")].find(
+    (card) => card.id === `kw-yard-entry-${id}`,
+  );
+}
+
+function enterFromRail(id: string): void {
+  pressLeader("y");
+  for (let step = 0; step < 8 && !landedOn(id); step += 1) key("j");
+  key("Enter");
 }
 
 function railTo(card: HTMLElement): void {

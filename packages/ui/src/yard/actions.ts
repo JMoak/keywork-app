@@ -10,7 +10,7 @@ export type TrailStep = "rootward" | "leafward";
 
 export const yardRailAction: AppAction = {
   chords: "leader y",
-  help: "the yard's rail: j k move, enter opens, x dismisses, p pins, t trail, esc returns",
+  help: "the yard's rail: j k move, enter opens, x dismisses, p pins, t the trail (or /trail), [ ] walk, esc returns",
   inEveryPane: true,
   command: {
     name: "yard-rail",
@@ -35,18 +35,19 @@ export const yardToggleAction: AppAction = {
 
 export const yardTrailAction: AppAction = {
   chords: "none",
-  help: "the rail by depth or as the trail (toggle; t on the rail)",
+  help: "the rail now or as the trail: leader y then t, or /trail",
   command: {
     name: "trail",
     label: "the rail now or as the trail",
-    description: "order the yard's rail by depth, or by the trail each panel grew from",
+    description:
+      "order the yard's rail by depth, or by the trail each panel grew from (leader y then t does the same)",
   },
   invoke: (target) => target.toggleYardTrail(),
 };
 
 export const yardRootwardAction: AppAction = {
-  chords: "leader [",
-  help: "walk the trail toward its root",
+  chords: "leader shift+[",
+  help: "walk the trail toward its root ([ on the rail)",
   inEveryPane: true,
   command: {
     name: "trail-back",
@@ -56,8 +57,8 @@ export const yardRootwardAction: AppAction = {
 };
 
 export const yardLeafwardAction: AppAction = {
-  chords: "leader ]",
-  help: "walk the trail toward its newest branch",
+  chords: "leader shift+]",
+  help: "walk the trail back toward its newest branch (] on the rail)",
   inEveryPane: true,
   command: {
     name: "trail-on",

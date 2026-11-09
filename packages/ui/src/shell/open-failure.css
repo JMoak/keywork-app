@@ -1,0 +1,51 @@
+.kw-open-fix {
+  display: flex;
+  margin: 0;
+  padding-left: 1.5rem;
+  color: var(--kw-text-mid);
+}
+
+.kw-open-failure-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.5rem;
+  background: var(--kw-panel);
+  box-shadow: inset 0 2px 0 var(--kw-error);
+  color: var(--kw-text-mid);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-open-failure-card p {
+  margin: 0;
+}
+
+.kw-open-failure-card .kw-open-failure,
+.kw-open-failure-card .kw-open-fix {
+  padding-left: 0;
+}
+
+.kw-open-failure-of {
+  color: var(--kw-text);
+}
+
+.kw-open-failure-keys {
+  display: flex;
+  gap: 1ch;
+  align-items: baseline;
+}
+
+.kw-open-failure-act {
+  font: inherit;
+  padding: 0 0.5ch;
+  border: none;
+  background: none;
+  color: var(--kw-accent);
+  cursor: pointer;
+}
+
+.kw-open-failure-act:hover,
+.kw-open-failure-act:focus-visible {
+  outline: none;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+}

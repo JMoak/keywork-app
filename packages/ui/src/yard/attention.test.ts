@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { createRoot, createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
 import {
@@ -47,26 +48,33 @@ describe("attention reports", () => {
     run.dispose();
   });
 
-  it("never reports two interactions closer than two seconds, and never drops one that is due", () => {
-    for (const gaps of sequences([0, 1, 1_999, 2_000, 4_500], 6)) {
-      const run = reporting();
-      const reported: number[] = [];
-      for (const gap of gaps) {
-        run.later(gap);
-        const before = run.notices.length;
-        run.interact("diff");
-        const last = reported.at(-1);
-        if (run.notices.length > before) reported.push(run.clock());
-        else expect(last !== undefined && run.clock() - last < interactEveryMs).toBe(true);
-      }
-      for (const [index, at] of reported.entries()) {
-        if (index > 0)
-          expect(at - (reported[index - 1] ?? 0)).toBeGreaterThanOrEqual(interactEveryMs);
-      }
-      run.dispose();
-    }
+  it("reports an interaction exactly when that panel's last report is two seconds old, so none is too close and none due is dropped", () => {
+    fc.assert(
+      fc.property(fc.array(pressArb, { maxLength: 24 }), (presses) => {
+        const run = reporting();
+        const lastReported = new Map<string, number>();
+        for (const { panel, gap } of presses) {
+          run.later(gap);
+          const before = run.notices.length;
+          run.interact(panel);
+          const last = lastReported.get(panel);
+          const due = last === undefined || run.clock() - last >= interactEveryMs;
+          expect(run.kinds().slice(before)).toEqual(due ? [`interact ${panel}`] : []);
+          if (due) lastReported.set(panel, run.clock());
+        }
+        run.dispose();
+      }),
+      { numRuns: 1_000 },
+    );
   });
 });
+
+const gapArb = fc.oneof(
+  fc.constantFrom(0, 1, interactEveryMs - 1, interactEveryMs),
+  fc.integer({ min: 0, max: 3 * interactEveryMs }),
+);
+
+const pressArb = fc.record({ panel: fc.constantFrom("diff", "file"), gap: gapArb });
 
 describe("watching a panel for interactions", () => {
   it("hears a scroll, an edit and a keypress anywhere inside, and stops when released", () => {
@@ -112,9 +120,4 @@ function reporting() {
       kinds: () => notices.map((notice) => `${notice.kind} ${notice.id}`),
     };
   });
-}
-
-function sequences<T>(alphabet: readonly T[], length: number): T[][] {
-  if (length === 0) return [[]];
-  return sequences(alphabet, length - 1).flatMap((held) => alphabet.map((next) => [...held, next]));
 }

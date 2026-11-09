@@ -8,10 +8,10 @@ import {
   type FactsHarness,
   factsHarness,
   memoryStorage,
-} from "../../posture/facts.test.ts";
+} from "../../posture/facts-testing.ts";
 import { postureStorageKey } from "../../posture/record.ts";
 import { createTrustSetup, type TrustSetup } from "../../posture/trust-setup.ts";
-import { inertFeed, inertTrust } from "../../shell/trust.test.ts";
+import { inertFeed, inertTrust } from "../../shell/trust-testing.ts";
 import { mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { posturePane } from "./index.tsx";

@@ -171,6 +171,16 @@ describe("Keymap", () => {
     expect(() => new Keymap({ bindings: { a: "ctrl+k" } })).toThrow("is the leader");
     expect(() => new Keymap({ bindings: { a: "leader ctrl+z" } })).toThrow("can never fire");
   });
+
+  it("keeps an armed leader through a rebind that keeps the leader, and drops it when the leader moves", () => {
+    const map = keymap();
+    map.press(parseChord("ctrl+k"), 0);
+    map.rebind({ leader: "ctrl+k", timeoutMs: 100, bindings: { "pane.zoom": "leader z" } });
+    expect(map.press(parseChord("z"), 50)).toEqual({ type: "action", action: "pane.zoom" });
+    map.press(parseChord("ctrl+k"), 60);
+    map.rebind({ leader: "ctrl+j", timeoutMs: 100, bindings: { "pane.zoom": "leader z" } });
+    expect(map.armed(70)).toBe(false);
+  });
 });
 
 describe("scoped bindings", () => {
@@ -242,6 +252,49 @@ describe("the app's bindings", () => {
     expect(map.describe("palette.go")).toBe("ctrl+p");
     expect(map.describe("tree.summon")).toBe("ctrl+k t");
     expect(map.describeAll("help.toggle")).toEqual(["ctrl+k /", "f1"]);
+  });
+
+  it("walk the trail with leader shift+[ and shift+] in every pane, the conversation's leader [ and ] staying its presets", () => {
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
+    const afterLeader = (typed: string, code: string, shiftKey: boolean, scope?: string) => {
+      map.press(parseChord("ctrl+k"), 0, scope);
+      return map.press(chordsOfKey({ ...key({ key: typed, shiftKey }), code }), 1, scope);
+    };
+    for (const scope of ["conversation", "diff", "file", "tree", "stead"]) {
+      expect(afterLeader("{", "BracketLeft", true, scope), scope).toEqual({
+        type: "action",
+        action: "yard.rootward",
+      });
+      expect(afterLeader("}", "BracketRight", true, scope), scope).toEqual({
+        type: "action",
+        action: "yard.leafward",
+      });
+    }
+    expect(afterLeader("[", "BracketLeft", false, "conversation")).toEqual({
+      type: "action",
+      action: "conversation.preset-tighter",
+    });
+    expect(afterLeader("]", "BracketRight", false, "conversation")).toEqual({
+      type: "action",
+      action: "conversation.preset-looser",
+    });
+    expect(map.describe("yard.rootward")).toBe("ctrl+k shift+[");
+    expect(map.describe("tree.summon")).toBe("ctrl+k t");
+  });
+
+  it("give the trail no chord of its own: leader y then t on the rail, or /trail", () => {
+    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
+    expect(map.describeAll("yard.trail")).toEqual([]);
+    expect(map.describe("yard.rail")).toBe("ctrl+k y");
+    expect(appActions["yard.rail"]?.help).toContain("t the trail (or /trail)");
+    expect(appActions["yard.trail"]?.help).toBe(
+      "the rail now or as the trail: leader y then t, or /trail",
+    );
+    expect(appActions["yard.trail"]?.command?.name).toBe("trail");
+    const claims = Object.entries(appBindings).filter(([, chords]) =>
+      [chords].flat().includes("leader shift+t"),
+    );
+    expect(claims.map(([action]) => action)).toEqual(["terminal.summon"]);
   });
 
   it("make a creature on leader 1 from the stead, the creature pane and the chores pane alike", () => {

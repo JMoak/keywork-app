@@ -1,7 +1,7 @@
 import type { PermissionRule, PermissionsView } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import grantAnswers from "../../../client/src/fixtures/grants.json";
-import { factsWith, mcpServer } from "./facts.test.ts";
+import { factsWith, mcpServer } from "./facts-testing.ts";
 import { coversServerOf, mcpServerOf, offersFrom, proposalOf, sameRule } from "./proposal.ts";
 
 const recordedView = grantAnswers.permissions.body as PermissionsView;

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import treeRoot from "../../../../client/src/fixtures/tree-root.json?raw";
 import treeSrc from "../../../../client/src/fixtures/tree-src.json?raw";
 import { browserHost } from "../../host/browser.ts";
-import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust.test.ts";
+import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
 import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { browserPane, describeTreeRefusal, filterMissLine, markOf } from "./index.tsx";

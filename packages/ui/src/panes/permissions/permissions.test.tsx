@@ -12,7 +12,7 @@ import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import grantAnswers from "../../../../client/src/fixtures/grants.json";
 import { quietMark } from "../../chrome/title-row.tsx";
-import { inertFeed } from "../../shell/trust.test.ts";
+import { inertFeed } from "../../shell/trust-testing.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import {

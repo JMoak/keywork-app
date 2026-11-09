@@ -44,6 +44,17 @@ describe("the rail's trail view", () => {
     expect(yard.toggled).toHaveBeenCalledOnce();
   });
 
+  it("walks with the shifted brackets on the rail too, so leader shift+[ and shift+] hold everywhere", () => {
+    const yard = renderTrail({ view: "trail" });
+    keyOnRail("j");
+    keyOnRail("{");
+    keyOnRail("}");
+    expect(yard.walked).toEqual([
+      ["diff", "rootward"],
+      ["diff", "leafward"],
+    ]);
+  });
+
   it("heads the hub with the chain of the node under the cursor, and only when it grew from one", () => {
     const yard = renderTrail({ view: "now" });
     expect(crumb()).toBeNull();

@@ -26,15 +26,16 @@ export function yardLineageOf(yard: Accessor<YardState>): YardLineage {
       ? setting
       : undefined;
   };
+  const parentOf = (id: string): string | undefined => {
+    const trail = trailOf(yard(), id);
+    const above = trail.slice(0, -1).findLast((step) => shown(step) !== undefined);
+    return above ?? conversationRootOf(yard(), trail[0]);
+  };
   return {
-    parentOf: (id) => {
-      const trail = trailOf(yard(), id);
-      const above = trail.slice(0, -1).findLast((step) => shown(step) !== undefined);
-      return above ?? conversationRootOf(yard(), trail[0]);
-    },
+    parentOf,
     childrenOf: (id) =>
       Object.values(yard().settings)
-        .filter((setting) => fromOf(setting) === id && shown(setting.id) !== undefined)
+        .filter((setting) => shown(setting.id) !== undefined && parentOf(setting.id) === id)
         .toSorted((a, b) => byArrival(b, a))
         .map((setting) => setting.id),
     chainOf: (id) => chainOf(yard(), id),

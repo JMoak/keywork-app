@@ -7,16 +7,10 @@ import {
   MergeView,
   unifiedMergeView,
 } from "@codemirror/merge";
-import {
-  Compartment,
-  EditorSelection,
-  EditorState,
-  type Extension,
-  type Text,
-} from "@codemirror/state";
+import { Compartment, EditorSelection, type Extension, type Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { WidthTier } from "../../page/tiers.ts";
-import { codeHighlighting, codeTheme } from "../../theme/code.ts";
+import { codeHighlighting, codeTheme, readOnlyCode } from "../../theme/code.ts";
 import { dressInLanguage } from "../../theme/languages.ts";
 
 export type MergeLayout = "unified" | "split";
@@ -92,11 +86,7 @@ export const mergeTheme: Extension = [
   }),
 ];
 
-const readOnly: Extension = [
-  EditorState.readOnly.of(true),
-  EditorView.editable.of(false),
-  EditorView.lineWrapping,
-];
+const readOnly: Extension = [readOnlyCode, EditorView.lineWrapping];
 
 const collapseUnchanged = { margin: 3, minSize: 4 };
 

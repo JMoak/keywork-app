@@ -109,6 +109,25 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     if (control.railActive() || !panels.focus(id)) control.focusRail(id);
     options.say(walkedLine(model.lineage.chainOf(id), titleOfSetting(setting)));
   };
+  const waitsBesidePanel = (id: string): boolean => {
+    if (panels.settingOf(id) !== undefined) return false;
+    for (let above = model.lineage.parentOf(id); above !== undefined; ) {
+      if (panels.settingOf(above) !== undefined) return true;
+      above = model.lineage.parentOf(above);
+    }
+    return false;
+  };
+  const enterInPlace = (setting: YardSetting): void => {
+    if (!reaches(setting.shown, "unfold")) model.raiseByHand(setting);
+    control.leaveRail();
+    panels.focusWhenMounted(setting.id);
+    model.attend({
+      type: "keeper.attend",
+      ts: new Date(now()).toISOString(),
+      id: setting.id,
+      kind: "enter",
+    });
+  };
   const cameFrom = new Map<string, string>();
   const walkFrom = (at: string | undefined, step: TrailStep): void => {
     const next =
@@ -135,6 +154,7 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     ownerOf: model.ownerOf,
     enter: (setting) => {
       const withdrawn = model.withdrawn(setting.id);
+      if (!withdrawn && waitsBesidePanel(setting.id)) return enterInPlace(setting);
       if (!withdrawn && !reaches(setting.shown, "unfold")) return model.raiseByHand(setting);
       control.leaveRail();
       takeIntoHub(setting, model.shellOf(setting), options.host);

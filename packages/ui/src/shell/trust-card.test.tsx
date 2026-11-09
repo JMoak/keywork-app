@@ -1,8 +1,8 @@
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
-import { inertTrust } from "./trust.test.ts";
 import { trustPrompt, trustStaysOff } from "./trust.ts";
 import { TrustCard } from "./trust-card.tsx";
+import { inertTrust } from "./trust-testing.ts";
 
 afterEach(cleanup);
 

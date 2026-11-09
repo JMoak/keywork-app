@@ -4,10 +4,10 @@ import { render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
-import { inertShellExtras } from "../../shell/trust.test.ts";
+import { inertShellExtras } from "../../shell/trust-testing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { type TerminalSpec, terminalPane } from "./index.tsx";
-import { type FakeSurface, fakeSurface } from "./session.test.ts";
+import { type FakeSurface, fakeSurface } from "./session-testing.ts";
 
 const surfaces: FakeSurface[] = [];
 

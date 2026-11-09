@@ -52,6 +52,7 @@
     "@playwright/test": "1.65.0",
     "@solidjs/testing-library": "0.8.10",
     "@tailwindcss/vite": "4.3.3",
+    "fast-check": "4.10.2",
     "happy-dom": "20.14.0",
     "tailwindcss": "4.3.3",
     "vite": "8.3.6",

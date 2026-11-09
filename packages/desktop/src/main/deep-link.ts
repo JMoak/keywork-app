@@ -25,6 +25,8 @@ export type ProtocolHandler =
   | { kind: "dev-app"; appPath: string }
   | { kind: "untouched" };
 
+export const registerProtocolSwitch = "register-protocol-handler";
+
 export function requestFromUrl(
   input: string,
   profile: ProductProfile = keyworkProfile,
@@ -66,14 +68,19 @@ export function launchFrom(argv: readonly string[], defaultApp: boolean): Launch
 }
 
 export function protocolHandlerFor(launch: Launch): ProtocolHandler {
-  if (launch.switches.length > 0) return { kind: "untouched" };
-  if (!launch.defaultApp) return { kind: "this-executable" };
-  if (launch.appPath === undefined) return { kind: "untouched" };
-  return { kind: "dev-app", appPath: launch.appPath };
+  const asked = launch.switches.includes(`--${registerProtocolSwitch}`);
+  if (launch.defaultApp) return asked ? devAppHandler(launch.appPath) : untouched;
+  return asked || launch.switches.length === 0 ? { kind: "this-executable" } : untouched;
 }
 
 export function openUrlFor(path: string, profile: ProductProfile = keyworkProfile): string {
   return `${profile.protocolScheme}://open?path=${encodeURIComponent(path)}`;
+}
+
+const untouched: ProtocolHandler = { kind: "untouched" };
+
+function devAppHandler(appPath: string | undefined): ProtocolHandler {
+  return appPath === undefined ? untouched : { kind: "dev-app", appPath };
 }
 
 function requestForPath(path: string, input: string): OpenRequest {

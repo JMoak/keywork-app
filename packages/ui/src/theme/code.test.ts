@@ -105,6 +105,20 @@ describe("the file viewer", () => {
   });
 });
 
+describe("read-only code", () => {
+  it("lets a press on its text take the keyboard, since CodeMirror focuses the content itself", () => {
+    const file = host();
+    mountTextView(file, "export const sum = 1;\n", numbering);
+    const diff = host();
+    mountMergeView(diff, { before: "one\n", after: "two\n" }, "unified");
+    for (const view of [file, diff]) {
+      const content = view.querySelector(".cm-content");
+      expect(content?.getAttribute("contenteditable")).toBe("false");
+      expect(content?.getAttribute("tabindex")).toBe("-1");
+    }
+  });
+});
+
 describe("the diff merge view", () => {
   it("highlights both sides by the file's language and paints diffs from the theme", async () => {
     const element = host();

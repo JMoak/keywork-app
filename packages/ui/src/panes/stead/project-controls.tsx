@@ -14,13 +14,7 @@ export interface CreatureProjectControlsProps {
   readonly creature: { readonly slug: string; readonly name: string };
   readonly scope: Pick<
     SteadHomeScope,
-    | "activeProject"
-    | "openMemory"
-    | "openProject"
-    | "openSession"
-    | "projectFailure"
-    | "projects"
-    | "workspace"
+    "activeProject" | "openMemory" | "openProject" | "openSession" | "projects" | "workspace"
   >;
   readonly feed: Pick<ServerFeed, "subscribe">;
   conversation(slug: string): Promise<string | undefined>;
@@ -260,7 +254,6 @@ export function CreatureProjectControls(props: CreatureProjectControlsProps) {
           </Show>
         )}
       </Show>
-      <Show when={scope.projectFailure?.()}>{(line) => <p role="status">{line()}</p>}</Show>
       <Show when={notice()}>{(line) => <p role="status">{line()}</p>}</Show>
     </section>
   );

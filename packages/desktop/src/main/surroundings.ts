@@ -1,5 +1,5 @@
 import type { Surroundings } from "../shared/channels.ts";
-import { notificationStates } from "./companion/foreground.ts";
+import { notificationStates, type ScreenRect } from "./companion/foreground.ts";
 
 export interface SurroundingFacts {
   readonly fullscreen: boolean;
@@ -7,6 +7,7 @@ export interface SurroundingFacts {
   readonly foregroundIsOurs: boolean | undefined;
   readonly displays: number;
   readonly display: string | undefined;
+  readonly coveredDisplays: readonly string[];
   readonly sharedDisplays: readonly string[];
 }
 
@@ -23,6 +24,7 @@ export interface SurroundingsSeams {
   displays(): number;
   notificationState(): number | undefined;
   foregroundIsOurs(): boolean | undefined;
+  coveredDisplays(): readonly string[];
   sharedDisplays(): readonly string[];
 }
 
@@ -31,11 +33,18 @@ export interface SurroundingsRelay {
   push(): void;
 }
 
+export interface DisplayArea {
+  readonly id: string;
+  readonly bounds: ScreenRect;
+}
+
 export const unknownSurroundings: Surroundings = {
   fullscreen: false,
   fullscreenElsewhere: false,
   displayShared: false,
 };
+
+export const coverSlackDip = 1;
 
 export function surroundingsOf(facts: SurroundingFacts): Surroundings {
   return {
@@ -43,6 +52,14 @@ export function surroundingsOf(facts: SurroundingFacts): Surroundings {
     fullscreenElsewhere: anotherAppFullscreenHere(facts),
     displayShared: presenting(facts) || sharedByTheConsole(facts),
   };
+}
+
+export function displaysCoveredBy(
+  window: ScreenRect | undefined,
+  displays: readonly DisplayArea[],
+): readonly string[] {
+  if (window === undefined) return [];
+  return displays.filter((display) => covers(window, display.bounds)).map((display) => display.id);
 }
 
 export function surroundingsRelay(seams: SurroundingsSeams): SurroundingsRelay {
@@ -53,6 +70,7 @@ export function surroundingsRelay(seams: SurroundingsSeams): SurroundingsRelay {
     foregroundIsOurs: seams.foregroundIsOurs(),
     displays: seams.displays(),
     display: window.display(),
+    coveredDisplays: seams.coveredDisplays(),
     sharedDisplays: seams.sharedDisplays(),
   });
   return {
@@ -76,8 +94,13 @@ function anotherAppFullscreenHere(facts: SurroundingFacts): boolean {
     facts.notificationState !== undefined &&
     fullscreenStates.has(facts.notificationState) &&
     facts.foregroundIsOurs === false &&
-    facts.displays === 1
+    onTheConsolesDisplay(facts)
   );
+}
+
+function onTheConsolesDisplay(facts: SurroundingFacts): boolean {
+  if (facts.displays === 1) return true;
+  return facts.display !== undefined && facts.coveredDisplays.includes(facts.display);
 }
 
 function presenting(facts: SurroundingFacts): boolean {
@@ -86,6 +109,15 @@ function presenting(facts: SurroundingFacts): boolean {
 
 function sharedByTheConsole(facts: SurroundingFacts): boolean {
   return facts.display !== undefined && facts.sharedDisplays.includes(facts.display);
+}
+
+function covers(outer: ScreenRect, inner: ScreenRect): boolean {
+  return (
+    outer.x <= inner.x + coverSlackDip &&
+    outer.y <= inner.y + coverSlackDip &&
+    outer.x + outer.width >= inner.x + inner.width - coverSlackDip &&
+    outer.y + outer.height >= inner.y + inner.height - coverSlackDip
+  );
 }
 
 const fullscreenStates: ReadonlySet<number> = new Set([

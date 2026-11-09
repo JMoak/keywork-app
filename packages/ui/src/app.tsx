@@ -28,6 +28,12 @@ import {
   type NeedsYouQueue,
   sessionVerdicts,
 } from "./shell/needs-you-queue.ts";
+import {
+  type OpenFailureNotice,
+  type OpenFailureView,
+  openFailureView,
+  plainOpenFailure,
+} from "./shell/open-failure.tsx";
 import { OpenScreen } from "./shell/open-screen.tsx";
 import {
   type ServerStanding,
@@ -78,7 +84,7 @@ function ConnectedApp(props: AppProps) {
   const [home, setHome] = createSignal<Connection>();
   const [homePane, setHomePane] = createSignal<PaneSpec>();
   const [opening, setOpening] = createSignal<string>();
-  const [failure, setFailure] = createSignal<string>();
+  const [failure, setFailure] = createSignal<OpenFailureView>();
   const [homeFailure, setHomeFailure] = createSignal<string>();
   const active = () => project() ?? (startsAtHome ? home() : undefined);
   const connect =
@@ -118,7 +124,7 @@ function ConnectedApp(props: AppProps) {
         const result = await props.host.openWorkspace(path);
         if (disposed || request !== newestOpen) return;
         if (!result.ok) {
-          setFailure(describeFailure(result.failure));
+          setFailure(openFailureView(path, result.failure, profile));
           return;
         }
         const connection = await attach(result.opened, false, host, connect, needsYou);
@@ -131,7 +137,7 @@ function ConnectedApp(props: AppProps) {
         previous?.close();
       } catch (cause) {
         if (!disposed && request === newestOpen)
-          setFailure(`could not open ${path} · ${messageOf(cause)}`);
+          setFailure(plainOpenFailure(path, `could not open ${path} · ${messageOf(cause)}`));
       } finally {
         if (!disposed && request === newestOpen) setOpening(undefined);
       }
@@ -173,7 +179,7 @@ function ConnectedApp(props: AppProps) {
       await props.host.enableRuntime?.();
       if (lastRequestedProject !== undefined) await open(lastRequestedProject);
     } catch (cause) {
-      if (!disposed) setFailure(messageOf(cause));
+      if (!disposed) setFailure(plainOpenFailure(lastRequestedProject ?? "", messageOf(cause)));
     }
   };
   const chooseProject = async (): Promise<void> => {
@@ -214,9 +220,21 @@ function ConnectedApp(props: AppProps) {
       openSession,
       openProject: () => void chooseProject(),
       openMemory: () => openPane({ kind: "memory" }),
-      projectFailure: failure,
       presentedPane: homePane,
       dismissPane: () => setHomePane(undefined),
+    };
+  };
+
+  const enableRuntime =
+    props.host.enableRuntime === undefined ? undefined : () => void enableProjectRuntime();
+  const failureNotice = (): OpenFailureNotice | undefined => {
+    const view = failure();
+    if (view === undefined) return undefined;
+    return {
+      view,
+      enableRuntime,
+      retry: () => void open(view.path),
+      dismiss: () => setFailure(undefined),
     };
   };
 
@@ -254,6 +272,7 @@ function ConnectedApp(props: AppProps) {
             steadHome={steadHome}
             prepareSteadHome={props.host.openHome === undefined ? undefined : ensureHome}
             steadHomeFailure={homeFailure()}
+            openFailure={failureNotice()}
           />
         )}
       </Match>
@@ -285,9 +304,7 @@ function ConnectedApp(props: AppProps) {
           failure={failure()}
           opening={opening()}
           onOpen={open}
-          onEnableRuntime={
-            props.host.enableRuntime === undefined ? undefined : () => void enableProjectRuntime()
-          }
+          onEnableRuntime={enableRuntime}
         />
       </Match>
     </Switch>

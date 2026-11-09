@@ -196,70 +196,140 @@ function satellitesOf(
   const unfolds = ladder.filter((setting) => rankOf(setting.shown) >= rankOf("unfold"));
   if (unfolds.length === 0) return [];
   const slots = ringSlots(input.viewport, input.hub, reserved);
-  const seats = seated(input.viewport, chosenOf(unfolds, slots.length), slots, reserved);
-  const sized = sizedSeats(input.viewport, seats, reserved, input.inside);
-  return inTrailOrder(sized).map(({ seat, rect, size }) => ({
+  const seats = seatedInTurn(input.viewport, unfolds, slots, reserved);
+  const handed = handedToTheVisit(seats, unfolds, input.inside);
+  const kept = handed === undefined ? reserved : [...reserved, handed.yielded.rect];
+  const sized = sizedSeats(input.viewport, handed?.seats ?? seats, kept, input.inside);
+  const satellites = inTrailOrder(sized).map(({ seat, rect, size }) => ({
     ...placed(seat.setting.id, rect, "unfold", "mid", size),
     slot: seat.slot,
   }));
+  return handed === undefined ? satellites : [...satellites, handed.yielded];
 }
 
-interface Chosen {
-  readonly seeds: readonly YardSetting[];
-  readonly children: readonly YardSetting[];
+interface Handed {
+  readonly seats: readonly Seat[];
+  readonly yielded: Placement;
 }
 
-function chosenOf(unfolds: readonly YardSetting[], ringSize: number): Chosen {
-  const out = new Set(unfolds.map((setting) => setting.id));
-  const besideOne = (setting: YardSetting): boolean =>
-    setting.unfolded?.lane !== undefined && out.has(setting.from ?? "");
-  const seeds = unfolds.filter((setting) => !besideOne(setting)).slice(0, ringSize);
-  const chosen = new Set(seeds.map((setting) => setting.id));
-  const children: YardSetting[] = [];
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const setting of unfolds.filter(besideOne)) {
-      if (chosen.has(setting.id) || !chosen.has(setting.from ?? "")) continue;
-      chosen.add(setting.id);
-      children.push(setting);
-      grew = true;
-    }
+function handedToTheVisit(
+  seats: readonly Seat[],
+  unfolds: readonly YardSetting[],
+  inside: string | undefined,
+): Handed | undefined {
+  const visited = unfolds.find((setting) => setting.id === inside);
+  if (visited === undefined || seats.some((seat) => seat.setting === visited)) return undefined;
+  const ancestor = nearestSeatedAncestor(visited, unfolds, seats);
+  if (ancestor === undefined) return undefined;
+  const corner = cornersOf(ancestor)[0];
+  if (corner === undefined) return undefined;
+  const taken: Seat = { ...ancestor, setting: visited, rect: besideCorner(ancestor.rect, corner) };
+  return {
+    seats: seats.map((seat) => (seat === ancestor ? taken : seat)),
+    yielded: {
+      ...placed(ancestor.setting.id, corner, "unfold", "mid", "card"),
+      slot: ancestor.slot,
+    },
+  };
+}
+
+function nearestSeatedAncestor(
+  setting: YardSetting,
+  unfolds: readonly YardSetting[],
+  seats: readonly Seat[],
+): Seat | undefined {
+  const byId = new Map(unfolds.map((held) => [held.id, held]));
+  const visited = new Set<string>([setting.id]);
+  for (let from = setting.from; from !== null && from !== undefined && !visited.has(from); ) {
+    visited.add(from);
+    const seat = seats.find((held) => held.setting.id === from);
+    if (seat !== undefined) return seat;
+    from = byId.get(from)?.from;
   }
-  return { seeds, children };
+  return undefined;
 }
 
-function seated(
+function besideCorner(space: Rect, corner: Rect): Rect {
+  const { gap } = yardMetrics;
+  const height = space.height - corner.height - gap;
+  return corner.y === space.y
+    ? { ...space, y: bottom(corner) + gap, height }
+    : { ...space, height };
+}
+
+function seatedInTurn(
   viewport: Rect,
-  chosen: Chosen,
+  unfolds: readonly YardSetting[],
   slots: readonly Slot[],
   reserved: readonly Rect[],
 ): Seat[] {
   const seats: Seat[] = [];
-  for (const setting of chosen.seeds) {
-    const kept = keptRingSlot(setting, slots.length, seats);
-    const slot = kept === undefined ? undefined : slots[kept];
-    if (kept !== undefined && slot !== undefined) seats.push(ringSeat(setting, slot, kept));
-  }
   const inner = innerOf(viewport);
   const free = (rect: Rect): boolean =>
     within(rect, inner) &&
     reserved.every((other) => !overlaps(rect, other)) &&
     seats.every((seat) => !overlaps(rect, seat.rect));
-  const newcomers = chosen.seeds.filter(
-    (setting) => !seats.some((seat) => seat.setting === setting),
-  );
-  for (const setting of newcomers.toSorted(byUnfolding)) {
-    const seat = onTheRing(setting, slots, seats, free, undefined);
-    if (seat !== undefined) seats.push(seat);
-  }
-  for (const setting of chosen.children.toSorted(byUnfolding)) {
-    const parent = parentSeatOf(setting, seats);
-    const seat =
-      besideParent(readableSize(viewport), setting, seats, chosen.children, free) ??
-      (parent === undefined ? undefined : onTheRing(setting, slots, seats, free, parent));
+  const size = readableSize(viewport);
+  const ids = new Set(unfolds.map((setting) => setting.id));
+  for (const setting of inTurn(unfolds, ids)) {
+    const seat = growsBeside(setting, ids)
+      ? childSeat(size, setting, seats, slots, free)
+      : seedSeat(setting, slots, seats, free);
     if (seat !== undefined) seats.push(seat);
   }
   return seats;
+}
+
+function inTurn(unfolds: readonly YardSetting[], ids: ReadonlySet<string>): YardSetting[] {
+  const order: YardSetting[] = [];
+  const taken = new Set<string>();
+  const waiting = new Map<string, YardSetting[]>();
+  const take = (setting: YardSetting): void => {
+    order.push(setting);
+    taken.add(setting.id);
+    const children = waiting.get(setting.id) ?? [];
+    waiting.delete(setting.id);
+    for (const child of children) take(child);
+  };
+  for (const setting of unfolds.toSorted(byUnfolding)) {
+    const parent = setting.from ?? "";
+    if (!growsBeside(setting, ids) || taken.has(parent)) take(setting);
+    else waiting.set(parent, [...(waiting.get(parent) ?? []), setting]);
+  }
+  return order;
+}
+
+function growsBeside(setting: YardSetting, ids: ReadonlySet<string>): boolean {
+  return setting.unfolded?.lane !== undefined && ids.has(setting.from ?? "");
+}
+
+function seedSeat(
+  setting: YardSetting,
+  slots: readonly Slot[],
+  seats: readonly Seat[],
+  free: (rect: Rect) => boolean,
+): Seat | undefined {
+  const kept = keptRingSlot(setting, slots.length, seats);
+  const slot = kept === undefined ? undefined : slots[kept];
+  const rect = slot === undefined ? undefined : ringRects(setting, slot).find(free);
+  if (kept !== undefined && slot !== undefined && rect !== undefined) {
+    return { setting, rect, side: slot.side, slot: kept, lane: undefined };
+  }
+  return onTheRing(setting, slots, seats, free, undefined);
+}
+
+function childSeat(
+  size: Extent,
+  setting: YardSetting,
+  seats: readonly Seat[],
+  slots: readonly Slot[],
+  free: (rect: Rect) => boolean,
+): Seat | undefined {
+  const parent = parentSeatOf(setting, seats);
+  if (parent === undefined) return undefined;
+  return (
+    besideParent(size, setting, parent, free) ?? onTheRing(setting, slots, seats, free, parent)
+  );
 }
 
 function keptRingSlot(
@@ -274,31 +344,20 @@ function keptRingSlot(
   return seats.some((seat) => seat.slot === unfolded.slot) ? undefined : unfolded.slot;
 }
 
-function ringSeat(setting: YardSetting, slot: Slot, index: number): Seat {
-  const rect = codeKinds.has(setting.what.kind) ? (slot.wide ?? slot.rect) : slot.rect;
-  return { setting, rect, side: slot.side, slot: index, lane: undefined };
+function ringRects(setting: YardSetting, slot: Slot): Rect[] {
+  const code = codeKinds.has(setting.what.kind);
+  return [...(code && slot.wide !== undefined ? [slot.wide] : []), slot.rect];
 }
 
 function besideParent(
   size: Extent,
   setting: YardSetting,
-  seats: readonly Seat[],
-  chosen: readonly YardSetting[],
+  parent: Seat,
   free: (rect: Rect) => boolean,
 ): Seat | undefined {
   const own = setting.unfolded?.lane;
-  const parent = parentSeatOf(setting, seats);
-  if (own === undefined || parent === undefined) return undefined;
-  const siblings = new Set(
-    chosen.flatMap((other) => {
-      const lane = other.unfolded?.lane;
-      return other !== setting && other.from === setting.from && lane !== undefined ? [lane] : [];
-    }),
-  );
-  const tried = [
-    own,
-    ...[...childLanes.keys()].filter((lane) => lane !== own && !siblings.has(lane)),
-  ];
+  if (own === undefined) return undefined;
+  const tried = [own, ...[...childLanes.keys()].filter((lane) => lane !== own)];
   const code = codeKinds.has(setting.what.kind);
   return firstOf(tried, (lane) => {
     const floor = laneRect(parent, lane, size);
@@ -326,12 +385,10 @@ function onTheRing(
   const tried = open.toSorted(
     (a, b) => nearness(a) - nearness(b) || Number(b === own) - Number(a === own) || a - b,
   );
-  const code = codeKinds.has(setting.what.kind);
   return firstOf(tried, (index) => {
     const slot = slots[index];
-    if (slot === undefined) return undefined;
-    const rect = [...(code && slot.wide !== undefined ? [slot.wide] : []), slot.rect].find(free);
-    return rect === undefined
+    const rect = slot === undefined ? undefined : ringRects(setting, slot).find(free);
+    return slot === undefined || rect === undefined
       ? undefined
       : { setting, rect, side: slot.side, slot: index, lane: undefined };
   });
@@ -787,16 +844,16 @@ function centerX(rect: Rect): number {
   return rect.x + rect.width / 2;
 }
 
-function area(rect: Rect): number {
-  return rect.width * rect.height;
+function centerY(rect: Rect): number {
+  return rect.y + rect.height / 2;
 }
 
 function distance(a: Rect, b: Rect): number {
   return Math.hypot(centerX(a) - centerX(b), centerY(a) - centerY(b));
 }
 
-function centerY(rect: Rect): number {
-  return rect.y + rect.height / 2;
+function area(rect: Rect): number {
+  return rect.width * rect.height;
 }
 
 function right(rect: Rect): number {

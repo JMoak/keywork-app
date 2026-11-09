@@ -19,7 +19,6 @@ export interface SteadHomeScope {
   openSession(reference: SteadSessionReference): void;
   openProject?(): void;
   openMemory?(): void;
-  projectFailure?(): string | undefined;
   presentedPane?(): PaneSpecBase | undefined;
   dismissPane?(): void;
 }

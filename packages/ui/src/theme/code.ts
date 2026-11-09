@@ -1,5 +1,5 @@
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { type Tag, tags } from "@lezer/highlight";
 import type { SyntaxKey } from "./sections.ts";
@@ -79,6 +79,14 @@ export const codeHighlightStyle: HighlightStyle = HighlightStyle.define([
 
 export const codeHighlighting: Extension = syntaxHighlighting(codeHighlightStyle);
 
+// CodeMirror cancels a press's native focus and focuses its content element itself, then blurs
+// whatever held focus; read-only content is focusable only through a tabindex.
+export const readOnlyCode: Extension = [
+  EditorState.readOnly.of(true),
+  EditorView.editable.of(false),
+  EditorView.contentAttributes.of({ tabindex: "-1" }),
+];
+
 export const codeTheme: Extension = EditorView.theme({
   "&": {
     height: "100%",
@@ -86,6 +94,7 @@ export const codeTheme: Extension = EditorView.theme({
     color: "var(--kw-text)",
     fontFamily: "var(--kw-font-mono)",
   },
+  "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.45" },
   ".cm-content": { caretColor: "var(--kw-cursor)" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--kw-cursor)" },

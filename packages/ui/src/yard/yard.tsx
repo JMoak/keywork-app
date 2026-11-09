@@ -14,6 +14,7 @@ import {
 } from "@keywork-app/habitat";
 import type { KeeperShowOutcome, SettingSubject } from "@keywork-app/protocol";
 import {
+  type Accessor,
   createEffect,
   createMemo,
   createSignal,
@@ -314,25 +315,28 @@ export function Yard(props: YardProps) {
         )}
       </Show>
       <For each={satelliteIds()}>
-        {(id) => (
-          <Show when={shownSatellite(id)}>
-            {(shown) => (
-              <SatelliteSlot
-                placement={shown().placement}
-                setting={shown().setting}
-                rect={rectOf(id)}
-                shell={props.shell}
-                by={byLine(shown().setting)}
-                withdrawn={isGhost(id)}
-                folding={isFolding(id)}
-                cursor={props.railActive && current() === id}
-                panels={panels}
-                onOpen={(what) => props.onOpen?.(shown().setting, what)}
-                onInteract={() => props.onInteract?.(shown().setting)}
-              />
-            )}
-          </Show>
-        )}
+        {(id) => {
+          const held = lastShown(() => shownSatellite(id));
+          return (
+            <Show when={held()}>
+              {(shown) => (
+                <SatelliteSlot
+                  placement={shown().placement}
+                  setting={shown().setting}
+                  rect={rectOf(id)}
+                  shell={props.shell}
+                  by={byLine(shown().setting)}
+                  withdrawn={isGhost(id)}
+                  folding={isFolding(id)}
+                  cursor={props.railActive && current() === id}
+                  panels={panels}
+                  onOpen={(what) => props.onOpen?.(shown().setting, what)}
+                  onInteract={() => props.onInteract?.(shown().setting)}
+                />
+              )}
+            </Show>
+          );
+        }}
       </For>
       <Show when={shownRail()}>
         {(rail) => (
@@ -515,6 +519,10 @@ function plotCardsOnRail(
       return rect === undefined ? [] : entry.members.map((member) => [member.id, rect] as const);
     }),
   );
+}
+
+function lastShown<Value>(read: () => Value | undefined): Accessor<Value | undefined> {
+  return createMemo<Value | undefined>((held) => read() ?? held);
 }
 
 function sameRect(a: Rect | undefined, b: Rect): boolean {

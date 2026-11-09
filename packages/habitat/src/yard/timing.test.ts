@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { minute, second } from "../clock/clock.ts";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
-import { breakpointWaitMs, digestOf, foldBackAfterMs, moveByHand, stepYard } from "./step.ts";
+import { foldBackAfterMs } from "./fold-back.ts";
+import { breakpointWaitMs, digestOf, moveByHand, stepYard } from "./step.ts";
 import { aSetting, askedIn, calm, isoAt, noon, proposed } from "./testing.ts";
 import { type YardContext, type YardSetting, type YardState, yardOf } from "./types.ts";
 

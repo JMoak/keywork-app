@@ -1,8 +1,8 @@
 import type { ProposedRung, Rung } from "@keywork-app/protocol";
 import { minute, parseTs } from "../clock/clock.ts";
 import type { HabitatState } from "../world/types.ts";
-import { attendedAt, attentionTuning, flowedScore } from "./attention.ts";
-import { byDepth, depthHalfLife, depthOf } from "./depth.ts";
+import { byDepth, depthOf } from "./depth.ts";
+import { foldsBackNow } from "./fold-back.ts";
 import {
   admitUnfold,
   awayReasons,
@@ -15,10 +15,9 @@ import {
   ruleOf,
   showReasons,
   spendsBudget,
-  unfoldBudget,
 } from "./gate.ts";
-import { plotOf, plotSeedOf } from "./lineage.ts";
-import { focusWithin, foldPlot, hasLiveDescendants } from "./plot.ts";
+import { plotSeedOf } from "./lineage.ts";
+import { foldPlot, hasLiveDescendants } from "./plot.ts";
 import {
   byArrival,
   originOf,
@@ -35,26 +34,29 @@ import {
 
 export const breakpointWaitMs = 2 * minute;
 
-export const foldBackAfterMs = depthHalfLife;
-
 export function stepYard(yard: YardState, context: YardContext, at: number): YardState {
+  const woken = wakeYard(yard, context, at);
+  return context.railFocused === true ? woken : rescored(woken, context, at);
+}
+
+export function wakeYard(yard: YardState, context: YardContext, at: number): YardState {
   const clocked = attentionClocked(yard, context, at);
   const ruled = sameRules(clocked.rules, context.rules)
     ? clocked
     : { ...clocked, rules: context.rules };
-  const railStill = context.railFocused === true;
-  const folded = railStill ? ruled : foldBackIgnored(ruled, context, at);
-  const judged = awaitingGate(folded).reduce(
+  const folded = context.railFocused === true ? ruled : foldBackIgnored(ruled, context, at);
+  return awaitingGate(folded).reduce(
     (current, setting) => judge(current, setting, context, at),
     folded,
   );
-  return railStill ? judged : rescored(judged, context, at);
 }
 
 export function withYardStep(state: HabitatState, context: YardContext, at: number): HabitatState {
-  const yard = yardOf(state);
-  const stepped = stepYard(yard, context, at);
-  return stepped === yard ? state : { ...state, yard: stepped };
+  return withYard(state, (yard) => stepYard(yard, context, at));
+}
+
+export function withYardWake(state: HabitatState, context: YardContext, at: number): HabitatState {
+  return withYard(state, (yard) => wakeYard(yard, context, at));
 }
 
 export function moveByHand(yard: YardState, id: string, rung: ProposedRung, at: number): YardState {
@@ -109,16 +111,6 @@ export function plotsFoldedWhileAway(yard: YardState, returnedAt?: number): read
   return [...new Set(folds)];
 }
 
-export function nextChangeAt(yard: YardState, at: number): number | undefined {
-  const { played, lastUnfolds = [] } = yard.budget;
-  const moments = [
-    ...Object.values(yard.settings).flatMap((setting) => changesOf(yard, setting, at)),
-    ...played.map((time) => time + unfoldBudget.windowMs),
-    ...lastUnfolds.map((last) => last.at + unfoldBudget.cooldownMs),
-  ].filter((moment) => moment > at);
-  return moments.length === 0 ? undefined : Math.min(...moments);
-}
-
 export function awaitsBreakpoint(
   decision: YardDecision,
   setting: YardSetting,
@@ -168,7 +160,7 @@ function moved(yard: YardState, setting: YardSetting, rung: ProposedRung, at: nu
 
 function foldBackIgnored(yard: YardState, context: YardContext, at: number): YardState {
   return Object.values(yard.settings)
-    .filter((setting) => ignoredUnfold(yard, setting, context, at))
+    .filter((setting) => foldsBackNow(yard, setting, context, at))
     .sort(byArrival)
     .reduce((current, setting) => {
       const held = current.settings[setting.id];
@@ -200,92 +192,8 @@ function foldedAway(yard: YardState, setting: YardSetting, reason: string, at: n
   return { ...folded, decisions: recordedShow(folded.decisions, decision) };
 }
 
-function ignoredUnfold(
-  yard: YardState,
-  setting: YardSetting,
-  context: YardContext,
-  at: number,
-): boolean {
-  const unfolded = foldableUnfold(setting);
-  if (unfolded === undefined || !neglectable(yard, setting) || attendedAt(yard, setting.id, at)) {
-    return false;
-  }
-  return (
-    unfolded.focus !== context.focusedThread || at >= lastTouchOf(yard, setting) + foldBackAfterMs
-  );
-}
-
-function foldBackDueAt(yard: YardState, setting: YardSetting, at: number): number | undefined {
-  if (foldableUnfold(setting) === undefined || !neglectable(yard, setting)) return undefined;
-  if (yard.awaySince !== undefined && attendedAt(yard, setting.id, at)) return undefined;
-  const cleared = attentionClearedAt(yard, setting.id, at);
-  if (cleared === undefined) return undefined;
-  return Math.max(lastTouchOf(yard, setting) + foldBackAfterMs, cleared);
-}
-
-function neglectable(yard: YardState, setting: YardSetting): boolean {
-  return !plotOf(yard, setting.id).some((id) => yard.settings[id]?.unfolded?.byHand === true);
-}
-
-function lastTouchOf(yard: YardState, setting: YardSetting): number {
-  return Math.max(
-    ...plotOf(yard, setting.id)
-      .flatMap((id) => yard.settings[id] ?? [])
-      .map(lastTouchedAt),
-  );
-}
-
-function attentionClearedAt(yard: YardState, id: string, at: number): number | undefined {
-  if (focusWithin(yard, id)) return undefined;
-  const { halfLifeMs, working } = attentionTuning;
-  const flowed = flowedScore(yard, id, at);
-  if (flowed <= working.leave) return at;
-  const estimate = at + halfLifeMs * Math.log2(flowed / working.leave);
-  return firstMoment(at, estimate, (moment) => !attendedAt(yard, id, moment));
-}
-
-const momentSearchSteps = 16;
-
-function firstMoment(
-  after: number,
-  estimate: number,
-  reached: (moment: number) => boolean,
-): number | undefined {
-  let moment = Math.max(after + 1, Math.ceil(estimate));
-  for (let step = 0; step < momentSearchSteps && !reached(moment); step += 1) moment += 1;
-  if (!reached(moment)) return undefined;
-  for (
-    let step = 0;
-    step < momentSearchSteps && moment - 1 > after && reached(moment - 1);
-    step += 1
-  ) {
-    moment -= 1;
-  }
-  return moment;
-}
-
-function foldableUnfold(setting: YardSetting): Unfolded | undefined {
-  const { unfolded } = setting;
-  const gatePlayed = unfolded !== undefined && !unfolded.byHand;
-  const standing = setting.state === "live" && setting.folded === undefined;
-  return setting.shown === "unfold" && standing && gatePlayed ? unfolded : undefined;
-}
-
-function lastTouchedAt(setting: YardSetting): number {
-  return Math.max(
-    setting.unfolded?.at ?? Number.NEGATIVE_INFINITY,
-    setting.attention?.lastAt ?? Number.NEGATIVE_INFINITY,
-  );
-}
-
 function lowersSatellite(setting: YardSetting, rung: ProposedRung): boolean {
   return satellite(setting.shown) && !satellite(rung);
-}
-
-function changesOf(yard: YardState, setting: YardSetting, at: number): number[] {
-  if (setting.shown === "glyph") return [parseTs(setting.at) + breakpointWaitMs];
-  const due = foldBackDueAt(yard, setting, at);
-  return due === undefined ? [] : [due];
 }
 
 function recordedMove(
@@ -453,6 +361,12 @@ function awaitingGate(yard: YardState): YardSetting[] {
 
 function staged(yard: YardState): YardSetting[] {
   return Object.values(yard.settings).filter((setting) => setting.shown === "stage");
+}
+
+function withYard(state: HabitatState, change: (yard: YardState) => YardState): HabitatState {
+  const yard = yardOf(state);
+  const changed = change(yard);
+  return changed === yard ? state : { ...state, yard: changed };
 }
 
 function byIdOf(settings: readonly YardSetting[]): Record<string, YardSetting> {

@@ -1,9 +1,9 @@
 import type { ConsoleClient, KeyworkClient } from "@keywork-app/client";
 import type { BusEnvelope } from "@keywork-app/protocol";
-import { idleControlsClient } from "./controls-store.test.ts";
-import { inertMemoryClient } from "./memory-store.test.ts";
-import { emptySurfacesClient } from "./surfaces-store.test.ts";
-import { inertWorkspaceClient } from "./trust.test.ts";
+import { idleControlsClient } from "./controls-store-testing.ts";
+import { inertMemoryClient } from "./memory-store-testing.ts";
+import { emptySurfacesClient } from "./surfaces-store-testing.ts";
+import { inertWorkspaceClient } from "./trust-testing.ts";
 
 export function fakeClient(overrides: Partial<ConsoleClient> = {}): ConsoleClient {
   const client: KeyworkClient = { ...inertClient(), ...overrides };

@@ -69,14 +69,14 @@ describe("satellites keep their ring slot", () => {
     expect(satellites(placed)).toEqual(["late 0 972,632 648", "kept 1 1256,16 648"]);
   });
 
-  it("still lets depth decide what unfolds when the ring is full", () => {
+  it("keeps the ring for whoever took it when it is full, the deeper newcomer waiting on the rail", () => {
     const placed = place([
       unfold("shallow", 1, inSlot(0)),
       unfold("deep", 5, inSlot(1)),
       unfold("deeper", 4, inSlot(2)),
     ]);
-    expect(satellites(placed)).toEqual(["deeper 0 972,632 648", "deep 1 1256,16 648"]);
-    expect(placed.find((placement) => placement.id === "shallow")?.rung).toBe("card");
+    expect(satellites(placed)).toEqual(["shallow 0 972,632 648", "deep 1 1256,16 648"]);
+    expect(placed.find((placement) => placement.id === "deeper")?.rung).toBe("card");
   });
 
   it("holds the ring to a fixed number of slots", () => {

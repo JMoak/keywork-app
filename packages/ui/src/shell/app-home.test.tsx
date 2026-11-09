@@ -5,12 +5,13 @@ import type {
   SessionRow,
   WorkspaceView,
 } from "@keywork-app/protocol";
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 import type { HostPort, NeedsYouTrigger, OpenedWorkspace } from "../host/port.ts";
 import { fakeClient } from "./client-testing.ts";
+import { connectFix } from "./open-failure.tsx";
 
 afterEach(() => {
   cleanup();
@@ -181,4 +182,32 @@ it("reopens runtime consent only when the keeper explicitly retries home", async
   await screen.findByText("Wren at home", { selector: ".kw-frame-name" });
   expect(enableRuntime).toHaveBeenCalledTimes(1);
   expect(h.openHome).toHaveBeenCalledTimes(2);
+});
+
+it("says in the yard, in stead words, when a project cannot open for want of a model", async () => {
+  const h = harness();
+  h.openWorkspace.mockResolvedValueOnce({
+    ok: false,
+    failure: {
+      kind: "unresolved",
+      message: "no inference provider is configured",
+      nextAction: "run keywork connect",
+    },
+  });
+  const { container } = render(() => (
+    <App profile={steadProfile} host={h.host} connect={h.connect} />
+  ));
+  await screen.findByText("Wren at home", { selector: ".kw-frame-name" });
+  void h.host.switchWorkspace(projectPath);
+  const card = await screen.findByRole("complementary", { name: "project did not open" });
+  expect(container.querySelector(".kw-yard[data-mode='yard']")?.closest(".kw-workspace")).toBe(
+    card.closest(".kw-workspace"),
+  );
+  expect(within(card).getByRole("status").textContent).toBe("no model is connected");
+  expect(card.textContent).toContain(connectFix);
+  expect(card.textContent).not.toContain("inference provider");
+  fireEvent.click(within(card).getByRole("button", { name: "open it again" }));
+  await waitFor(() => expect(h.connect).toHaveBeenCalledWith(expect.anything(), projectPath));
+  expect(h.openWorkspace).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("complementary", { name: "project did not open" })).toBeNull();
 });

@@ -8,9 +8,10 @@ import { attend } from "./attention.ts";
 import { yardCard } from "./card.ts";
 import { unfoldBudget } from "./gate.ts";
 import { defaultHub, placeYard } from "./place.ts";
-import { moveByHand, nextChangeAt, plotsFoldedWhileAway, restorePlot, stepYard } from "./step.ts";
+import { moveByHand, plotsFoldedWhileAway, restorePlot, stepYard } from "./step.ts";
 import { aSetting, askedIn, calm, isoAt, noon, proposed, settled } from "./testing.ts";
 import { type AttendKind, type Rect, type YardContext, type YardState, yardOf } from "./types.ts";
+import { nextChangeAt } from "./wake.ts";
 
 const asked: YardContext = { ...calm, ...askedIn("s1", noon - 30 * second) };
 const at = (seconds: number): number => noon + seconds * second;

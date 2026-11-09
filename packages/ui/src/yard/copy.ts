@@ -9,7 +9,8 @@ export const railLabel = "the yard's rail";
 
 export const emptyRail = "nothing set out";
 
-export const railHint = "j k move · enter opens · x dismisses · p pins · t trail · esc returns";
+export const railHint =
+  "j k move · enter opens · x dismisses · p pins · t trail · [ ] walk · esc returns";
 
 export const trailHint = "j k move · [ ] walk the chain · enter opens · t now · esc returns";
 

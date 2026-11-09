@@ -1,4 +1,5 @@
 import {
+  attend,
   emptyYard,
   plotCardId,
   proposeSetting,
@@ -20,6 +21,7 @@ export interface PlotStage {
   readonly view: RailView;
   readonly railActive: boolean;
   readonly railAt: string | undefined;
+  readonly inside: string | undefined;
 }
 
 export function plotStageOf(scene: PlotScene): PlotStage {
@@ -30,6 +32,7 @@ export function plotStageOf(scene: PlotScene): PlotStage {
     view: scene === "yard-trail" ? "trail" : "now",
     railActive: scene === "yard-trail",
     railAt: scene === "yard-trail" ? "test" : undefined,
+    inside: yard.visit?.id,
   };
 }
 
@@ -64,6 +67,7 @@ const grown: Readonly<Record<PlotScene, readonly Setting[]>> = {
   "yard-plot-seed": [note, diff],
   "yard-plot-file": [note, diff, file],
   "yard-plot-test": [note, diff, file, test],
+  "yard-plot-entered": [note, diff, file, test],
   "yard-plot-folded": [note, diff, file, test],
   "yard-plot-restored": [note, diff, file, test],
   "yard-trail": [note, diff, file, test],
@@ -74,6 +78,9 @@ function yardAt(scene: PlotScene): YardState {
     (yard, setting) => stepYard(proposeSetting(yard, setting), context, minuteOf(setting.at)),
     emptyYard,
   );
+  if (scene === "yard-plot-entered") {
+    return attend(planted, { id: "test", kind: "enter", at: minute(4) });
+  }
   if (scene !== "yard-plot-folded" && scene !== "yard-plot-restored") return planted;
   const folded = settleSetting(
     planted,

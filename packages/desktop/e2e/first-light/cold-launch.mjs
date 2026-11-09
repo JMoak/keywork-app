@@ -1,7 +1,9 @@
 // Cold-launch check: launches the built console (packages/desktop/out) twice through
 // Playwright's Electron harness and types nothing. The first launch has no folder and
 // screenshots the open screen; the second opens the given folder and screenshots the first
-// frame the keeper sees there. Both windows close on their own.
+// frame the keeper sees there, waiting for the frame of the product the console says it is:
+// keywork's conversation and five keys, or the stead with onboarding (Stead's own harness proves
+// Stead's build). Both windows close on their own. Shots land in artifacts/first-launch.
 //
 //   node packages/desktop/e2e/first-light/cold-launch.mjs <workspace> [shotsDir] [userDataDir]
 //
@@ -13,20 +15,30 @@ import { join, resolve } from "node:path";
 
 const desktopRoot = resolve(import.meta.dirname, "../..");
 const repoRoot = resolve(desktopRoot, "../..");
-const steadRoot = resolve(repoRoot, "../..");
 const requireFromUi = createRequire(join(repoRoot, "packages", "ui", "package.json"));
 const { _electron: electron } = requireFromUi("@playwright/test");
 const requireFromDesktop = createRequire(join(desktopRoot, "package.json"));
 const electronBinary = requireFromDesktop("electron");
 
 const workspace = process.argv[2];
-const shots = resolve(process.argv[3] ?? join(steadRoot, "artifacts", "first-launch"));
+const shots = resolve(process.argv[3] ?? join(repoRoot, "artifacts", "first-launch"));
 const userData = process.argv[4];
 if (workspace === undefined) {
   console.error("usage: cold-launch.mjs <workspace> [shotsDir] [userDataDir]");
   process.exit(2);
 }
 mkdirSync(shots, { recursive: true });
+
+const firstFrameWaits = {
+  keywork: [
+    ["[aria-label=prompt], .kw-open-failure", 120_000],
+    [".kw-first-run", 30_000],
+  ],
+  stead: [
+    [".kw-stead, .kw-open-failure", 120_000],
+    [".kw-onboard[data-phase=step]", 90_000],
+  ],
+};
 
 const openScreen = await frame({
   args: [],
@@ -35,17 +47,14 @@ const openScreen = await frame({
   read: readOpenScreen,
 });
 console.log(JSON.stringify({ openScreen }, null, 2));
-const stead = await frame({
+const firstFrame = await frame({
   args: [workspace],
-  waits: [
-    [".kw-stead, .kw-open-failure", 120_000],
-    [".kw-onboard[data-phase=step]", 90_000],
-  ],
-  shot: "02-stead-onboarding.png",
-  read: readStead,
+  waits: (product) => firstFrameWaits[product],
+  shot: (product) => `02-${product}-first-frame.png`,
+  read: readFirstFrame,
 });
-console.log(JSON.stringify({ stead }, null, 2));
-process.exitCode = openScreen.ranOut === undefined && stead.ranOut === undefined ? 0 : 1;
+console.log(JSON.stringify({ firstFrame }, null, 2));
+process.exitCode = openScreen.ranOut === undefined && firstFrame.ranOut === undefined ? 0 : 1;
 
 async function frame({ args, waits, shot, read }) {
   const app = await electron.launch({
@@ -63,13 +72,20 @@ async function frame({ args, waits, shot, read }) {
   }
   try {
     const page = await consoleWindow(app);
-    const ranOut = await settle(page, waits);
+    const product = await page.evaluate(() => window.keyworkHost?.productId ?? "keywork");
+    const ranOut = await settle(
+      page,
+      typeof waits === "function" ? waits(product) : waits,
+      product === "stead",
+    );
     await page.waitForTimeout(1_500);
     const seen = await page.evaluate(read, args[0] ?? null);
-    await page.screenshot({ path: join(shots, shot) });
+    const named = typeof shot === "function" ? shot(product) : shot;
+    await page.screenshot({ path: join(shots, named) });
     return {
+      product,
       ...seen,
-      screenshot: join(shots, shot),
+      screenshot: join(shots, named),
       ...(ranOut === undefined ? {} : { ranOut }),
       mainLog: mainLog.slice(-20),
     };
@@ -78,21 +94,21 @@ async function frame({ args, waits, shot, read }) {
   }
 }
 
-async function settle(page, waits) {
+async function settle(page, waits, onboardingNeedsTrust) {
   for (const [selector, timeout] of waits) {
     try {
       await page.waitForSelector(selector, { timeout });
     } catch {
       return `waited ${timeout} ms for ${selector}`;
     }
-    const stopped = await page.evaluate(() => {
+    const stopped = await page.evaluate((trustStops) => {
       const failure = document.querySelector(".kw-open-failure")?.textContent;
       if (failure) return `the folder did not open: ${failure}`;
-      const trustAsk = document.body.innerText.match(/^trust .+\?.*$/m);
+      const trustAsk = trustStops ? document.body.innerText.match(/^trust .+\?.*$/m) : null;
       return trustAsk
         ? `the folder is untrusted, so onboarding cannot start: ${trustAsk[0]}`
         : null;
-    });
+    }, onboardingNeedsTrust);
     if (stopped !== null) return stopped;
   }
   return undefined;
@@ -123,7 +139,7 @@ function readOpenScreen() {
   };
 }
 
-async function readStead(workspace) {
+async function readFirstFrame(workspace) {
   const frames = [...document.querySelectorAll(".kw-frame")].map((held) => ({
     name: held.querySelector(".kw-frame-name")?.textContent ?? "",
     focused: held.hasAttribute("data-focused"),

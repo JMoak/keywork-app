@@ -1,7 +1,7 @@
 [
   {
     "path": "packages/desktop/src/main/companion/foreground.ts",
-    "pattern": "^\\s*'Add-Type -Namespace Stead -Name Shell -MemberDefinition ",
+    "pattern": "^\\s*`Add-Type -Namespace Stead -Name Shell -MemberDefinition ",
     "reason": "PowerShell CLR namespace used by the foreground probe."
   },
   {

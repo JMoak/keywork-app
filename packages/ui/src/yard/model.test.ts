@@ -1,11 +1,12 @@
-import type { BusEnvelope } from "@keywork-app/protocol";
+import { byDepth, type YardSetting } from "@keywork-app/habitat";
+import type { BusEnvelope, Setting } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShellSeams } from "../panes/index.ts";
 import { createYardModel } from "./model.ts";
 import { createYardRuleBook } from "./rules.ts";
 import { unseenSurroundings } from "./signals.ts";
-import { aSetting, proposed } from "./testing.ts";
+import { aSetting, proposed, settled } from "./testing.ts";
 
 describe("the yard model", () => {
   it("feeds the keeper's attention into the habitat world, where the kernel measures it", () => {
@@ -24,7 +25,64 @@ describe("the yard model", () => {
   });
 });
 
-function yardModel() {
+describe("when the yard re-sorts", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("re-sorts at a pin, the moment its settle arrives", () => {
+    const run = yardModel();
+    run.emit([proposed(1, elsewhere("diff", "diff")), proposed(2, elsewhere("note", "note"))]);
+    expect(run.railOrder()).toEqual(["diff", "note"]);
+    run.emit([settled(3, elsewhere("note", "note"), "pinned")]);
+    expect(run.railOrder()).toEqual(["note", "diff"]);
+    run.dispose();
+  });
+
+  it("re-sorts at the keeper's own attention, the moment the notice arrives", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    run.emit([proposed(1, aSetting({ id: "panel", sessionId: "s1", rung: "unfold" }))]);
+    const before = run.depthOf("panel");
+    run.model.attend({ type: "keeper.attend", ts: at(0), id: "panel", kind: "interact" });
+    expect(run.depthOf("panel")).toBeGreaterThan(before);
+    run.dispose();
+  });
+
+  it("holds every depth through a wake, and re-sorts at the yard's next event", () => {
+    vi.useFakeTimers({ now: Date.parse(at(0)) });
+    const run = yardModel({ focusedThread: "s1", now: () => Date.now() });
+    run.emit([
+      proposed(1, aSetting({ id: "old-report", sessionId: "s1", what: report, at: hoursAgo(2) })),
+      proposed(2, elsewhere("fresh-diff", "diff")),
+      proposed(3, aSetting({ id: "delivery", sessionId: "s1", what: diff, rung: "unfold" })),
+    ]);
+    expect(run.railOrder()).toEqual(["fresh-diff", "old-report"]);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(run.shownOf("delivery")).toBe("card");
+    expect(run.railOrder()).toEqual(["delivery", "fresh-diff", "old-report"]);
+    run.emit([proposed(4, elsewhere("later", "note"))]);
+    expect(run.railOrder()).toEqual(["delivery", "old-report", "fresh-diff", "later"]);
+    run.dispose();
+  });
+});
+
+const report = { kind: "report", ref: "the weekly report" } as const;
+const diff = { kind: "diff", ref: "change-1" } as const;
+
+function elsewhere(id: string, kind: "diff" | "note"): Setting {
+  return aSetting({ id, sessionId: "s2", what: { kind, ref: id } });
+}
+
+function hoursAgo(hours: number): string {
+  return new Date(Date.parse(at(0)) - hours * 3_600_000).toISOString();
+}
+
+interface YardModelOptions {
+  readonly focusedThread?: string | undefined;
+  readonly now?: (() => number) | undefined;
+}
+
+function yardModel(options: YardModelOptions = {}) {
   const listeners = new Set<(batch: readonly BusEnvelope[]) => void>();
   const shell = {
     feed: {
@@ -40,7 +98,7 @@ function yardModel() {
     const model = createYardModel({
       shell,
       home: () => undefined,
-      focusedThread: () => undefined,
+      focusedThread: () => options.focusedThread,
       windowFocused: () => true,
       reducedMotion: () => true,
       signals: () => ({
@@ -54,7 +112,7 @@ function yardModel() {
         quietHours: false,
       }),
       rules: createYardRuleBook(undefined),
-      now: () => Date.parse(at(0)),
+      now: options.now ?? (() => Date.parse(at(0))),
     });
     return {
       model,
@@ -62,9 +120,21 @@ function yardModel() {
       emit: (batch: readonly BusEnvelope[]) => {
         for (const listener of listeners) listener(batch);
       },
-      attentionOf: (id: string) => model.settings().find((setting) => setting.id === id)?.attention,
+      attentionOf: (id: string) => settingOf(model.settings(), id)?.attention,
+      depthOf: (id: string) => settingOf(model.settings(), id)?.depth ?? 0,
+      shownOf: (id: string) => settingOf(model.settings(), id)?.shown,
+      railOrder: () =>
+        model
+          .settings()
+          .filter((setting) => setting.shown === "card")
+          .toSorted(byDepth)
+          .map((setting) => setting.id),
     };
   });
+}
+
+function settingOf(settings: readonly YardSetting[], id: string): YardSetting | undefined {
+  return settings.find((setting) => setting.id === id);
 }
 
 function at(second: number): string {

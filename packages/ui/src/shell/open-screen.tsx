@@ -8,10 +8,11 @@ import { relativeAge } from "../chrome/telemetry.ts";
 import type { HostPort } from "../host/port.ts";
 import { keymapFromConfig } from "../keys/config.ts";
 import { createLiveKeymap, followKeybindings } from "../keys/live.ts";
+import { OpenFailure, type OpenFailureView } from "./open-failure.tsx";
 
 export interface OpenScreenProps {
   host: HostPort;
-  failure: string | undefined;
+  failure: OpenFailureView | undefined;
   opening: string | undefined;
   onOpen: (path: string) => void;
   onEnableRuntime?: (() => void) | undefined;
@@ -77,18 +78,7 @@ export function OpenScreen(props: OpenScreenProps) {
         </Show>
         <Show when={props.opening}>{(path) => <OpeningNote path={path()} />}</Show>
         <Show when={props.failure}>
-          {(text) => (
-            <>
-              <p class="kw-open-failure">{text()}</p>
-              <Show when={props.onEnableRuntime}>
-                {(enable) => (
-                  <button class="kw-open-pick" type="button" onClick={() => enable()()}>
-                    Enable background work
-                  </button>
-                )}
-              </Show>
-            </>
-          )}
+          {(failure) => <OpenFailure view={failure()} onEnableRuntime={props.onEnableRuntime} />}
         </Show>
       </div>
     </main>
