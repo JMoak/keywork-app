@@ -78,10 +78,10 @@ export function campaignsOverFetch(fetch: Fetch): CampaignsClient {
       return listed.campaigns;
     },
     read: async (id, signal) =>
-      readingOf(await request(campaignPath(id), "GET", undefined, signal)),
+      readingOf(await request(campaignPath(id), "GET", undefined, signal), id),
     create: async (input) => readingOf(await request("/campaigns", "POST", input)),
     command: async (id, command) =>
-      readingOf(await request(`${campaignPath(id)}/commands`, "POST", command)),
+      readingOf(await request(`${campaignPath(id)}/commands`, "POST", command), id),
     artifact: (id, artifactId, path) =>
       request(
         `${campaignPath(id)}/artifacts/${encodeURIComponent(artifactId)}${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`,
@@ -134,7 +134,7 @@ async function* watchCampaign(
       continue;
     }
     if (frame.event === "snapshot") {
-      yield { kind: "snapshot", reading: readingOf(jsonValue(frame.data)) };
+      yield { kind: "snapshot", reading: readingOf(jsonValue(frame.data), id) };
       continue;
     }
     if (frame.event === "resync") {
@@ -189,17 +189,51 @@ function exportOf(value: unknown, artifactId: string): CampaignArtifactExport {
   return { artifactId, path: value.path };
 }
 
-function readingOf(value: unknown): CampaignReading {
+function readingOf(value: unknown, expectedId?: string): CampaignReading {
   if (!record(value) || !record(value.campaign)) throw unreadable();
   const campaign = value.campaign;
   if (
     campaign.schemaVersion !== 1 ||
     typeof campaign.id !== "string" ||
+    campaign.id.trim() === "" ||
+    (expectedId !== undefined && campaign.id !== expectedId) ||
     !safeSequence(campaign.revision) ||
-    !safeSequence(value.sequence)
+    !safeSequence(value.sequence) ||
+    !hasCampaignStructure(campaign)
   )
     throw unreadable();
   return value as unknown as CampaignReading;
+}
+
+function hasCampaignStructure(campaign: Record<string, unknown>): boolean {
+  return (
+    ["title", "workload", "status", "delivery", "verification"].every(
+      (field) => typeof campaign[field] === "string",
+    ) &&
+    safeSequence(campaign.purposeRevision) &&
+    typeof campaign.createdAt === "number" &&
+    Number.isFinite(campaign.createdAt) &&
+    typeof campaign.updatedAt === "number" &&
+    Number.isFinite(campaign.updatedAt) &&
+    ["model", "budget", "persistence"].every((field) => record(campaign[field])) &&
+    Array.isArray(campaign.alternativeArtifactIds) &&
+    campaign.alternativeArtifactIds.every((id) => typeof id === "string") &&
+    [
+      "purposes",
+      "artifacts",
+      "attempts",
+      "evidence",
+      "evaluations",
+      "achievements",
+      "cartridges",
+      "contexts",
+      "usage",
+      "decisions",
+    ].every((field) => {
+      const collection = campaign[field];
+      return Array.isArray(collection) && collection.every(record);
+    })
+  );
 }
 
 function isCampaignEvent(value: unknown): value is CampaignEvent {

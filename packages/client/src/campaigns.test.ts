@@ -34,6 +34,44 @@ describe("campaign transport", () => {
     );
     await expect(forbidden.read("campaign-one")).rejects.toMatchObject({ status: 403 });
   });
+  it.each(["read", "command"] as const)(
+    "rejects a %s response for another campaign",
+    async (method) => {
+      const client = campaignsOverFetch(async () =>
+        Response.json({ campaign: campaignFixture({ id: "another-campaign" }), sequence: 1 }),
+      );
+      const request =
+        method === "read"
+          ? client.read("campaign-one")
+          : client.command("campaign-one", { expectedRevision: 1, command: { type: "pause" } });
+      await expect(request).rejects.toMatchObject({ status: 502 });
+    },
+  );
+  it.each([
+    ["an envelope without a campaign body", { schemaVersion: 1, id: "campaign-one", revision: 1 }],
+    ["an empty identity", campaignFixture({ id: "" })],
+    ["missing usage", { ...campaignFixture(), usage: undefined }],
+    ["a null budget", { ...campaignFixture(), budget: null }],
+    ["an invalid persistence object", { ...campaignFixture(), persistence: [] }],
+    ["a null artifact", { ...campaignFixture(), artifacts: [null] }],
+  ])("rejects a campaign reading with %s", async (_description, campaign) => {
+    const client = campaignsOverFetch(async () => Response.json({ campaign, sequence: 1 }));
+    await expect(client.read("campaign-one")).rejects.toMatchObject({ status: 502 });
+  });
+  it("rejects a streamed snapshot for another campaign before yielding it", async () => {
+    const client = campaignsOverFetch(
+      async () =>
+        new Response(
+          `event: snapshot\ndata: ${JSON.stringify({ campaign: campaignFixture({ id: "another-campaign" }), sequence: 99 })}\n\n`,
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+    );
+    const stream = client
+      .watch("campaign-one", 1, new AbortController().signal)
+      [Symbol.asyncIterator]();
+    expect(await stream.next()).toEqual({ done: false, value: { kind: "connected" } });
+    await expect(stream.next()).rejects.toMatchObject({ status: 502 });
+  });
   it("resumes with a durable cursor and reads snapshots, heartbeats and domain events", async () => {
     let headers: Headers | undefined;
     const event = {
