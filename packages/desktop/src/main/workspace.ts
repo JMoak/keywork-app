@@ -627,7 +627,7 @@ function nextActionFor(
 function ticketNextAction(node: NodeTicketOwner | undefined, productName: string): string {
   switch (node) {
     case "shared-runtime":
-      return "Use matching app releases. Incompatible shared-engine upgrades require explicit maintenance; existing clients and background work remain running.";
+      return "Use an app release that supports this engine's contract. Incompatible shared-engine changes require explicit maintenance; existing clients and background work remain running.";
     case "this-install":
       return `restart the node on the engine ${productName} ships (\`keywork node restart\`); ${productName} asks before it does`;
     case "another-install":

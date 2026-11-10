@@ -17,6 +17,7 @@ import {
   restartAnOlderNode,
   runtimeConsumerFile,
   type SidecarRun,
+  sidecarNodeServing,
 } from "./node-consent.ts";
 import { runtimeFailure } from "./runtime-failure.ts";
 import { bundledEngineVersion, type ContractMismatch, expectedContract } from "./serve-process.ts";
@@ -42,7 +43,7 @@ describe("product consent and durable runtime registration", () => {
       kind: "installed",
     });
     expect(world.asked).toHaveLength(2);
-    expect(world.runs).toHaveLength(1);
+    expect(world.runs).toHaveLength(2);
   });
   it("records a declined answer without running an engine command", async () => {
     const world = fakeWorld(false);
@@ -62,6 +63,7 @@ describe("product consent and durable runtime registration", () => {
     expect(await offerNodeAtFirstRun(world.seams)).toEqual({ kind: "installed" });
     const id = consumerInstallationId(world.seams);
     expect(world.runs).toEqual([
+      { args: nodeStatusArgs, cwd: undefined },
       { args: nodeConsumerArgs("install", keyworkProfile, id), cwd: undefined },
     ]);
     expect(world.files.get(join(userData, runtimeConsumerFile))).toBe(`${id}\n`);
@@ -76,8 +78,8 @@ describe("product consent and durable runtime registration", () => {
       answer: "installed",
     });
     expect(world.asked).toHaveLength(1);
-    expect(world.runs).toHaveLength(2);
-    expect(world.runs[0]?.args).toEqual(world.runs[1]?.args);
+    expect(world.runs).toHaveLength(4);
+    expect(world.runs[1]?.args).toEqual(world.runs[3]?.args);
   });
 
   it("keeps product installation identities distinct and stable", () => {
@@ -101,13 +103,12 @@ describe("product consent and durable runtime registration", () => {
         recovery: "update-products",
       }),
     };
-    expect(await offerNodeAtFirstRun(world.seams)).toEqual({
+    expect(await offerNodeAtFirstRun(world.seams)).toMatchObject({
       kind: "failed",
       code: 3,
-      detail: "Update the other product before replacing the shared engine.",
     });
     expect(world.files.size).toBe(0);
-    expect(world.told[0]?.detail).toBe(
+    expect(world.told[0]?.detail).toContain(
       "Update the other product before replacing the shared engine.",
     );
   });
@@ -116,9 +117,9 @@ describe("product consent and durable runtime registration", () => {
     const world = fakeWorld(true);
     world.seams.folder = undefined;
     await offerNodeAtFirstRun(world.seams);
-    expect(world.runs[0]?.cwd).toBeUndefined();
-    expect(world.runs[0]?.args).not.toContain("workspace");
-    expect(world.runs[0]?.args).not.toContain(userData);
+    expect(world.runs[1]?.cwd).toBeUndefined();
+    expect(world.runs[1]?.args).not.toContain("workspace");
+    expect(world.runs[1]?.args).not.toContain(userData);
   });
 
   it("stays silent when no compiled sidecar is available", async () => {
@@ -131,6 +132,114 @@ describe("product consent and durable runtime registration", () => {
 });
 
 describe("shared runtime compatibility", () => {
+  it("requests its exact contract while the engine chooses another compatible release", async () => {
+    const world = fakeWorld(true);
+    world.status = statusReport("9.9.9");
+    world.result = {
+      code: 0,
+      output: JSON.stringify({
+        kind: "attached",
+        runtime: { version: "9.9.9", contract: expectedContract },
+      }),
+    };
+    expect(await offerNodeAtFirstRun(world.seams)).toEqual({ kind: "installed" });
+    expect(world.runs[1]?.args).toContain("--contract");
+    expect(world.runs[1]?.args).toContain(expectedContract);
+    expect(world.runs[1]?.args).not.toContain("--version");
+    expect(world.runs).toHaveLength(2);
+  });
+
+  it("keeps using the selected engine when its safe upgrade is deferred", async () => {
+    const world = fakeWorld(true);
+    world.result = {
+      code: 0,
+      output: JSON.stringify({
+        kind: "attached",
+        runtime: { version: "0.3.0", contract: expectedContract },
+        deferred: { version: bundledEngineVersion, reason: "runtime-running" },
+      }),
+    };
+    expect(await offerNodeAtFirstRun(world.seams)).toEqual({ kind: "installed" });
+    expect(world.told).toEqual([]);
+    expect(world.runs).toHaveLength(2);
+    expect(world.runs.every(({ args }) => !args.includes("restart"))).toBe(true);
+  });
+
+  it("requires a compatible bootstrap even when legacy status reports a matching or empty runtime", async () => {
+    const report = JSON.parse(statusReport()) as { node: unknown };
+    for (const node of [report.node, null]) {
+      const world = fakeWorld(true);
+      world.status = JSON.stringify({
+        registration: { installed: node !== null },
+        liveness: node === null ? "absent" : "running",
+        node,
+      });
+      expect(await offerNodeAtFirstRun(world.seams)).toMatchObject({ kind: "failed" });
+      expect(world.runs.map(({ args }) => args)).toEqual([nodeStatusArgs]);
+      expect(world.files.size).toBe(0);
+      expect(world.told[0]?.detail).toContain("Install an updated app release");
+    }
+  });
+
+  it.each([
+    { version: "9.9.9", contract: expectedContract },
+    { version: "0.1.0", contract: expectedContract },
+    { version: bundledEngineVersion, contract: "1.28" },
+    {},
+  ])(
+    "refuses a legacy bootstrap before it can replace a different or unknown engine: %j",
+    async (identity) => {
+      const world = fakeWorld(true);
+      world.status = JSON.stringify({
+        registration: { installed: true },
+        liveness: "running",
+        node: { startedAt: "2026-11-06T12:00:00Z", workspaces: [], ...identity },
+      });
+      expect(await offerNodeAtFirstRun(world.seams)).toMatchObject({ kind: "failed" });
+      expect(world.runs.map(({ args }) => args)).toEqual([nodeStatusArgs]);
+      expect(world.files.size).toBe(0);
+      expect(world.told[0]?.detail).toContain("Install an updated app release");
+    },
+  );
+
+  it("never retries a rejected compatibility flag without its requirement", async () => {
+    const world = fakeWorld(true);
+    world.result = { code: 2, output: "Unknown option '--contract'" };
+    expect(await offerNodeAtFirstRun(world.seams)).toMatchObject({ kind: "failed", code: 2 });
+    expect(world.runs).toHaveLength(2);
+    expect(world.runs[1]?.args).toContain("--contract");
+    expect(world.files.size).toBe(0);
+  });
+
+  it("uses one capability probe for client attachment and subsequent lease renewals", async () => {
+    const world = fakeWorld(true);
+    world.status = statusReport("9.9.9");
+    const serving = sidecarNodeServing({
+      ...world.seams,
+      consolePid: 123,
+      clientId: () => "client-one",
+    });
+    expect(await serving.serves()).toBe(true);
+    await serving.add("/work");
+    await serving.renew?.("/work");
+    expect(world.runs.filter(({ args }) => args === nodeStatusArgs)).toHaveLength(1);
+    expect(world.runs[1]?.args).toEqual(world.runs[2]?.args);
+    expect(world.runs[1]?.args).toContain("--contract");
+    expect(world.runs[1]?.args).toContain(expectedContract);
+  });
+
+  it("refuses attachment through an old bootstrap without acquiring a lease", async () => {
+    const world = fakeWorld(true);
+    const report = JSON.parse(statusReport("9.9.9")) as { runtimeCompatibility?: number };
+    delete report.runtimeCompatibility;
+    world.status = JSON.stringify(report);
+    const serving = sidecarNodeServing({ ...world.seams, consolePid: 123 });
+    expect(await serving.serves()).toBe(true);
+    expect((await serving.add("/work")).code).toBe(3);
+    await serving.remove("/work");
+    expect(world.runs.map(({ args }) => args)).toEqual([nodeStatusArgs]);
+  });
+
   it("never restarts a running engine merely because a sidecar is newer", async () => {
     const world = fakeWorld(true);
     expect(await restartAnOlderNode(world.seams)).toEqual({ kind: "current" });
@@ -174,6 +283,7 @@ describe("shared runtime compatibility", () => {
   it("reads exact running engine and contract identities", async () => {
     const world = fakeWorld(true);
     expect(await readNodeStanding(world.seams)).toMatchObject({
+      runtimeCompatibility: 1,
       installed: true,
       running: true,
       version: bundledEngineVersion,
@@ -206,7 +316,8 @@ describe("runtime presentation", () => {
       ),
     ).toEqual({
       message: "The other client still needs the engine.",
-      nextAction: "Close the other app windows before updating the shared engine.",
+      nextAction:
+        "Close the other app windows, then follow the upgrade guide to stop the shared engine before applying its update.",
     });
   });
 });
@@ -271,6 +382,7 @@ function fakeWorld(consent: boolean) {
 
 function statusReport(version = bundledEngineVersion, contract = expectedContract): string {
   return JSON.stringify({
+    runtimeCompatibility: 1,
     registration: { installed: true, program: "C:/Users/keeper/.keywork/runtime/engine.exe" },
     liveness: "running",
     node: {

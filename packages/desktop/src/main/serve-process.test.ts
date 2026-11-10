@@ -399,6 +399,15 @@ describe("healthCheck", () => {
     });
   });
 
+  it("does not infer compatibility from a shared contract major", async () => {
+    const [major, minor] = expectedContract.split(".").map(Number);
+    const previous = `${major}.${(minor ?? 1) - 1}`;
+    expect(await healthCheck(ticket, served("9.9.9", previous))).toMatchObject({
+      ok: false,
+      failure: { kind: "contract-mismatch", expected: expectedContract, actual: previous },
+    });
+  });
+
   it("stamps where the engine came from onto a contract refusal and nothing else", () => {
     const source = { origin: "PATH" as const, from: "/usr/bin/keywork" };
     const refused = { kind: "contract-mismatch" as const, expected: "1.25", actual: "1.7", ticket };

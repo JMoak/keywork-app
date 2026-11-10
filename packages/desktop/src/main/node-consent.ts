@@ -89,6 +89,7 @@ export type NodeOffer =
   | { kind: "failed"; code: number | null; detail: string };
 
 export interface NodeStanding {
+  runtimeCompatibility?: number;
   installed: boolean;
   program: string | null;
   running: boolean;
@@ -130,9 +131,12 @@ export async function offerNodeAtFirstRun(
   }
   const profile = seams.profile ?? keyworkProfile;
   const installation = consumerInstallationId(seams);
-  const ran = await seams.run(seams.sidecar, nodeConsumerArgs("install", profile, installation));
+  const refusal = bootstrapRefusal(await readNodeStanding(seams));
+  const ran =
+    refusal ?? (await seams.run(seams.sidecar, nodeConsumerArgs("install", profile, installation)));
   if (ran.code !== 0) {
-    const detail = runtimeFailure(ran.output).message;
+    const failure = runtimeFailure(ran.output);
+    const detail = [failure.message, failure.nextAction].filter(Boolean).join("\n\n");
     await seams.tell(nodeFailureCard(seams.machine, ran.code, detail, profile));
     return { kind: "failed", code: ran.code, detail };
   }
@@ -166,6 +170,7 @@ export function nodeConsumerArgs(
     profile.id,
     "--installation",
     installation,
+    ...(action === "install" ? ["--contract", expectedContract] : []),
     "--json",
   ];
 }
@@ -204,7 +209,16 @@ export function sidecarNodeServing(
 ): NodeServing {
   const clients = new Map<string, string>();
   const profile = seams.profile ?? keyworkProfile;
-  const attach = (folder: string, home = false): Promise<SidecarRun> => {
+  let standing: NodeStanding | undefined;
+  let inspected = false;
+  const inspect = async (): Promise<NodeStanding | undefined> => {
+    standing = await readNodeStanding(seams);
+    inspected = true;
+    return standing;
+  };
+  const attach = async (folder: string, home = false): Promise<SidecarRun> => {
+    const refusal = bootstrapRefusal(inspected ? standing : await inspect());
+    if (refusal !== undefined) return refusal;
     const id = clients.get(folder) ?? (seams.clientId ?? randomUUID)();
     clients.set(folder, id);
     return seams.run(seams.sidecar, [
@@ -218,6 +232,8 @@ export function sidecarNodeServing(
       id,
       "--console",
       String(seams.consolePid),
+      "--contract",
+      expectedContract,
       ...(home ? ["--home"] : []),
       "--json",
     ]);
@@ -225,7 +241,7 @@ export function sidecarNodeServing(
   return {
     required: true,
     serves: async () => {
-      const standing = await readNodeStanding(seams);
+      const standing = await inspect();
       return standing?.installed === true && standing.running;
     },
     add: attach,
@@ -247,6 +263,9 @@ export async function readNodeStanding(
   const report = parsedStatus(ran.output);
   if (report === undefined) return undefined;
   return {
+    ...(report.runtimeCompatibility !== undefined && {
+      runtimeCompatibility: report.runtimeCompatibility,
+    }),
     installed: report.registration?.installed ?? false,
     program: report.registration?.program ?? null,
     running: report.liveness === "running",
@@ -348,6 +367,7 @@ export function answerPath(userData: string, answer: NodeAnswer): string {
 }
 
 const nodeStatusReport = z.object({
+  runtimeCompatibility: z.number().int().optional(),
   registration: z
     .object({ installed: z.boolean(), program: z.string().nullable().optional() })
     .nullable(),
@@ -361,6 +381,22 @@ const nodeStatusReport = z.object({
     })
     .nullable(),
 });
+
+function bootstrapRefusal(standing: NodeStanding | undefined): SidecarRun | undefined {
+  if (standing?.runtimeCompatibility === 1) return undefined;
+  return {
+    code: 3,
+    output: JSON.stringify({
+      kind: "refused",
+      code: "bootstrap-update-required",
+      message:
+        standing === undefined
+          ? "The shared engine's compatibility could not be checked."
+          : "This app needs an update before it can use the shared engine.",
+      ...(standing !== undefined && { recovery: "update-bootstrap" }),
+    }),
+  };
+}
 
 function parsedStatus(output: string): z.infer<typeof nodeStatusReport> | undefined {
   try {
