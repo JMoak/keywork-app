@@ -55,7 +55,11 @@ export function campaignsPaneWith(seams: CampaignPaneSeams): PaneDefinition<Camp
         help: "refresh campaign",
         command: { name: "campaign-refresh", description: "read current campaign state" },
       },
-      "campaigns.back": { chords: "escape", help: "back to campaigns" },
+      "campaigns.back": {
+        chords: "escape",
+        help: "back to campaigns",
+        command: { name: "campaign-back", description: "return to the campaign list" },
+      },
     },
   });
 }

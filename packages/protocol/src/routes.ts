@@ -17,7 +17,7 @@ import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
 import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.4.1";
+export const protocolVersion = "0.5.0";
 
 export const contractVersion = "1.31";
 

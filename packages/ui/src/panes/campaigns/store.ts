@@ -51,20 +51,20 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
   let commandProblem: string | null = null;
   let snapshotEpoch = 0;
 
-  const apply = (reading: CampaignReading, turn: number, epoch: number): void => {
+  const apply = (reading: CampaignReading, turn: number, epoch: number): boolean => {
     if (
       disposed ||
       turn !== generation ||
       epoch !== snapshotEpoch ||
       reading.campaign.id !== state.selected
     )
-      return;
+      return false;
     const prior = state.reading;
     if (
       prior !== null &&
       (reading.campaign.revision < prior.campaign.revision || reading.sequence < prior.sequence)
     )
-      return;
+      return false;
     setState("reading", reconcile(reading));
     setState({
       receivedAt: clock.now(),
@@ -80,6 +80,7 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
         )
         .sort((left, right) => right.updatedAt - left.updatedAt),
     );
+    return true;
   };
   const load = async (): Promise<void> => {
     const turn = ++listingGeneration;
@@ -159,8 +160,8 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
           setState("connection", "live");
           retry = 0;
           if (item.kind === "snapshot") {
-            apply(item.reading, turn, snapshotEpoch);
-            cursor = Math.max(cursor, item.reading.sequence);
+            if (apply(item.reading, turn, snapshotEpoch))
+              cursor = Math.max(cursor, item.reading.sequence);
           } else if (item.kind === "event" && item.event.sequence > cursor) {
             cursor = item.event.sequence;
             newestSequence = Math.max(newestSequence, cursor);

@@ -229,6 +229,73 @@ describe("campaign monitor", () => {
     }
   });
 
+  it.each(["another campaign", "an older revision"])(
+    "does not advance the event cursor for a rejected snapshot from %s",
+    async (rejection) => {
+      const queue = eventQueue();
+      let reads = 0;
+      const monitor = createRoot(() =>
+        createCampaignMonitor(
+          fakeClient({
+            read: async () => reading(++reads >= 3 ? 3 : 2),
+            watch: (_id, _cursor, signal) => queue.watch(signal),
+          }),
+        ),
+      );
+      try {
+        await monitor.open("campaign-one");
+        await ready(monitor);
+        queue.push({
+          kind: "snapshot",
+          reading: {
+            sequence: 99,
+            campaign: campaignFixture({
+              id: rejection === "another campaign" ? "another-campaign" : "campaign-one",
+              revision: 1,
+            }),
+          },
+        });
+        queue.push(eventAt(3));
+        await vi.waitFor(() => expect(reads).toBe(3));
+        expect(monitor.state.reading?.sequence).toBe(3);
+        expect(monitor.state.reading?.campaign.id).toBe("campaign-one");
+        expect(monitor.state.stale).toBe(false);
+      } finally {
+        monitor.dispose();
+      }
+    },
+  );
+
+  it("reconnects from the last accepted cursor after rejecting a snapshot", async () => {
+    const queue = eventQueue();
+    const cursors: number[] = [];
+    const monitor = createRoot(() =>
+      createCampaignMonitor(
+        fakeClient({
+          read: async () => reading(2),
+          watch: async function* (_id, cursor, signal) {
+            cursors.push(cursor);
+            if (cursors.length === 1) {
+              yield { kind: "connected" };
+              yield { kind: "snapshot", reading: { campaign: campaignFixture(), sequence: 99 } };
+              return;
+            }
+            yield* queue.watch(signal);
+          },
+        }),
+        { now: Date.now, pause: async () => undefined },
+      ),
+    );
+    try {
+      await monitor.open("campaign-one");
+      await vi.waitFor(() => expect(cursors).toEqual([2, 2]));
+      await ready(monitor);
+      expect(monitor.state.reading?.sequence).toBe(2);
+    } finally {
+      monitor.dispose();
+    }
+  });
+
   it("ignores results from a campaign that was left before loading completed", async () => {
     const slow = deferred<CampaignReading>();
     const client = fakeClient({
