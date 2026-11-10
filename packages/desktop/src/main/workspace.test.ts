@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import { nodeConsentCard, sidecarNodeServing } from "./node-consent.ts";
 import { type FileSeams, recentStore } from "./recents.ts";
 import {
+  bundledEngineVersion,
   type EngineSource,
   expectedContract,
-  expectedServerVersion,
   type ServeFailure,
   type ServerProcess,
   type ServeSpec,
@@ -46,7 +46,7 @@ const spawnedTicket: ServerTicket = { url: "http://127.0.0.1:4771", token: "spaw
 function startOutcome(outcome: Outcome): ServeStart {
   switch (outcome) {
     case "ready":
-      return { ok: true, ticket: spawnedTicket, version: expectedServerVersion, pid: 5 };
+      return { ok: true, ticket: spawnedTicket, version: bundledEngineVersion, pid: 5 };
     case "unresolved":
       return {
         ok: false,
@@ -178,13 +178,13 @@ function liveServer(answer: Answer): LiveServer | undefined {
     case "old":
       return { version: "0.0.0", identity: workspaceIdentity };
     case "foreign":
-      return { version: expectedServerVersion, identity: "0123456789ab" };
+      return { version: bundledEngineVersion, identity: "0123456789ab" };
     case "unnamed":
-      return { version: expectedServerVersion, identity: undefined };
+      return { version: bundledEngineVersion, identity: undefined };
     case "ok":
     case "other-contract":
     case "no-contract":
-      return { version: expectedServerVersion, identity: workspaceIdentity };
+      return { version: bundledEngineVersion, identity: workspaceIdentity };
   }
 }
 
@@ -200,13 +200,13 @@ function servedDocument(answer: Answer): ServerDocument {
     case "old":
       return served("0.0.0", expectedContract);
     case "other-contract":
-      return served(expectedServerVersion, "1.7");
+      return served(bundledEngineVersion, "1.7");
     case "no-contract":
-      return served(expectedServerVersion, undefined);
+      return served(bundledEngineVersion, undefined);
     case "foreign":
     case "unnamed":
     case "ok":
-      return served(expectedServerVersion, expectedContract);
+      return served(bundledEngineVersion, expectedContract);
   }
 }
 
@@ -223,7 +223,7 @@ describe("workspaceHost: attach first, spawn second", () => {
         workspace: "/work",
         server: terminalTicket,
         attached: true,
-        version: expectedServerVersion,
+        version: bundledEngineVersion,
         binary: undefined,
       },
     });
@@ -252,13 +252,10 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(h.fs.files.has(workspaceTicketFile) && _case === "absent").toBe(false);
   });
 
-  it("refuses a running server of another version instead of spawning beside it", async () => {
+  it("attaches to a running server of another release that speaks the same contract", async () => {
     const h = harness({ ticket: terminalTicket, ticketAnswers: "old" });
     const opened = await workspaceHost(h.seams).open("/work");
-    expect(opened).toMatchObject({
-      ok: false,
-      failure: { kind: "version-mismatch", actual: "0.0.0", ticket: terminalTicket },
-    });
+    expect(opened).toMatchObject({ ok: true, opened: { attached: true, version: "0.0.0" } });
     expect(h.processes).toHaveLength(0);
   });
 
@@ -356,7 +353,7 @@ describe("workspaceHost: attach first, spawn second", () => {
     h.processes[0]?.listeners[0]?.({
       kind: "ready",
       ticket: { url: "http://127.0.0.1:4799", token: "restarted" },
-      version: expectedServerVersion,
+      version: bundledEngineVersion,
       pid: 6,
     });
     expect(host.ticketFor("/work")).toEqual({ url: "http://127.0.0.1:4799", token: "restarted" });
@@ -734,7 +731,7 @@ describe("workspaceHost: the node serves what you open", () => {
         workspace: "/work",
         server: nodeTickets[0],
         attached: true,
-        version: expectedServerVersion,
+        version: bundledEngineVersion,
         binary: undefined,
         servedByNode: true,
       },

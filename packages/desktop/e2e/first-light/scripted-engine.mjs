@@ -26,12 +26,19 @@ export const sumPath = "src/sum.js";
 export const sumTestPath = "src/sum.test.js";
 export const changeTitle = "the sum and its test";
 export const setOut = "The change is set out beside us.";
+export const yardNoteOpening = "From the yard, not the keeper's words:";
+export const firstRequest = "set the run's summary out for me to read";
+export const firstTitle = "the run's summary";
+export const secondRequest = "set the second note out beside it";
+export const secondTitle = "the second note";
+export const takeBackRequest = "see what is out and take the second note back";
 
 const keyworkRepo = resolve(
   process.env.KEYWORK_REPO ?? join(import.meta.dirname, "../../../../../keywork"),
 );
 const logFile = process.env.FIRST_LIGHT_LOG;
 const capabilities = { input: ["text"], toolCalls: true, contextWindow: 200_000 };
+let yardPrompt;
 
 export async function serveScripted(argv) {
   record({ engine: process.pid });
@@ -42,6 +49,7 @@ export async function serveScripted(argv) {
     return cli.main(argv);
   }
   const inference = await import(keyworkModule("packages/cli/src/inference/runtime.ts"));
+  ({ yardPrompt } = await import(keyworkModule("packages/engine/src/index.ts")));
   return cli.main([...argv, "--model", scriptedReference], {
     composeInference: (inputs) => withScriptedProvider(inference.composeInference(inputs)),
   });
@@ -81,7 +89,7 @@ const scriptedProvider = {
   capabilities,
   async *stream(request) {
     const { kind, deltas } = turnFor(request.messages);
-    record({ turn: kind, messages: request.messages.length });
+    record({ turn: kind, messages: request.messages.length, ...whatTheModelHeard(request) });
     for (const delta of deltas) {
       request.signal?.throwIfAborted();
       yield delta;
@@ -105,6 +113,8 @@ function refusingProvider(binding) {
 function turnFor(messages) {
   const prompt = lastUserText(messages);
   if (prompt.includes(trailRequest)) return trailTurn(messages);
+  const yardScript = yardScripts.find((script) => prompt.includes(script.request));
+  if (yardScript !== undefined) return yardTurn(messages, yardScript);
   const last = messages.at(-1);
   if (last?.role === "tool") return { kind: "after-tool", deltas: words(delivered) };
   if (prompt.toLowerCase().includes(introductionMarker)) {
@@ -156,6 +166,96 @@ function trailTurn(messages) {
   const step = trailSteps[answered];
   if (step === undefined) return { kind: "trail-set-out", deltas: words(setOut) };
   return { kind: step.kind, deltas: [step.call(messages.length), done()] };
+}
+
+const yardScripts = [
+  {
+    request: firstRequest,
+    said: "The summary is out beside us.",
+    steps: [
+      {
+        kind: "yard-first-show",
+        call: (at) =>
+          toolCall(`yard-first-${at}`, "show", {
+            what: {
+              kind: "note",
+              ref: "Everything the run did, for a slow read.",
+              title: firstTitle,
+            },
+            rung: "unfold",
+            size: "working",
+            why: "you asked to read the run's summary",
+          }),
+      },
+    ],
+  },
+  {
+    request: secondRequest,
+    said: "The second note is out.",
+    steps: [
+      {
+        kind: "yard-second-show",
+        call: (at) =>
+          toolCall(`yard-second-${at}`, "show", {
+            what: { kind: "note", ref: "A second thing to look at.", title: secondTitle },
+            rung: "unfold",
+            size: "readable",
+            why: "you asked for a second note",
+          }),
+      },
+    ],
+  },
+  {
+    request: takeBackRequest,
+    said: "The second note has been taken back.",
+    steps: [
+      {
+        kind: "yard-shown",
+        call: (at) => toolCall(`yard-shown-${at}`, "shown", {}),
+      },
+      {
+        kind: "yard-withdraw",
+        call: (at, messages) =>
+          toolCall(`yard-withdraw-${at}`, "withdraw", { id: settingListed(messages, secondTitle) }),
+      },
+    ],
+  },
+];
+
+function yardTurn(messages, script) {
+  const answered = toolResultsSinceLastPrompt(messages);
+  const step = script.steps[answered];
+  if (step === undefined) return { kind: "yard-said", deltas: words(script.said) };
+  return { kind: step.kind, deltas: [step.call(messages.length, messages), done()] };
+}
+
+function settingListed(messages, title) {
+  const rows =
+    lastToolOutput(messages)
+      ?.split("\n")
+      .filter((line) => line.startsWith("{")) ?? [];
+  return rows.map((row) => JSON.parse(row)).find((row) => row.what?.title === title)?.id;
+}
+
+function whatTheModelHeard(request) {
+  const note = noteIn(request.messages.at(-1));
+  const toolOutput = lastToolOutput(request.messages);
+  return {
+    yardSection: yardPrompt !== undefined && request.systemPrompt?.includes(yardPrompt) === true,
+    ...(note !== undefined && { note }),
+    ...(toolOutput !== undefined && { toolOutput }),
+  };
+}
+
+function noteIn(message) {
+  return message?.parts
+    .map((part) => part.text ?? part.output ?? "")
+    .find((text) => text.includes(yardNoteOpening));
+}
+
+function lastToolOutput(messages) {
+  const last = messages.at(-1);
+  return last?.role === "tool" ? last.parts.at(-1)?.output : undefined;
 }
 
 function toolResultsSinceLastPrompt(messages) {

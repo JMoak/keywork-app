@@ -1,9 +1,11 @@
+import type { SettingSize } from "@keywork-app/protocol";
 import { minute, second } from "../clock/clock.ts";
 import { descendantsOf, lineageOf } from "./lineage.ts";
 import { focusWithin, pendingFoldsApplied } from "./plot.ts";
 import {
   type AttendKind,
   type Attention,
+  type Decaying,
   type Size,
   sizeOf,
   type Visit,
@@ -33,18 +35,33 @@ export interface Attend {
 }
 
 export function attend(yard: YardState, notice: Attend): YardState {
-  if (yard.settings[notice.id] === undefined) return yard;
+  if (yard.settings[notice.id] === undefined && yard.visit?.id !== notice.id) return yard;
   const visited = noticed(yard, notice);
   if (visited === yard) return yard;
   return sizesDecided(pendingFoldsApplied(visited), notice.at);
 }
 
-export function scoreAt(attention: Attention | undefined, at: number): number {
-  if (attention === undefined) return 0;
-  return attention.score * 0.5 ** (Math.max(0, at - attention.lastAt) / attentionTuning.halfLifeMs);
+export function scoreAt(decaying: Decaying | undefined, at: number): number {
+  if (decaying === undefined) return 0;
+  return decaying.score * 0.5 ** (Math.max(0, at - decaying.lastAt) / attentionTuning.halfLifeMs);
 }
 
-export function sizeAfter(size: Size, score: number): Size {
+export function openedAtItsNamedSize(
+  yard: YardState,
+  setting: YardSetting,
+  at: number,
+): YardSetting {
+  if (setting.size !== "working") return setting;
+  return workingPanelsIn(yard) < attentionTuning.workingAtMost
+    ? { ...setting, headStart: { score: attentionTuning.working.enter, lastAt: at } }
+    : { ...setting, size: "readable" };
+}
+
+export function onItsHeadStart(setting: Pick<YardSetting, "headStart" | "attention">): boolean {
+  return setting.headStart !== undefined && setting.attention === undefined;
+}
+
+export function sizeAfter(size: Size, score: number): SettingSize {
   const { working } = attentionTuning;
   if (size === "working" && score >= working.leave) return "working";
   return score >= working.enter ? "working" : "readable";
@@ -64,8 +81,8 @@ export function sizesDecided(yard: YardState, at: number): YardState {
       .map((setting) => setting.id),
   );
   const changed = wanted.flatMap(({ setting, size }) => {
-    const decided: Size = size === "working" && !working.has(setting.id) ? "readable" : size;
-    return decided === sizeOf(setting) ? [] : [{ ...setting, size: decided }];
+    const decided = size === "working" && !working.has(setting.id) ? "readable" : size;
+    return decided === sizeOf(setting) ? [] : [resized(setting, decided)];
   });
   if (changed.length === 0) return yard;
   return {
@@ -173,9 +190,24 @@ function counted(visit: Visit): Visit {
   return { ...visit, counted: true };
 }
 
-function sizeWanted(setting: YardSetting, inside: string | undefined, at: number): Size {
+function sizeWanted(setting: YardSetting, inside: string | undefined, at: number): SettingSize {
   if (setting.id === inside && sizeOf(setting) === "working") return "working";
-  return sizeAfter(sizeOf(setting), scoreAt(setting.attention, at));
+  return sizeAfter(sizeOf(setting), bandScoreAt(setting, at));
+}
+
+function bandScoreAt(setting: YardSetting, at: number): number {
+  return Math.max(scoreAt(setting.attention, at), scoreAt(setting.headStart, at));
+}
+
+function resized(setting: YardSetting, size: SettingSize): YardSetting {
+  const { headStart: _, ...rest } = setting;
+  return { ...rest, size };
+}
+
+function workingPanelsIn(yard: YardState): number {
+  return Object.values(yard.settings).filter(
+    (setting) => sizable(setting) && sizeOf(setting) === "working",
+  ).length;
 }
 
 function keepsWorkingFirst(a: YardSetting, b: YardSetting, inside: string | undefined): number {

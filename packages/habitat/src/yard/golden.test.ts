@@ -188,6 +188,42 @@ describe("the yard's goldens: a plot grows, folds and restores", () => {
   }
 });
 
+describe("the yard's goldens: a size the creature named", () => {
+  const first: readonly BusEnvelope[] = [
+    show(1, {
+      rung: "unfold",
+      size: "working",
+      what: { kind: "report", ref: "r-3", title: "Run" },
+    }),
+  ];
+  const later: readonly BusEnvelope[] = [
+    show(2, {
+      rung: "unfold",
+      size: "working",
+      creature: "ash",
+      what: { kind: "diff", ref: "cs-7", title: "Fix" },
+    }),
+    show(3, { what: { kind: "note", ref: "the rest can wait" } }),
+  ];
+
+  for (const [name, viewport] of Object.entries(viewports)) {
+    it(`the first opens working and keeps its space when a second arrives, on the ${name}`, () => {
+      const out = withYardStep(projectAll(emptyHabitat(), first), askedContext, noon + minute);
+      const habitat = withYardStep(projectAll(out, later), askedContext, noon + minute + second);
+      const placed = placeYard({
+        viewport,
+        hub: defaultHub(viewport),
+        settings: Object.values(yardOf(habitat).settings),
+        prefs: { reducedMotion: false, tier: "active" },
+      });
+      expect({
+        sketch: sketch(viewport, placed),
+        placements: placed.map(line),
+      }).toMatchSnapshot();
+    });
+  }
+});
+
 function attendAt(id: string, kind: AttendKind, seconds: number): HabitatInput {
   return { type: "keeper.attend", ts: isoAt(noon + seconds * second), id, kind };
 }

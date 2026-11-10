@@ -28,7 +28,8 @@ from the keywork GitHub release (`keywork-windows-x64.exe`, `keywork-darwin-arm6
 writes it to `packages/desktop/sidecar/` where electron-builder's `extraResources` picks it
 up. Nothing is written on a mismatch. `--all` fans every platform out into
 `sidecar/<platform>-<arch>/` for a multi-platform package. Bumping the sidecar is bumping
-`protocolVersion`, which is also what the app's version check against `/doc` expects.
+`protocolVersion`. At launch the app compares only `contractVersion` against `/doc`, so an engine of
+another release that speaks the same contract is accepted.
 
 ## Automatic releases
 

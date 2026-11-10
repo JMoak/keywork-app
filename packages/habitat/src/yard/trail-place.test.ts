@@ -361,6 +361,41 @@ describe("the yard with trails, for any viewport and settings", () => {
     );
   });
 
+  it("gives a panel opening on its head start only free space, displacing no one already out", () => {
+    fc.assert(
+      fc.property(
+        yardArb,
+        fc.nat(),
+        fc.integer({ min: -5, max: 40 }),
+        fc.boolean(),
+        ({ viewport, settings, inside }, pick, depth, asChild) => {
+          const parent = settings[pick % settings.length];
+          const arrival =
+            asChild && parent !== undefined
+              ? child("newcomer", parent.id, depth, 99, pick % 3)
+              : seed("newcomer", depth, 99);
+          const newcomer: YardSetting = {
+            ...arrival,
+            size: "working",
+            headStart: { score: 20, lastAt: noon },
+          };
+          const before = place(settings, viewport, inside);
+          const after = place([...settings, newcomer], viewport, inside);
+          for (const held of before.filter((placement) => placement.rung === "unfold")) {
+            const now = after.find((placement) => placement.id === held.id);
+            expect(now && placeOf(now), held.id).toEqual(placeOf(held));
+          }
+          after.forEach((a, index) => {
+            for (const b of after.slice(index + 1)) {
+              expect(overlaps(a.rect, b.rect), `${a.id} over ${b.id}`).toBe(false);
+            }
+          });
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+
   it("moves nothing that outranks a satellite whose size changes; only those below it yield", () => {
     fc.assert(
       fc.property(yardArb, fc.nat(), ({ viewport, settings, inside }, pick) => {

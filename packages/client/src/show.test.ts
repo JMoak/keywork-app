@@ -49,6 +49,15 @@ describe("the yard's routes", () => {
     ]);
   });
 
+  it("keeps a named size on what GET /show lists, and leaves it absent when none was named", async () => {
+    const named = { ...setting, id: "set-2", size: "working" } as const;
+    const server = serving(() => json(200, { settings: [setting, named] }));
+    const client = keyworkClient(ticket, { fetch: server.fetch });
+    const listed = await client.settings();
+    expect(listed).toEqual([setting, named]);
+    expect(Array.isArray(listed) && "size" in (listed[0] ?? {})).toBe(false);
+  });
+
   it("posts the keeper's outcome to POST /show/{id}/answer and settles nothing itself", async () => {
     const server = serving(() => json(200, { ...setting, state: "dismissed" }));
     const client = keyworkClient(ticket, { fetch: server.fetch });

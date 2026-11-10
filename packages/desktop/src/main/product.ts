@@ -1,6 +1,6 @@
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import type { HostAbout } from "./host.ts";
-import { expectedServerVersion } from "./serve-process.ts";
+import { bundledEngineVersion } from "./serve-process.ts";
 
 export interface AboutBox {
   title: string;
@@ -16,6 +16,6 @@ export function aboutBox(about: HostAbout, profile: ProductProfile = keyworkProf
   return {
     title: `About ${profile.name}`,
     message: `${profile.name} ${about.version}`,
-    detail: `keywork ${expectedServerVersion} inside · ${about.shell} on ${about.platform}`,
+    detail: `keywork ${bundledEngineVersion} inside · ${about.shell} on ${about.platform}`,
   };
 }

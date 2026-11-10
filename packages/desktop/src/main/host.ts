@@ -341,8 +341,6 @@ function publicFailure(failure: ServeFailure, profile: ProductProfile): PublicFa
   switch (failure.kind) {
     case "unreachable":
       return { kind: "unreachable", ticket: { url: failure.ticket.url }, detail: failure.detail };
-    case "version-mismatch":
-      return { kind: "version-mismatch", expected: failure.expected, actual: failure.actual };
     case "contract-mismatch":
       return { kind: "unresolved", ...contractRefusal(failure, profile) };
     default:
@@ -351,9 +349,8 @@ function publicFailure(failure: ServeFailure, profile: ProductProfile): PublicFa
 }
 
 type PublicFailure =
-  | Exclude<ServeFailure, { kind: "unreachable" | "version-mismatch" | "contract-mismatch" }>
-  | { kind: "unreachable"; ticket: { url: string }; detail: string }
-  | { kind: "version-mismatch"; expected: string; actual: string };
+  | Exclude<ServeFailure, { kind: "unreachable" | "contract-mismatch" }>
+  | { kind: "unreachable"; ticket: { url: string }; detail: string };
 
 const userMemoryVault = join(homedir(), ".keywork", "memory");
 const managedHomePath = join(homedir(), ".keywork", "home");

@@ -1,6 +1,7 @@
 import type { ProposedRung, Rung } from "@keywork-app/protocol";
 import { minute, parseTs } from "../clock/clock.ts";
 import type { HabitatState } from "../world/types.ts";
+import { openedAtItsNamedSize } from "./attention.ts";
 import { byDepth, depthOf } from "./depth.ts";
 import { foldsBackNow } from "./fold-back.ts";
 import {
@@ -20,6 +21,7 @@ import { plotSeedOf } from "./lineage.ts";
 import { foldPlot, hasLiveDescendants } from "./plot.ts";
 import {
   byArrival,
+  type Decaying,
   originOf,
   ownerOf,
   rankOf,
@@ -231,11 +233,18 @@ function reshown(
   rung: Rung,
   unfolding: Omit<Unfolded, "slot" | "lane"> | undefined,
 ): YardSetting {
-  const { unfolded, size, ...rest } = setting;
-  if (!satellite(rung) || unfolding === undefined) return { ...rest, shown: rung };
+  if (!satellite(rung) || unfolding === undefined) return lowered(setting, rung);
+  const { unfolded } = setting;
   const place = unfolded === undefined ? placeFor(yard, setting) : placeKept(unfolded);
-  const kept = size === undefined ? rest : { ...rest, size };
-  return { ...kept, shown: rung, unfolded: { ...unfolding, ...place } };
+  const sized =
+    unfolded === undefined ? openedAtItsNamedSize(yard, setting, unfolding.at) : setting;
+  return { ...sized, shown: rung, unfolded: { ...unfolding, ...place } };
+}
+
+function lowered(setting: YardSetting, rung: Rung): YardSetting {
+  const { unfolded, size, headStart: _, ...rest } = setting;
+  const neverOut = unfolded === undefined && size !== undefined;
+  return neverOut ? { ...rest, size, shown: rung } : { ...rest, shown: rung };
 }
 
 type Place = Pick<Unfolded, "slot" | "lane">;
@@ -335,11 +344,18 @@ function rescored(yard: YardState, context: YardContext, at: number): YardState 
 function attentionShifted(yard: YardState, away: number): YardState {
   if (away <= 0) return yard;
   return changedSettings(yard, (setting) => {
-    const { attention } = setting;
-    return attention === undefined
-      ? setting
-      : { ...setting, attention: { ...attention, lastAt: attention.lastAt + away } };
+    const { attention, headStart } = setting;
+    if (attention === undefined && headStart === undefined) return setting;
+    return {
+      ...setting,
+      ...(attention !== undefined && { attention: resumedAfter(attention, away) }),
+      ...(headStart !== undefined && { headStart: resumedAfter(headStart, away) }),
+    };
   });
+}
+
+function resumedAfter<Clocked extends Decaying>(decaying: Clocked, away: number): Clocked {
+  return { ...decaying, lastAt: decaying.lastAt + away };
 }
 
 function changedSettings(

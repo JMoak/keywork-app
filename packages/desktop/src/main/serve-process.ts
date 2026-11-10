@@ -10,7 +10,7 @@ import {
 } from "@keywork-app/client";
 import { contractVersion, protocolVersion } from "@keywork-app/protocol";
 
-export const expectedServerVersion = protocolVersion;
+export const bundledEngineVersion = protocolVersion;
 
 export const expectedContract = contractVersion;
 
@@ -68,7 +68,6 @@ export type ServeFailure =
   | { kind: "port-in-use"; port: number; detail: string }
   | { kind: "failed"; exitCode: number | null; detail: string }
   | { kind: "unreachable"; ticket: ServerTicket; detail: string }
-  | { kind: "version-mismatch"; expected: string; actual: string; ticket: ServerTicket }
   | ContractMismatch
   | { kind: "no-ticket"; detail: string }
   | { kind: "silent"; waitedMs: number; detail: string }
@@ -203,17 +202,6 @@ export async function healthCheck(
         kind: "contract-mismatch",
         expected: expectedContract,
         actual: document.contract,
-        ticket,
-      },
-    };
-  }
-  if (document.version !== expectedServerVersion) {
-    return {
-      ok: false,
-      failure: {
-        kind: "version-mismatch",
-        expected: expectedServerVersion,
-        actual: document.version,
         ticket,
       },
     };

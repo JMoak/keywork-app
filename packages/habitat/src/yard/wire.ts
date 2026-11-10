@@ -65,7 +65,8 @@ function arrivedIn(yard: YardState, setting: Setting, prior: YardSetting | undef
     unfolded: prior?.unfolded,
     ruled: prior?.ruled,
     attention: prior?.attention,
-    size: prior?.size,
+    headStart: prior?.headStart,
+    size: prior === undefined ? setting.size : prior.size,
     folded: prior === undefined ? joinedFold(yard, setting) : prior.folded,
   };
 }

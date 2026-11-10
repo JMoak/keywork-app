@@ -6,7 +6,6 @@ import {
   contractVersion,
   eventTypes,
   type HttpMethod,
-  protocolVersion,
   type RouteShape,
   requestBodies,
   routes,
@@ -45,7 +44,6 @@ export interface ContractDocument {
 
 export function contractViolations(document: ContractDocument, pinned?: EventShapes): string[] {
   return [
-    ...versionViolations(document.version),
     ...contractVersionViolations(document.contract),
     ...routeViolations(document.routes),
     ...bodyViolations(document.bodies),
@@ -161,11 +159,6 @@ export function propertyPathsOf(schema: JsonSchema, prefix = "", depth = 0): str
 const recordedVersion = "fixture";
 
 const wayBack = `once the protocol mirrors the server, copy keywork's ${servedShapesPath} to packages/protocol/src/fixtures/event-shapes.json`;
-
-function versionViolations(version: string | undefined): string[] {
-  if (version === undefined || version === protocolVersion) return [];
-  return [`the server reports version ${version}; the app pins ${protocolVersion}`];
-}
 
 function contractVersionViolations(served: string | undefined): string[] {
   if (served === undefined) {

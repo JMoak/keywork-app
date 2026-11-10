@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { contractVersion, protocolVersion, routes } from "@keywork-app/protocol";
+import { contractVersion, routes } from "@keywork-app/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   contractViolations,
@@ -33,7 +33,6 @@ describe("check:contract", () => {
       "drifted",
     );
     expect(contractViolations(document)).toEqual([
-      `the server reports version 9.9.9; the app pins ${protocolVersion}`,
       "the server no longer serves abortSession",
       "the server added setSessionMode; the protocol does not know it yet",
       "injectPrompt moved: the protocol has POST /sessions/{id}/inject, the server PUT /sessions/{id}/inject",
@@ -70,10 +69,7 @@ describe("check:contract", () => {
       const document = await documentOfCheckout(checkout);
       expect(document.origin).toBe(checkout);
       expect(document.version).toBe("0.0.9");
-      expect(contractViolations(document)).toEqual([
-        `the server reports version 0.0.9; the app pins ${protocolVersion}`,
-        "the server no longer serves injectPrompt",
-      ]);
+      expect(contractViolations(document)).toEqual(["the server no longer serves injectPrompt"]);
     });
   });
 });

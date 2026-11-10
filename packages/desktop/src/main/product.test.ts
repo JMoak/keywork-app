@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { keyworkProfile, steadProfile } from "@keywork-app/product";
 import { describe, expect, it } from "vitest";
 import { aboutBox, windowTitle } from "./product.ts";
-import { expectedServerVersion } from "./serve-process.ts";
+import { bundledEngineVersion } from "./serve-process.ts";
 
 const builder = readFileSync(
   join(import.meta.dirname, "../../electron-builder.yml"),
@@ -20,7 +20,7 @@ describe("the product name", () => {
     const box = aboutBox({ shell: "electron", platform: "win32", version: "0.1.0" });
     expect(box.title).toBe("About keywork");
     expect(box.message).toBe("keywork 0.1.0");
-    expect(box.detail).toBe(`keywork ${expectedServerVersion} inside · electron on win32`);
+    expect(box.detail).toBe(`keywork ${bundledEngineVersion} inside · electron on win32`);
   });
 
   it("uses an explicitly selected Stead name in native titles and dialogs", () => {

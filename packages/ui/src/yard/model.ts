@@ -170,6 +170,7 @@ function createYardWorld(
   attention: AttentionSource,
 ) {
   const { shell } = seams;
+  const voice = createKeeperVoice(shell.feed);
   const world = createHabitatWorld({
     rows: () => shell.store.state.summaries,
     bots: () => shell.store.surfaces.state.bots,
@@ -181,7 +182,6 @@ function createYardWorld(
     now: seams.now,
     offsetMinutes: houseOffsetMinutes(),
   });
-  const voice = createKeeperVoice(shell.feed);
   const [clock, setClock] = createSignal(seams.now());
   const context = (): YardContext => ({ ...keeperContext(), keeperSpokeAt: voice() });
   const advance = (by: typeof withYardStep): void => {

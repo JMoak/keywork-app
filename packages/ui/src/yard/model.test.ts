@@ -66,8 +66,100 @@ describe("when the yard re-sorts", () => {
   });
 });
 
+describe("a size the creature named", () => {
+  it("reaches the yard with the setting and opens the panel at it", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    run.emit([proposed(1, delivery({ size: "working" }))]);
+    expect(settingOf(run.model.settings(), "delivery")).toMatchObject({
+      shown: "unfold",
+      size: "working",
+    });
+    run.dispose();
+  });
+
+  it("opens readable when a keeper's own opening names none", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    run.emit([proposed(1, delivery({ origin: "keeper" }))]);
+    expect(settingOf(run.model.settings(), "delivery")?.size).toBeUndefined();
+    run.dispose();
+  });
+});
+
+describe("the gate and the keeper's own words", () => {
+  it("hears the keeper first when their words and a setting arrive in one batch", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    const note = aSetting({
+      id: "asked-for",
+      sessionId: "s1",
+      rung: "unfold",
+      what: { kind: "note", ref: "the note the keeper asked for" },
+    });
+    run.emit([keeperSpoke(1, "s1", note.at), proposed(2, note)]);
+    expect(run.shownOf("asked-for")).toBe("unfold");
+    run.dispose();
+  });
+});
+
+describe("a creature's withdrawal", () => {
+  it("takes the setting off the yard through the ordinary settle, leaving no card behind", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    run.emit([proposed(1, delivery())]);
+    run.emit([withdrawnByItsOwner(2, delivery())]);
+    expect(run.model.settings()).toEqual([]);
+    expect(run.model.plots()).toEqual([]);
+    expect(run.model.withdrawn("delivery")).toBe(true);
+    run.dispose();
+  });
+
+  it("folds what grew from it into a card instead of orphaning it", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    const opened = aSetting({
+      id: "opened",
+      sessionId: "s1",
+      from: "delivery",
+      origin: "keeper",
+      rung: "unfold",
+      what: { kind: "file", ref: "src/app.ts" },
+    });
+    run.emit([proposed(1, delivery()), proposed(2, opened)]);
+    run.emit([withdrawnByItsOwner(3, delivery())]);
+    expect(run.model.settings().map((setting) => setting.id)).toEqual(["opened"]);
+    expect(run.model.plots().map((plot) => plot.id)).toEqual(["plot:delivery"]);
+    run.dispose();
+  });
+
+  it("closes the keeper's visit when they leave the panel it took back", () => {
+    const run = yardModel({ focusedThread: "s1" });
+    run.emit([proposed(1, delivery())]);
+    run.model.attend({ type: "keeper.attend", ts: at(1), id: "delivery", kind: "enter" });
+    run.emit([withdrawnByItsOwner(2, delivery())]);
+    expect(run.model.inside()).toBe("delivery");
+    run.model.attend({ type: "keeper.attend", ts: at(2), id: "delivery", kind: "leave" });
+    expect(run.model.inside()).toBeUndefined();
+    run.dispose();
+  });
+});
+
 const report = { kind: "report", ref: "the weekly report" } as const;
 const diff = { kind: "diff", ref: "change-1" } as const;
+
+function delivery(overrides: Partial<Setting> = {}): Setting {
+  return aSetting({ id: "delivery", sessionId: "s1", what: diff, rung: "unfold", ...overrides });
+}
+
+function keeperSpoke(id: number, sessionId: string, ts: string): BusEnvelope {
+  return { id, ts, sessionId, type: "turn.started", payload: { userText: "show me" } };
+}
+
+function withdrawnByItsOwner(id: number, setting: Setting): BusEnvelope {
+  return {
+    id,
+    ts: setting.at,
+    sessionId: setting.sessionId,
+    type: "show.settled",
+    payload: { id: setting.id, outcome: "withdrawn", by: "creature" },
+  };
+}
 
 function elsewhere(id: string, kind: "diff" | "note"): Setting {
   return aSetting({ id, sessionId: "s2", what: { kind, ref: id } });

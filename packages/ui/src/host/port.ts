@@ -124,7 +124,6 @@ export type WorkspaceFailure =
   | { kind: "port-in-use"; port: number; detail: string }
   | { kind: "failed"; exitCode: number | null; detail: string }
   | { kind: "unreachable"; ticket: { url: string }; detail: string }
-  | { kind: "version-mismatch"; expected: string; actual: string }
   | { kind: "no-ticket"; detail: string }
   | { kind: "silent"; waitedMs: number; detail: string }
   | { kind: "gone"; url: string };
@@ -207,8 +206,6 @@ export function describeFailure(failure: WorkspaceFailure): string {
       return failure.nextAction === ""
         ? failure.message
         : `${failure.message} · ${failure.nextAction}`;
-    case "version-mismatch":
-      return `the running engine is version ${failure.actual}; this app expects ${failure.expected}`;
     case "port-in-use":
       return `port ${failure.port} is taken`;
     case "unreachable":

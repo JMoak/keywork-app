@@ -4,6 +4,7 @@ import {
   type Setting,
   type SettingKind,
   type SettingOrigin,
+  type SettingSize,
 } from "@keywork-app/protocol";
 import { parseTs } from "../clock/clock.ts";
 import type { Budget, GateContext, Verdict } from "../creature/gate.ts";
@@ -29,7 +30,7 @@ export interface YardSetting extends Setting {
   readonly unfolded?: Unfolded | undefined;
   readonly ruled?: boolean | undefined;
   readonly attention?: Attention | undefined;
-  readonly size?: Size | undefined;
+  readonly headStart?: Decaying | undefined;
   readonly folded?: string | undefined;
 }
 
@@ -47,12 +48,15 @@ export const sizes: readonly Size[] = ["card", "readable", "working"];
 
 export type AttendKind = "enter" | "leave" | "interact";
 
-export interface Attention {
+export interface Decaying {
+  readonly score: number;
+  readonly lastAt: number;
+}
+
+export interface Attention extends Decaying {
   readonly dwellMs: number;
   readonly entries: number;
   readonly interactions: number;
-  readonly lastAt: number;
-  readonly score: number;
   readonly interactedAt?: number | undefined;
 }
 
@@ -158,7 +162,7 @@ export function stillShown(setting: Pick<Setting, "state">): boolean {
   return setting.state === "live" || setting.state === "pinned";
 }
 
-export function sizeOf(setting: Pick<YardSetting, "size">): Size {
+export function sizeOf(setting: Pick<YardSetting, "size">): SettingSize {
   return setting.size ?? "readable";
 }
 

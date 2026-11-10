@@ -16,9 +16,9 @@ import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
 import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.2.2";
+export const protocolVersion = "0.4.0";
 
-export const contractVersion = "1.28";
+export const contractVersion = "1.29";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);

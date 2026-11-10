@@ -19,7 +19,7 @@ import {
   type SidecarRun,
 } from "./node-consent.ts";
 import { runtimeFailure } from "./runtime-failure.ts";
-import { type ContractMismatch, expectedContract, expectedServerVersion } from "./serve-process.ts";
+import { bundledEngineVersion, type ContractMismatch, expectedContract } from "./serve-process.ts";
 
 const userData = "C:/Users/keeper/AppData/Roaming/stead";
 const sidecar = "C:/Programs/stead/resources/sidecar/keywork.exe";
@@ -176,7 +176,7 @@ describe("shared runtime compatibility", () => {
     expect(await readNodeStanding(world.seams)).toMatchObject({
       installed: true,
       running: true,
-      version: expectedServerVersion,
+      version: bundledEngineVersion,
       contract: expectedContract,
       tickets: [ticket.url],
     });
@@ -269,7 +269,7 @@ function fakeWorld(consent: boolean) {
   return world;
 }
 
-function statusReport(version = expectedServerVersion, contract = expectedContract): string {
+function statusReport(version = bundledEngineVersion, contract = expectedContract): string {
   return JSON.stringify({
     registration: { installed: true, program: "C:/Users/keeper/.keywork/runtime/engine.exe" },
     liveness: "running",

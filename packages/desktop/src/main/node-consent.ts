@@ -6,7 +6,6 @@ import { runtimeFailure } from "./runtime-failure.ts";
 import {
   type ContractMismatch,
   expectedContract,
-  expectedServerVersion,
   type NodeTicketOwner,
   type ServeFailure,
 } from "./serve-process.ts";
@@ -176,8 +175,8 @@ export async function restartAnOlderNode(seams: UpgradeSeams): Promise<NodeUpgra
   const standing = await readNodeStanding(seams);
   if (standing === undefined) return { kind: "unknown" };
   if (!standing.installed) return { kind: "not-installed" };
-  if (standing.version === undefined || standing.contract === undefined) return { kind: "unknown" };
-  if (standing.version === expectedServerVersion && standing.contract === expectedContract) {
+  if (standing.contract === undefined) return { kind: "unknown" };
+  if (standing.contract === expectedContract) {
     return { kind: "current" };
   }
   return {

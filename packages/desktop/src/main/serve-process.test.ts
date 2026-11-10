@@ -1,10 +1,10 @@
 import type { ServerDocument, ServerTicket } from "@keywork-app/client";
 import { describe, expect, it } from "vitest";
 import {
+  bundledEngineVersion,
   type ChildHandle,
   exitFailureOf,
   expectedContract,
-  expectedServerVersion,
   healthCheck,
   type ServeState,
   type Spawn,
@@ -111,7 +111,7 @@ function harness(
   const spawned: Harness["spawned"] = [];
   const delays: number[] = [];
   const document: ServerDocument = {
-    version: options.version ?? expectedServerVersion,
+    version: options.version ?? bundledEngineVersion,
     contract: options.contract === null ? undefined : (options.contract ?? expectedContract),
     operationIds: [],
   };
@@ -192,7 +192,7 @@ describe("superviseServer", () => {
     expect(started).toEqual({
       ok: true,
       ticket: { url: "http://127.0.0.1:4771", token: "abc123" },
-      version: expectedServerVersion,
+      version: bundledEngineVersion,
       pid: 100,
     });
     expect(h.states.map((state) => state.kind)).toEqual(["starting", "ready"]);
@@ -251,25 +251,16 @@ describe("superviseServer", () => {
     expect(await child.handle.exited).toBe(137);
   });
 
-  it("refuses a version mismatch and stops the child it started", async () => {
+  it("accepts an engine of another release that speaks the same contract", async () => {
     const h = harness({ version: "9.9.9" });
     const server = superviseServer(spec, h.seams);
     const starting = server.start();
     await tick();
     announce(h.children[0] as ScriptedChild);
-    expect(await starting).toEqual({
-      ok: false,
-      failure: {
-        kind: "version-mismatch",
-        expected: expectedServerVersion,
-        actual: "9.9.9",
-        ticket: { url: "http://127.0.0.1:4771", token: "abc123" },
-      },
-    });
-    expect(h.delays).toEqual([2000]);
+    expect(await starting).toMatchObject({ ok: true, version: "9.9.9" });
   });
 
-  it("refuses an engine whose contract differs before it reads the release version, and stops it", async () => {
+  it("refuses an engine whose contract differs, and stops it", async () => {
     const h = harness({ version: "9.9.9", contract: "1.7" });
     const server = superviseServer(spec, h.seams);
     const starting = server.start();
@@ -392,18 +383,19 @@ describe("healthCheck", () => {
   });
 
   it("passes an engine that speaks the pinned contract at the pinned release", async () => {
-    expect(await healthCheck(ticket, served(expectedServerVersion, expectedContract))).toEqual({
+    expect(await healthCheck(ticket, served(bundledEngineVersion, expectedContract))).toEqual({
       ok: true,
-      version: expectedServerVersion,
+      version: bundledEngineVersion,
     });
   });
 
-  it("judges the contract first and the release version second, from the one /doc read", async () => {
+  it("judges only the contract, whatever release the /doc names", async () => {
     expect(await healthCheck(ticket, served("9.9.9", "1.7"))).toMatchObject({
       failure: { kind: "contract-mismatch", actual: "1.7" },
     });
-    expect(await healthCheck(ticket, served("9.9.9", expectedContract))).toMatchObject({
-      failure: { kind: "version-mismatch", actual: "9.9.9" },
+    expect(await healthCheck(ticket, served("9.9.9", expectedContract))).toEqual({
+      ok: true,
+      version: "9.9.9",
     });
   });
 

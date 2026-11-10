@@ -26,6 +26,10 @@ export const settingOrigins = ["creature", "keeper"] as const;
 
 export type SettingOrigin = (typeof settingOrigins)[number];
 
+export const settingSizes = ["readable", "working"] as const;
+
+export type SettingSize = (typeof settingSizes)[number];
+
 export interface Setting {
   id: string;
   creature: string | null;
@@ -41,6 +45,8 @@ export interface Setting {
   from?: string | null | undefined;
   origin?: SettingOrigin | undefined;
   replaces?: string | null | undefined;
+  // Since contract 1.29; absent when none was named, and a keeper's opening never carries one.
+  size?: SettingSize | undefined;
 }
 
 export const showOutcomes = ["seen", "pinned", "unpinned", "dismissed", "withdrawn"] as const;

@@ -1,4 +1,5 @@
 import type { SettingKind } from "@keywork-app/protocol";
+import { onItsHeadStart } from "./attention.ts";
 import { byDepth } from "./depth.ts";
 import { plotSeedOf } from "./lineage.ts";
 import { hiddenInPlots, type PlotCard, plotCardsOf } from "./plot.ts";
@@ -434,11 +435,7 @@ function sizedSeats(
   reserved: readonly Rect[],
   inside: string | undefined,
 ): Sized[] {
-  const precedence = seats.toSorted(
-    (a, b) =>
-      Number(b.setting.id === inside) - Number(a.setting.id === inside) ||
-      byDepth(a.setting, b.setting),
-  );
+  const precedence = seats.toSorted((a, b) => claimsSpaceFirst(a.setting, b.setting, inside));
   const inner = innerOf(viewport);
   const grown = new Map<Seat, Rect>();
   precedence.forEach((seat, rank) => {
@@ -459,6 +456,18 @@ function sizedSeats(
     );
     return corner === undefined ? [] : [{ seat, rect: corner, size: "card" }];
   });
+}
+
+function claimsSpaceFirst(a: YardSetting, b: YardSetting, inside: string | undefined): number {
+  return (
+    Number(b.id === inside) - Number(a.id === inside) ||
+    lateClaimOf(a) - lateClaimOf(b) ||
+    byDepth(a, b)
+  );
+}
+
+function lateClaimOf(setting: YardSetting): number {
+  return onItsHeadStart(setting) ? (setting.unfolded?.at ?? 0) : 0;
 }
 
 function overlapsGrown(grown: ReadonlyMap<Seat, Rect>, seat: Seat, rect: Rect): boolean {

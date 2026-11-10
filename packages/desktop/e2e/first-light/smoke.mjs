@@ -9,9 +9,9 @@
 // chores pane's buttons and the chord it prints.
 //
 //   bun run --cwd packages/desktop build      (once: the smoke runs packages/desktop/out)
-//   bun run smoke:first-light [--keep] [--first-light] [--trail] [--stead]
+//   bun run smoke:first-light [--keep] [--first-light] [--trail] [--stead] [--creature]
 //
-// Scenarios, all three unless flags pick some:
+// Scenarios, all four unless flags pick some:
 //   first-light  keywork profile, runbook steps 1 to 3 as keywork-app's own build shows them: the
 //                keywork first frame, a creature made from the keys the console teaches and
 //                introduced, a turn that asks and delivers. The stead profile's first frame is
@@ -25,6 +25,11 @@
 //                at home, where this profile keeps a creature's chores on screen (/chores): a
 //                creature made through the card its first frame shows, a read-only chore that
 //                completes and a write chore that parks.
+//   creature     stead profile, started at home with no project: the creature's model sets out a
+//                note with a rung and a size and it opens beside the hub; the keeper dismisses it
+//                from the rail by key and the model's next request hears that; the model lists
+//                what is out and takes a second setting back; every stage is shot into
+//                artifacts/e2e/stead/creature.
 //
 // Prints one line per step and exits 0 when every step is observed. The first regressed step
 // stops its scenario: its name, the check that failed and a screenshot beside report.json in the
@@ -46,12 +51,18 @@ import { pathToFileURL } from "node:url";
 import {
   changeTitle,
   delivered,
+  firstRequest,
+  firstTitle,
   introduction,
   notePath,
+  secondRequest,
+  secondTitle,
   setOut,
   sumPath,
   sumTestPath,
+  takeBackRequest,
   trailRequest,
+  yardNoteOpening,
 } from "./scripted-engine.mjs";
 
 const desktopRoot = resolve(import.meta.dirname, "../..");
@@ -90,6 +101,7 @@ const scenarios = [
   {
     id: "stead",
     profile: "stead",
+    keylessFolder: true,
     steps: [
       {
         id: "keyless",
@@ -103,11 +115,34 @@ const scenarios = [
       },
     ],
   },
+  {
+    id: "creature",
+    profile: "stead",
+    atHome: true,
+    steps: [
+      {
+        id: "out",
+        name: "the creature's model sets out a note at a size and it opens beside the hub",
+        run: stepCreatureSetsOut,
+      },
+      {
+        id: "dismissed",
+        name: "the keeper dismisses it by key and the model's next request hears that",
+        run: stepKeeperDismisses,
+      },
+      {
+        id: "taken-back",
+        name: "the model lists what is out and takes the second setting back",
+        run: stepModelTakesBack,
+      },
+    ],
+  },
 ];
 const picked = scenarios.filter((scenario) => process.argv.includes(`--${scenario.id}`));
 const chosen = picked.length === 0 ? scenarios : picked;
 const trailShots = join(repoRoot, "artifacts", "e2e", "trail");
 const steadShots = join(repoRoot, "artifacts", "e2e", "stead");
+const creatureShots = join(steadShots, "creature");
 
 const readOnlyChore = {
   title: "look around",
@@ -122,6 +157,8 @@ const needsYouLetsGoMs = 5_000;
 const consoleLinesKept = 30;
 const hostAnswersWithinMs = 45_000;
 const presentedConversation = ".kw-stead-presented[data-keywork-pane-kind=conversation]";
+const readableFloor = { width: 480, height: 320 };
+const railAndItsGaps = 296;
 let openedFolder;
 
 if (!existsSync(builtMain) || !existsSync(builtRuntime)) {
@@ -156,7 +193,7 @@ async function runScenario(scenario) {
     const said = whatTheConsoleSays(app);
     const page = await consoleWindow(app);
     await expectProfile(page, scenario.profile);
-    const creatureHome = join(scratch.home, ".keywork", "home");
+    const creatureHome = creatureHomeOf(scratch);
     const world = { scratch, app, page, said, creatureHome };
     for (const step of scenario.steps) {
       const at = Date.now();
@@ -514,6 +551,198 @@ async function stepKeyless(world) {
   return `the engine refused ${scratch.workspace}; the yard reads "${seen.head} · ${seen.line} · ${seen.fix}" and offers ${seen.actions.join(", ")}; shot ${shot}`;
 }
 
+async function stepCreatureSetsOut(world) {
+  const { page } = world;
+  mkdirSync(creatureShots, { recursive: true });
+  await page.waitForSelector(".kw-yard[data-mode='yard'] .kw-stead", { timeout: 120_000 });
+  await page.click(".kw-onboard[data-phase=step] input");
+  await walkTheOnboardingCard(page);
+  await page.waitForSelector(".kw-onboard[data-phase=made]", { timeout: 60_000 });
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".kw-onboard", { state: "detached", timeout: 10_000 });
+  const creatures = await until(page, async () => {
+    const listed = await served(page, "/creatures");
+    return listed.creatures?.length === 1 ? listed.creatures : undefined;
+  });
+  const detail = await served(page, `/creatures/${creatures[0].slug}`);
+  world.conversation = detail.conversation;
+  await until(page, async () => {
+    const session = await served(page, `/sessions/${world.conversation}`);
+    return lastAssistantText(session) === introduction ? session : undefined;
+  });
+  await keeperSays(page, firstRequest);
+  const first = await settingOut(page, (setting) => setting.what.title === firstTitle);
+  expect(
+    first.rung === "unfold" && first.size === "working" && first.origin === "creature",
+    `the setting came out ${first.rung}, ${first.size}, from ${first.origin}`,
+  );
+  await page.waitForSelector(panelOf(first.id), { timeout: 30_000 }).catch(async () => {
+    throw new Error(`the note never unfolded: ${await theYardsOwnWords(page)}`);
+  });
+  const seen = await panelAtRest(page, first.id);
+  expect(seen.rung === "unfold", `the panel is drawn at ${seen.rung}`);
+  expect(seen.size === "working", `the panel opened ${seen.size}, not working`);
+  expect(seen.besideHub, `the panel at ${seen.panelAt} is not beside the hub at ${seen.hubAt}`);
+  expect(
+    seen.width >= readableFloor.width && seen.height >= readableFloor.height,
+    `the panel is only ${seen.width} by ${seen.height}`,
+  );
+  expect(!seen.tookFocus, "the panel took the keeper's focus when it opened");
+  world.first = first;
+  const shot = await creatureShot(page, "1-set-out-working.png");
+  return `"${firstTitle}" came out rung ${first.rung}, size ${first.size}; drawn working at ${seen.panelAt} beside the hub at ${seen.hubAt}, ${seen.distance} px from it, focus left with the keeper; shot ${shot}`;
+}
+
+async function stepKeeperDismisses(world) {
+  const { page, scratch, first } = world;
+  await pressLeader(page, "y");
+  for (let moved = 0; moved < 8 && !(await railCursorOn(page, first.id)); moved += 1) {
+    await page.keyboard.press("j");
+  }
+  expect(await railCursorOn(page, first.id), "the rail cursor never reached the note");
+  await page.keyboard.press("x");
+  await page
+    .waitForSelector(panelOf(first.id), { state: "detached", timeout: 15_000 })
+    .catch(async () => {
+      throw new Error(`x left the note out: ${await page.evaluate(railReading)}`);
+    });
+  await settingGone(page, first.id);
+  const shots = [await creatureShot(page, "2-dismissed.png")];
+  await page.keyboard.press("Escape");
+  await keeperSays(page, secondRequest);
+  const second = await settingOut(page, (setting) => setting.what.title === secondTitle);
+  const heard = await turnLogged(world, "yard-second-show");
+  expect(heard.note?.includes(yardNoteOpening), `the next request carried no note: ${heard.note}`);
+  expect(
+    heard.note?.includes("the keeper dismissed it unread, and it has left the yard."),
+    `the note does not say the keeper dismissed it: ${heard.note}`,
+  );
+  expect(heard.yardSection, "the next request's system prompt has no yard section");
+  const opening = engineLines(scratch).find((line) => line.turn === "yard-first-show");
+  expect(opening?.note === undefined, "the first request carried a note before anything settled");
+  await page.waitForSelector(entryOf(second.id), { timeout: 30_000 }).catch(async () => {
+    throw new Error(`the second note never reached the yard: ${await page.evaluate(railReading)}`);
+  });
+  world.second = second;
+  shots.push(await creatureShot(page, "3-second-set-out.png"));
+  return `leader y put the rail cursor on the note and x dismissed it; the next request opened "${firstLineOf(heard.note)}" and said the keeper dismissed it unread; its system prompt holds the yard section; shots ${shots.join(", ")}`;
+}
+
+async function stepModelTakesBack(world) {
+  const { page, second } = world;
+  await keeperSays(page, takeBackRequest);
+  const listed = await turnLogged(world, "yard-withdraw");
+  expect(
+    listed.toolOutput?.startsWith("1 setting is out") && listed.toolOutput?.includes(second.id),
+    `shown answered: ${listed.toolOutput}`,
+  );
+  await page
+    .waitForSelector(entryOf(second.id), { state: "detached", timeout: 30_000 })
+    .catch(async () => {
+      throw new Error(`the second note stayed out: ${await page.evaluate(railReading)}`);
+    });
+  await settingGone(page, second.id);
+  const closing = await turnLogged(world, "yard-said", world.second.id);
+  expect(
+    closing.toolOutput?.startsWith(`Withdrawn: ${second.id} has left the yard`),
+    `withdraw answered: ${closing.toolOutput}`,
+  );
+  const shot = await creatureShot(page, "4-taken-back.png");
+  return `shown listed one setting with ${second.id}; withdraw answered "${closing.toolOutput}"; its panel left the yard and GET /show no longer holds it; shot ${shot}`;
+}
+
+async function panelAtRest(page, id) {
+  let last;
+  return until(
+    page,
+    async () => {
+      const seen = await page.evaluate(panelBesideTheHub, { id, reach: railAndItsGaps });
+      const rested = seen.panelAt === last?.panelAt && seen.hubAt === last?.hubAt;
+      last = seen;
+      return rested ? seen : undefined;
+    },
+    10_000,
+  );
+}
+
+async function keeperSays(page, words) {
+  await page.click("[aria-label=prompt]");
+  await page.keyboard.type(words, { delay: 5 });
+  const typed = await page.evaluate(composerReading);
+  expect(
+    typed.text.includes(words),
+    `the words never reached the composer: ${JSON.stringify(typed)}`,
+  );
+  await page.keyboard.press("Enter");
+}
+
+async function theYardsOwnWords(page) {
+  const rail = await page.evaluate(railReading);
+  await page.click(".kw-yard-rail-head");
+  const log = await page.locator(".kw-yard-decisions li").allTextContents();
+  await page.click(".kw-yard-rail-head");
+  return `${rail}; the yard's decisions: ${log.join(" | ")}`;
+}
+
+function composerReading() {
+  const composers = [...document.querySelectorAll("[aria-label=prompt]")];
+  const focus = document.activeElement;
+  return {
+    count: composers.length,
+    text: composers.map((composer) => composer.value ?? composer.textContent ?? "").join(" | "),
+    focus: `${focus?.tagName}.${focus?.className}`,
+  };
+}
+
+async function settingGone(page, id) {
+  await until(page, async () => {
+    const out = await served(page, "/show");
+    return out.settings.some((setting) => setting.id === id) ? undefined : true;
+  });
+}
+
+async function turnLogged(world, kind, holding) {
+  return until(world.page, async () =>
+    engineLines(world.scratch)
+      .filter((line) => line.turn === kind)
+      .findLast((line) => holding === undefined || line.toolOutput?.includes(holding)),
+  );
+}
+
+async function creatureShot(page, name) {
+  const path = join(creatureShots, name);
+  await page.screenshot({ path });
+  return path;
+}
+
+function panelBesideTheHub({ id, reach }) {
+  const panel = document.querySelector(`.kw-yard-satellite[data-setting="${id}"]`);
+  const hub = document.querySelector(".kw-yard-hub");
+  const placed = panel.getBoundingClientRect();
+  const beside = hub.getBoundingClientRect();
+  const round = (rect) =>
+    `${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`;
+  const toTheRight = placed.left - beside.right;
+  const toTheLeft = beside.left - placed.right;
+  const distance = Math.round(Math.max(toTheRight, toTheLeft));
+  const overlapsVertically = placed.top < beside.bottom && placed.bottom > beside.top;
+  return {
+    rung: panel.dataset.rung,
+    size: panel.dataset.size,
+    width: Math.round(placed.width),
+    height: Math.round(placed.height),
+    panelAt: round(placed),
+    hubAt: round(beside),
+    distance,
+    besideHub: distance >= 0 && distance <= reach && overlapsVertically,
+    tookFocus: panel.contains(document.activeElement),
+  };
+}
+
+function firstLineOf(text) {
+  return text.split("\n")[0];
+}
+
 async function hostAnswerFor({ path, within }) {
   const asked = Date.now();
   const silent = new Promise((resolve) => setTimeout(() => resolve(undefined), within));
@@ -850,7 +1079,7 @@ function scratchFolder(scenario) {
   const root = mkdtempSync(join(tmpdir(), `first-light-${scenario.id}-`));
   const scratch = {
     root,
-    workspace: join(root, scenario.profile === "stead" ? "keyless" : "first-light"),
+    workspace: join(root, scenario.keylessFolder === true ? "keyless" : "first-light"),
     home: join(root, "home"),
     userData: join(root, "user-data"),
     engineLog: join(root, "engine.log"),
@@ -862,8 +1091,12 @@ function scratchFolder(scenario) {
   }
   scratch.launcher = engineLauncher(root);
   scratch.entry = scenario.profile === "stead" ? steadEntry(root) : ".";
-  openedFolder = scratch.workspace;
+  openedFolder = scenario.atHome === true ? creatureHomeOf(scratch) : scratch.workspace;
   return scratch;
+}
+
+function creatureHomeOf(scratch) {
+  return join(scratch.home, ".keywork", "home");
 }
 
 function steadEntry(root) {
@@ -893,7 +1126,8 @@ function engineLauncher(root) {
 }
 
 function scratchEnv(scratch, scenario) {
-  const keyless = scenario?.profile === "stead" ? { FIRST_LIGHT_KEYLESS: scratch.workspace } : {};
+  const keyless =
+    scenario?.keylessFolder === true ? { FIRST_LIGHT_KEYLESS: scratch.workspace } : {};
   return {
     ...withoutModelKeys(process.env),
     USERPROFILE: scratch.home,
@@ -920,7 +1154,11 @@ function trust(scratch, verb) {
 async function launch(scratch, scenario) {
   return electron.launch({
     executablePath: electronBinary,
-    args: [scratch.entry, `--user-data-dir=${scratch.userData}`, scratch.workspace],
+    args: [
+      scratch.entry,
+      `--user-data-dir=${scratch.userData}`,
+      ...(scenario.atHome === true ? [] : [scratch.workspace]),
+    ],
     cwd: desktopRoot,
     env: scratchEnv(scratch, scenario),
     timeout: 60_000,
