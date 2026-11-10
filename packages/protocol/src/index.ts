@@ -1,3 +1,4 @@
+export * from "./campaigns.ts";
 export {
   type ChildFinished,
   type ChildOutcome,
@@ -322,6 +323,7 @@ export {
   type UnbindReason,
 } from "./mesh.ts";
 export {
+  type ConversationModel,
   type FallbackTrigger,
   type InheritedClasses,
   type InheritedDecider,

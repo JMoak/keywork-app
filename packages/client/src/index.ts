@@ -6,6 +6,12 @@ export type {
   WorkspaceSessionRef,
 } from "@keywork-app/protocol";
 export {
+  CampaignRequestError,
+  type CampaignStreamItem,
+  type CampaignsClient,
+  campaignsOverFetch,
+} from "./campaigns.ts";
+export {
   authorizedFetch,
   type ClientSeams,
   type ConsoleClient,

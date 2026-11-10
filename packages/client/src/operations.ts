@@ -1,10 +1,22 @@
 import type { OperationId } from "@keywork-app/protocol";
+import type { CampaignsClient } from "./campaigns.ts";
 import type { ConsoleClient } from "./client.ts";
 import { creatureProjectOperations } from "./creature-projects.ts";
 import { ranchOperations } from "./ranch.ts";
 import { showOperations } from "./show.ts";
 
 export type ClientMethod = Exclude<keyof ConsoleClient, "url">;
+
+export const operationOfCampaignMethod = {
+  list: "listCampaigns",
+  cartridges: "listCampaignCartridges",
+  read: "readCampaign",
+  create: "createCampaign",
+  command: "commandCampaign",
+  artifact: "readCampaignArtifact",
+  export: "exportCampaignArtifact",
+  watch: "campaignEvents",
+} as const satisfies Record<keyof CampaignsClient, OperationId>;
 
 export const operationOfMethod = {
   ...creatureProjectOperations,

@@ -26,7 +26,10 @@ export interface PtyLink {
   args: readonly string[];
 }
 
-export type PtyEvent = { kind: "opened"; title: string } | { kind: "exit"; exit: PtyExit };
+export type PtyEvent =
+  | { kind: "opened"; title: string }
+  | { kind: "exit"; exit: PtyExit }
+  | { kind: "failed" };
 
 export interface PtyConnection {
   write(data: string): void;
@@ -43,30 +46,56 @@ export function connectPty(
   let live = true;
   const stops: Array<() => void> = [];
   const size = surface.size();
-  void port.open({ ...link, cols: size.cols, rows: size.rows }).then((opened) => {
-    if (!live) {
-      port.close(opened.id);
-      return;
-    }
-    id = opened.id;
-    onEvent({ kind: "opened", title: opened.title });
-    stops.push(
-      port.onData(opened.id, (bytes) => surface.write(bytes)),
-      port.onExit(opened.id, (exit) => {
-        id = undefined;
-        onEvent({ kind: "exit", exit });
-      }),
-      surface.onInput((data) => port.write(opened.id, data)),
-      surface.onResize((next) => port.resize(opened.id, next.cols, next.rows)),
-    );
-  });
+  const stopListening = (): void => {
+    for (const stop of stops.splice(0)) stop();
+  };
+  const fail = (): void => {
+    if (!live) return;
+    stopListening();
+    if (id !== undefined) port.close(id);
+    id = undefined;
+    onEvent({ kind: "failed" });
+  };
+  const remember = (stop: () => void): void => {
+    if (live) stops.push(stop);
+    else stop();
+  };
+  void Promise.resolve()
+    .then(() => (live ? port.open({ ...link, cols: size.cols, rows: size.rows }) : undefined))
+    .then((opened) => {
+      if (opened === undefined) return;
+      if (!live) {
+        port.close(opened.id);
+        return;
+      }
+      id = opened.id;
+      remember(port.onData(opened.id, (bytes) => surface.write(bytes)));
+      remember(
+        surface.onInput((data) => {
+          if (id !== undefined) port.write(id, data);
+        }),
+      );
+      remember(
+        surface.onResize((next) => {
+          if (id !== undefined) port.resize(id, next.cols, next.rows);
+        }),
+      );
+      remember(
+        port.onExit(opened.id, (exit) => {
+          id = undefined;
+          onEvent({ kind: "exit", exit });
+        }),
+      );
+      if (id !== undefined) onEvent({ kind: "opened", title: opened.title });
+    })
+    .catch(fail);
   return {
     write: (data) => {
       if (id !== undefined) port.write(id, data);
     },
     dispose: () => {
       live = false;
-      for (const stop of stops.splice(0)) stop();
+      stopListening();
       if (id !== undefined) port.close(id);
       id = undefined;
     },

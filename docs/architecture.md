@@ -78,9 +78,22 @@ queues, so the app never starts a second one.
   launch, no CORS.
 - The app never reads or writes `~/.keywork` directly. Sessions, config, memory, and
   credentials are keywork's; the app sees them through routes.
-- Onboarding reuses keywork's: when a server reports an unresolved inference (exit class 3,
-  the IR-18 `code` and `nextAction`), the app shows that text and opens a terminal pane
-  running `keywork connect`. No parallel setup flow, no credential handling in the app.
+- Onboarding offers Local, Flagship AI direct (OpenAI or Anthropic), and OpenRouter through
+  one shared setup card. A discovered local model is highlighted without changing the
+  user's choice or moving keyboard focus. Keywork can open its managed home for setup
+  before a project is open; Stead lets the keeper meet a creature and explore first.
+  Connection entry stays in the existing PTY running
+  `keywork connect --group <route> --first-model`; renderer components add no credential
+  fields or storage. The terminal transport still carries its input.
+- After successful setup, the client calls authenticated `POST /models/refresh` (contract
+  1.31) and uses the returned model for the requested activity. Creature conversation
+  reads `conversation`, whose `chat` mode permits smaller models with tools disabled by
+  the engine. Project setup continues to require `inherits.strong`. It keeps recovery visible if refresh is
+  unsupported or fails. Setup never grants project trust, restarts the shared engine,
+  or changes a running conversation. A chosen model is presented as ready to try; only
+  the normal conversation supplies evidence of a real response. The keeper explicitly
+  continues into the project or creature conversation. Advanced creature controls remain
+  available separately from the first meeting.
 
 ### AD3. The shell: Electron, with a thin main process
 

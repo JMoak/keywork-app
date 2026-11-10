@@ -6,7 +6,7 @@ import { chooseRenderer, probeWebgl2, type RendererChoice } from "./renderer.ts"
 import type { TerminalSize, TerminalSurface } from "./session.ts";
 
 export interface SurfaceOptions {
-  leader: string;
+  leader?: string;
   theme: ITheme;
   fontFamily: string;
   fontSize: number;
@@ -32,7 +32,10 @@ export function xtermSurface(container: HTMLElement, options: SurfaceOptions): X
   });
   const fit = new FitAddon();
   terminal.loadAddon(fit);
-  terminal.attachCustomKeyEventHandler((event) => terminalKeeps(event, options.leader));
+  const leader = options.leader;
+  if (leader !== undefined) {
+    terminal.attachCustomKeyEventHandler((event) => terminalKeeps(event, leader));
+  }
   terminal.open(container);
   let renderer = installRenderer(terminal, (lost) => {
     renderer = lost;

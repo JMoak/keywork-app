@@ -61,6 +61,24 @@ function modeEnvelope(id: number): BusEnvelope {
 }
 
 describe("keyworkClient routes", () => {
+  it("refreshes model setup with an authenticated body-free request", async () => {
+    const inventory = {
+      generatedAt: "2026-11-10T12:00:00.000Z",
+      nodes: [],
+      inherits: { strong: { provider: "local", model: "chosen" } },
+    };
+    const { calls, fetch } = recordingFetch(() => json(200, inventory));
+    expect(await keyworkClient(ticket, { fetch }).refreshModels()).toEqual(inventory);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:4770/models/refresh",
+        method: "POST",
+        headers: expect.objectContaining({ authorization: "Bearer t0k3n" }),
+        body: undefined,
+      },
+    ]);
+  });
+
   it("sends the bearer token on every route and trims the url", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/sessions") && call.method === "GET")

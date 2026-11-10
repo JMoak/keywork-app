@@ -106,11 +106,16 @@ export type InheritedModel =
 
 export type InheritedClasses = Readonly<Record<ModelClass, InheritedModel>>;
 
+export type ConversationModel =
+  | { provider: string; model: string; mode: "chat" | "tools"; projectCheck?: ModelTarget }
+  | InheritRefusal;
+
 export interface ModelsReport {
   generatedAt: string;
   nodes: readonly NodeModels[];
   market?: readonly MarketServerRow[];
   inherits?: InheritedClasses;
+  conversation?: ConversationModel;
 }
 
 export interface ModelProbeRequest {
@@ -148,6 +153,7 @@ export type ModelBenchReport = Readonly<Record<string, unknown>>;
 export const modelRoutes = [
   { method: "GET", path: "/models", operationId: "listModels" },
   { method: "POST", path: "/models/probe", operationId: "probeModels" },
+  { method: "POST", path: "/models/refresh", operationId: "refreshModels" },
   { method: "POST", path: "/models/acknowledgements", operationId: "acknowledgeModelLicense" },
   { method: "POST", path: "/models/bench", operationId: "benchModel" },
   { method: "GET", path: "/models/bench", operationId: "readModelBench" },

@@ -789,6 +789,7 @@ function Stead(props: PaneProps<SteadSpec>) {
         shell={props.shell}
         controller={onboarding}
         automatic={profile.startup === "creature"}
+        simple={profile.id === "stead" && props.shell.steadHome !== undefined}
       />
       <Show
         when={members().length > 0}
