@@ -85,6 +85,7 @@ export interface RanchClient {
     limit?: number,
   ): Promise<readonly RunRow[] | ServedRefusal>;
   models(node?: string): Promise<ModelsReport | ServedRefusal>;
+  refreshModels(): Promise<ModelsReport | ServedRefusal>;
   probeModels(request: ModelProbeRequest): Promise<ModelProbeReport | ServedRefusal>;
   acknowledgeModelLicense(
     request: ModelLicenseRequest,
@@ -176,6 +177,7 @@ export const ranchOperations = {
   acceptRoutineGrants: "acceptRoutineGrants",
   routineRuns: "listRoutineRuns",
   models: "listModels",
+  refreshModels: "refreshModels",
   probeModels: "probeModels",
   acknowledgeModelLicense: "acknowledgeModelLicense",
   benchModel: "benchModel",
@@ -302,6 +304,7 @@ export function ranchRoutes(request: RanchRequest): RanchClient {
         ),
       ),
     probeModels: async (probe) => answered(await request("POST", "/models/probe", probe)),
+    refreshModels: async () => answered(await request("POST", "/models/refresh")),
     acknowledgeModelLicense: async (acknowledgement) =>
       answered(await request("POST", "/models/acknowledgements", acknowledgement)),
     benchModel: async (target) => answered(await request("POST", "/models/bench", target)),

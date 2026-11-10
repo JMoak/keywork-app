@@ -157,6 +157,7 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
     if (live === undefined) return;
     const spec = JSON.parse(attachment()) as Pick<TerminalSpec, "mode" | "sessionId" | "verb">;
     setExit(undefined);
+    setFailure(undefined);
     live.reset();
     write = () => {};
     if (spec.mode === "mirror") {
@@ -170,6 +171,7 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
         : { workspace: props.shell.workspace, program: "shell" as const, args: [] };
     const connection = connectPty(live, props.shell.host.pty, link, (event) => {
       if (event.kind === "exit") setExit(event.exit);
+      if (event.kind === "failed") setFailure("the host could not open it");
     });
     write = connection.write;
     onCleanup(() => connection.dispose());

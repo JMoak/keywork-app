@@ -42,6 +42,7 @@ import {
   workshopKeys,
 } from "./copy.ts";
 import { introducingClient } from "./introduction.ts";
+import { MeetCreature } from "./meet.tsx";
 import {
   type CloudStanding,
   localFirst,
@@ -153,6 +154,7 @@ export function onboardingSeamsOf(
 export interface OnboardingOnTheSteadProps {
   readonly shell: ShellSeams;
   readonly automatic?: boolean;
+  readonly simple?: boolean;
   readonly controller?: OnboardingController;
   readonly storage?: OnboardingStorage | undefined;
   readonly seams?: Partial<OnboardingSeams> | undefined;
@@ -178,7 +180,8 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
     return kind === "making" || kind === "made" || kind === "failed";
   };
   const showing = (): boolean =>
-    controller.requested() || (onboarding.phase().kind !== "closed" && (underway() || wanted()));
+    controller.requested() ||
+    (props.simple !== true && onboarding.phase().kind !== "closed" && (underway() || wanted()));
   createEffect(
     on(
       () => onboarding.phase().kind,
@@ -191,14 +194,24 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
     if (showing()) onCleanup(controller.bind(onboarding));
   });
   return (
-    <Show when={showing()}>
-      <OnboardingCard
-        onboarding={onboarding}
-        workspace={props.shell.workspace}
-        controller={controller}
-        home={props.shell.steadHome !== undefined}
-      />
-    </Show>
+    <>
+      <Show when={props.simple && !showing()}>
+        <MeetCreature
+          shell={props.shell}
+          creatures={listed()}
+          first={wanted()}
+          onCustomize={() => controller.request()}
+        />
+      </Show>
+      <Show when={showing()}>
+        <OnboardingCard
+          onboarding={onboarding}
+          workspace={props.shell.workspace}
+          controller={controller}
+          home={props.shell.steadHome !== undefined}
+        />
+      </Show>
+    </>
   );
 }
 

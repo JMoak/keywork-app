@@ -2,6 +2,7 @@ import type { AppAction } from "../keys/actions.ts";
 import { arcsPane } from "./arcs/index.tsx";
 import { botsPane } from "./bots/index.tsx";
 import { browserPane } from "./browser/index.tsx";
+import { campaignsPane } from "./campaigns/index.tsx";
 import { choresPane } from "./chores/index.tsx";
 import { contextPane } from "./context/index.tsx";
 import { conversationPane } from "./conversation/index.tsx";
@@ -36,6 +37,7 @@ export const paneDefinitions = [
   botsPane,
   workspacesPane,
   browserPane,
+  campaignsPane,
   filePane,
   themesPane,
   permissionsPane,

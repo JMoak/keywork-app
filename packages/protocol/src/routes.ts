@@ -1,3 +1,4 @@
+import { campaignRequestBodies, campaignRoutes } from "./campaigns.ts";
 import { creatureProjectRoutes, projectThreadBody } from "./creature-projects.ts";
 import {
   creatureDraftBody,
@@ -18,7 +19,7 @@ import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.4.1";
 
-export const contractVersion = "1.29";
+export const contractVersion = "1.31";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -33,6 +34,7 @@ export interface RouteShape {
 }
 
 export const requestBodies: Readonly<Record<string, readonly string[]>> = {
+  ...campaignRequestBodies,
   startCreatureProjectThread: projectThreadBody,
   discussCreatureProjectSession: projectThreadBody,
   receiveCreatureProjectWork: [
@@ -150,6 +152,7 @@ export const routes = [
   ...workshopRoutes,
   ...meshRoutes,
   ...showRoutes,
+  ...campaignRoutes,
 ] as const satisfies readonly RouteShape[];
 
 export type OperationId = (typeof routes)[number]["operationId"];

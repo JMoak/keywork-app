@@ -1,0 +1,112 @@
+import type { Campaign, CampaignArtifact, CampaignUsage } from "./campaign-state.ts";
+
+export function campaignFixture(patch: Partial<Campaign> = {}): Campaign {
+  return {
+    schemaVersion: 1,
+    id: "campaign-one",
+    ownerScope: "workspace",
+    title: "Improve the welcome flow",
+    workload: "app-improvement",
+    createdAt: 1_000,
+    updatedAt: 2_000,
+    revision: 1,
+    status: "ready",
+    waitingReason: null,
+    statusReason: null,
+    controlRequested: null,
+    model: { providerId: "openrouter", modelId: "model-a", connectionId: null, effort: null },
+    purposeRevision: 1,
+    purposes: [
+      {
+        revision: 1,
+        outcome: "A clear welcome flow",
+        audience: "New visitors",
+        scope: ["local"],
+        references: [],
+        criteria: [{ id: "useful", description: "A visitor can finish setup", critical: true }],
+        invariants: [],
+        sufficientDelivery: "An inspected artifact",
+        createdAt: 1_000,
+      },
+    ],
+    baselineArtifactId: "baseline",
+    currentBestArtifactId: "baseline",
+    latestArtifactId: "baseline",
+    alternativeArtifactIds: [],
+    artifacts: [artifactFixture()],
+    attempts: [],
+    evidence: [],
+    evaluations: [],
+    achievements: [],
+    budget: {
+      currency: "USD",
+      limitMicros: 5_000_000,
+      evaluationReserveMicros: 500_000,
+      deliveryReserveMicros: 250_000,
+    },
+    persistence: {
+      profile: "persistent",
+      probeLimit: 8,
+      probesUsed: 5,
+      spendLimitMicros: 1_000_000,
+      spentMicros: 100_000,
+      reservedMicros: 0,
+      timeLimitMs: 600_000,
+      elapsedMs: 120_000,
+      consecutiveWithoutImprovement: 5,
+      active: true,
+      openedAt: 1_000,
+      terminationReason: null,
+    },
+    cartridges: [],
+    contexts: [],
+    usage: [],
+    decisions: [],
+    handoff: null,
+    delivery: "pending",
+    verification: "unverified",
+    ...patch,
+  };
+}
+
+export function artifactFixture(patch: Partial<CampaignArtifact> = {}): CampaignArtifact {
+  return {
+    schemaVersion: 1,
+    id: "baseline",
+    kind: "report",
+    title: "Starting artifact",
+    digest: "sha256:baseline",
+    parentIds: [],
+    storageRef: "artifacts/baseline",
+    ownerScope: "workspace",
+    producerAttemptId: null,
+    createdAt: 1_000,
+    entries: [
+      { path: "report.md", digest: "sha256:baseline", sizeBytes: 50, mediaType: "text/markdown" },
+    ],
+    capabilities: ["inspect", "export"],
+    ...patch,
+  };
+}
+
+export function usageFixture(patch: Partial<CampaignUsage> = {}): CampaignUsage {
+  return {
+    id: "usage-one",
+    operationId: "operation-one",
+    attemptId: null,
+    providerRequestId: null,
+    stage: "review",
+    model: null,
+    currency: "USD",
+    reservedMicros: 500_000,
+    costMicros: null,
+    state: "reserved",
+    costSource: "provider",
+    pricingAt: 1_000,
+    recordedAt: 2_000,
+    inputTokens: null,
+    outputTokens: null,
+    cachedTokens: null,
+    ...patch,
+  };
+}

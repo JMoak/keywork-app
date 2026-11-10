@@ -60,6 +60,11 @@
     "reason": "the pty program id main maps to the engine binary; never rendered"
   },
   {
+    "path": "packages/ui/src/model-setup/terminal.tsx",
+    "pattern": "^\\s*program: \"keywork\",$",
+    "reason": "The existing PTY program identifier selects the engine binary; it is never rendered as a product label."
+  },
+  {
     "path": "packages/ui/src/renderer.tsx",
     "pattern": "^const profile = productProfiles\\[host\\?\\.productId \\?\\? \"keywork\"\\];$",
     "reason": "Default product identifier when running the renderer outside the desktop host."
