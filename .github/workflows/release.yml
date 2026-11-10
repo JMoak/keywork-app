@@ -36,11 +36,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   verify:
+    if: github.ref_type != 'tag'
     uses: ./.github/workflows/ci.yml
 
   build:
     needs: [plan, verify]
-    if: needs.plan.outputs.publish == 'true'
+    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && (needs.verify.result == 'success' || (github.ref_type == 'tag' && needs.verify.result == 'skipped')) }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -79,7 +80,10 @@ jobs:
         if: ${{ matrix.target == 'macos' && env.MAC_CSC_LINK == '' }}
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
       - name: package ${{ matrix.target }} (signed and notarized only when the secrets are set)
-        run: bun run --cwd packages/desktop pack
+        shell: bash
+        run: |
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK; fi
+          bun run --cwd packages/desktop pack
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
@@ -114,6 +118,7 @@ jobs:
 
   publish:
     needs: [plan, build]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -1,6 +1,12 @@
 {
   "name": "@keywork-app/desktop",
   "version": "0.2.2",
+  "description": "Native desktop client for the Keywork coding-agent harness.",
+  "author": {
+    "name": "Jordan Moak",
+    "email": "jordan.moak@gmail.com"
+  },
+  "homepage": "https://github.com/JMoak/keywork-app",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
