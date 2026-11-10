@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { appendFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { analyzeCommits } from "@semantic-release/commit-analyzer";
-import { gt, gte, inc, valid } from "semver";
+import { gt, gte, inc, rcompare, valid } from "semver";
 import { repoRoot } from "./lib/repo-files.ts";
 
 export interface ReleasePlan {
@@ -23,10 +23,16 @@ export interface ReleaseInput {
   refType: string;
   refName: string;
   latestTag?: string;
+  existingTag?: string;
   commits: readonly { hash: string; message: string }[];
 }
 
 export async function planRelease(input: ReleaseInput): Promise<ReleasePlan | undefined> {
+  if (input.refType !== "tag" && input.refName !== "main")
+    throw new Error("Automatic releases require main");
+  if (input.existingTag !== undefined) {
+    return { version: versionOfTag(input.existingTag), tag: input.existingTag };
+  }
   const latest = input.latestTag === undefined ? undefined : versionOfTag(input.latestTag);
   if (input.refType === "tag") {
     const version = versionOfTag(input.refName);
@@ -36,7 +42,6 @@ export async function planRelease(input: ReleaseInput): Promise<ReleasePlan | un
     }
     return { version, tag: input.refName };
   }
-  if (input.refName !== "main") throw new Error("Automatic releases require main");
   if (latest === undefined) return undefined;
   const bump = await analyzeCommits(
     {
@@ -52,6 +57,13 @@ export async function planRelease(input: ReleaseInput): Promise<ReleasePlan | un
   const version = inc(latest, bump);
   if (version === null) throw new Error(`Cannot increment ${latest} by ${bump}`);
   return { version, tag: `v${version}` };
+}
+
+export function releaseTags(tags: readonly string[]): string[] {
+  return tags
+    .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag) && valid(tag.slice(1)) !== null)
+    .filter((tag) => gte(tag.slice(1), "0.2.2"))
+    .sort((left, right) => rcompare(left.slice(1), right.slice(1)));
 }
 
 export function versionOfTag(tag: string): string {
@@ -125,15 +137,19 @@ async function run(): Promise<void> {
   const sha = git("rev-parse", "HEAD");
   if (sha !== process.env.GITHUB_SHA)
     throw new Error("Checkout does not match the workflow commit");
-  if (process.argv[2] === "publish") {
+  if (process.argv[2] === "publish" || process.argv[2] === "reserve") {
     const tag = process.env.RELEASE_TAG ?? "";
     versionOfTag(tag);
-    await publishRelease(repository, tag, sha);
+    if (process.argv[2] === "reserve") await reserveReleaseTag(repository, tag, sha);
+    else await publishRelease(repository, tag, sha);
     return;
   }
-  if (process.argv[2] !== "plan") throw new Error("Expected plan, version, or publish");
-  const latestTag = await latestReleaseTag(repository);
-  if (latestTag !== undefined) {
+  if (process.argv[2] !== "plan") throw new Error("Expected plan, version, reserve, or publish");
+  const tags = releaseTags(git("tag", "--list", "v*").split("\n"));
+  const existingTag = refType === "tag" ? refName : tags.find((tag) => tagCommit(tag) === sha);
+  if (existingTag !== undefined) requireTagCommit(existingTag, sha, tagCommit(existingTag));
+  const latestTag = tags[0] ?? (await latestReleaseTag(repository));
+  if (latestTag !== undefined && existingTag === undefined) {
     versionOfTag(latestTag);
     git("merge-base", "--is-ancestor", `refs/tags/${latestTag}`, "HEAD");
     if (latestTag === refName) requireTagCommit(latestTag, sha, tagCommit(latestTag));
@@ -142,7 +158,8 @@ async function run(): Promise<void> {
     refType,
     refName,
     ...(latestTag === undefined ? {} : { latestTag }),
-    commits: latestTag === undefined ? [] : commitsSince(latestTag),
+    ...(existingTag === undefined ? {} : { existingTag }),
+    commits: latestTag === undefined || existingTag !== undefined ? [] : commitsSince(latestTag),
   });
   if (plan !== undefined) requireTagCommit(plan.tag, sha, tagCommit(plan.tag));
   const output = process.env.GITHUB_OUTPUT;
@@ -153,8 +170,8 @@ async function run(): Promise<void> {
   );
   const summary =
     plan === undefined
-      ? "No release is due. Main requires the published v0.2.2 baseline and an unreleased conventional release commit."
-      : `Release ${plan.tag} from ${sha} after all desktop and SDK checks pass.`;
+      ? "No release is due. Main requires a stable release tag and an unreleased conventional release commit."
+      : `Release ${plan.tag} from ${sha}; SDK and native installers publish independently after verification.`;
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY !== undefined) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
@@ -172,7 +189,7 @@ async function latestReleaseTag(repository: string): Promise<string | undefined>
   return release.tag_name;
 }
 
-async function publishRelease(repository: string, tag: string, sha: string): Promise<void> {
+async function reserveReleaseTag(repository: string, tag: string, sha: string): Promise<void> {
   const ref = await github<{ object: { sha: string; type: string } }>(
     repository,
     `git/ref/tags/${tag}`,
@@ -183,6 +200,10 @@ async function publishRelease(repository: string, tag: string, sha: string): Pro
   } else {
     await github(repository, "git/refs", { ref: `refs/tags/${tag}`, sha });
   }
+}
+
+async function publishRelease(repository: string, tag: string, sha: string): Promise<void> {
+  await reserveReleaseTag(repository, tag, sha);
   const release = await releaseForTag(repository, tag);
   if (release !== undefined && !release.draft) {
     if (release.prerelease) throw new Error(`${tag} is already published as a prerelease`);
@@ -211,6 +232,7 @@ async function publishRelease(repository: string, tag: string, sha: string): Pro
     gh("release", "delete-asset", tag, asset, "--repo", repository, "--yes");
   }
   gh("release", "upload", tag, "--repo", repository, "--clobber", ...assets);
+  const latest = await latestReleaseTag(repository);
   gh(
     "release",
     "edit",
@@ -219,7 +241,7 @@ async function publishRelease(repository: string, tag: string, sha: string): Pro
     repository,
     "--draft=false",
     "--prerelease=false",
-    "--latest",
+    `--latest=${latest === undefined || gt(versionOfTag(tag), versionOfTag(latest))}`,
   );
 }
 

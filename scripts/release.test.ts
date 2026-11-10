@@ -8,6 +8,7 @@ import {
   obsoleteSdkAssets,
   planRelease,
   releaseForTag,
+  releaseTags,
   requireTagCommit,
   versionOfTag,
 } from "./release.ts";
@@ -103,9 +104,51 @@ describe("planRelease", () => {
       }),
     ).rejects.toThrow("require main");
   });
+
+  it("reuses the source commit's reserved version after partial publication", async () => {
+    for (const latestTag of ["v0.3.0", "v0.4.0"]) {
+      await expect(
+        planRelease({
+          refType: "branch",
+          refName: "main",
+          latestTag,
+          existingTag: "v0.3.0",
+          commits: commits("feat: already reserved"),
+        }),
+      ).resolves.toEqual({ version: "0.3.0", tag: "v0.3.0" });
+    }
+  });
+
+  it("advances beyond a reserved SDK version while its installers are unfinished", async () => {
+    await expect(
+      planRelease({
+        refType: "branch",
+        refName: "main",
+        latestTag: "v0.3.0",
+        commits: commits("fix: repair the published SDK"),
+      }),
+    ).resolves.toEqual({ version: "0.3.1", tag: "v0.3.1" });
+  });
+
+  it("retries an older tagged release without assigning a new version", async () => {
+    await expect(
+      planRelease({
+        refType: "tag",
+        refName: "v0.3.0",
+        latestTag: "v0.4.0",
+        existingTag: "v0.3.0",
+        commits: [],
+      }),
+    ).resolves.toEqual({ version: "0.3.0", tag: "v0.3.0" });
+  });
 });
 
 describe("release identity", () => {
+  it("uses stable reserved tags in semantic order and ignores unrelated tags", () => {
+    expect(
+      releaseTags(["v0.2.1", "v0.3.0", "v0.10.0", "v0.4.0-beta.1", "v01.0.0", "other"]),
+    ).toEqual(["v0.10.0", "v0.3.0"]);
+  });
   it("removes only obsolete SDK assets from an unfinished draft", () => {
     const current = ["sdk-0123456789ab.tgz", "sdk-0123456789ab.tgz.sha256"];
     const previous = ["sdk-abcdef012345.tgz", "sdk-abcdef012345.tgz.sha256"];
