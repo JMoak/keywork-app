@@ -18,11 +18,13 @@ export function runtimeFailure(output: string): { message: string; nextAction: s
 function recoveryText(recovery: unknown): string {
   switch (recovery) {
     case "update-products":
-      return "Use matching app releases. An incompatible shared-engine upgrade requires the maintenance steps in the upgrade guide.";
+      return "Update the app that does not support the shared engine's contract. Incompatible engine changes require the maintenance steps in the upgrade guide.";
+    case "update-bootstrap":
+      return "Install an updated app release with shared-runtime compatibility support. The installed engine and current work have been left unchanged.";
     case "close-clients":
-      return "Close the other app windows before updating the shared engine.";
+      return "Close the other app windows, then follow the upgrade guide to stop the shared engine before applying its update.";
     case "finish-work":
-      return "Finish current tasks, then follow the upgrade guide to explicitly stop serving the affected workspaces.";
+      return "Finish current tasks, then follow the upgrade guide to stop the shared engine before applying its update.";
     case "start-runtime":
       return "Enable background work to prepare the shared engine.";
     case "new-client":

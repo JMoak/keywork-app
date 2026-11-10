@@ -851,12 +851,23 @@ describe("the node the packaged console hands folders to", () => {
       run: async (binary, args, cwd) => {
         expect(binary).toBe(sidecarPath);
         runs.push({ args, cwd });
+        if (args[1] === "status")
+          return {
+            code: 0,
+            output: JSON.stringify({
+              runtimeCompatibility: 1,
+              registration: { installed: true },
+              liveness: "running",
+              node: null,
+            }),
+          };
         return { code: 0, output: "" };
       },
     });
     await serving.add("C:/src/notes");
     await serving.remove("C:/src/notes");
     expect(runs).toEqual([
+      { args: ["node", "status", "--json"], cwd: undefined },
       {
         args: [
           "node",
@@ -869,6 +880,8 @@ describe("the node the packaged console hands folders to", () => {
           "client-one",
           "--console",
           "7300",
+          "--contract",
+          expectedContract,
           "--json",
         ],
         cwd: undefined,
@@ -1066,7 +1079,7 @@ describe("managed home and client leases", () => {
         kind: "unresolved",
         message: "The shared contract differs.",
         nextAction:
-          "Use matching app releases. An incompatible shared-engine upgrade requires the maintenance steps in the upgrade guide.",
+          "Update the app that does not support the shared engine's contract. Incompatible engine changes require the maintenance steps in the upgrade guide.",
       },
     });
     expect(h.processes).toEqual([]);

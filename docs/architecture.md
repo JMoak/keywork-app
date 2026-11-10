@@ -29,12 +29,13 @@ surface. Consequences:
 - The contract is the wire: `docs/events.md` (the twenty-one bus events and their envelope)
   and the OpenAPI document at `/doc`. The app's `protocol` package mirrors both, and a
   contract check against a real `keywork serve` fails the build when they drift.
-- The contract is also the identity of an engine at run time. The installed console runs the
-  engine it ships (its sidecar, never PATH; a development build takes `KEYWORK_BIN`, then the
-  sibling checkout through bun, then PATH), and before it uses an attached ticket or a server
-  it spawned it reads `info.x-keywork-contract` from `/doc` and refuses a mismatch in the
-  keeper's words, naming both contracts and where the engine came from
-  (adr.the-installed-console-runs-the-engine-it-ships).
+- The contract identifies the wire the client supports. A packaged console uses its bundled
+  engine as the lifecycle bootstrap and immutable installation candidate; the engine selects
+  a verified compatible shared runtime, which can be a different release. Before using any
+  attached ticket or spawned server, the app reads `info.x-keywork-contract` from `/doc` and
+  requires its exact authored contract. Contract `1.28` does not imply support for `1.29`.
+  A development build's existing `KEYWORK_BIN`, sibling checkout, and PATH launch order remains
+  separate from packaged lifecycle admission.
 - When the app needs something the server lacks, **the server grows**, as a task in the
   keywork repo (`docs/plan.md`, server lane). The app never re-implements the missing piece.
 - Ratchet: `scripts/check-guardrails.ts` fails on any import of `@keywork/engine`,
@@ -57,11 +58,22 @@ queues, so the app never starts a second one.
   first answer to an ask wins and the other client sees the resulting `gate.permission`.
   Context and memory stay single-writer because the server is the only writer.
 - The app bundles the same single-file `keywork` binary every release ships (Bun-compiled,
-  per platform, checksummed) as its sidecar, and a packaged app runs that sidecar and nothing
-  else: PATH is never consulted. A development build takes `KEYWORK_BIN`, then the sibling
-  checkout's CLI through bun (`KEYWORK_REPO`, else `../keywork`, as `check:contract` finds it),
-  then PATH. A contract other than the app's is shown, never silently papered over
-  (adr.the-installed-console-runs-the-engine-it-ships).
+  per platform, checksummed). Packaged lifecycle commands invoke that trusted bootstrap,
+  never PATH. `node status --json` advertises `runtimeCompatibility: 1` when it supports
+  `--contract <expectedContract>` on consumer installation and client attachment. The app
+  probes once per preparation or workspace attachment and reuses that capability for lease
+  renewals. Runtime selection, artifact verification, consumer admission, and safe replacement
+  remain engine responsibilities. A running compatible engine is reused while a newer candidate
+  is deferred. Activation requires an explicit stop, with its supervisor and recorded children
+  stopped; closing app windows alone is insufficient. The app does not restart or downgrade it.
+- A bundled engine without the recognized capability marker is refused before any installation
+  or attachment, even if its status reports an empty or matching runtime: old status cannot
+  establish the persisted runtime registry's identity. Unsupported requirement flags are never
+  retried without their requirement. This SDK requires the compatible engine implementation to
+  be published and adopted into the app's verified bundle before shipping; changing the SDK
+  alone does not upgrade an old bootstrap. Earlier app registrations retain their original
+  exact-version requirements until that app is updated. The desktop has no release-version
+  threshold or alternate state directory to bypass this transition.
 - The server's security posture is inherited unchanged: `127.0.0.1` only, bearer token per
   launch, no CORS.
 - The app never reads or writes `~/.keywork` directly. Sessions, config, memory, and

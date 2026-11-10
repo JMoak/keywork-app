@@ -59,4 +59,25 @@ subagent writing keywork-app code; the perspective is the point.
   `.map` in JSX is a bug. Signals are read by calling them; a stray `count` where `count()`
   was meant renders `[Function]`. Stores update through `setStore` paths or `produce`, never
   by mutation. Tests use `@solidjs/testing-library` and `createRoot` for reactive units.
-- `bun run check && bun run test` must be green before any task is called done.
+- Run focused tests and relevant static checks for the changed behavior locally. CI owns
+  the full `bun run check && bun run test` gate; do not repeat the full suite locally unless
+  a failure or the change's risk warrants it. Report local results and CI status separately.
+
+## Development and release flow
+
+- Optimize for frequent, independent releases through published dependencies. Exact pins
+  and lockfiles provide reproducibility; automate their advancement rather than adding
+  sibling-checkout requirements or coordinating every product release.
+- Keep client compatibility requirements independently authored. Derive bundled engine
+  identity and checksums from verified producer metadata as package ownership is adopted;
+  never change the expected contract merely to make a dependency update pass.
+- Treat the bundled engine as an installation candidate, not a demand that the shared
+  runtime use that exact release. The engine owns compatibility admission, safe replacement,
+  and persistent state. Desktop startup must not duplicate those decisions, force a
+  downgrade, interrupt background work, or delete state to make an upgrade succeed.
+- Keep SDK publication independent of downstream consumer releases and unrelated installer
+  jobs. Preserve the immutable source/version relationship between SDKs and installers.
+  Avoid duplicate manual pins and new cross-repository services or credentials without a
+  demonstrated requirement.
+- Distinguish publication, dependency adoption, and runtime activation in status reports.
+  A published version does not prove that a consumer or a running machine has adopted it.
