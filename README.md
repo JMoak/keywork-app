@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/keywork-app-hero.svg" alt="keywork — native desktop workbench. An abstract tiled window and Ctrl/K keycaps in the app's night-theme palette." width="100%">
+  <img src="docs/assets/keywork-app-hero.svg" alt="keywork · app — the terminal learned to typeset. The original density mark and serif typography beside luminous layered panes in violet, blue, and cyan." width="100%">
 </p>
 
 <p align="center">
@@ -42,7 +42,7 @@ The app is a client of `keywork serve`. Sessions, tools, permissions, memory, an
 
 The default leader is **Ctrl+K**. Pane actions include focus, summon, dock, move, rotate, and zoom. The command palette and key hints expose the same action definitions, and terminals and editors can own their keyboard input when focused.
 
-Themes come from Keywork's shared theme system. Window chrome, individual work panes, code, terminal output, and prose use the same token vocabulary. The header above is an illustration in the `keywork-night` palette, not an application screenshot.
+Themes come from Keywork's shared theme system. Window chrome, individual work panes, code, terminal output, and prose use the same token vocabulary. The header extends the typography, density mark, and palette of the [Keywork site](https://moak.dev/keywork) and [app page](https://moak.dev/keywork/app). It is a brand illustration, not an application screenshot.
 
 ## Run from source
 
