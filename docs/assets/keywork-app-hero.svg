@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title desc">
+<title id="title">keywork — native desktop workbench</title>
+<desc id="desc">Keywork's night-theme palette, a large lowercase wordmark, an abstract tiled desktop and sculpted Ctrl and K keycaps. This is a brand illustration, not an application screenshot.</desc>
+<metadata>Palette source: packages/ui/src/theme/gallery.json, keywork-night. Header artwork only; no product theme overrides.</metadata>
+<defs><style>:root{--kw-background:#1a1b26;--kw-panel:#1f2335;--kw-panelLift:#24283b;--kw-text:#c0caf5;--kw-textMid:#828bb8;--kw-textDim:#565f89;--kw-border:#3b4261;--kw-borderFocus:#bb9af7;--kw-accent:#bb9af7;--kw-accentSoft:#9d7cd8;--kw-success:#9ece6a;--kw-error:#f7768e;--kw-blue:#7aa2f7;--kw-cyan:#7dcfff;}</style><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r=".7" fill="var(--kw-textDim)" opacity=".16"/></pattern><linearGradient id="keyface" x2="0" y2="1"><stop stop-color="var(--kw-panelLift)"/><stop offset="1" stop-color="var(--kw-panel)"/></linearGradient></defs>
+<rect width="1280" height="440" rx="8" fill="var(--kw-background)"/>
+<rect x="1" y="1" width="1278" height="438" rx="8" fill="url(#dots)" stroke="var(--kw-border)"/>
+<g transform="translate(66 72)" fill="none" stroke="var(--kw-accent)" stroke-width="2"><rect width="36" height="28" rx="3"/><path d="M12 0V28M12 18H36"/></g>
+<text x="60" y="242" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="116" font-weight="650" letter-spacing="-6" fill="var(--kw-text)">keywork</text>
+<text x="68" y="294" font-family="Consolas, 'Liberation Mono', monospace" font-size="22" fill="var(--kw-textMid)">Native desktop workbench.</text>
+<path d="M66 355h42" stroke="var(--kw-accent)" stroke-width="3"/>
+<g transform="translate(700 70)">
+  <rect x="18" y="18" width="482" height="266" rx="12" fill="var(--kw-panel)" stroke="var(--kw-border)" opacity=".45"/>
+  <rect width="482" height="266" rx="10" fill="var(--kw-panel)" stroke="var(--kw-border)" stroke-width="1.5"/>
+  <path d="M0 32H482M91 32V266M341 32V266M91 204H341" fill="none" stroke="var(--kw-border)"/>
+  <circle cx="19" cy="16" r="3" fill="var(--kw-accent)"/><circle cx="32" cy="16" r="3" fill="var(--kw-textDim)"/><circle cx="45" cy="16" r="3" fill="var(--kw-textDim)"/>
+  <rect x="19" y="54" width="52" height="5" rx="2.5" fill="var(--kw-textMid)"/>
+  <g fill="var(--kw-textDim)"><rect x="20" y="82" width="34" height="4" rx="2"/><rect x="20" y="103" width="45" height="4" rx="2"/><rect x="29" y="124" width="40" height="4" rx="2"/><rect x="29" y="145" width="28" height="4" rx="2"/></g>
+  <rect x="110" y="51" width="75" height="5" rx="2.5" fill="var(--kw-accent)"/>
+  <g fill="var(--kw-textMid)"><rect x="110" y="79" width="205" height="5" rx="2.5"/><rect x="110" y="93" width="182" height="5" rx="2.5"/><rect x="110" y="107" width="130" height="5" rx="2.5"/></g>
+  <rect x="110" y="133" width="212" height="49" rx="5" fill="var(--kw-panelLift)"/>
+  <path d="M122 147l5 5-5 5" fill="none" stroke="var(--kw-cyan)" stroke-width="2"/><rect x="138" y="151" width="140" height="3" rx="1.5" fill="var(--kw-textMid)"/>
+  <path d="M111 222l5 5-5 5" fill="none" stroke="var(--kw-success)" stroke-width="2"/><rect x="127" y="225" width="74" height="4" rx="2" fill="var(--kw-textMid)"/>
+  <g fill="var(--kw-textDim)"><rect x="359" y="54" width="63" height="5" rx="2.5"/><rect x="359" y="83" width="103" height="4" rx="2"/><rect x="370" y="98" width="73" height="4" rx="2"/><rect x="370" y="113" width="85" height="4" rx="2"/></g>
+  <rect x="355" y="134" width="112" height="19" rx="3" fill="var(--kw-success)" opacity=".12"/><rect x="370" y="142" width="80" height="4" rx="2" fill="var(--kw-success)"/>
+  <rect x="355" y="160" width="112" height="19" rx="3" fill="var(--kw-error)" opacity=".1"/><rect x="370" y="168" width="63" height="4" rx="2" fill="var(--kw-error)"/>
+</g>
+<g transform="translate(870 290)">
+  <path d="M0 23Q0 12 12 12H130Q142 12 142 23V88Q142 100 130 100H12Q0 100 0 88Z" fill="var(--kw-background)" stroke="var(--kw-border)" stroke-width="2"/>
+  <rect width="142" height="82" rx="12" fill="url(#keyface)" stroke="var(--kw-textDim)" stroke-width="1.5"/>
+  <rect x="10" y="8" width="122" height="61" rx="9" fill="var(--kw-panelLift)" stroke="var(--kw-border)"/>
+  <text x="71" y="48" text-anchor="middle" font-family="Consolas, monospace" font-size="25" fill="var(--kw-text)">Ctrl</text>
+</g>
+<g transform="translate(1026 290)">
+  <path d="M0 23Q0 12 12 12H70Q82 12 82 23V88Q82 100 70 100H12Q0 100 0 88Z" fill="var(--kw-accentSoft)" stroke="var(--kw-accentSoft)" stroke-width="2"/>
+  <rect width="82" height="82" rx="12" fill="var(--kw-accent)"/>
+  <rect x="9" y="8" width="64" height="61" rx="9" fill="var(--kw-accent)" stroke="var(--kw-text)" stroke-opacity=".4"/>
+  <text x="41" y="50" text-anchor="middle" font-family="Consolas, monospace" font-size="31" fill="var(--kw-background)">K</text>
+</g>
+</svg>
