@@ -29,6 +29,11 @@ export interface ActionTarget {
   switchCompanion(creature: string | undefined): void;
   closePane(): void;
   zoomPane(): void;
+  floatPane(): void;
+  shelvePane(): void;
+  returnFromShelf(): void;
+  pinPane(): void;
+  focusAcrossLayers(): void;
   rotatePane(): void;
   focusToward(direction: Direction): void;
   focusOrdinal(ordinal: number): void;
@@ -87,6 +92,52 @@ export const coreActions: Record<string, AppAction> = {
     hotPath: true,
     invoke: (target) => target.zoomPane(),
     command: { name: "zoom", description: "zoom the focused pane" },
+  },
+  "pane.float": {
+    chords: "leader space",
+    help: "float this pane over the tiling (toggle)",
+    invoke: (target) => target.floatPane(),
+    command: {
+      name: "float-pane",
+      description: "lift this pane to float over the tiling; again settles it where it sat",
+      aliases: ["lift", "settle"],
+    },
+  },
+  "focus.layer": {
+    chords: "leader tab",
+    help: "step between the tiling and what floats",
+    invoke: (target) => target.focusAcrossLayers(),
+    command: {
+      name: "float-next",
+      description: "step from the tiling through each floating pane and back",
+    },
+  },
+  "pane.shelve": {
+    chords: "leader -",
+    help: "shelve this pane: out of the way, still running",
+    invoke: (target) => target.shelvePane(),
+    command: {
+      name: "shelve",
+      description: "put this pane on the shelf; it keeps running and keeps its place",
+    },
+  },
+  "pane.unshelve": {
+    chords: "leader =",
+    help: "bring back the last pane from the shelf",
+    invoke: (target) => target.returnFromShelf(),
+    command: {
+      name: "unshelve",
+      description: "bring the last pane to leave for the shelf back where it sat",
+    },
+  },
+  "pane.pin": {
+    chords: "leader '",
+    help: "pin this pane: the last to leave when room runs out",
+    invoke: (target) => target.pinPane(),
+    command: {
+      name: "pin",
+      description: "keep this pane on the stage when room runs out; again unpins it",
+    },
   },
   "pane.rotate": {
     chords: "leader r",

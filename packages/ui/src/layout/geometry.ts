@@ -44,7 +44,40 @@ export function nearestInDirection<Id>(
   return best?.id;
 }
 
+export function nearestTowards<Id>(
+  from: Rect,
+  candidates: Iterable<readonly [Id, Rect]>,
+  direction: Direction,
+): Id | undefined {
+  const origin = centerOf(from);
+  let best: { id: Id; distance: number } | undefined;
+  for (const [id, rect] of candidates) {
+    const target = centerOf(rect);
+    if (!leadsTowards(origin, target, direction)) continue;
+    const distance = (origin.x - target.x) ** 2 + (origin.y - target.y) ** 2;
+    if (best === undefined || distance < best.distance) best = { id, distance };
+  }
+  return best?.id;
+}
+
 const wideAspect = 1.2;
+
+function leadsTowards(
+  origin: { x: number; y: number },
+  target: { x: number; y: number },
+  direction: Direction,
+): boolean {
+  switch (direction) {
+    case "left":
+      return target.x < origin.x;
+    case "right":
+      return target.x > origin.x;
+    case "up":
+      return target.y < origin.y;
+    case "down":
+      return target.y > origin.y;
+  }
+}
 
 function centerOf(rect: Rect): { x: number; y: number } {
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };

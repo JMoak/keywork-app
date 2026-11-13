@@ -22,6 +22,7 @@ import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { PaneShelf, type ShelfItem } from "../chrome/pane-shelf.tsx";
 import { useProductProfile } from "../chrome/product.ts";
 import { readingMs } from "../chrome/reading-time.ts";
 import { gapCells } from "../chrome/root-attributes.ts";
@@ -235,6 +236,13 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const [ordinalsShown, setOrdinalsShown] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
+  const [changingLayer, setChangingLayer] = createSignal<PaneId>();
+  const floatFocused = (): Verdict => {
+    const pane = tiler.focused();
+    setChangingLayer(pane);
+    setTimeout(() => setChangingLayer((held) => (held === pane ? undefined : held)), layerChangeMs);
+    return tiler.float(screen());
+  };
   const localHandlers = new Map<PaneId, PaneActionHandler>();
   const awaitingHandlers = new Map<PaneId, () => void>();
   const closeGate = createCloseGate();
@@ -258,8 +266,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (isSurfaceRefusal(answer)) say(`${answer.detail} · worn in this window only`);
   };
   const act = (verdict: Verdict, otherwise?: string): void => {
-    if (verdict.ok) return;
-    const line = verdict.notice ?? otherwise;
+    const line = verdict.ok ? verdict.notice : (verdict.notice ?? otherwise);
     if (line !== undefined) say(line);
   };
 
@@ -515,21 +522,16 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (!keyboard.restore()) keyboard.returnHome();
   };
   const show = (spec: PaneSpec, variant?: string): void => {
-    const shown = tiler.summon(spec, screen(), variant);
-    const full = !shown.ok && shown.refused === "no-room";
-    if (full && spec.kind === "conversation") showInPlaceOfLastConversation(spec, shown);
-    else act(shown);
+    const full = spec.kind === "conversation" && tiler.crowds(spec, screen(), variant);
+    const lastUsed = full ? tiler.lastFocusedOf("conversation") : undefined;
+    if (lastUsed === undefined) act(tiler.summon(spec, screen(), variant));
+    else showInPlaceOf(lastUsed, spec);
   };
-  const showInPlaceOfLastConversation = (spec: PaneSpec, refusal: Verdict): void => {
-    const pane = tiler.lastFocusedOf("conversation");
-    const left = pane === undefined ? undefined : tiler.spec(pane);
-    if (pane === undefined || left === undefined) {
-      act(refusal);
-      return;
-    }
+  const showInPlaceOf = (pane: PaneId, spec: PaneSpec): void => {
+    const left = tiler.spec(pane);
     tiler.bind(pane, spec);
     act(tiler.focus(pane));
-    if (left.kind === "conversation" && left.sessionId !== undefined)
+    if (left?.kind === "conversation" && left.sessionId !== undefined)
       say(
         refusalNotices.shownInstead(paneTitle(spec), paneTitle(left), keys.describe("tree.summon")),
       );
@@ -674,7 +676,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     switchCompanion: companion.switchTo,
     closePane: closeFocusedPane,
     zoomPane: () => reshape(() => tiler.zoom(), refusalNotices.nothingFocused),
-    rotatePane: () => reshape(() => tiler.rotate(), refusalNotices.nothingToRotate),
+    floatPane: () => reshape(floatFocused, refusalNotices.nothingFocused),
+    shelvePane: () => reshape(() => tiler.shelve(), refusalNotices.nothingFocused),
+    returnFromShelf: () => reshape(() => tiler.returnFromShelf(screen())),
+    pinPane: () => reshape(() => tiler.pin(), refusalNotices.nothingFocused),
+    focusAcrossLayers: () => reshape(() => tiler.focusAcrossLayers(screen())),
+    rotatePane: () => reshape(() => tiler.rotate(screen()), refusalNotices.nothingToRotate),
     focusToward,
     focusOrdinal: (ordinal) =>
       act(tiler.focusOrdinal(ordinal), refusalNotices.noPaneNumbered(ordinal)),
@@ -905,6 +912,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const applyGesture = (intent: PointerIntent): void => {
     if (intent.type === "focus") act(tiler.focus(intent.id));
     else if (intent.type === "resize") act(tiler.resizeSeam(intent.handle, intent.ratio, screen()));
+    else if (intent.type === "place") act(tiler.placeFloat(intent.id, intent.rect, screen()));
     else act(tiler.send(intent.id, intent.zone, screen()));
   };
 
@@ -980,7 +988,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   });
   createEffect(on(tiler.version, settleKeyboardSoon, { defer: true }));
 
-  const titleOf = (slot: PaneSlot): string => paneTitle(slot.spec);
+  const titleOf = (slot: Pick<PaneSlot, "spec">): string => paneTitle(slot.spec);
   const titleOfPane = (id: PaneId): string => {
     const slot = slots().find((held) => held.id === id);
     return slot === undefined ? "" : titleOf(slot);
@@ -1027,11 +1035,38 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     return state.phase === "dragging" ? state : undefined;
   };
   const dropZones = () => Object.entries(dropZoneRects(scene())) as [DropZone, Rect][];
+  const benched = createMemo((): PaneSlot[] =>
+    focusedPaneHub()
+      ? []
+      : tiler.shelf(screen()).map(({ id, spec, spawnRank }) => ({
+          id,
+          spec,
+          spawnRank,
+          focused: false,
+          rect: { x: 0, y: 0, ...screen() },
+        })),
+  );
+  const onShelf = (id: PaneId): boolean => benched().some((slot) => slot.id === id);
+  const shelfItems = createMemo((): ShelfItem[] =>
+    focusedPaneHub()
+      ? []
+      : tiler.shelf(screen()).map((entry) => {
+          const slot = benched().find((held) => held.id === entry.id);
+          return {
+            id: entry.id,
+            name: titleOf(entry),
+            ordinal: entry.spawnRank + 1,
+            why: entry.why,
+            pinned: entry.pinned,
+            state: slot === undefined ? "idle" : lifecycleOf(slot),
+          };
+        }),
+  );
   const paneIds = createMemo<readonly PaneId[]>(
     (shown) =>
       keptInPlace(
         shown,
-        slots().map((slot) => slot.id),
+        [...slots(), ...benched()].map((slot) => slot.id),
       ),
     [],
   );
@@ -1039,8 +1074,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     new Map(slots().flatMap((slot) => (tabbedAway(slot.id) ? [] : [[slot.id, slot.rect]])));
   const ordinalChord = (slot: PaneSlot): string | undefined =>
     slot.spawnRank < 9 ? keys.describe(`focus.pane${slot.spawnRank + 1}`) : undefined;
-  const hiddenByZoom = (): number => (tiler.zoomed() === undefined ? 0 : tiler.panes().length - 1);
-  const slotOf = (id: PaneId): PaneSlot | undefined => slots().find((slot) => slot.id === id);
+  const hiddenByZoom = (): number =>
+    tiler.zoomed() === undefined ? 0 : tiler.panes().length - slots().length - benched().length;
+  const slotOf = (id: PaneId): PaneSlot | undefined =>
+    slots().find((slot) => slot.id === id) ?? benched().find((slot) => slot.id === id);
   const needsYouPaneOpen = () => slots().some((slot) => slot.spec.kind === "needs-you");
   const focusedProjection = (): SessionProjection =>
     tiler.focusedSpec()?.kind === "conversation"
@@ -1069,9 +1106,15 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         class="kw-slot"
         data-pane-id={slot().id}
         data-lantern={yard.lanternOn(slot().spec) ? "" : undefined}
-        hidden={tabbedAway(slot().id) ? true : undefined}
+        data-floating={slot().floating === undefined ? undefined : ""}
+        data-changing-layer={changingLayer() === slot().id ? "" : undefined}
+        hidden={tabbedAway(slot().id) || onShelf(slot().id) ? true : undefined}
         tabIndex={-1}
-        style={{ ...rectStyle(slot().rect), outline: "none" }}
+        style={{
+          ...rectStyle(slot().rect),
+          outline: "none",
+          "--kw-float-z": slot().floating?.z,
+        }}
       >
         <Show when={ordinalsShown()}>
           <OrdinalBadge chord={ordinalChord(slot())} />
@@ -1090,6 +1133,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           hueRank={adornmentsOf(slot()).hueRank}
           outfit={attire.outfit(slot().id)}
           marked={marks.has(slot().id)}
+          pinned={slot().pinned}
           quiet={adornmentsOf(slot()).quiet}
           onGauge={gaugeOpener(slot())}
           ribbon={adornmentsOf(slot()).ribbon}
@@ -1119,6 +1163,9 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
             )}
           </Show>
         </PaneFrame>
+        <Show when={slot().floating !== undefined}>
+          <div class="kw-float-grip" aria-hidden="true" />
+        </Show>
       </div>
     );
   };
@@ -1227,6 +1274,11 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       >
         {stageView}
       </Yard>
+      <PaneShelf
+        items={shelfItems()}
+        hint={keys.describe("pane.unshelve")}
+        onReturn={(id) => act(tiler.focus(id))}
+      />
       <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
       <OpenFailureCard
         notice={props.openFailure}
@@ -1279,6 +1331,8 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     </div>
   );
 }
+
+export const layerChangeMs = 160;
 
 function markedNotice(count: number): string {
   const carry = count === 1 ? "carries" : "carry";

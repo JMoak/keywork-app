@@ -2025,6 +2025,72 @@ every terminal, and Zed's review UI stays observed behaviour only.
 | **S24 posture facts** | 1 | `GET /workspace/toolchain` → `{ manifests: [{ path, kind }], families: [{ rule, reason }] }`, detected by keywork across the workspace in its grant grammar with K9 applied; `GET /permissions` serves the destructive forms (exact-only and never-remembered) so the app stops mirroring them from `docs/events.md` | Trust onboarding (wave 7) |
 | **S25 the decider's state** | 1 | 121-12's `decider` block on `GET /memory`, read the way K12's doctor row reads it (config, the credential store, connect's observations; no network call): `{ selected: "builtin" \| "jev", active: "builtin" \| "jev", credential: "saved" \| "environment" \| "missing" \| "refused", model?, proven: string[], lastFailure?: { at, reason }, nextAction? }`, the credential a fact and never a value, `nextAction` the command in keywork's words (`keywork connect typesafe`); a new `surface.changed` kind, `decider`, whenever any of it moves (a connect, a removal, a 401 latching `refused`), so a card clears without polling; and 121-5's process-level `memory.decided` (`sessionId: ""`) for sweep decisions, with staged items carrying `decision`, `score` and `decider`. The persistent card shows while `selected` is `jev` and `credential` is `missing` or `refused`; the invitation while `selected` is `builtin` and `credential` is `missing`, dismissed per workspace in the app; neither has a key field or a decider toggle, and the one action opens a terminal pane on `nextAction` | AJ4, AJ5 (needs K12, K13, K17) |
 
+### Standing ledger (2026-11-12): floats, the shelf and the fit
+
+AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
+
+- **The model (`src/layout/`).** `standing.ts` holds the fit (`tuckedFor`: tuck by ascending
+  standing until the arrangement holds, then return whatever still fits) and float geometry
+  in unit rects. `Layout` keeps `floats`, the hand `shelf` and `pins` beside the arrangement
+  and derives everything else: `rects`, `floating`, `shelved`, `seams` and `regions` all
+  read the showing arrangement. Seams over a tucked or floating pane resolve to the seated
+  split path (`survivingSplitPaths`), and `resizeAroundLeaf`/`rotateAroundLeaf` act on the
+  nearest split whose other side is showing. The persisted layout gains optional `floats`,
+  `shelved` and `pinned` at version 1; a state written before them loads unchanged.
+- **Behaviour that changed.** `open`, `dock`, `cycle`, `move` and a pointer drop no longer
+  refuse for room; the tiler answers `ok` with the notice `no room for every pane · one
+  waits on the shelf`. The two refusal notices `no room for another pane` and `no room in
+  <home>` are gone with the refusals. `Layout.rotate` takes the screen; `openInDock`,
+  `dock` and `dockFocused` no longer do.
+- **Verbs.** `pane.float` (`leader space`, palette `float-pane`), `focus.layer`
+  (`leader tab`), `pane.shelve` (`leader -`), `pane.unshelve` (`leader =`), `pane.pin`
+  (`leader '`). The pointer state machine gains `moving` and `sizing`; `hitAt` finds the
+  topmost float before a seam or a tile.
+- **Chrome.** `chrome/pane-shelf.tsx` is the shelf line; shelved and tucked panes stay
+  mounted under `hidden`. A float wears a pane-ink ring, a drawn offset edge and a corner
+  grip; a pinned pane carries `◆` in its title row and on the shelf.
+- **Proof.** `layout/standing.test.ts` (the fit as a projection, the shelf, floats, pointer
+  gestures, and a seeded all-verbs run over four screen sizes that holds the tiling gapless
+  under the floats and the focused pane on the stage), `shell/tiler.test.ts`,
+  `chrome/pane-shelf.test.tsx` and the keyboard workflows in `shell/workflows.test.tsx`.
+- **Met the UX sweep (2026-11-12).** The sweep's rule for a full layout stands for
+  sessions: `tiler.crowds` asks, without seating anything, whether a summon would send a
+  pane to the shelf (`Layout.hasRoomBeside`, `hasRoomInMain`, `hasRoomInDock`), and the
+  workspace then shows the session in place of the conversation last used. Every other
+  pane, and a shrinking window, use the shelf. Ordinals follow the sweep's opening order,
+  so a shelved pane keeps its number.
+- **Motion.** Lifting and settling travel in `--kw-tempo-quick` (three steps, 120 ms) on the
+  one slot that changes layer; measured in Chromium as 960, 853, 747, 640 px wide, and as
+  960 then 640 under reduced motion.
+- **Owed: leaving the window (decided by Jordan, 2026-11-12).** A float that crosses the
+  window's edge becomes a frameless child OS window with no chrome of its own, so the
+  console still reads as one window. The mechanism is the same pane on a new surface: the
+  renderer opens the child window and re-parents the pane's live DOM into it, as VS Code's
+  floating windows do, so nothing remounts and a terminal, a draft and the scroll position
+  cross the edge intact. It needs one internal `window.open` admitted by the navigation
+  policy, and every pane kind proven in a second document (focus, key routing, observers,
+  the terminal renderer). It is built after the Electron main-process rewrite in flight on
+  2026-11-12 lands, never against it. Weighed and declined: a second console window per
+  pane (the pane remounts at the edge) and one oversized transparent main window (the app
+  redraws its own frame, and transparency with click-through is fragile on Wayland).
+- **Owed.** No screenshot stage covers a float or the shelf.
+
+### Stock ledger (2026-11-12): the carter and the joiner
+
+Two more creature skins from stead's art direction (`docs/design/creature-art-direction.md`
+sections 2.2 and 2.3), in `packages/habitat/src/skins/`. `stock/` is the shared rig and clip
+set over the kid's limb and prop kit, so every species shares one pose graph, ground line
+and beat table; a species supplies its head, ears, torso, gear and the clips that are its
+own. The carter (a mule) signals with its ears (one back at idle, up at work, perked on the
+porch, flat when blocked, sideways asleep), carries in its panniers and naps on its feet.
+The joiner (a badger) wears the stripe crown to nose in the highlight tone, opens its tool
+roll at the bench, tucks a pencil behind its ear to read, shoulders the crate, sits to wait,
+covers its eyes when blocked and naps as a ball. Both are in the registry, so onboarding and
+the creature pane offer them. `stock/stock.test.ts` holds both to the kid's contract (atlas
+validation, ground contact, sealed outlines, the crown clear for the glyph) and to their
+own signals. Left for the art pass, as the direction says: the carter's rope-in-teeth ring
+and straw hat, and the joiner's sleeves and gate lantern.
+
 ## What is deliberately not in this plan
 
 - Shared workspaces across machines (keywork P2.3) and any multi-user story.

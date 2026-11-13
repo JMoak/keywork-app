@@ -31,7 +31,7 @@ export interface PackedSdk {
   pin: SdkReleasePin;
 }
 
-export function sdkManifest(desktop: DesktopManifest): object {
+export function sdkManifest(desktop: DesktopManifest, sourceSha?: string): object {
   return {
     name: "@jmoak/keywork-desktop",
     version: desktop.version,
@@ -48,6 +48,8 @@ export function sdkManifest(desktop: DesktopManifest): object {
     peerDependencies: { electron: desktop.devDependencies.electron },
     engines: { node: ">=22.14.0" },
     repository: { type: "git", url: `git+https://github.com/${sdkRepository}.git` },
+    publishConfig: { access: "public", provenance: true },
+    ...(sourceSha === undefined ? {} : { gitHead: sourceSha }),
   };
 }
 
@@ -85,6 +87,10 @@ export function sdkReleasePin(build: SdkBuild, sha256: string): SdkReleasePin {
 
 export async function packDesktopSdk(output: string, expectedTag?: string): Promise<PackedSdk> {
   const desktop = join(repoRoot, "packages", "desktop");
+  const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
   const manifest: DesktopManifest = JSON.parse(
     await readFile(join(desktop, "package.json"), "utf8"),
   );
@@ -114,7 +120,7 @@ export async function packDesktopSdk(output: string, expectedTag?: string): Prom
     );
     await writeFile(
       join(stage, "package.json"),
-      `${JSON.stringify(sdkManifest(manifest), null, 2)}\n`,
+      `${JSON.stringify(sdkManifest(manifest, sourceSha), null, 2)}\n`,
     );
     await writeFile(join(stage, "build.json"), `${JSON.stringify(build, null, 2)}\n`);
     return await nameByChecksum(await npmPack(stage, output), output, build);
@@ -165,3 +171,5 @@ if (import.meta.main) {
   console.log(packed.checksum);
   console.log(JSON.stringify(packed.pin, null, 2));
 }
+
+import { execFileSync } from "node:child_process";

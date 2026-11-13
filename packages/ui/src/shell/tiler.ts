@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import type {
+  Absence,
   Direction,
   DockSide,
   DropZone,
@@ -26,6 +27,16 @@ export interface PaneSlot {
   readonly rect: Rect;
   readonly focused: boolean;
   readonly spawnRank: number;
+  readonly floating?: { readonly z: number } | undefined;
+  readonly pinned?: true | undefined;
+}
+
+export interface ShelfEntry {
+  readonly id: PaneId;
+  readonly spec: PaneSpec;
+  readonly why: Absence;
+  readonly pinned: boolean;
+  readonly spawnRank: number;
 }
 
 export interface Tiler {
@@ -35,6 +46,7 @@ export interface Tiler {
   spec(id: PaneId): PaneSpec | undefined;
   findPane(matches: (spec: PaneSpec) => boolean): PaneId | undefined;
   slots(screen: Screen): PaneSlot[];
+  shelf(screen: Screen): ShelfEntry[];
   scene(screen: Screen): Scene;
   emptyMain(screen: Screen): Rect | undefined;
   focused(): PaneId | undefined;
@@ -43,6 +55,7 @@ export interface Tiler {
   zoomed(): PaneId | undefined;
   open(spec: PaneSpec, screen: Screen): Verdict;
   summon(spec: PaneSpec, screen: Screen, argument?: string): Verdict;
+  crowds(spec: PaneSpec, screen: Screen, argument?: string): boolean;
   bind(id: PaneId, spec: PaneSpec): void;
   close(id: PaneId): Verdict;
   closeFocused(): Verdict;
@@ -51,8 +64,14 @@ export interface Tiler {
   focusToward(direction: Direction, screen: Screen): Verdict;
   focusShownToward(direction: Direction, screen: Screen, shown: ReadonlyMap<PaneId, Rect>): Verdict;
   move(direction: Direction, screen: Screen): Verdict;
+  focusAcrossLayers(screen: Screen): Verdict;
   zoom(): Verdict;
-  rotate(): Verdict;
+  float(screen: Screen): Verdict;
+  placeFloat(id: PaneId, rect: Rect, screen: Screen): Verdict;
+  shelve(): Verdict;
+  returnFromShelf(screen: Screen): Verdict;
+  pin(): Verdict;
+  rotate(screen: Screen): Verdict;
   cycle(screen: Screen): Verdict;
   dock(side: DockSide, screen: Screen): Verdict;
   resizeDock(delta: number, screen: Screen): Verdict;
@@ -85,21 +104,34 @@ export function createTiler(
     return explained(verdict, noRoom);
   };
 
+  const tucked = (screen: Screen): PaneId[] =>
+    layout.shelved(screen).flatMap((absent) => (absent.why === "tucked" ? [absent.id] : []));
+
+  const seated = (screen: Screen, seat: () => Verdict): Verdict => {
+    const waiting = new Set(tucked(screen));
+    const verdict = touched(seat());
+    const displaced = tucked(screen).filter((id) => !waiting.has(id)).length;
+    return verdict.ok && displaced > 0
+      ? { ok: true, notice: shelfNotices.tucked(displaced) }
+      : verdict;
+  };
+
   const place = (id: PaneId, spec: PaneSpec, screen: Screen): Verdict => {
     const home = definitions(spec.kind).home;
-    if (home !== "main") return layout.openInDock(id, home, screen);
+    if (home !== "main") return layout.openInDock(id, home);
     const beside = mainAnchor(layout);
     return beside === undefined ? layout.openInMain(id, screen) : layout.open(id, screen, beside);
   };
 
-  const open = (spec: PaneSpec, screen: Screen): Verdict => {
-    const id = ids.mint(spec.kind);
-    const verdict = place(id, spec, screen);
-    if (!verdict.ok) return explained(verdict, refusalNotices.noRoomForPane);
-    ids.adopt(id);
-    specs.set(id, spec);
-    return touched(verdict);
-  };
+  const open = (spec: PaneSpec, screen: Screen): Verdict =>
+    seated(screen, () => {
+      const id = ids.mint(spec.kind);
+      const verdict = place(id, spec, screen);
+      if (!verdict.ok) return verdict;
+      ids.adopt(id);
+      specs.set(id, spec);
+      return verdict;
+    });
 
   const bind = (id: PaneId, spec: PaneSpec): void => {
     if (specs.get(id)?.kind !== spec.kind) return;
@@ -130,6 +162,21 @@ export function createTiler(
     );
   };
 
+  const summoned = (spec: PaneSpec, argument: string | undefined): PaneId | undefined => {
+    if (opensAnother(spec)) return undefined;
+    const named = argument !== undefined && argument.trim() !== "";
+    return showing(spec) ?? (named ? lastFocusedOf(spec.kind) : undefined);
+  };
+
+  const hasRoomFor = (spec: PaneSpec, screen: Screen): boolean => {
+    const home = definitions(spec.kind).home;
+    if (home !== "main") return layout.hasRoomInDock(home, screen);
+    const beside = mainAnchor(layout);
+    return beside === undefined
+      ? layout.hasRoomInMain(screen)
+      : layout.hasRoomBeside(screen, beside);
+  };
+
   return {
     version,
     layout,
@@ -146,10 +193,29 @@ export function createTiler(
     slots: (screen) => {
       version();
       const focused = layout.focused();
+      const afloat = new Map(layout.floating(screen).map(({ id, z }) => [id, { z }] as const));
       return [...layout.rects(screen)].flatMap(([id, rect]) => {
         const spec = specs.get(id);
         if (spec === undefined) return [];
-        return [{ id, spec, rect, focused: id === focused, spawnRank: layout.spawnRank(id) }];
+        return [
+          {
+            id,
+            spec,
+            rect,
+            focused: id === focused,
+            spawnRank: layout.spawnRank(id),
+            ...(afloat.has(id) && { floating: afloat.get(id) }),
+            ...(layout.isPinned(id) && { pinned: true as const }),
+          },
+        ];
+      });
+    },
+    shelf: (screen) => {
+      version();
+      return layout.shelved(screen).flatMap(({ id, why }) => {
+        const spec = specs.get(id);
+        if (spec === undefined) return [];
+        return [{ id, spec, why, pinned: layout.isPinned(id), spawnRank: layout.spawnRank(id) }];
       });
     },
     scene: (screen) => {
@@ -179,13 +245,16 @@ export function createTiler(
     },
     open,
     summon: (spec, screen, argument) => {
-      if (opensAnother(spec)) return open(spec, screen);
-      const named = argument !== undefined && argument.trim() !== "";
-      const existing = showing(spec) ?? (named ? lastFocusedOf(spec.kind) : undefined);
+      const existing = summoned(spec, argument);
       if (existing === undefined) return open(spec, screen);
+      const named = argument !== undefined && argument.trim() !== "";
       if (named || retargets(definitions(spec.kind), specs.get(existing), spec))
         bind(existing, spec);
       return touched(layout.focus(existing));
+    },
+    crowds: (spec, screen, argument) => {
+      version();
+      return summoned(spec, argument) === undefined && !hasRoomFor(spec, screen);
     },
     bind,
     close,
@@ -207,13 +276,30 @@ export function createTiler(
         ? { ok: false, refused: "nothing-to-do" }
         : touched(layout.focus(target));
     },
-    move: (direction, screen) => touched(layout.move(direction, screen)),
+    focusAcrossLayers: (screen) =>
+      noted(touched(layout.focusAcrossLayers(screen)), shelfNotices.nothingFloats),
+    move: (direction, screen) => seated(screen, () => layout.move(direction, screen)),
     zoom: () => touched(layout.zoomToggle()),
-    rotate: () => touched(layout.rotate()),
-    cycle: (screen) =>
-      touched(layout.cycleFocused(screen), refusalNotices.noRoomIn("this pane's next home")),
-    dock: (side, screen) =>
-      touched(layout.dockFocused(side, screen), refusalNotices.noRoomIn(`the ${side} dock`)),
+    float: (screen) => seated(screen, () => layout.floatToggle(screen)),
+    placeFloat: (id, rect, screen) => touched(layout.placeFloat(id, rect, screen)),
+    shelve: () => noted(touched(layout.shelveFocused()), shelfNotices.lastPaneStays),
+    returnFromShelf: (screen) =>
+      noted(
+        seated(screen, () => layout.returnFromShelf(screen)),
+        shelfNotices.empty,
+      ),
+    pin: () => {
+      const verdict = touched(layout.pinToggle());
+      const id = layout.focused();
+      if (!verdict.ok || id === undefined) return verdict;
+      return {
+        ok: true,
+        notice: layout.isPinned(id) ? shelfNotices.pinned : shelfNotices.unpinned,
+      };
+    },
+    rotate: (screen) => touched(layout.rotate(screen)),
+    cycle: (screen) => seated(screen, () => layout.cycleFocused(screen)),
+    dock: (side, screen) => seated(screen, () => layout.dockFocused(side)),
     resizeDock: (delta, screen) => {
       const id = layout.focused();
       const side = id === undefined ? undefined : layout.dockSideOf(id);
@@ -222,8 +308,7 @@ export function createTiler(
     },
     resizePane: (delta, screen) => touched(layout.resizeFocused(delta, screen)),
     resizeSeam: (handle, ratio, screen) => touched(layout.resizeSeam(handle, ratio, screen)),
-    send: (id, zone, screen) =>
-      touched(layout.send(id, zone, screen), refusalNotices.noRoomIn(placeName(zone))),
+    send: (id, zone, screen) => seated(screen, () => layout.send(id, zone, screen)),
     snapshot: () => ({ layout: layout.toJSON(), specs: Object.fromEntries(specs) }),
   };
 }
@@ -249,8 +334,6 @@ export function parseTilerState(value: unknown): TilerState | undefined {
 }
 
 export const refusalNotices = {
-  noRoomForPane: "no room for another pane · close or resize one",
-  noRoomIn: (where: string) => `no room in ${where} · close or resize a pane`,
   noRoomHere: "no room for that here",
   nothingToClose: "no pane is focused · nothing to close",
   nothingFocused: "no pane is focused",
@@ -276,6 +359,16 @@ export const refusalNotices = {
     ),
   closeAgain: (reason: string, closeChord: string | undefined) =>
     withChord(reason, closeChord, "again closes it anyway"),
+};
+
+export const shelfNotices = {
+  tucked: (count: number) =>
+    `no room for every pane · ${count === 1 ? "one waits" : `${count} wait`} on the shelf`,
+  lastPaneStays: "the last pane on the stage stays",
+  empty: "the shelf is empty",
+  nothingFloats: "no pane is floating",
+  pinned: "pinned · the last to leave when room runs out",
+  unpinned: "unpinned",
 };
 
 export function paneIdOf(kind: PaneKind, ordinal: number): PaneId {
@@ -378,8 +471,11 @@ function explained(verdict: Verdict, noRoom: string): Verdict {
   return { ...verdict, notice: noRoom };
 }
 
-function placeName(zone: DropZone): string {
-  return zone === "main" ? "the main area" : `the ${zone} dock`;
+function noted(verdict: Verdict, nothingToDo: string): Verdict {
+  if (verdict.ok || verdict.refused !== "nothing-to-do" || verdict.notice !== undefined) {
+    return verdict;
+  }
+  return { ...verdict, notice: nothingToDo };
 }
 
 function mainAnchor(layout: Layout): PaneId | undefined {

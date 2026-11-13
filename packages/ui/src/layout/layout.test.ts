@@ -47,14 +47,15 @@ describe("Layout verbs", () => {
     expect(layout.focused()).toBe("b");
   });
 
-  it("refuses a split that cannot meet minimum sizes and leaves the layout untouched", () => {
+  it("seats a split the screen cannot show and tucks the pane of lower standing", () => {
     const tiny: Screen = { width: minPaneSize.width + 10, height: minPaneSize.height + 10 };
     const layout = new Layout();
     expect(layout.open("a", tiny).ok).toBe(true);
-    const verdict = layout.open("b", tiny);
-    expect(verdict).toEqual({ ok: false, refused: "no-room" });
-    expect(layout.panes()).toEqual(["a"]);
-    expect(layout.focused()).toBe("a");
+    expect(layout.open("b", tiny)).toEqual({ ok: true });
+    expect(layout.panes()).toEqual(["a", "b"]);
+    expect(layout.focused()).toBe("b");
+    expect([...layout.rects(tiny)]).toEqual([["b", { x: 0, y: 0, ...tiny }]]);
+    expect(layout.shelved(tiny)).toEqual([{ id: "a", why: "tucked" }]);
   });
 
   it("zooms the focused pane to the whole screen and restores on toggle", () => {
@@ -89,7 +90,7 @@ describe("Layout verbs", () => {
 
   it("numbers panes in the order they opened, so a move never renumbers them", () => {
     const layout = opened(["a", "b", "c"]);
-    layout.dockFocused("left", screen);
+    layout.dockFocused("left");
     layout.focus("b");
     expect(layout.move("left", screen).ok).toBe(true);
     expect(layout.panes()).not.toEqual(["a", "b", "c"]);
@@ -151,7 +152,7 @@ describe("Layout verbs", () => {
 
   it("rotates the split around the focused pane and resizes by stepped ratio", () => {
     const layout = opened(["a", "b"]);
-    expect(layout.rotate().ok).toBe(true);
+    expect(layout.rotate(screen).ok).toBe(true);
     expect(layout.rects(screen).get("b")).toEqual({ x: 0, y: 500, width: 1600, height: 500 });
     expect(layout.resizeFocused(0.1, screen).ok).toBe(true);
     expect(layout.rects(screen).get("b")?.height).toBe(600);
@@ -169,7 +170,7 @@ describe("Layout verbs", () => {
 
   it("round-trips through JSON and refuses corrupt state", () => {
     const layout = opened(["a", "b", "c"]);
-    layout.dockFocused("right", screen);
+    layout.dockFocused("right");
     const state = layout.toJSON();
     const revived = new Layout();
     revived.load(parseLayoutState(JSON.parse(JSON.stringify(state))) as never);
@@ -218,8 +219,8 @@ describe("Layout invariants under random verb sequences", () => {
         else if (verb === "focus") layout.focus(target);
         else if (verb === "move") layout.move(pick(directions), screen);
         else if (verb === "cycle") layout.cycleFocused(screen);
-        else if (verb === "dock") layout.dockFocused(pick(["left", "right"] as const), screen);
-        else if (verb === "rotate") layout.rotate();
+        else if (verb === "dock") layout.dockFocused(pick(["left", "right"] as const));
+        else if (verb === "rotate") layout.rotate(screen);
         else if (verb === "resize") layout.resizeFocused(pick([-0.2, -0.05, 0.05, 0.2]), screen);
         else layout.swapWith(target);
         if (layout.panes().length === 0) continue;

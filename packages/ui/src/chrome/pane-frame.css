@@ -155,6 +155,12 @@
   color: var(--kw-pane-hue);
 }
 
+.kw-frame-pin {
+  flex: none;
+  margin-right: 1ch;
+  color: var(--kw-text-mid);
+}
+
 .kw-frame-telemetry {
   flex: none;
   margin-left: 1ch;

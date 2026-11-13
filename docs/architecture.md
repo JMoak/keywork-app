@@ -149,6 +149,52 @@ doubles as documentation, and a leaderless hot path (Enter queues, Alt+Enter ste
 keywork's composer; interrupt, approve, deny, mode cycle, palette, pane jump, zoom, overlay). Bindings share
 action ids with keywork where the action exists in both, so muscle memory transfers.
 
+**Standing (2026-11-12): seats persist, the stage is a projection.** Every open pane keeps a
+seat in the arrangement (a leaf of the split tree or a dock slot) for as long as it is open.
+What the stage shows is a pure function of the seats, each pane's standing and the screen;
+there is no second arrangement to keep in step, and nothing the screen does is ever saved.
+Three things take a pane off the tiling without touching its seat:
+
+- **Float.** A pane lifts over the tiling as a window in a pane's clothes: the same frame,
+  verbs, ordinal and outfit, placed in fractions of the stage so it survives a resize,
+  stacked by recency with the focused one on top. The tiling closes under it. The same key
+  settles it back into the seat it left. `move` nudges a float and `grow`/`shrink` size it
+  by one step; the title row drags it and a corner grip sizes it. A float wears no window
+  chrome: its own pane-ink line and the ground's shade under it are all that set it off, so
+  it reads as a lifted pane, in the window or (when it can leave) out of it. Lifting and
+  settling are the one place geometry moves: the pane travels between its seat and its
+  float in one quick stepped beat so the eye keeps hold of it, the tiling around it still
+  snaps, a drag or a nudge never eases, and reduced motion snaps the lot. Zoom leaves floats where
+  they are, so a float over a zoomed pane is the picture-in-picture: a workshop display, a
+  terminal or the stead kept in sight over the work.
+- **Shelf.** The keeper puts a pane out of the way by hand. It stays mounted and running,
+  and one line above the status line lists it by ordinal, name and lifecycle stamp, so a
+  shelved pane that needs you still says so. Focusing it by any route (ordinal, palette,
+  summon, a needs-you jump, a click on the shelf) returns it to the exact seat and ratio it
+  left. The last pane on the stage cannot be shelved.
+- **The fit.** When the screen cannot hold every seated pane at the minimum pane size, the
+  panes of lowest standing are tucked onto the same shelf, marked as waiting for room, and
+  they return on their own when room does. Standing is ordinal only: the focused pane,
+  then pinned panes, then recency of focus. Only as many panes are tucked as free the room
+  that is missing. An open, a dock, a cycle or a move is therefore never refused for room;
+  the status line says how many panes now wait. A resize that would squeeze a shown pane
+  under its minimum is still refused, because resizing is not a reason to hide anything.
+  One open is handled before it reaches the fit: a session opened into a stage with no room
+  takes the place of the conversation last used, and the status line names both, so
+  sessions (which the tree already lists) do not pile up on the shelf.
+
+The arrows walk the tiling and never land on a float; one verb steps from the tiling through
+each float and back. Floats, the shelf and pins persist with the layout per workspace.
+
+Why this shape. The order is Furnas's degree of interest (a priori importance less distance
+from the focus) used ordinally, as the yard's depth already is. Adaptation that moves
+familiar things loses to layouts the person arranged, and loses badly when it is
+unpredictable, so the keeper's seats and pins outrank the fit, the fit is deterministic,
+and it changes what is shown only on an event (a pane opens, closes or takes focus, the
+window resizes), never on a clock. Floating and stepping between layers follow i3
+(`floating toggle`, `focus mode_toggle`); the shelf is the minimised row every desktop has,
+kept honest by carrying each pane's state.
+
 ### AD6. One theme system: keywork themes (PD15, T6)
 
 The app does not have its own theme format. It reads keywork **theme** files (tokens,

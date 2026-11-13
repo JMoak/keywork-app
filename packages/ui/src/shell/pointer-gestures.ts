@@ -21,6 +21,7 @@ export interface PointerGestures {
 }
 
 export const titleRowSelector = ".kw-frame-title";
+export const floatGripSelector = ".kw-float-grip";
 
 export function bindPointerGestures(
   stage: HTMLElement,
@@ -68,7 +69,7 @@ export function bindPointerGestures(
     const grip = gripOf(event.target);
     feed({ type: "down", grip, ...localPoint(event) });
     if (state().phase === "idle") return;
-    if (grip === "title" || state().phase === "resizing") event.preventDefault();
+    if (grip !== "body" || state().phase === "resizing") event.preventDefault();
     follow();
   };
   stage.addEventListener("pointerdown", onDown);
@@ -81,5 +82,7 @@ export function bindPointerGestures(
 }
 
 function gripOf(target: EventTarget | null): Grip {
-  return target instanceof Element && target.closest(titleRowSelector) !== null ? "title" : "body";
+  if (!(target instanceof Element)) return "body";
+  if (target.closest(floatGripSelector) !== null) return "corner";
+  return target.closest(titleRowSelector) !== null ? "title" : "body";
 }
