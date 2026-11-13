@@ -79,7 +79,7 @@ describe("what is reachable now", () => {
       nothingLocal,
       "cloud: anthropic/claude-sonnet-4-5 answered this workspace before",
     ]);
-    expect(cloudNeverRequired).toContain("never required");
+    expect(cloudNeverRequired).toContain("no cloud account needed");
   });
 
   it("counts a cloud provider connected with keywork connect as reachable on a workspace no turn has answered in", () => {

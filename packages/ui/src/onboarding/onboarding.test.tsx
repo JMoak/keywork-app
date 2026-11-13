@@ -135,10 +135,8 @@ describe("first-run onboarding on the stead", () => {
     expect(proposals?.names).toEqual(proposeNames(workspace, namesLeft(listed)));
     expect(proposals?.coat).toBe(hueStop(1));
     expect(run.onboarding.coat()).toBe(hueStop(1));
-    for (const _ of ["name", "skin", "workshop", "models"]) {
-      key(run.container, "Escape");
-      await flush();
-    }
+    key(run.container, "a");
+    await flush();
     const made = run.created[0]?.name ?? "";
     expect(made).not.toBe("Osk");
     expect(proposals?.names).toContain(made);
@@ -157,10 +155,8 @@ describe("first-run onboarding on the stead", () => {
     expect(two.onboarding.proposals()?.names).not.toContain("Osk");
     expect(two.onboarding.proposals()?.names).not.toContain("Tam");
     expect(two.onboarding.coat()).toBe(hueStop(2));
-    for (const _ of ["name", "skin", "workshop", "models"]) {
-      key(two.container, "Escape");
-      await flush();
-    }
+    key(two.container, "a");
+    await flush();
     expect(two.patched.map(([, seed]) => seed)).toEqual([2]);
 
     const three = harness({
@@ -174,17 +170,33 @@ describe("first-run onboarding on the stead", () => {
     expect(three.onboarding.coat()).toBe(hueStop(0));
   });
 
-  it("skips every step with esc and still makes a working creature: the first proposed name, the tinkerer, the host workshop, inherit everywhere", async () => {
+  it.each([
+    ["name", 0],
+    ["skin", 0],
+    ["workshop", 1],
+    ["models", 2],
+  ] as const)("esc on the %s step says not now and makes nothing", async (step, keptPastName) => {
     const run = harness();
     await flush();
-    fireEvent.keyDown(inputOf(run.container), { key: "Escape" });
+    if (step !== "name") typeName(run.container, "Wren");
     await flush();
-    expect(stepMarks(run.container)).toEqual(["name ·", "skin", "workshop", "models"]);
-    key(run.container, "Escape");
+    for (let kept = 0; kept < keptPastName; kept += 1) {
+      key(run.container, "Enter");
+      await flush();
+    }
+    expect(currentStep(run.container)).toBe(step);
+    if (step === "name") fireEvent.keyDown(inputOf(run.container), { key: "Escape" });
+    else key(run.container, "Escape");
     await flush();
-    key(run.container, "Escape");
+    expect(run.onboarding.phase()).toEqual({ kind: "closed" });
+    expect(run.created).toEqual([]);
+    expect(run.injected).toEqual([]);
+  });
+
+  it("a on the first step keeps every suggestion and still makes a working creature: the first proposed name, the tinkerer, the host workshop, inherit everywhere", async () => {
+    const run = harness();
     await flush();
-    key(run.container, "Escape");
+    key(run.container, "a");
     await flush();
     const first = names[0] ?? "";
     expect(run.created).toEqual([{ name: first, skin: "kid", substrate: "host" }]);
@@ -450,10 +462,8 @@ describe("first-run onboarding on the stead", () => {
     expect(proposed).not.toContain(byCreature);
     expect(proposed).not.toContain(byId);
     expect(proposed).toEqual(proposeNames(workspace, namesLeft([], owners)));
-    for (const _ of ["name", "skin", "workshop", "models"]) {
-      key(run.container, "Escape");
-      await flush();
-    }
+    key(run.container, "a");
+    await flush();
     expect(run.created.map((request) => request.name)).toEqual([proposed[0]]);
     expect(linesOf(run.container)[0]).toBe(madeLine(proposed[0] ?? ""));
   });
@@ -474,8 +484,6 @@ describe("first-run onboarding on the stead", () => {
     expect(next).toHaveLength(3);
     expect(next).not.toContain("Bea");
     expect(next).toEqual(proposeNames(workspace, namesLeft([], ["bea"])));
-    key(run.container, "Escape");
-    await flush();
     key(run.container, "a");
     await flush();
     expect(run.created.map((request) => request.name)).toEqual(["Bea", next[0]]);
@@ -496,12 +504,12 @@ describe("first-run onboarding on the stead", () => {
     expect(currentStep(run.container)).toBe("name");
   });
 
-  it("x says not now, remembers it, and the first run then stays quiet", async () => {
+  it("esc says not now, remembers it, and the first run then stays quiet", async () => {
     const run = harness();
     await flush();
     typeName(run.container, "Wren");
     await flush();
-    key(run.container, "x");
+    key(run.container, "Escape");
     await flush();
     expect(run.onboarding.phase()).toEqual({ kind: "closed" });
     expect(run.onboarding.act("keep")).toBe(false);
@@ -545,9 +553,58 @@ describe("the card on the stead", () => {
     shell.onboarding.request();
     await flush();
     expect(currentStep(container)).toBe("name");
-    fireEvent.keyDown(cardOf(container), { key: "x" });
+    fireEvent.keyDown(cardOf(container), { key: "Escape" });
     await flush();
     expect(container.querySelector(".kw-onboard")).toBeNull();
+  });
+
+  it("brings a requested card back once, not again after its creature is made and the stead mounts afresh", async () => {
+    const storage = memoryStorage();
+    const creatures: CreatureSummary[] = [];
+    const shell = fakeShell({ creatures });
+    const seams = () => fakeSeams({}, recorder(), storage, () => void creatures.push(creature()));
+    const first = render(() => (
+      <OnboardingOnTheStead automatic simple shell={shell} storage={storage} seams={seams()} />
+    ));
+    await flush();
+    shell.onboarding.request();
+    await flush();
+    typeName(first.container, "Wren");
+    await flush();
+    key(first.container, "a");
+    await flush();
+    expect(first.container.querySelector(".kw-onboard[data-phase=made]")).not.toBeNull();
+    expect(shell.onboarding.requested()).toBe(false);
+    first.unmount();
+    const again = render(() => (
+      <OnboardingOnTheStead automatic simple shell={shell} storage={storage} seams={seams()} />
+    ));
+    await flush();
+    expect(again.container.querySelector(".kw-onboard")).toBeNull();
+    expect(document.activeElement?.closest(".kw-onboard")).toBeNull();
+  });
+
+  it("goes back to meeting the creature when a customize card on an empty home says not now", async () => {
+    const storage = memoryStorage();
+    const shell = fakeShell({ creatures: 0 });
+    const { container } = render(() => (
+      <OnboardingOnTheStead
+        automatic
+        simple
+        shell={shell}
+        storage={storage}
+        seams={fakeSeams({}, recorder(), storage)}
+      />
+    ));
+    await flush();
+    expect(container.querySelector(".kw-meet-creature")).not.toBeNull();
+    shell.onboarding.request();
+    await flush();
+    expect(currentStep(container)).toBe("name");
+    fireEvent.keyDown(inputOf(container), { key: "Escape" });
+    await flush();
+    expect(container.querySelector(".kw-onboard")).toBeNull();
+    expect(container.querySelector(".kw-meet-creature")).not.toBeNull();
   });
 
   it("mounts when the first run is wanted, stays away once a creature exists, and comes back on request", async () => {
@@ -563,7 +620,7 @@ describe("the card on the stead", () => {
     shell.onboarding.request();
     await flush();
     expect(quiet.container.querySelector(".kw-onboard")).not.toBeNull();
-    fireEvent.keyDown(cardOf(quiet.container), { key: "x" });
+    fireEvent.keyDown(cardOf(quiet.container), { key: "Escape" });
     await flush();
     expect(quiet.container.querySelector(".kw-onboard")).toBeNull();
     cleanup();
@@ -662,7 +719,7 @@ describe("the card on the stead", () => {
     key(container, "a");
     await flush();
     expect(creatures).toHaveLength(1);
-    expect(linesOf(container)[0]).toBe("Wren is made · its workshop rises on the stead");
+    expect(linesOf(container)[0]).toBe(madeLine("Wren"));
     key(container, "Enter");
     await flush();
     expect(container.querySelector(".kw-onboard")).toBeNull();
@@ -689,7 +746,7 @@ describe("the card on the stead", () => {
     elsewhere.focus();
     key(container, "a");
     await flush();
-    expect(linesOf(container)[0]).toBe("Wren is made · its workshop rises on the stead");
+    expect(linesOf(container)[0]).toBe(madeLine("Wren"));
     expect(document.activeElement).toBe(cardOf(container));
     expect(shell.onboarding.card()).toBe(cardOf(container));
     fireEvent.keyDown(document.activeElement as Element, { key: "Enter" });
@@ -772,7 +829,7 @@ describe("the card on the stead", () => {
     await flush();
     expect(currentStep(container)).toBe("workshop");
     expect(shell.onboarding.take("stead.approve")).toBe(false);
-    key(container, "x");
+    key(container, "Escape");
     await flush();
     expect(shell.onboarding.take("stead.down")).toBe(false);
   });

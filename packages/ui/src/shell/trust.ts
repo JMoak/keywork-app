@@ -36,13 +36,17 @@ export const inPlacePatienceMs = 2_000;
 
 export const composedPollMs = 500;
 
-export const trustEnables = "memory, changes, the terminal, LSP and project config";
+export const trustEnables =
+  "memory, change tracking, code intelligence and the folder's own settings";
 
 export function trustPrompt(root: string): string {
-  return `trust ${root}? the server keeps workspace files and memory in .keywork`;
+  return `trust ${folderNameOf(root)}?`;
 }
 
-export const trustStaysOff = `${trustEnables} stay off until you trust it`;
+export const trustExplains =
+  "trusting lets commands that only read inside this folder run without asking, so what they read can reach your model · reading outside it, writing files and every other command still ask you first · its notes and memory live in .keywork inside the folder";
+
+export const trustStaysOff = `until you trust it, ${trustEnables} stay off · chatting works either way`;
 
 export function untrustedNotice(root: string, chord: string): string {
   return `${root} isn't trusted yet · ${trustEnables} stay off until it is · ${chord} trusts it`;
@@ -61,7 +65,7 @@ export function waitingOnServeNotice(root: string): string {
 }
 
 export function recomposedNotice(root: string): string {
-  return `trusted ${root} · the server recomposed in place · open sessions reload on their next prompt · any running turn stopped and its asks were refused`;
+  return `trusted ${folderNameOf(root)} · open conversations pick it up with their next message · a reply that was running stopped and its waiting approvals were declined`;
 }
 
 export function staleServeNotice(root: string): string {
@@ -177,6 +181,10 @@ const anchorWords: Partial<Record<AnchorSource, string>> = {
   git: "git root",
   declaration: "declared workspace root",
 };
+
+function folderNameOf(path: string): string {
+  return path.split(/[\\/]/).findLast((segment) => segment !== "") ?? path;
+}
 
 function canonicalPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();

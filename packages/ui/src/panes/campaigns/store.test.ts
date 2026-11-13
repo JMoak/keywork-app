@@ -102,6 +102,36 @@ describe("campaign monitor", () => {
     }
   });
 
+  it("says a refused creation in plain words beside the form, not as an engine error at the top", async () => {
+    const create = vi.fn(async () => {
+      throw new CampaignRequestError(
+        400,
+        "ENOENT: no such file or directory, lstat 'C:\\Users\\k\\home\\notes\\todo.md'",
+      );
+    });
+    const monitor = createRoot(() => createCampaignMonitor(fakeClient({ create })));
+    try {
+      const created = await monitor.create({
+        title: "Welcome",
+        workload: "app-improvement",
+        objective: "Clear setup",
+        criteria: ["Usable"],
+        references: [],
+        model: { provider: "openrouter", model: "openai/gpt-5" },
+        budgetMicros: 5_000_000,
+        persistenceProfile: "focused",
+        artifactPath: "notes/todo.md",
+      });
+      expect(created).toBe(false);
+      expect(monitor.state.createRefusal).toBe(
+        "notes/todo.md is not in this folder. Check the starting file or folder.",
+      );
+      expect(monitor.state.problem).toBeNull();
+    } finally {
+      monitor.dispose();
+    }
+  });
+
   it("does not duplicate a pending creation or apply its result after disposal", async () => {
     const delayed = deferred<CampaignReading>();
     const create = vi.fn(() => delayed.promise);

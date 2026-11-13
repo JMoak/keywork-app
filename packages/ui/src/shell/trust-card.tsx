@@ -1,9 +1,10 @@
-import { Match, Show, Switch } from "solid-js";
+import { createSignal, Match, Show, Switch } from "solid-js";
 import {
   reopeningNotice,
   staleServeNotice,
   type TrustFlow,
   type TrustState,
+  trustExplains,
   trustPrompt,
   trustStaysOff,
   waitingOnServeNotice,
@@ -15,14 +16,23 @@ export interface TrustCardProps {
   chord: string;
 }
 
+export const notNowWord = "not now";
+
 export function TrustCard(props: TrustCardProps) {
   const state = () => props.trust.state();
+  const [setAside, setSetAside] = createSignal(false);
+  const asking = () => state().kind === "undecided" || state().kind === "failed";
   return (
-    <Show when={state().kind !== "unknown" && state().kind !== "trusted"}>
+    <Show
+      when={state().kind !== "unknown" && state().kind !== "trusted" && !(asking() && setAside())}
+    >
       <aside class="kw-trust" data-state={state().kind} aria-label="trust">
         <Switch>
-          <Match when={state().kind === "undecided" || state().kind === "failed"}>
-            <p class="kw-trust-ask">{trustPrompt(rootOf(state()))}</p>
+          <Match when={asking()}>
+            <p class="kw-trust-ask" title={rootOf(state())}>
+              {trustPrompt(rootOf(state()))}
+            </p>
+            <p class="kw-trust-enables">{trustExplains}</p>
             <p class="kw-trust-enables">{trustStaysOff}</p>
             <Show when={messageOf(state())}>
               {(message) => <p class="kw-trust-refusal">{message()}</p>}
@@ -33,9 +43,12 @@ export function TrustCard(props: TrustCardProps) {
                 class="kw-trust-accept"
                 onClick={() => void props.trust.accept()}
               >
-                trust this workspace
+                trust this folder
               </button>
               <kbd>{props.chord}</kbd>
+              <button type="button" class="kw-trust-later" onClick={() => setSetAside(true)}>
+                {notNowWord}
+              </button>
             </p>
           </Match>
           <Match when={state().kind === "refused"}>

@@ -44,7 +44,7 @@ describe("what this machine supports", () => {
     expect(workshopChoiceOf(support)).toEqual({
       substrate: "host",
       limitation:
-        "this node serves no workshops yet (this host serves no workshops); threads run on the bare node",
+        "no sandbox is available here yet (this host serves no workshops) · its commands run directly on this computer",
       installStep,
     });
     expect(workshopChoices(support)).toEqual(["host"]);

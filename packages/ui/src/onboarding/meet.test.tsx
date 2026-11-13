@@ -1,10 +1,11 @@
 import type { CreatureSummary } from "@keywork-app/protocol";
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
 import { browserHost } from "../host/browser.ts";
 import type { HostPort } from "../host/port.ts";
 import type { ShellSeams } from "../panes/registry.ts";
-import { MeetCreature } from "./meet.tsx";
+import { MeetCreature, meetingName } from "./meet.tsx";
+import { proposeNames } from "./names.ts";
 
 vi.mock("./portrait.tsx", () => ({ Portrait: () => <span>Creature portrait</span> }));
 
@@ -65,12 +66,14 @@ it("lets the keeper meet and keep a creature before setup, then binds the select
     store: { surfaces: { refetch: async () => {} } },
   } as unknown as ShellSeams;
 
+  const proposed = meetingName("C:/managed-home");
   render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
-  expect(screen.getByRole("heading", { name: "Meet Wren" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: `Meet ${proposed}` })).toBeTruthy();
   expect(createCreature).not.toHaveBeenCalled();
   expect(serverFetch).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Explore first" }));
   expect(await screen.findByRole("heading", { name: "Wren" })).toBeTruthy();
+  expect(createCreature).toHaveBeenCalledWith({ name: proposed, skin: "kid" });
   expect(serverFetch).not.toHaveBeenCalled();
   expect(openSession).not.toHaveBeenCalled();
 
@@ -81,21 +84,29 @@ it("lets the keeper meet and keep a creature before setup, then binds the select
   expect(await screen.findByText("first-model")).toBeTruthy();
   expect(screen.getByText(/Conversation only/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Open conversation" }));
-  await screen.findByRole("heading", { name: "Wren" });
+  await waitFor(() => expect(openSession).toHaveBeenCalledWith("wren-thread"));
   expect(createCreature).toHaveBeenCalledOnce();
   expect(updateCreature).toHaveBeenCalledWith("wren", { models: { strong: model } });
-  expect(openSession).toHaveBeenCalledWith("wren-thread");
   expect(inject).not.toHaveBeenCalled();
+  expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Start a conversation" })).toBeNull();
+});
 
+it("introduces the name the customize card proposes first, and steps aside for a creature already at home", () => {
+  const shell = {
+    host: browserHost(),
+    workspace: "C:/managed-home",
+    client: { creatures: async () => [] },
+  } as unknown as ShellSeams;
+  const firstProposal = proposeNames("C:/managed-home")[0];
+  render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
+  expect(screen.getByRole("heading", { name: `Meet ${firstProposal}` })).toBeTruthy();
   cleanup();
-  openSession.mockClear();
-  updateCreature.mockClear();
-  serverFetch.mockClear();
+
+  const resident = { slug: "kit", name: "Kit", conversation: "kit-thread" } as CreatureSummary;
   render(() => (
-    <MeetCreature shell={shell} creatures={[draft]} first={false} onCustomize={() => {}} />
+    <MeetCreature shell={shell} creatures={[resident]} first={false} onCustomize={() => {}} />
   ));
-  fireEvent.click(screen.getByRole("button", { name: "Open current conversation" }));
-  expect(openSession).toHaveBeenCalledWith("wren-thread");
-  expect(updateCreature).not.toHaveBeenCalled();
-  expect(serverFetch).not.toHaveBeenCalled();
+  expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Open current conversation" })).toBeNull();
 });

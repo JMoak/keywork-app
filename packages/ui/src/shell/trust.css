@@ -43,3 +43,24 @@
 .kw-trust-keys kbd {
   color: var(--kw-text-dim);
 }
+
+.kw-trust-later {
+  font: inherit;
+  padding: 0 0.5ch;
+  border: none;
+  background: none;
+  color: var(--kw-accent);
+  cursor: pointer;
+}
+
+.kw-trust-later:hover,
+.kw-trust-later:focus-visible {
+  outline: none;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+}
+
+.kw-trust-ask,
+.kw-trust-enables {
+  overflow-wrap: anywhere;
+}

@@ -31,6 +31,7 @@ import { ForgetCard } from "../memory/forget-card.tsx";
 import { ChoiceLine, createCursor, DraftLine, NoticeLine, OverviewRow } from "../overview/rows.tsx";
 import { definePane, type PaneLocalAction, type PaneProps, type ShellSeams } from "../registry.ts";
 import { timeWord, whatAreYouDoing } from "../stead/copy.ts";
+import { creatureHomeShell, InCreatureHome } from "../stead/creature-home.tsx";
 import { createHabitatState, houseOffsetMinutes } from "../stead/habitat.ts";
 import { skinIds } from "../stead/habitat-render.ts";
 import { coatOf } from "../stead/herd.ts";
@@ -139,7 +140,11 @@ export const creaturePane = definePane<CreatureSpec>({
   title: (spec, shell) =>
     spec.slug === undefined ? creatureWord : (shell.creatureNames?.nameOf(spec.slug) ?? spec.slug),
   emptyState: (keys) => emptyStateLine(keys.chord(onboardingActionId)),
-  component: CreatureProfile,
+  component: (props) => (
+    <InCreatureHome shell={props.shell} class="kw-ov kw-creature">
+      {(home) => <CreatureProfile {...props} shell={home} />}
+    </InCreatureHome>
+  ),
   summon: {
     action: "creature.summon",
     chords: "leader shift+i",
@@ -150,14 +155,19 @@ export const creaturePane = definePane<CreatureSpec>({
       aliases: ["profile"],
       argument: {
         hint: "[slug]",
-        choices: (shell) =>
-          shell.store.surfaces.state.bots.map((bot) => ({
+        choices: (shell) => {
+          const home = creatureHomeShell(shell) ?? shell;
+          return home.store.surfaces.state.bots.map((bot) => ({
             value: bot.name,
             description: shell.creatureNames?.nameOf(bot.name),
-          })),
+          }));
+        },
       },
     },
-    spec: (shell, argument) => ({ kind: "creature", ...slugFor(shell, argument) }),
+    spec: (shell, argument) => ({
+      kind: "creature",
+      ...slugFor(creatureHomeShell(shell) ?? shell, argument),
+    }),
   },
   localActions: {
     "creature.down": action(
@@ -304,7 +314,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     fetch: hostFetch(shell.host, shell.workspace),
     ranch: shell.client,
   });
-  const slug = (): string | undefined => props.spec.slug;
+  const slug = (): string | undefined => props.spec.slug ?? slugFor(shell, undefined).slug;
   const offsetMinutes = houseOffsetMinutes();
   const [now, setNow] = createSignal(Date.now());
   const ticking = setInterval(() => setNow(Date.now()), minuteMs);

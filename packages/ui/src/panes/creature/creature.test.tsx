@@ -326,11 +326,21 @@ describe("the creature profile", () => {
       detail: { refused: "missing", detail: "no creature has that slug" },
     });
     expect(lineText(gone.container)).toBe("no creature has that slug");
-    const harness = creatureHarness();
+    const harness = creatureHarness({ bots: [] });
     const { container } = mountPane(creaturePane.component, { kind: "creature" }, harness.shell);
     expect(container.querySelector(".kw-empty")?.textContent).toBe(
       "No creature yet · make one with ctrl+k 1",
     );
+    harness.dispose();
+  });
+
+  it("opens the home's creature when summoned from a window that does not know it", async () => {
+    const harness = creatureHarness();
+    const { container } = mountPane(creaturePane.component, { kind: "creature" }, harness.shell);
+    await settle();
+    await settle();
+    expect(container.querySelector(".kw-creature-name")?.textContent).toBe("Wren");
+    expect(container.querySelector(".kw-empty")).toBeNull();
     harness.dispose();
   });
 

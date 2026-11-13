@@ -127,6 +127,24 @@ export interface ModelChoice {
   model: string;
 }
 
+export const campaignModelsLine =
+  "Campaigns run only on models whose prices can be checked before every step: today, OpenAI GPT models reached through OpenRouter (for example openai/gpt-5).";
+
+export const noCampaignModelLine =
+  "No connected model can run a campaign yet. Connect OpenRouter and choose an OpenAI GPT model, then come back.";
+
+export function campaignAdmits(model: string): boolean {
+  return !model.includes("latest") && priceCheckedModel.test(model);
+}
+
+export function admittedChoices(choices: readonly ModelChoice[]): ModelChoice[] {
+  return choices.filter((choice) => campaignAdmits(choice.model));
+}
+
+// Mirrors keywork's campaign admission (engine campaigns/pricing.ts) until /models reports it.
+const priceCheckedModel =
+  /^openai\/gpt-(?:4\.1(?:-(?:mini|nano))?|4o(?:-mini)?|4-turbo|[56](?:\.\d+)?(?:-[a-z0-9]+)*)(?:-\d{4}-\d{2}-\d{2})?$/;
+
 export function campaignModelChoices(report: ModelsReport): ModelChoice[] {
   const choices: ModelChoice[] = [];
   const inherited = report.inherits?.strong;

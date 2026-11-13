@@ -25,6 +25,7 @@ describe("a project that did not open", () => {
       line: "no model is connected",
       fix: connectFix,
       connectsAModel: true,
+      enablesBackgroundWork: false,
     });
     expect(notOpenedLine("C:\\work\\keyless\\")).toBe("keyless did not open");
     expect(notOpenedLine("/home/keeper/keyless")).toBe("keyless did not open");
@@ -56,15 +57,55 @@ describe("a project that did not open", () => {
     });
     expect(
       openFailureView("/p", { kind: "port-in-use", port: 4770, detail: "" }, steadProfile),
-    ).toEqual({ path: "/p", line: "port 4770 is taken", connectsAModel: false });
+    ).toEqual({
+      path: "/p",
+      line: "port 4770 is taken",
+      connectsAModel: false,
+      enablesBackgroundWork: false,
+    });
   });
 
-  it("keeps the classic layout's words under keywork", () => {
+  it("says a missing model in plain words under keywork too, with connecting as the fix", () => {
     expect(openFailureView("/p", noModel, keyworkProfile)).toEqual({
       path: "/p",
-      line: "no inference provider is configured · run keywork connect",
-      connectsAModel: false,
+      line: "no model is connected",
+      fix: connectFix,
+      connectsAModel: true,
+      enablesBackgroundWork: false,
     });
+    expect(
+      openFailureView("/p", { kind: "port-in-use", port: 4770, detail: "" }, keyworkProfile),
+    ).toEqual({
+      path: "/p",
+      line: "port 4770 is taken",
+      connectsAModel: false,
+      enablesBackgroundWork: false,
+    });
+  });
+
+  it("offers background work only to a failure that asks for it", () => {
+    const sharedEngineDown: WorkspaceFailure = {
+      kind: "unresolved",
+      message: "The shared engine is not running.",
+      nextAction: "Enable background work before opening your creature home or a project.",
+    };
+    expect(openFailureView("/p", sharedEngineDown, keyworkProfile).enablesBackgroundWork).toBe(
+      true,
+    );
+    expect(openFailureView("/p", noModel, steadProfile).enablesBackgroundWork).toBe(false);
+    const enable = vi.fn();
+    render(() => (
+      <OpenFailureCard
+        notice={{
+          view: openFailureView("/work/keyless", noModel, steadProfile),
+          enableRuntime: enable,
+          retry: vi.fn(),
+          dismiss: vi.fn(),
+        }}
+        onConnect={vi.fn()}
+      />
+    ));
+    expect(screen.queryByRole("button", { name: "Enable background work" })).toBeNull();
   });
 
   it("draws one card in the workspace that connects, opens again or steps aside", () => {

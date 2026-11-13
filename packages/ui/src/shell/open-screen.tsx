@@ -1,15 +1,17 @@
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
-import { createResource, createSignal, For, onCleanup, Show } from "solid-js";
-import { FirstRun } from "../chrome/first-run.tsx";
+import { createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { useProductProfile } from "../chrome/product.ts";
 import { themeName } from "../chrome/root-attributes.ts";
 import { createTileFillStep, stampGlyph } from "../chrome/stamp.ts";
 import { relativeAge } from "../chrome/telemetry.ts";
 import { describeFailure, type HostPort, type WorkspaceFailure } from "../host/port.ts";
-import { keymapFromConfig } from "../keys/config.ts";
-import { createLiveKeymap, followKeybindings } from "../keys/live.ts";
 import { ModelSetup } from "../model-setup/index.tsx";
-import { OpenFailure, type OpenFailureView } from "./open-failure.tsx";
+import {
+  notOpenedLine,
+  OpenFailure,
+  type OpenFailureView,
+  setUpModelWord,
+} from "./open-failure.tsx";
 
 export interface OpenScreenProps {
   host: HostPort;
@@ -19,6 +21,8 @@ export interface OpenScreenProps {
   onEnableRuntime?: (() => void) | undefined;
 }
 
+export const notNowWord = "Not now";
+
 export function startingLine(path: string, profile: ProductProfile = keyworkProfile): string {
   return `starting ${profile.name} in ${path}`;
 }
@@ -27,17 +31,16 @@ export function OpenScreen(props: OpenScreenProps) {
   const profile = useProductProfile();
   const [recents] = createResource(() => props.host.recentWorkspaces());
   const [about] = createResource(() => props.host.about());
-  const live = createLiveKeymap(keymapFromConfig());
-  onCleanup(followKeybindings(props.host, { projectTrusted: false }, live, () => undefined));
-  const keys = { chord: (action: string) => live.keys.describe(action) ?? "an unbound key" };
-  const neverOpened = () => recents.state === "ready" && (recents() ?? []).length === 0;
   const [setup, setSetup] = createSignal(false);
   const [setupWorkspace, setSetupWorkspace] = createSignal<string>();
   const [setupFailure, setSetupFailure] = createSignal<{ line: string; enable: boolean }>();
   const [pendingProject, setPendingProject] = createSignal<string>();
   const retainedProject = () => pendingProject() ?? props.failure?.path;
+  const setsUpAModel = () => props.host.openHome !== undefined;
+  const failureOffersSetup = () => setsUpAModel() && props.failure?.connectsAModel === true;
   let folderButton: HTMLButtonElement | undefined;
   let setupAttempt = 0;
+  onMount(() => folderButton?.focus({ preventScroll: true }));
   onCleanup(() => {
     setupAttempt++;
   });
@@ -103,13 +106,13 @@ export function OpenScreen(props: OpenScreenProps) {
           <button type="button" class="kw-open-pick" ref={folderButton} onClick={() => void pick()}>
             open a folder
           </button>
-          <Show when={props.host.openHome !== undefined && !setup()}>
+          <Show when={setsUpAModel() && !setup() && !failureOffersSetup()}>
             <button
               type="button"
               class="kw-model-link kw-open-model-button"
               onClick={() => void startSetup()}
             >
-              Set up a model
+              {setUpModelWord}
             </button>
           </Show>
           <Show when={(recents() ?? []).length > 0}>
@@ -127,14 +130,7 @@ export function OpenScreen(props: OpenScreenProps) {
             </ol>
           </Show>
         </section>
-        <Show
-          when={setup()}
-          fallback={
-            <Show when={neverOpened()}>
-              <FirstRun keys={keys} />
-            </Show>
-          }
-        >
+        <Show when={setup()}>
           <Show when={retainedProject()}>
             {(path) => <p class="kw-model-notice">Folder to open after setup: {path()}</p>}
           </Show>
@@ -169,7 +165,7 @@ export function OpenScreen(props: OpenScreenProps) {
                   )}
                 </Show>
                 <button type="button" class="kw-model-link" onClick={closeSetup}>
-                  Explore first
+                  {notNowWord}
                 </button>
               </div>
             }
@@ -180,8 +176,9 @@ export function OpenScreen(props: OpenScreenProps) {
                 workspace={workspace}
                 heading="How would you like to connect a model?"
                 continueLabel={
-                  retainedProject() === undefined ? "Continue to workspaces" : "Open this folder"
+                  retainedProject() === undefined ? "Choose a folder" : "Open this folder"
                 }
+                exploreLabel={notNowWord}
                 onContinue={continueSetup}
                 onExplore={closeSetup}
               />
@@ -189,8 +186,17 @@ export function OpenScreen(props: OpenScreenProps) {
           </Show>
         </Show>
         <Show when={props.opening}>{(path) => <OpeningNote path={path()} />}</Show>
-        <Show when={props.failure}>
-          {(failure) => <OpenFailure view={failure()} onEnableRuntime={props.onEnableRuntime} />}
+        <Show when={!setup() && props.failure}>
+          {(failure) => (
+            <section class="kw-open-workspaces" aria-label={notOpenedLine(failure().path)}>
+              <p class="kw-open-failure-of">{notOpenedLine(failure().path)}</p>
+              <OpenFailure
+                view={failure()}
+                onEnableRuntime={props.onEnableRuntime}
+                onSetUpModel={setsUpAModel() ? () => void startSetup() : undefined}
+              />
+            </section>
+          )}
         </Show>
       </div>
     </main>

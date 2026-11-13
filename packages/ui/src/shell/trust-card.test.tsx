@@ -1,7 +1,7 @@
-import { cleanup, render } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
-import { trustPrompt, trustStaysOff } from "./trust.ts";
-import { TrustCard } from "./trust-card.tsx";
+import { trustExplains, trustPrompt, trustStaysOff } from "./trust.ts";
+import { notNowWord, TrustCard } from "./trust-card.tsx";
 import { inertTrust } from "./trust-testing.ts";
 
 afterEach(cleanup);
@@ -15,5 +15,19 @@ describe("the trust card", () => {
     expect(text).toContain(trustPrompt("C:/work"));
     expect(text).toContain(trustStaysOff);
     expect(text).not.toContain("read-only");
+    expect(text).not.toContain("terminal");
+  });
+
+  it("names the folder, says what trusting risks and what still asks, and steps aside on not now", () => {
+    const root = "C:\\Users\\keeper\\AppData\\Local\\Temp\\runs\\a-long-folder\\workspace";
+    const { container } = render(() => (
+      <TrustCard trust={inertTrust({ kind: "undecided", root })} chord="ctrl+k u" />
+    ));
+    expect(screen.getByText("trust workspace?").getAttribute("title")).toBe(root);
+    expect(trustExplains).toContain("can reach your model");
+    expect(trustExplains).toContain("still ask you first");
+    expect(container.textContent).toContain(trustExplains);
+    fireEvent.click(screen.getByRole("button", { name: notNowWord }));
+    expect(container.querySelector(".kw-trust")).toBeNull();
   });
 });

@@ -253,6 +253,48 @@ describe("campaign workspace", () => {
     }
   });
 
+  it("asks before cancelling or finishing, and offers nothing that steers a finished campaign", async () => {
+    let latest = campaignFixture({ status: "ready", attempts: [] });
+    const sent: string[] = [];
+    const client = clientFor(() => latest, {
+      command: async (_id, request) => {
+        sent.push(request.command.type);
+        latest = campaignFixture({ status: "completed", revision: latest.revision + 1 });
+        return { campaign: latest, sequence: latest.revision };
+      },
+    });
+    const monitor = createRoot(() => createCampaignMonitor(client));
+    render(() => (
+      <CampaignDetail
+        campaign={monitor.state.reading?.campaign ?? latest}
+        monitor={monitor}
+        client={client}
+        models={[]}
+      />
+    ));
+    try {
+      await monitor.open(latest.id);
+      await waitFor(() => expect(monitor.state.connection).toBe("live"));
+      await fireEvent.click(screen.getByRole("button", { name: "Cancel campaign" }));
+      expect(sent).toEqual([]);
+      expect(screen.getByRole("group", { name: "Cancel this campaign?" })).toBeDefined();
+      await fireEvent.click(screen.getByRole("button", { name: "Keep going" }));
+      expect(screen.queryByRole("group", { name: "Cancel this campaign?" })).toBeNull();
+      await fireEvent.click(screen.getByRole("button", { name: "Finish with best" }));
+      const asking = screen.getByRole("group", { name: "Finish with the best result so far?" });
+      expect(asking.textContent).toContain("Nothing has run yet, so there is no improved result.");
+      expect(sent).toEqual([]);
+      await fireEvent.click(within(asking).getByRole("button", { name: "Finish campaign" }));
+      await waitFor(() => expect(sent).toEqual(["finish"]));
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Redirect purpose" })).toBeNull(),
+      );
+      expect(screen.queryByRole("button", { name: "Cancel campaign" })).toBeNull();
+    } finally {
+      monitor.dispose();
+    }
+  });
+
   it("ignores a redirect response after opening another campaign", async () => {
     const slow = deferred<CampaignReading>();
     const [campaign, setCampaign] = createSignal(campaignFixture());

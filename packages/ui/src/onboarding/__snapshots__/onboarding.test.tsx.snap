@@ -7,11 +7,11 @@ exports[`first-run onboarding on the stead > chooses the bare host with its limi
 > workshop
   models
 [portrait kid]
-Where its threads run.
-  one install step: Docker Sandboxes (sbx), winget install -h Docker.sbx on Windows; the workshop pane raises a sealed one afterwards
-> █ a bare host workshop on this machine
-    this node serves no workshops yet (this host serves no workshops); threads run on the bare node
-j k move · enter keeps · i opens a terminal for the install step · esc skips and takes what this machine has · a accepts the rest · backspace goes back · x not now"
+Where its commands run.
+  a sealed sandbox needs Docker Sandboxes installed first (on Windows: winget install -h Docker.sbx) · you can move it into one later from its workshop
+> █ directly on this computer
+    no sandbox is available here yet (this host serves no workshops) · its commands run directly on this computer
+j k move · enter keeps · i opens a terminal to install it · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > offers keywork connect when nothing is reachable, never requires a cloud key, and lets the introduction wait > 4 models, nothing reachable 1`] = `
@@ -21,14 +21,14 @@ exports[`first-run onboarding on the stead > offers keywork connect when nothing
   workshop █
 > models
 [portrait kid]
-Which models answer, local first.
+Which models it uses.
   no local model server answers on this machine
   cloud: unknown until the first turn answers
-  nothing is reachable that the console can see
-  c opens \`keywork connect\` in a terminal pane
-> █ inherit everywhere
-    a cloud key is never required · inherit keeps whatever model the server already answers with
-j k move · enter keeps · esc skips and inherits everywhere · a accepts the rest · backspace goes back · x not now"
+  no model is connected yet
+  c connects a model in a terminal (\`keywork connect\`)
+> █ the model your conversations use
+    no cloud account needed · it answers with whatever model already answers you here
+j k move · enter keeps · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > says a refusal plainly and backspace returns to the name > not made 1`] = `
@@ -38,7 +38,7 @@ exports[`first-run onboarding on the stead > says a refusal plainly and backspac
   workshop ·
   models ·
 [portrait kid]
-not made: a bot already has the slug wren · backspace goes back"
+not made: a bot already has the slug wren · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 1 name 1`] = `
@@ -53,7 +53,7 @@ name ▏Vey
   1 Vey
   2 Una
   3 Fen
-enter keeps the name · 1 2 3 take a proposal · esc skips and it answers to Vey until you rename it"
+enter keeps what you type, or Vey · 1 2 3 take a proposal · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 2 skin 1`] = `
@@ -66,7 +66,7 @@ exports[`first-run onboarding on the stead > walks name, skin, workshop and mode
 How it looks on the stead.
 > █ the tinkerer · a small ranch hand in a leather apron, tools on its belt
   surprise me
-j k move · enter keeps · esc skips and takes the tinkerer · a accepts the rest · backspace goes back · x not now"
+j k move · enter keeps · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 3 workshop 1`] = `
@@ -76,11 +76,11 @@ exports[`first-run onboarding on the stead > walks name, skin, workshop and mode
 > workshop
   models
 [portrait kid]
-Where its threads run.
-  one install step: Docker Sandboxes (sbx), winget install -h Docker.sbx on Windows; the workshop pane raises a sealed one afterwards
-> █ a bare host workshop on this machine
-    commands run unconfined on this machine and nothing is sealed
-j k move · enter keeps · i opens a terminal for the install step · esc skips and takes what this machine has · a accepts the rest · backspace goes back · x not now"
+Where its commands run.
+  a sealed sandbox needs Docker Sandboxes installed first (on Windows: winget install -h Docker.sbx) · you can move it into one later from its workshop
+> █ directly on this computer
+    no sandbox: commands run with your account's access · anything beyond reading its own folder asks you first
+j k move · enter keeps · i opens a terminal to install it · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 4 models 1`] = `
@@ -90,7 +90,7 @@ exports[`first-run onboarding on the stead > walks name, skin, workshop and mode
   workshop █
 > models
 [portrait kid]
-Which models answer, local first.
+Which models it uses.
   qwen3:32b on moak-main (ollama) · strong loop · loaded
   qwen3:8b on moak-main (ollama) · loop
   moondream on moak-main (ollama) · vision
@@ -99,10 +99,10 @@ Which models answer, local first.
   loop: ollama/qwen3:32b
   decide: inherit
   vision: ollama/moondream
-> █ local first
-  inherit everywhere
-    a cloud key is never required · inherit keeps whatever model the server already answers with
-j k move · enter keeps · esc skips and inherits everywhere · a accepts the rest · backspace goes back · x not now"
+> █ models on this computer first
+  the model your conversations use
+    no cloud account needed · it answers with whatever model already answers you here
+j k move · enter keeps · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 5 made 1`] = `
@@ -112,8 +112,8 @@ exports[`first-run onboarding on the stead > walks name, skin, workshop and mode
   workshop █
   models █
 [portrait kid]
-Wren is made · its workshop rises on the stead
-a bare host workshop is raised
-Wren opens its first thread and introduces itself
-enter closes this card · the thread stays open"
+Wren is ready · you will find it on the stead
+its commands run directly on this computer
+Wren opens its first conversation and introduces itself
+enter closes this card · the conversation stays open"
 `;

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { tileFill } from "../chrome/stamp.ts";
 import { browserHost } from "../host/browser.ts";
 import type { HostPort, RecentWorkspace } from "../host/port.ts";
+import { openFailureView } from "./open-failure.tsx";
 import { OpenScreen, startingLine } from "./open-screen.tsx";
 
 afterEach(async () => {
@@ -39,13 +40,46 @@ describe("OpenScreen", () => {
     expect(screen.getByRole("button", { name: "open a folder" })).toBeTruthy();
   });
 
-  it("teaches the five keys on the very first run and lists workspaces after that", async () => {
+  it("starts on opening a folder, teaches no keys that only work in a workspace, and lists workspaces after the first", async () => {
     const first = openScreen([]);
-    await screen.findByLabelText("five keys to start");
+    await settled();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "open a folder" }));
+    expect(document.querySelector(".kw-first-run")).toBeNull();
     first.unmount();
     openScreen([{ path: "C:\\src\\keywork", openedAt: new Date().toISOString() }]);
     expect(await screen.findByText("C:\\src\\keywork")).toBeTruthy();
     expect(document.querySelector(".kw-first-run")).toBeNull();
+  });
+
+  it("says which folder did not open and offers background work only when that is what it needs", () => {
+    const view = openFailureView("C:\\work\\site", {
+      kind: "unresolved",
+      message: "The shared engine is not running.",
+      nextAction: "Enable background work before opening your creature home or a project.",
+    });
+    const { unmount } = render(() => (
+      <OpenScreen
+        host={hostWith([])}
+        failure={view}
+        opening={undefined}
+        onOpen={() => {}}
+        onEnableRuntime={() => {}}
+      />
+    ));
+    expect(screen.getByText("site did not open")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable background work" })).toBeTruthy();
+    unmount();
+    render(() => (
+      <OpenScreen
+        host={hostWith([])}
+        failure={openFailureView("C:\\work\\site", { kind: "port-in-use", port: 4770, detail: "" })}
+        opening={undefined}
+        onOpen={() => {}}
+        onEnableRuntime={() => {}}
+      />
+    ));
+    expect(screen.getByText("port 4770 is taken")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enable background work" })).toBeNull();
   });
 
   it("marks a starting server with the tile-fill, never a spinner, in the product's words", async () => {

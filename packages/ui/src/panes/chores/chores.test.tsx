@@ -7,7 +7,9 @@ import { actionScopes, appActions } from "../../keys/actions.ts";
 import { Keymap } from "../../keys/keymap.ts";
 import type { TrustFlow } from "../../shell/trust.ts";
 import type { PaneDefinition, ShellSeams } from "../registry.ts";
+import { homeOpeningLine } from "../stead/creature-home.tsx";
 import { checkPaneDefinition } from "../testing.ts";
+import { settingsPointer, settingsUnservedLine } from "./copy.ts";
 import { type ChoresSpec, choresPane, choresPaneWith } from "./index.tsx";
 import type { ChoresPort } from "./port.ts";
 import {
@@ -96,14 +98,51 @@ describe("the chores pane, listing", () => {
     const served = await mounted(reading({ settings: nodeSettings }));
     expect(settings(served.container)).toEqual([
       "digest at 08:30, 12:30, 17:30 · quiet 22:00 to 07:00 (America/Chicago)",
-      "Node settings, read-only here: change them in the node's config. A run that needs you rings at once, after quiet hours.",
+      settingsPointer,
     ]);
     expect(served.container.querySelectorAll(".kw-chores-settings input")).toHaveLength(0);
     cleanup();
     const unserved = await mounted(reading());
-    expect(settings(unserved.container)[0]).toBe(
-      "Digest times and quiet hours: this node does not serve them yet.",
-    );
+    expect(settings(unserved.container)[0]).toBe(settingsUnservedLine);
+  });
+});
+
+describe("the chores pane, wherever it opens", () => {
+  it("reads the creature home's chores from a project window, never the project's", async () => {
+    const opened: string[] = [];
+    const { portsFor, container } = await mounted(reading(), {
+      shell: (project) =>
+        ({
+          ...project,
+          steadHome: {
+            workspace: "C:/home/.keywork/home",
+            shell: {
+              ...project,
+              workspace: "C:/home/.keywork/home",
+              sessions: { ...project.sessions, openSession: () => undefined },
+            },
+            openSession: (reference: { session: string }) => void opened.push(reference.session),
+          },
+        }) as unknown as ShellSeams,
+    });
+    expect(portsFor).toEqual(["C:/home/.keywork/home"]);
+    expect(rows(container)).toContain("▾ Wren 5 chores");
+  });
+
+  it("asks for the creature home and says it is opening until the home answers", async () => {
+    let prepared = 0;
+    const { portsFor, container } = await mounted(reading(), {
+      shell: (project) =>
+        ({
+          ...project,
+          prepareSteadHome: () => {
+            prepared += 1;
+          },
+        }) as unknown as ShellSeams,
+    });
+    expect(prepared).toBe(1);
+    expect(portsFor).toEqual([]);
+    expect(container.textContent).toContain(homeOpeningLine);
   });
 });
 
@@ -341,6 +380,66 @@ describe("the chores pane, verbs", () => {
     await settle();
     expect(runTable(container)[1]?.slice(1, 4)).toEqual(["delivered", "completed", "delivered"]);
     expect(runTable(container)).toHaveLength(2);
+  });
+
+  it("finishes the open run when routine.finished arrives in the same burst as creature.changed", async () => {
+    const changing = reading();
+    const running = runRow({
+      runId: "r-62",
+      firedAt: "2026-11-05T15:00:00.000Z",
+      status: "running",
+      process: null,
+      delivery: null,
+    });
+    changing.chores.wren = [{ ...morningTriage, activeRunId: "r-62" }];
+    changing.runs["wren/morning-triage"] = [running];
+    const { container, act, feed } = await mounted(changing);
+    act("chores.down");
+    act("chores.open");
+    await settle();
+    expect(runTable(container)[1]?.slice(1, 3)).toEqual(["running", "running"]);
+    const ended = runRow({
+      runId: "r-62",
+      firedAt: "2026-11-05T15:00:00.000Z",
+      endedAt: "2026-11-05T15:00:41.000Z",
+      trigger: "manual",
+    });
+    changing.chores.wren = [{ ...morningTriage, activeRunId: null, lastRun: ended }];
+    changing.runs["wren/morning-triage"] = [ended];
+    feed.emitTogether([
+      ["creature.changed", { slug: "wren", change: "updated" }],
+      ["routine.finished", { run: ended, disabled: null }],
+    ]);
+    await settle();
+    expect(runTable(container)[1]?.slice(1, 3)).toEqual(["delivered", "completed"]);
+  });
+
+  it("reads the open runs again whenever it reads everything again", async () => {
+    const changing = reading();
+    const running = runRow({
+      runId: "r-62",
+      firedAt: "2026-11-05T15:00:00.000Z",
+      status: "running",
+      process: null,
+      delivery: null,
+    });
+    changing.runs["wren/morning-triage"] = [running];
+    const { container, act, feed } = await mounted(changing);
+    act("chores.down");
+    act("chores.open");
+    await settle();
+    expect(runTable(container)[1]?.[1]).toBe("running");
+    changing.runs["wren/morning-triage"] = [
+      runRow({
+        runId: "r-62",
+        firedAt: "2026-11-05T15:00:00.000Z",
+        endedAt: "2026-11-05T15:00:41.000Z",
+        trigger: "manual",
+      }),
+    ];
+    feed.emit("creature.changed", { slug: "tam", change: "updated" });
+    await settle();
+    expect(runTable(container)[1]?.[1]).toBe("delivered");
   });
 
   it("names a write chore parked on its grants as needing you from the wire item alone, in the head and on its row, until routine.needs clears it", async () => {
@@ -670,6 +769,7 @@ const keys = {
 interface FakeFeed {
   readonly feed: ServerFeed;
   emit(type: string, payload: unknown): void;
+  emitTogether(events: readonly (readonly [type: string, payload: unknown])[]): void;
   connect(): void;
 }
 
@@ -691,12 +791,19 @@ function fakeFeed(): FakeFeed {
     whenLost: () => () => undefined,
     close: () => undefined,
   };
+  const envelopeOf = (type: string, payload: unknown): BusEnvelope => {
+    id += 1;
+    return { id, ts: "t", sessionId: "", type, payload } as unknown as BusEnvelope;
+  };
   return {
     feed,
     emit: (type, payload) => {
-      id += 1;
-      const envelope = { id, ts: "t", sessionId: "", type, payload } as unknown as BusEnvelope;
+      const envelope = envelopeOf(type, payload);
       for (const listener of listeners) listener([envelope]);
+    },
+    emitTogether: (events) => {
+      const batch = events.map(([type, payload]) => envelopeOf(type, payload));
+      for (const listener of listeners) listener(batch);
     },
     connect: () => {
       for (const listener of notices) listener({ kind: "connected" });
@@ -710,11 +817,13 @@ interface Mounted {
   readonly opened: string[];
   readonly recorded: ReturnType<typeof recordingPort>;
   readonly feed: FakeFeed;
+  readonly portsFor: readonly string[];
 }
 
 interface Mounting {
   readonly spec?: ChoresSpec | undefined;
   readonly answers?: Partial<ScriptedAnswers> | undefined;
+  readonly shell?: (shell: ShellSeams) => ShellSeams;
 }
 
 async function mounted(served: ChoresReading, mounting: Mounting = {}): Promise<Mounted> {
@@ -722,11 +831,15 @@ async function mounted(served: ChoresReading, mounting: Mounting = {}): Promise<
   const recorded = recordingPort(served, mounting.answers);
   const feed = fakeFeed();
   const opened: string[] = [];
+  const portsFor: string[] = [];
   const pane: PaneDefinition<ChoresSpec> = choresPaneWith({
-    port: (): ChoresPort => recorded.port,
+    port: (shell): ChoresPort => {
+      portsFor.push(shell.workspace);
+      return recorded.port;
+    },
     clock: { now: () => thursdayMorning, zone: () => testZone },
   });
-  const shell = {
+  const plain = {
     store: {},
     keys,
     sessions: {
@@ -745,6 +858,7 @@ async function mounted(served: ChoresReading, mounting: Mounting = {}): Promise<
     trust: {} as TrustFlow,
     openPane: () => undefined,
   } as unknown as ShellSeams;
+  const shell = mounting.shell?.(plain) ?? plain;
   let handle: (action: string) => void = () => undefined;
   const { container } = render(() => (
     <pane.component
@@ -758,7 +872,7 @@ async function mounted(served: ChoresReading, mounting: Mounting = {}): Promise<
     />
   ));
   await settle();
-  return { container, act: (action) => handle(action), opened, recorded, feed };
+  return { container, act: (action) => handle(action), opened, recorded, feed, portsFor };
 }
 
 async function settle(): Promise<void> {

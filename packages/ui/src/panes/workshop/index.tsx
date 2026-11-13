@@ -21,6 +21,7 @@ import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { ChoiceLine, DraftLine, NoticeLine } from "../overview/rows.tsx";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
+import { InCreatureHome } from "../stead/creature-home.tsx";
 import { houseOffsetMinutes } from "../stead/habitat.ts";
 import {
   displayDarkLine,
@@ -102,7 +103,11 @@ export const workshopPane = definePane<WorkshopSpec>({
   attire: "work",
   title: (spec) => workshopTitle(spec.creature),
   emptyState: (keys) => emptyStateLine(keys.chord("workshop.raise")),
-  component: WorkshopPane,
+  component: (props) => (
+    <InCreatureHome shell={props.shell} class="kw-workshop">
+      {(home) => <WorkshopPane {...props} shell={home} />}
+    </InCreatureHome>
+  ),
   summon: {
     action: "workshop.summon",
     chords: "leader shift+o",

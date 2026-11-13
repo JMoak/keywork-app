@@ -29,7 +29,9 @@ export function CampaignDetail(props: {
   const [artifactId, setArtifactId] = createSignal<string>();
   const [compare, setCompare] = createSignal(false);
   const [steering, setSteering] = createSignal(false);
+  const [confirming, setConfirming] = createSignal<Ending>();
   const [redirectOutcome, setRedirectOutcome] = createSignal("");
+  const finished = () => endedStatuses.has(props.campaign.status);
   let artifactSection: HTMLElement | undefined;
   let artifactSelect: HTMLSelectElement | undefined;
   let redirectGeneration = 0;
@@ -41,6 +43,7 @@ export function CampaignDetail(props: {
         setArtifactId(undefined);
         setCompare(false);
         setSteering(false);
+        setConfirming(undefined);
         redirectGeneration += 1;
       },
     ),
@@ -144,30 +147,54 @@ export function CampaignDetail(props: {
             Resume
           </button>
         </Show>
-        <Show when={!["completed", "cancelled", "failed"].includes(props.campaign.status)}>
+        <Show when={!finished()}>
           <button
             type="button"
             disabled={!canControl()}
-            onClick={() =>
-              send({ type: "cancel", reason: "Cancel requested from campaign monitor." })
-            }
+            aria-expanded={confirming() === "cancel"}
+            onClick={() => setConfirming("cancel")}
           >
             Cancel campaign
           </button>
           <button
             type="button"
             disabled={!canControl()}
-            onClick={() =>
-              send({ type: "finish", reason: "Finish with the best result retained." })
-            }
+            aria-expanded={confirming() === "finish"}
+            onClick={() => setConfirming("finish")}
           >
             Finish with best
           </button>
+          <button type="button" disabled={!canControl()} onClick={toggleSteering}>
+            Redirect purpose
+          </button>
         </Show>
-        <button type="button" disabled={!canControl()} onClick={toggleSteering}>
-          Redirect purpose
-        </button>
       </fieldset>
+      <Show when={!finished() && confirming()}>
+        {(ending) => (
+          <fieldset class="kw-campaign-actions" aria-label={endingWords[ending()].ask}>
+            <p>
+              {ending() === "finish" && props.campaign.attempts.length === 0
+                ? `${endingWords.finish.ask} Nothing has run yet, so there is no improved result.`
+                : endingWords[ending()].ask}{" "}
+              {endingWords[ending()].consequence}
+            </p>
+            <button
+              type="button"
+              disabled={!canControl()}
+              onClick={() => {
+                const { command } = endingWords[ending()];
+                setConfirming(undefined);
+                send(command);
+              }}
+            >
+              {endingWords[ending()].confirm}
+            </button>
+            <button type="button" onClick={() => setConfirming(undefined)}>
+              Keep going
+            </button>
+          </fieldset>
+        )}
+      </Show>
       <Show when={props.campaign.controlRequested}>
         <p role="status">
           {props.campaign.controlRequested === "pause"
@@ -720,3 +747,27 @@ function ArtifactPreview(props: ArtifactInspectionProps) {
     </div>
   );
 }
+
+type Ending = "cancel" | "finish";
+
+const endedStatuses: ReadonlySet<string> = new Set(["completed", "cancelled", "failed"]);
+
+const endingWords: Readonly<
+  Record<
+    Ending,
+    { ask: string; consequence: string; confirm: string; command: CampaignUserCommand }
+  >
+> = {
+  cancel: {
+    ask: "Cancel this campaign?",
+    consequence: "It stops for good and cannot be started again; its artifacts stay.",
+    confirm: "Cancel campaign",
+    command: { type: "cancel", reason: "Cancel requested from campaign monitor." },
+  },
+  finish: {
+    ask: "Finish with the best result so far?",
+    consequence: "The campaign ends and keeps that result; it cannot run again.",
+    confirm: "Finish campaign",
+    command: { type: "finish", reason: "Finish with the best result retained." },
+  },
+};

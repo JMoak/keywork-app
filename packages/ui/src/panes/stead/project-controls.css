@@ -8,7 +8,9 @@
 .kw-stead-projects {
   border-top: 1px solid var(--kw-border);
   color: var(--kw-text-mid);
-  padding: 0.625rem 0;
+  padding: 0.625rem 0.75rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .kw-stead-project-actions,

@@ -23,14 +23,14 @@ describe("the onboarding copy speaks in the creature's voice", () => {
     expect(introductionFrame(facts)).not.toMatch(/!/);
   });
 
-  it("keeps the ranch idiom in the chrome and says plainly what a bare host lacks", () => {
+  it("says plainly what running without a sandbox means and what was made", () => {
     expect(copy.hostLimitation).toBe(
-      "commands run unconfined on this machine and nothing is sealed",
+      "no sandbox: commands run with your account's access · anything beyond reading its own folder asks you first",
     );
     expect(copy.noWorkshopsServed("no port")).toBe(
-      "this node serves no workshops yet (no port); threads run on the bare node",
+      "no sandbox is available here yet (no port) · its commands run directly on this computer",
     );
-    expect(copy.madeLine("Wren")).toBe("Wren is made · its workshop rises on the stead");
+    expect(copy.madeLine("Wren")).toBe("Wren is ready · you will find it on the stead");
     expect(
       copy.reachableModelLine({
         model: "qwen3:32b",
@@ -40,6 +40,19 @@ describe("the onboarding copy speaks in the creature's voice", () => {
         loaded: true,
       }),
     ).toBe("qwen3:32b on moak-main (ollama) · strong loop · loaded");
+  });
+
+  it("teaches esc as not now on every step and never as a way to make the creature", () => {
+    const stepKeys = [
+      copy.nameKeys("Wren"),
+      copy.skinKeys,
+      copy.workshopKeys(true),
+      copy.modelsKeys,
+      copy.notMadeLine("no room"),
+    ];
+    expect(copy.notNowKey).toBe("esc not now");
+    expect(copy.nameKeys("Wren")).toContain(copy.notNowKey);
+    for (const line of stepKeys) expect(line).not.toMatch(/esc skips/);
   });
 });
 

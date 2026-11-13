@@ -1,10 +1,11 @@
+import { keyworkProfile } from "@keywork-app/product";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../host/browser.ts";
 import type { HostPort, PtyExit, ServerResponseHead } from "../host/port.ts";
 import { fakeSurface } from "../panes/terminal/session-testing.ts";
-import { type OpenFailureView, plainOpenFailure } from "../shell/open-failure.tsx";
+import { type OpenFailureView, openFailureView, plainOpenFailure } from "../shell/open-failure.tsx";
 import { OpenScreen } from "../shell/open-screen.tsx";
 import { ModelSetup } from "./index.tsx";
 import { setupInventory } from "./inventory.ts";
@@ -304,11 +305,47 @@ it("uses the latest folder if the user explores and then chooses another project
   await screen.findByText("current");
   fireEvent.click(screen.getByRole("button", { name: "open a folder" }));
   await screen.findByText("Folder to open after setup: C:/first");
-  fireEvent.click(screen.getByRole("button", { name: "Explore first" }));
+  fireEvent.click(screen.getByRole("button", { name: "Not now" }));
   fireEvent.click(screen.getByRole("button", { name: "open a folder" }));
   await screen.findByText("A model is needed.");
   fireEvent.click(screen.getByRole("button", { name: "Set up a model" }));
   expect(await screen.findByText("Folder to open after setup: C:/second")).toBeTruthy();
+});
+
+it("offers setting up a model as the one way on when a folder did not open for want of one, then opens that folder", async () => {
+  const { host } = setupHost(async () =>
+    json(200, report({ provider: "openai", model: "current" })),
+  );
+  const open = vi.fn();
+  const keyless = openFailureView(
+    "C:/work/keyless",
+    {
+      kind: "unresolved",
+      message: "no inference provider is configured",
+      nextAction: "run keywork connect",
+    },
+    keyworkProfile,
+  );
+  render(() => (
+    <OpenScreen
+      host={host}
+      failure={keyless}
+      opening={undefined}
+      onOpen={open}
+      onEnableRuntime={vi.fn()}
+    />
+  ));
+  expect(screen.getByText("keyless did not open")).toBeTruthy();
+  expect(screen.getByText("no model is connected")).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/inference provider|keywork connect/);
+  expect(screen.queryByRole("button", { name: "Enable background work" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Set up a model" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Set up a model" }));
+  await screen.findByText("current");
+  expect(screen.getByText("Folder to open after setup: C:/work/keyless")).toBeTruthy();
+  expect(screen.queryByText("no model is connected")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open this folder" }));
+  expect(open).toHaveBeenCalledWith("C:/work/keyless");
 });
 
 it("asks before enabling the managed runtime when setup needs background work", async () => {
@@ -339,6 +376,34 @@ it("asks before enabling the managed runtime when setup needs background work", 
   await screen.findByRole("heading", { name: "How would you like to connect a model?" });
   expect(host.enableRuntime).toHaveBeenCalledOnce();
   expect(host.openHome).toHaveBeenCalledTimes(2);
+});
+
+it("tabs from its heading to its own first choice, never back to the top of the pane around it", async () => {
+  const laidOut = vi
+    .spyOn(HTMLElement.prototype, "getClientRects")
+    .mockReturnValue([{}] as unknown as DOMRectList);
+  const { host } = setupHost(async () =>
+    json(200, report({ provider: "openai", model: "current" })),
+  );
+  render(() => (
+    <section>
+      <button type="button">companion off</button>
+      <ModelSetup
+        host={host}
+        workspace="C:/managed-home"
+        heading="How would you like Wren to reply?"
+        continueLabel="Open conversation"
+        onContinue={vi.fn()}
+        onExplore={vi.fn()}
+      />
+    </section>
+  ));
+  const continuing = await screen.findByRole("button", { name: "Open conversation" });
+  const heading = screen.getByRole("heading", { name: "How would you like Wren to reply?" });
+  expect(document.activeElement).toBe(heading);
+  fireEvent.keyDown(heading, { key: "Tab" });
+  expect(document.activeElement).toBe(continuing);
+  laidOut.mockRestore();
 });
 
 function showSetup(host: HostPort, use = vi.fn(), explore = vi.fn()): void {
