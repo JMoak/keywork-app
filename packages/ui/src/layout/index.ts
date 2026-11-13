@@ -7,6 +7,7 @@ export {
   dropEdgeWidth,
   dropZoneAt,
   dropZoneRects,
+  floatingAt,
   type Hit,
   hitAt,
   type Point,
@@ -18,7 +19,14 @@ export {
   seamReach,
   seamZoneRect,
 } from "./hit.ts";
-export { Layout, type Refusal, type Verdict } from "./layout.ts";
+export {
+  type Absence,
+  type Floating,
+  Layout,
+  type Refusal,
+  type Shelved,
+  type Verdict,
+} from "./layout.ts";
 export {
   advancePointer,
   dragThreshold,
@@ -30,6 +38,7 @@ export {
   type PointerStep,
 } from "./pointer.ts";
 export { arrangementRects, holds, type Regions, regionsOf } from "./scene.ts";
+export { floatStep, type UnitRect } from "./standing.ts";
 export {
   type LayoutState,
   layoutStateIds,

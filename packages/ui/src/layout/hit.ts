@@ -26,6 +26,7 @@ export interface Scene {
   readonly seams: readonly Seam[];
   readonly regions: Regions;
   readonly seamReach?: number;
+  readonly floating?: readonly PaneId[];
 }
 
 export interface Point {
@@ -50,6 +51,8 @@ export function sameSeam(one: Seam | undefined, other: Seam | undefined): boolea
 }
 
 export function hitAt(scene: Scene, point: Point): Hit | undefined {
+  const afloat = floatingAt(scene, point);
+  if (afloat !== undefined) return { kind: "pane", id: afloat };
   const reach = scene.seamReach ?? seamReach;
   const seam = scene.seams.find((candidate) =>
     contains(seamZoneRect(candidate, reach), point.x, point.y),
@@ -59,6 +62,13 @@ export function hitAt(scene: Scene, point: Point): Hit | undefined {
     if (contains(rect, point.x, point.y)) return { kind: "pane", id };
   }
   return undefined;
+}
+
+export function floatingAt(scene: Scene, point: Point): PaneId | undefined {
+  return scene.floating?.find((id) => {
+    const rect = scene.rects.get(id);
+    return rect !== undefined && contains(rect, point.x, point.y);
+  });
 }
 
 export function seamZoneRect(seam: Seam, reach: number = seamReach): Rect {

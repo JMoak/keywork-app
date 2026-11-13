@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { browserHost } from "../host/browser.ts";
 import { fakeClient } from "./client-testing.ts";
-import { createTiler, refusalNotices } from "./tiler.ts";
+import { createTiler, shelfNotices } from "./tiler.ts";
 
 afterEach(() => {
   cleanup();
@@ -178,27 +178,44 @@ describe("keyboard workflows", () => {
     await waitFor(() => expect(screen.queryByLabelText("palette")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(composer()));
   });
-  it("says the tiler's no-room sentence in the status line when a chord summons a pane nothing can hold", async () => {
+  it("shelves the pane of lowest standing, and says so, when a chord summons one more than the stage shows", async () => {
     await openWorkspace();
     await fillTheMain();
-    const open = frames().length;
+    const showing = shownFrames().length;
+    expect(shelfPanes()).toHaveLength(0);
     press("k", { ctrlKey: true });
     press("B", { shiftKey: true });
-    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
-    expect(frames()).toHaveLength(open);
+    await waitFor(() => expect(noticeText()).toBe(shelfNotices.tucked(1)));
+    expect(shownFrames()).toHaveLength(showing);
+    expect(shelfPanes().map((pane) => pane.dataset.why)).toEqual(["tucked"]);
   });
 
-  it("says the same sentence when the palette summons a pane nothing can hold", async () => {
+  it("does the same when the palette summons one more than the stage shows", async () => {
     await openWorkspace();
     await fillTheMain();
-    const open = frames().length;
+    const showing = shownFrames().length;
     press("p", { ctrlKey: true, shiftKey: true });
     const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
     palette.value = "/chores";
     fireEvent.input(palette);
     fireEvent.keyDown(palette, { key: "Enter" });
-    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
-    expect(frames()).toHaveLength(open);
+    await waitFor(() => expect(noticeText()).toBe(shelfNotices.tucked(1)));
+    expect(shownFrames()).toHaveLength(showing);
+    expect(shelfPanes()).toHaveLength(1);
+  });
+
+  it("returns a tucked pane to its seat when the shelf is clicked, tucking the next in line", async () => {
+    await openWorkspace();
+    await fillTheMain();
+    press("k", { ctrlKey: true });
+    press("B", { shiftKey: true });
+    await waitFor(() => expect(shelfPanes()).toHaveLength(1));
+    const waiting = shelfPanes()[0] as HTMLElement;
+    const name = waiting.querySelector(".kw-shelf-name")?.textContent;
+    fireEvent.click(waiting);
+    await waitFor(() => expect(focusedName()).toBe(name));
+    expect(shelfPanes()).toHaveLength(1);
+    expect(shelfPanes()[0]?.querySelector(".kw-shelf-name")?.textContent).not.toBe(name);
   });
 
   it("focuses the optional Stead pane on both its first and subsequent summons", async () => {
@@ -226,8 +243,95 @@ describe("keyboard workflows", () => {
   });
 });
 
+describe("floating, shelving and pinning by key", () => {
+  const slotNamed = (name: string): HTMLElement | undefined =>
+    [...document.querySelectorAll<HTMLElement>(".kw-slot")].find(
+      (slot) => slot.querySelector(".kw-frame-name")?.textContent === name,
+    );
+  const leader = (key: string): void => {
+    press("k", { ctrlKey: true });
+    press(key);
+  };
+
+  it("floats the focused pane over the tiling with leader space and settles it with the same key", async () => {
+    await openWorkspace();
+    expect(focusedName()).toBe("new session");
+    leader(" ");
+    await waitFor(() => expect(slotNamed("new session")?.dataset.floating).toBe(""));
+    expect(slotNamed("new session")?.querySelector(".kw-float-grip")).not.toBeNull();
+    expect(slotNamed("sessions")?.dataset.floating).toBeUndefined();
+    leader(" ");
+    await waitFor(() => expect(slotNamed("new session")?.dataset.floating).toBeUndefined());
+    expect(document.querySelector(".kw-float-grip")).toBeNull();
+  });
+
+  it("lets the pane travel between its seat and its float for one beat, then holds still", async () => {
+    await openWorkspace();
+    leader(" ");
+    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBe(""));
+    expect(slotNamed("sessions")?.dataset.changingLayer).toBeUndefined();
+    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBeUndefined());
+    expect(slotNamed("new session")?.dataset.floating).toBe("");
+    leader(" ");
+    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBe(""));
+    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBeUndefined());
+    expect(slotNamed("new session")?.dataset.floating).toBeUndefined();
+  });
+
+  it("steps from the tiling to the float and back with leader tab", async () => {
+    await openWorkspace();
+    leader(" ");
+    await waitFor(() => expect(slotNamed("new session")?.dataset.floating).toBe(""));
+    leader("Tab");
+    await waitFor(() => expect(focusedName()).toBe("sessions"));
+    leader("Tab");
+    await waitFor(() => expect(focusedName()).toBe("new session"));
+  });
+
+  it("shelves the focused pane with leader minus, keeps it mounted, and returns it with leader equals", async () => {
+    await openWorkspace();
+    leader("-");
+    await waitFor(() => expect(shelfPanes()).toHaveLength(1));
+    expect(shelfPanes()[0]?.dataset.why).toBe("shelved");
+    expect(shelfPanes()[0]?.querySelector(".kw-shelf-name")?.textContent).toBe("new session");
+    expect(focusedName()).toBe("sessions");
+    expect(slotNamed("new session")?.hidden).toBe(true);
+    expect(shownFrames()).toHaveLength(1);
+    leader("=");
+    await waitFor(() => expect(shelfPanes()).toHaveLength(0));
+    expect(focusedName()).toBe("new session");
+    expect(slotNamed("new session")?.hidden).toBe(false);
+  });
+
+  it("keeps the last pane on the stage and says so", async () => {
+    await openWorkspace();
+    leader("-");
+    await waitFor(() => expect(shelfPanes()).toHaveLength(1));
+    leader("-");
+    await waitFor(() => expect(noticeText()).toBe(shelfNotices.lastPaneStays));
+    expect(shelfPanes()).toHaveLength(1);
+  });
+
+  it("pins the focused pane with leader quote and marks its title row", async () => {
+    await openWorkspace();
+    leader("'");
+    await waitFor(() => expect(noticeText()).toBe(shelfNotices.pinned));
+    expect(slotNamed("new session")?.querySelector(".kw-frame-pin")).not.toBeNull();
+    leader("'");
+    await waitFor(() => expect(noticeText()).toBe(shelfNotices.unpinned));
+    expect(document.querySelector(".kw-frame-pin")).toBeNull();
+  });
+});
+
 const noticeText = (): string | undefined =>
   document.querySelector(".kw-status-notice")?.textContent ?? undefined;
+
+const shelfPanes = (): HTMLElement[] => [
+  ...document.querySelectorAll<HTMLElement>(".kw-shelf-pane"),
+];
+const shownFrames = (): HTMLElement[] => [
+  ...document.querySelectorAll<HTMLElement>(".kw-slot:not([hidden]) > .kw-frame"),
+];
 
 async function fillTheMain(): Promise<void> {
   const room = createRoot((dispose) => {
@@ -236,9 +340,9 @@ async function fillTheMain(): Promise<void> {
     tiler.summon({ kind: "tree" }, screenOfTheApp);
     tiler.open({ kind: "conversation" }, screenOfTheApp);
     let fitted = 0;
-    while (tiler.open({ kind: "conversation", sessionId: `fit-${fitted}` }, screenOfTheApp).ok) {
-      fitted += 1;
-    }
+    const oneMore = () =>
+      tiler.open({ kind: "conversation", sessionId: `fit-${fitted}` }, screenOfTheApp);
+    while (oneMore().notice === undefined) fitted += 1;
     dispose();
     return fitted;
   });

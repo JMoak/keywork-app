@@ -18,7 +18,7 @@ function twoMainOneDocked(): Layout {
   const layout = new Layout();
   layout.open("a", screen);
   layout.open("b", screen);
-  layout.openInDock("tree", "left", screen);
+  layout.openInDock("tree", "left");
   return layout;
 }
 
