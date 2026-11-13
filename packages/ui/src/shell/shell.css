@@ -114,7 +114,6 @@
 .kw-open-pick:focus-visible,
 .kw-open-recent:hover,
 .kw-open-recent:focus-visible {
-  outline: none;
   color: var(--kw-text);
   background: var(--kw-panel);
 }

@@ -1,4 +1,4 @@
-import { hexChannels } from "./contrast.ts";
+import { hexChannels, linearChannel } from "./contrast.ts";
 
 export function mixOklab(from: string, toward: string, amount: number): string {
   const blend = Math.min(Math.max(amount, 0), 1);
@@ -7,10 +7,10 @@ export function mixOklab(from: string, toward: string, amount: number): string {
   return hexOfOklab([l1 + (l2 - l1) * blend, a1 + (a2 - a1) * blend, b1 + (b2 - b1) * blend]);
 }
 
-type Oklab = readonly [number, number, number];
+export type Oklab = readonly [number, number, number];
 
-function oklabOf(hex: string): Oklab {
-  const [r, g, b] = hexChannels(hex).map(linearOf) as [number, number, number];
+export function oklabOf(hex: string): Oklab {
+  const [r, g, b] = hexChannels(hex).map(linearChannel) as [number, number, number];
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
@@ -31,11 +31,6 @@ function hexOfOklab([lightness, a, b]: Oklab): string {
     -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
   ];
   return `#${channels.map((channel) => byteOf(channel).toString(16).padStart(2, "0")).join("")}`;
-}
-
-function linearOf(channel: number): number {
-  const unit = channel / 255;
-  return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
 }
 
 function byteOf(linear: number): number {

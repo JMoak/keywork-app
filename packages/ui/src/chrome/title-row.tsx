@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, onCleanup, onMount, Show } from "solid-js";
 import type { ContextLevel, GaugeStyle } from "../instruments/context.ts";
 import { ContextGauge, contextUnit } from "../instruments/gauge.tsx";
 import { gaugeStyleFor, type InstrumentTier } from "../instruments/tier.ts";
@@ -7,6 +7,8 @@ import type { TitleBot } from "./identity.ts";
 import type { ChromeWeight } from "./root-attributes.ts";
 import { arcTagParts } from "./slug.ts";
 import { type LifecycleState, stampGlyph } from "./stamp.ts";
+import { compactTelemetry } from "./telemetry.ts";
+import { keepNameReadable } from "./title-fit.ts";
 
 export type TitleZone =
   | "stamp"
@@ -80,8 +82,12 @@ export function TitleRow(props: TitleRowProps) {
     props.instruments === undefined ? undefined : gaugeStyleFor(props.instruments);
   const telemetryShown = () =>
     zones().has("telemetry") && (props.context !== undefined || present(props.telemetry));
+  let header: HTMLElement | undefined;
+  onMount(() => {
+    if (header !== undefined) onCleanup(keepNameReadable(header));
+  });
   return (
-    <header class="kw-frame-title" data-tier={props.tier}>
+    <header class="kw-frame-title" data-tier={props.tier} ref={header}>
       <Show when={props.weight === "borderless"}>
         <span class="kw-frame-lead" aria-hidden="true">
           {props.focused ? focusMark : " "}
@@ -100,9 +106,9 @@ export function TitleRow(props: TitleRowProps) {
           {paneMark}
         </span>
       </Show>
-      <span class="kw-frame-name" data-state={props.state}>
+      <h2 class="kw-frame-name" title={props.name} data-state={props.state}>
         {props.name}
-      </span>
+      </h2>
       <Show when={shown("arc", props.arc)}>{(slug) => <ArcTag slug={slug()} />}</Show>
       <span class="kw-frame-detail">
         <Show when={shown("bot", props.bot)}>{(bot) => <BotIdentity bot={bot()} />}</Show>
@@ -129,7 +135,16 @@ export function TitleRow(props: TitleRowProps) {
             {(level) => <TitleGauge level={level()} style={gaugeStyle()} onOpen={props.onGauge} />}
           </Show>
           <Show when={props.telemetry}>
-            {(text) => <span class="kw-frame-usage">{text()}</span>}
+            {(text) => (
+              <>
+                <span class="kw-frame-usage" title={text()}>
+                  {text()}
+                </span>
+                <span class="kw-frame-usage-compact" title={text()}>
+                  {compactTelemetry(text())}
+                </span>
+              </>
+            )}
           </Show>
         </span>
       </Show>

@@ -3,7 +3,7 @@ import type { ContextLevel } from "../instruments/context.ts";
 import { tierOf, type WidthTier } from "../page/tiers.ts";
 import type { Outfit } from "../theme/attire.ts";
 import type { Theme } from "../theme/schema.ts";
-import { dressElement, undressElement } from "../theme/variables.ts";
+import { dressElement, swapAtOnce, undressElement } from "../theme/variables.ts";
 import type { TitleBot } from "./identity.ts";
 import { chromeWeight } from "./root-attributes.ts";
 import { createTileFillStep, type LifecycleState } from "./stamp.ts";
@@ -65,6 +65,7 @@ export function PaneFrame(props: PaneFrameProps) {
     <section
       ref={frame}
       class="kw-frame"
+      aria-label={`${props.name} pane`}
       data-attire={dressed()?.source}
       data-house={chromeWeight()}
       data-tier={tier()}
@@ -110,7 +111,10 @@ function ownOutfit(outfit: Outfit | undefined): OwnOutfit | undefined {
 
 function wearOn(frame: HTMLElement, theme: Theme | undefined): void {
   if (theme === undefined) {
-    frame.dataset.chrome = chromeWeight();
+    const weight = chromeWeight();
+    swapAtOnce(frame, () => {
+      frame.dataset.chrome = weight;
+    });
     return;
   }
   dressElement(frame, theme);

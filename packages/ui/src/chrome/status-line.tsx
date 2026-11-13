@@ -8,6 +8,8 @@ import "./status-line.css";
 export interface StatusLineProps {
   serverLabel: string;
   serverLost?: boolean | undefined;
+  folder?: string | undefined;
+  model?: string | undefined;
   projection: SessionProjection;
   usage: string;
   preset: string | undefined;
@@ -24,16 +26,18 @@ export type StatusTone = "mark" | "where" | "warn" | "word" | "quiet";
 export interface StatusItem {
   readonly tone: StatusTone;
   readonly text: string;
+  readonly detail?: string | undefined;
 }
 
 export function statusItems(
   props: StatusLineProps,
   profile: ProductProfile = keyworkProfile,
 ): StatusItem[] {
-  const candidates: { tone: StatusTone; text: string | undefined }[] = [
+  const candidates: StatusCandidate[] = [
     { tone: "mark", text: profile.name },
-    { tone: props.serverLost ? "warn" : "where", text: props.serverLabel },
+    whereItem(props),
     { tone: "warn", text: props.trust },
+    { tone: "word", text: props.model },
     { tone: "word", text: props.preset },
     { tone: "word", text: props.projection.mode },
     { tone: "quiet", text: props.usage },
@@ -50,13 +54,13 @@ export function StatusLine(props: StatusLineProps) {
       <span class="kw-status-items">
         <For each={statusItems(props, profile)}>
           {(item) => (
-            <span class="kw-status-item" data-tone={item.tone}>
+            <span class="kw-status-item" data-tone={item.tone} title={item.detail}>
               {item.text}
             </span>
           )}
         </For>
       </span>
-      <span class="kw-status-moment">
+      <span class="kw-status-moment" role="status">
         <Show when={props.leader}>
           {(leader) => <kbd class="kw-status-leader">{leader()} …</kbd>}
         </Show>
@@ -81,6 +85,24 @@ export function StatusLine(props: StatusLineProps) {
   );
 }
 
+interface StatusCandidate extends Omit<StatusItem, "text"> {
+  readonly text: string | undefined;
+}
+
+function whereItem(props: StatusLineProps): StatusItem {
+  if (props.serverLost) return { tone: "warn", text: props.serverLabel, detail: props.folder };
+  if (props.folder === undefined) return { tone: "where", text: props.serverLabel };
+  return {
+    tone: "where",
+    text: folderName(props.folder),
+    detail: `${props.folder} · served at ${props.serverLabel}`,
+  };
+}
+
+function folderName(path: string): string {
+  return path.split(pathSeparator).findLast((segment) => segment !== "") ?? path;
+}
+
 function UpdateNotice(props: { offer: UpdateOffer }) {
   return (
     <Show when={props.offer.waiting()}>
@@ -101,3 +123,5 @@ function UpdateNotice(props: { offer: UpdateOffer }) {
     </Show>
   );
 }
+
+const pathSeparator = /[\\/]/;

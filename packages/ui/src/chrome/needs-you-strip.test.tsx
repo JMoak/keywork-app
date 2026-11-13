@@ -1,11 +1,12 @@
-import { cleanup, render } from "@solidjs/testing-library";
-import { createRoot } from "solid-js";
+import { cleanup, render, screen } from "@solidjs/testing-library";
+import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { airlockItem, askItem } from "../shell/needs-you-testing.ts";
 import {
   createStripPreference,
   NeedsYouStrip,
   type StripInputs,
+  type StripLine,
   stripLine,
   stripStorageKey,
 } from "./needs-you-strip.tsx";
@@ -57,7 +58,7 @@ describe("the strip", () => {
   it("renders one glanceable line with the needs-you stamp and nothing to focus", () => {
     const { container } = render(() => <NeedsYouStrip line={stripLine(inputs)} />);
     const strip = container.querySelector(".kw-needs-you") as HTMLElement;
-    expect(strip.getAttribute("role")).toBe("status");
+    expect(strip.parentElement?.getAttribute("role")).toBe("status");
     expect(strip.dataset.detail).toBe("next");
     expect(strip.textContent).toBe("█3 need youask: rm -rf dist(refactor-permissions)ctrl+k n");
     expect(strip.querySelectorAll("button, a, input, [tabindex]")).toHaveLength(0);
@@ -74,6 +75,16 @@ describe("the strip", () => {
     expect(strips).toHaveLength(1);
     expect(strips[0]?.dataset.detail).toBe("count");
     expect(strips[0]?.textContent).toBe("█3 need you");
+  });
+
+  it("keeps its live region mounted while nothing needs you, so the first ask is announced", () => {
+    const [line, setLine] = createSignal<StripLine | undefined>(undefined);
+    render(() => <NeedsYouStrip line={line()} />);
+    const region = screen.getByRole("status", { name: "needs you" });
+    expect(region.textContent).toBe("");
+    setLine(stripLine(inputs));
+    expect(screen.getByRole("status", { name: "needs you" })).toBe(region);
+    expect(region.textContent).toContain("3 need you");
   });
 });
 

@@ -9,6 +9,18 @@ export function apcaLc(inkHex: string, groundHex: string): number {
   return magnitude < lowContrastClip ? 0 : (magnitude - lowContrastOffset) * 100;
 }
 
+export function wcagContrast(inkHex: string, groundHex: string): number {
+  const [lighter, darker] = [relativeLuminance(inkHex), relativeLuminance(groundHex)].sort(
+    (left, right) => right - left,
+  ) as [number, number];
+  return (lighter + wcagFlare) / (darker + wcagFlare);
+}
+
+export function linearChannel(channel: number): number {
+  const unit = channel / 255;
+  return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+}
+
 export type ContrastPolarity = "dark-on-light" | "light-on-dark";
 
 export function contrastPolarity(inkHex: string, groundHex: string): ContrastPolarity {
@@ -30,6 +42,12 @@ const lowContrastClip = 0.1;
 const lowContrastOffset = 0.027;
 const nearBlackThreshold = 0.022;
 const nearBlackExponent = Math.SQRT2;
+const wcagFlare = 0.05;
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexChannels(hex).map(linearChannel) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
 function screenLuminance(hex: string): number {
   const [r, g, b] = hexChannels(hex);

@@ -1,4 +1,4 @@
-import { derivedTextFaint } from "./complete.ts";
+import { legibleInks } from "./legible.ts";
 import type { Theme } from "./schema.ts";
 import { densityLevels, diffKeys, syntaxKeys, terminalKeys } from "./sections.ts";
 import { keyworkNight } from "./themes.ts";
@@ -11,25 +11,29 @@ export const fontVariables: ThemeVariables = {
   "--kw-font-prose": '"Source Serif 4", "Newsreader", Georgia, "Times New Roman", serif',
 };
 
+export const swappingAttribute = "data-theme-swap";
+
 export function themeVariables(theme: Theme): ThemeVariables {
   const { tokens } = theme;
+  const inks = legibleInks(theme);
   return {
     "--kw-background": tokens.background,
     "--kw-panel": tokens.panel,
     "--kw-panel-lift": tokens.panelLift,
-    "--kw-text": tokens.text,
-    "--kw-text-mid": tokens.textMid,
-    "--kw-text-dim": tokens.textDim,
-    "--kw-text-faint": derivedTextFaint(tokens),
+    "--kw-text": inks.text,
+    "--kw-text-mid": inks.textMid,
+    "--kw-text-dim": inks.textDim,
+    "--kw-text-faint": inks.textFaint,
     "--kw-border": tokens.border,
     "--kw-house-border": tokens.border,
-    "--kw-border-focus": tokens.borderFocus,
-    "--kw-accent": tokens.accent,
-    "--kw-accent-soft": tokens.accentSoft,
-    "--kw-success": tokens.success,
-    "--kw-error": tokens.error,
+    "--kw-border-focus": inks.borderFocus,
+    "--kw-scrollbar": inks.scrollbar,
+    "--kw-accent": inks.accent,
+    "--kw-accent-soft": inks.accentSoft,
+    "--kw-success": inks.success,
+    "--kw-error": inks.error,
     ...Object.fromEntries(
-      rampStops(tokens.ramp).map((stop, index) => [`--kw-ramp-${index + 1}`, stop]),
+      rampStops(inks.ramp).map((stop, index) => [`--kw-ramp-${index + 1}`, stop]),
     ),
     ...Object.fromEntries(
       densityLevels.map((level) => [
@@ -57,26 +61,39 @@ export function themeStylesheet(theme: Theme): string {
 }
 
 export function applyTheme(theme: Theme, root: HTMLElement = document.documentElement): void {
-  for (const [name, value] of Object.entries(themeVariables(theme))) {
-    root.style.setProperty(name, value);
-  }
-  root.style.colorScheme = theme.appearance;
-  Object.assign(root.dataset, themeAttributes(theme));
+  swapAtOnce(root, () => {
+    for (const [name, value] of Object.entries(themeVariables(theme))) {
+      root.style.setProperty(name, value);
+    }
+    root.style.colorScheme = theme.appearance;
+    Object.assign(root.dataset, themeAttributes(theme));
+  });
 }
 
 export function dressElement(element: HTMLElement, theme: Theme): void {
-  for (const [name, value] of Object.entries(paneVariables(theme))) {
-    element.style.setProperty(name, value);
-  }
-  element.style.colorScheme = theme.appearance;
-  Object.assign(element.dataset, paneAttributes(theme));
+  swapAtOnce(element, () => {
+    for (const [name, value] of Object.entries(paneVariables(theme))) {
+      element.style.setProperty(name, value);
+    }
+    element.style.colorScheme = theme.appearance;
+    Object.assign(element.dataset, paneAttributes(theme));
+  });
 }
 
 export function undressElement(element: HTMLElement): void {
-  for (const name of Object.keys(paneVariables(keyworkNight))) element.style.removeProperty(name);
-  element.style.removeProperty("color-scheme");
-  for (const attribute of Object.keys(paneAttributes(keyworkNight)))
-    delete element.dataset[attribute];
+  swapAtOnce(element, () => {
+    for (const name of Object.keys(paneVariables(keyworkNight))) element.style.removeProperty(name);
+    element.style.removeProperty("color-scheme");
+    for (const attribute of Object.keys(paneAttributes(keyworkNight)))
+      delete element.dataset[attribute];
+  });
+}
+
+export function swapAtOnce(element: HTMLElement, swap: () => void): void {
+  element.setAttribute(swappingAttribute, "");
+  swap();
+  settleStyles(element);
+  element.removeAttribute(swappingAttribute);
 }
 
 export function themeAttributes(theme: Theme): Readonly<Record<string, string>> {
@@ -142,4 +159,9 @@ function sectionVariables<Key extends string>(
 
 function kebab(name: string): string {
   return name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+function settleStyles(element: HTMLElement): void {
+  // Transitions start at the style recalc that sees a change; reading a computed style runs it now.
+  element.ownerDocument.defaultView?.getComputedStyle(element).getPropertyValue("color");
 }

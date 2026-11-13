@@ -1,5 +1,5 @@
 import type { ServerTheme } from "@keywork-app/protocol";
-import { cleanup } from "@solidjs/testing-library";
+import { cleanup, within } from "@solidjs/testing-library";
 import { createRoot } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -144,6 +144,33 @@ describe("the themes pane", () => {
     act("themes.up");
     act("themes.up");
     expect(cursorName(container)).toBe("system");
+    dispose();
+  });
+
+  it("tells assistive tech which theme the cursor is on and which one is worn", async () => {
+    const { wardrobe, dispose } = fitted();
+    const { container, act } = mount(wardrobe);
+    const list = within(container).getByRole("listbox", { name: "themes" });
+    const cursorOption = () =>
+      container.querySelector(`#${list.getAttribute("aria-activedescendant")}`);
+    expect(cursorOption()?.getAttribute("data-theme-name")).toBe("keywork-night");
+    expect(cursorOption()?.getAttribute("aria-selected")).toBe("true");
+    act("themes.down");
+    await nextFrame();
+    expect(cursorOption()?.getAttribute("data-theme-name")).toBe(cursorName(container));
+    const worn = within(list).getByRole("option", { current: true });
+    expect(worn.getAttribute("data-theme-name")).toBe("keywork-night");
+    expect(within(worn).getByRole("img", { name: "worn" })).toBeTruthy();
+    expect(within(container).getByRole("status").textContent).toBe(notice(container));
+    dispose();
+  });
+
+  it("teaches its keys from the keymap", () => {
+    const { wardrobe, dispose } = fitted();
+    const { container } = mount(wardrobe);
+    expect(container.querySelector(".kw-ov-head-detail")?.textContent).toBe(
+      "ctrl+k themes.wear wears · ctrl+k themes.restore keeps · ctrl+k themes.system system · ctrl+k themes.target target",
+    );
     dispose();
   });
 
@@ -530,7 +557,7 @@ describe("the themes pane on a target", () => {
     act("themes.target");
     expect(rowNames(container)[0]).toBe("system");
     act("themes.undress");
-    expect(notice(container)).toBe(windowAlwaysDressedNotice);
+    expect(notice(container)).toBe(windowAlwaysDressedNotice(shell.keys.chord));
     dispose();
   });
 

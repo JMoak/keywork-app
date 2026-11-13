@@ -8,7 +8,14 @@ export const liveTurnsOnly = "live turns only";
 export function telemetry(projection: SessionProjection, report?: CostReport): string {
   if (report !== undefined) return reportedUsageLine(report);
   const live = usageLine(projection.usage);
-  return live === "" ? "" : `${live} · ${liveTurnsOnly}`;
+  return live === "" ? "" : `${live}${itemJoint}${liveTurnsOnly}`;
+}
+
+export function compactTelemetry(line: string): string {
+  return line
+    .split(itemJoint)
+    .filter((item) => item !== liveTurnsOnly && !tokensItem.test(item))
+    .join(itemJoint);
 }
 
 export function relativeAge(iso: string, now: number = Date.now()): string {
@@ -20,3 +27,6 @@ export function relativeAge(iso: string, now: number = Date.now()): string {
   if (hours < 48) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
 }
+
+const itemJoint = " · ";
+const tokensItem = / tokens$/;
