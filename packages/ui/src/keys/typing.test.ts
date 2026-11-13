@@ -23,6 +23,19 @@ describe("pane-local chords while typing", () => {
     expect(keyFocusOf("terminal", area, owning)).toEqual({ scope: "terminal", typing: false });
   });
 
+  it("lets a keyboard-owning pane own the keys only while focus is inside it", () => {
+    const area = document.createElement("textarea");
+    expect(keyFocusOf("terminal", document.body, owning, false)).toEqual({
+      scope: undefined,
+      typing: false,
+    });
+    expect(keyFocusOf("terminal", area, owning, false)).toEqual({ scope: undefined, typing: true });
+    expect(keyFocusOf("tree", document.body, owning, false)).toEqual({
+      scope: "tree",
+      typing: false,
+    });
+  });
+
   it("recognizes inputs, textareas and editable elements as text fields", () => {
     const editable = document.createElement("div");
     editable.contentEditable = "true";

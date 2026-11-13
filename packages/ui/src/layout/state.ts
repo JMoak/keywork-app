@@ -33,6 +33,7 @@ export const layoutStateSchema = z
     version: z.literal(layoutStateVersion),
     tree: nodeSchema.optional(),
     focused: z.string().min(1).optional(),
+    opened: z.array(z.string().min(1)).optional(),
     docks: z.object({ left: dockSchema.optional(), right: dockSchema.optional() }).optional(),
   })
   .describe(
@@ -58,18 +59,24 @@ export function layoutStateIds(state: LayoutState): PaneId[] {
   ];
 }
 
-export function layoutStateOf(arrangement: Arrangement, focused: PaneId | undefined): LayoutState {
+export function layoutStateOf(
+  arrangement: Arrangement,
+  focused: PaneId | undefined,
+  opened: readonly PaneId[],
+): LayoutState {
   const { tree, docks } = arrangement;
   const persisted = {
     ...(docks.left.panes.length > 0 && { left: snapshot(docks.left) }),
     ...(docks.right.panes.length > 0 && { right: snapshot(docks.right) }),
   };
-  return {
+  const state: LayoutState = {
     version: layoutStateVersion,
     ...(tree !== undefined && { tree }),
     ...(focused !== undefined && { focused }),
     ...(Object.keys(persisted).length > 0 && { docks: persisted }),
   };
+  const placed = layoutStateIds(state);
+  return opened.every((id, at) => placed[at] === id) ? state : { ...state, opened: [...opened] };
 }
 
 export function arrangementOf(state: LayoutState): Arrangement {
@@ -82,6 +89,12 @@ export function arrangementOf(state: LayoutState): Arrangement {
     ),
   });
   return { tree: state.tree, docks: { left: revive("left"), right: revive("right") } };
+}
+
+export function openingOrderOf(state: LayoutState): PaneId[] {
+  const present = layoutStateIds(state);
+  const remembered = (state.opened ?? []).filter((id) => present.includes(id));
+  return [...new Set([...remembered, ...present])];
 }
 
 function snapshot(dock: DockState): { panes: PaneId[]; ratio: number } {

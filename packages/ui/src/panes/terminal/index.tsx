@@ -69,6 +69,7 @@ export const terminalPane = definePane<TerminalSpec>({
       },
     },
     spec: (shell, variant) => specFor(shell, variant),
+    again: "opens-another",
   },
   localActions: {
     "terminal.clear": {
@@ -219,6 +220,8 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
     else live.blur();
   });
 
+  props.guardClose?.(async () => stillRunningNotice((await pty?.running()) ?? []));
+
   props.onAction((action) => {
     const live = surface();
     if (live === undefined) return;
@@ -271,6 +274,11 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
 
 const enter = "\r";
 const formFeed = "\f";
+
+function stillRunningNotice(programs: readonly string[]): string | undefined {
+  if (programs.length === 0) return undefined;
+  return `${programs.join(", ")} ${programs.length === 1 ? "is" : "are"} still running in this shell`;
+}
 
 function copySelection(selected: string): void {
   if (selected !== "") void navigator.clipboard?.writeText(selected);

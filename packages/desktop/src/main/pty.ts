@@ -8,6 +8,7 @@ export interface PtyHost {
   write(owner: number, id: number, data: string): void;
   resize(owner: number, id: number, cols: number, rows: number): void;
   close(owner: number, id: number): void;
+  running(owner: number, id: number): Promise<readonly string[]>;
   closeOwned(owner: number): void;
   closeAll(): void;
 }
@@ -43,6 +44,7 @@ export interface PtySeams {
   keyworkBinary(): Promise<string>;
   secretsFor(workspace: string): readonly string[];
   treeKill(pid: number): void;
+  listProcesses?: (() => Promise<string>) | undefined;
   schedule?: ((flush: () => void) => void) | undefined;
 }
 
@@ -82,6 +84,13 @@ export function ptyHost(seams: PtySeams): PtyHost {
       if (process === undefined) return;
       held.delete(id);
       end(process, seams);
+    },
+    running: async (owner, id) => {
+      const process = ownedBy(owner, id);
+      const listing = await seams.listProcesses?.().catch(() => undefined);
+      return process === undefined || listing === undefined
+        ? []
+        : programsUnder(process.pid, listing);
     },
     closeOwned: (owner) => {
       for (const [id, entry] of [...held]) {
@@ -216,12 +225,40 @@ export function idMinter(): { next(): number } {
   return { next: () => ++last };
 }
 
+export function processListing(platform: NodeJS.Platform): {
+  command: string;
+  args: string[];
+} {
+  return platform === "win32"
+    ? {
+        command: "powershell.exe",
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name)" }',
+        ],
+      }
+    : { command: "ps", args: ["-A", "-o", "pid=,ppid=,comm="] };
+}
+
+export function programsUnder(pid: number, listing: string): string[] {
+  return listing.split("\n").flatMap((line) => {
+    const [, , parent, program] = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/) ?? [];
+    return Number(parent) === pid && program !== undefined ? [programName(program)] : [];
+  });
+}
+
 export function windowsTreeKill(pid: number, run: (command: string, args: string[]) => void): void {
   const kill = treeKillCommand(pid, "win32");
   if (kill !== undefined) run(kill.command, kill.args);
 }
 
 const encoder = new TextEncoder();
+
+function programName(program: string): string {
+  return (program.replace(/\\/g, "/").split("/").at(-1) ?? program).replace(/\.exe$/i, "");
+}
 
 function namesASecret(name: string): boolean {
   return /^KEYWORK_.*(TOKEN|SECRET)/i.test(name);

@@ -24,7 +24,13 @@ import {
 } from "./geometry.ts";
 import type { DropZone, Scene, Seam, SeamHandle } from "./hit.ts";
 import { arrangementRects, holds, type Regions, regionsOf } from "./scene.ts";
-import { arrangementOf, type LayoutState, layoutStateOf, parseLayoutState } from "./state.ts";
+import {
+  arrangementOf,
+  type LayoutState,
+  layoutStateOf,
+  openingOrderOf,
+  parseLayoutState,
+} from "./state.ts";
 import {
   attachAtEdge,
   collectSeams,
@@ -51,17 +57,19 @@ export class Layout {
   private focusedId: PaneId | undefined;
   private zoomedId: PaneId | undefined;
   private trail: PaneId[] = [];
+  private opened: PaneId[] = [];
 
   static parse(value: unknown): LayoutState | undefined {
     return parseLayoutState(value);
   }
 
   toJSON(): LayoutState {
-    return layoutStateOf(this.arrangement, this.focusedId);
+    return layoutStateOf(this.arrangement, this.focusedId, this.opened);
   }
 
   load(state: LayoutState): void {
     this.arrangement = arrangementOf(state);
+    this.opened = openingOrderOf(state);
     this.trail = [];
     this.zoomedId = undefined;
     this.focusOn(state.focused ?? panesOf(this.arrangement)[0]);
@@ -83,6 +91,14 @@ export class Layout {
     return [...this.trail];
   }
 
+  openingOrder(): PaneId[] {
+    return [...this.opened];
+  }
+
+  mainCount(): number {
+    return mainPanes(this.arrangement).length;
+  }
+
   dockSideOf(id: PaneId): DockSide | undefined {
     return sideOf(this.arrangement, id);
   }
@@ -92,7 +108,7 @@ export class Layout {
   }
 
   spawnRank(id: PaneId): number {
-    return this.panes().indexOf(id);
+    return this.opened.indexOf(id);
   }
 
   rects(screen: Screen): Map<PaneId, Rect> {
@@ -166,6 +182,7 @@ export class Layout {
     const slot = side === undefined ? -1 : this.arrangement.docks[side].panes.indexOf(id);
     this.arrangement = lifted(this.arrangement, id);
     this.trail = this.trail.filter((pane) => pane !== id);
+    this.opened = this.opened.filter((pane) => pane !== id);
     if (this.zoomedId === id) this.zoomedId = undefined;
     if (this.focusedId === id) this.focusOn(this.heir(side, slot));
     return ok;
@@ -179,15 +196,21 @@ export class Layout {
   }
 
   focusOrdinal(ordinal: number): Verdict {
-    const id = this.panes()[ordinal - 1];
+    const id = this.opened[ordinal - 1];
     return id === undefined ? refused("unknown-pane") : this.focus(id);
   }
 
   moveFocus(direction: Direction, screen: Screen): Verdict {
-    const neighbor = this.neighbor(direction, screen);
-    if (neighbor === undefined) return refused("nothing-to-do");
-    this.focusOn(neighbor);
-    return ok;
+    const neighbor = this.neighborToward(direction, this.tiledRects(screen));
+    return neighbor === undefined ? refused("nothing-to-do") : this.focus(neighbor);
+  }
+
+  neighborToward(direction: Direction, shown: ReadonlyMap<PaneId, Rect>): PaneId | undefined {
+    return this.neighbor(direction, shown);
+  }
+
+  tiledNeighborToward(direction: Direction, screen: Screen): PaneId | undefined {
+    return this.neighbor(direction, this.tiledRects(screen));
   }
 
   zoomToggle(): Verdict {
@@ -285,10 +308,9 @@ export class Layout {
     if (tree === undefined || this.dockSideOf(this.focusedId) !== undefined) {
       return refused("nothing-to-do");
     }
-    return this.commit(
-      withTree(this.arrangement, resizeAroundLeaf(tree, this.focusedId, delta)),
-      screen,
-    );
+    const resized = resizeAroundLeaf(tree, this.focusedId, delta);
+    if (JSON.stringify(resized) === JSON.stringify(tree)) return refused("nothing-to-do");
+    return this.commit(withTree(this.arrangement, resized), screen);
   }
 
   private withSeamRatio(handle: SeamHandle, ratio: number): Arrangement | undefined {
@@ -314,7 +336,9 @@ export class Layout {
 
   private commitFocusing(candidate: Arrangement, id: PaneId, screen: Screen): Verdict {
     const verdict = this.commit(candidate, screen);
-    if (verdict.ok) this.focusOn(id);
+    if (!verdict.ok) return verdict;
+    if (!this.opened.includes(id)) this.opened.push(id);
+    this.focusOn(id);
     return verdict;
   }
 
@@ -374,7 +398,9 @@ export class Layout {
     const tree = this.arrangement.tree;
     if (tree === undefined) return refused("nothing-to-do");
     const main = mainPanes(this.arrangement);
-    const neighbor = this.neighbor(direction, screen, (candidate) => main.includes(candidate));
+    const neighbor = this.neighbor(direction, this.tiledRects(screen), (candidate) =>
+      main.includes(candidate),
+    );
     if (neighbor !== undefined) {
       this.arrangement = withTree(this.arrangement, swapLeaves(tree, id, neighbor));
       return ok;
@@ -392,12 +418,11 @@ export class Layout {
 
   private neighbor(
     direction: Direction,
-    screen: Screen,
+    rects: ReadonlyMap<PaneId, Rect>,
     eligible: (id: PaneId) => boolean = () => true,
   ): PaneId | undefined {
     const focused = this.focusedId;
     if (focused === undefined) return undefined;
-    const rects = this.rects(screen);
     const origin = rects.get(focused);
     if (origin === undefined) return undefined;
     const candidates = [...rects].filter(([id]) => id !== focused && eligible(id));

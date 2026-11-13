@@ -67,6 +67,7 @@ export const filePane = definePane<FileSpec>({
   home: "main",
   attire: "work",
   title: (spec) => (spec.spill === undefined ? pathTitle(spec.path) : spillTitle(spec.path)),
+  subject: (spec) => [spec.path, spec.spill],
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {

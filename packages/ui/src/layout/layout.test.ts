@@ -87,6 +87,54 @@ describe("Layout verbs", () => {
     expect(layout.focusOrdinal(9).ok).toBe(false);
   });
 
+  it("numbers panes in the order they opened, so a move never renumbers them", () => {
+    const layout = opened(["a", "b", "c"]);
+    layout.dockFocused("left", screen);
+    layout.focus("b");
+    expect(layout.move("left", screen).ok).toBe(true);
+    expect(layout.panes()).not.toEqual(["a", "b", "c"]);
+    expect(layout.openingOrder()).toEqual(["a", "b", "c"]);
+    expect(["a", "b", "c"].map((id) => layout.spawnRank(id))).toEqual([0, 1, 2]);
+    expect(layout.focusOrdinal(3).ok).toBe(true);
+    expect(layout.focused()).toBe("c");
+    layout.close("b");
+    expect(layout.focusOrdinal(2).ok).toBe(true);
+    expect(layout.focused()).toBe("c");
+  });
+
+  it("keeps the opening order across a save and a restore", () => {
+    const layout = opened(["a", "b", "c"]);
+    layout.focus("c");
+    layout.move("left", screen);
+    const revived = new Layout();
+    revived.load(parseLayoutState(JSON.parse(JSON.stringify(layout.toJSON()))) as never);
+    expect(revived.openingOrder()).toEqual(["a", "b", "c"]);
+    const legacy = new Layout();
+    legacy.load(parseLayoutState({ ...layout.toJSON(), opened: undefined }) as never);
+    expect(legacy.openingOrder()).toEqual(layout.panes());
+  });
+
+  it("steps out of a zoom toward the pane in that direction, the way a pane number does", () => {
+    const layout = opened(["a", "b"]);
+    layout.zoomToggle();
+    expect(layout.moveFocus("left", screen).ok).toBe(true);
+    expect(layout.focused()).toBe("a");
+    expect(layout.zoomed()).toBeUndefined();
+    layout.zoomToggle();
+    expect(layout.moveFocus("left", screen)).toEqual({ ok: false, refused: "nothing-to-do" });
+    expect(layout.zoomed()).toBe("a");
+  });
+
+  it("moves focus among the rects actually shown when another view draws the panes", () => {
+    const layout = opened(["a", "b"]);
+    const mirrored = new Map([
+      ["a", { x: 800, y: 0, width: 800, height: 1000 }],
+      ["b", { x: 0, y: 0, width: 800, height: 1000 }],
+    ]);
+    expect(layout.neighborToward("right", mirrored)).toBe("a");
+    expect(layout.tiledNeighborToward("right", screen)).toBeUndefined();
+  });
+
   it("cycles a pane main → left → right → main and round-trips", () => {
     const layout = opened(["a", "b"]);
     const before = layout.toJSON();

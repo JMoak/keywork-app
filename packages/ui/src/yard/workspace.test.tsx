@@ -312,7 +312,7 @@ describe("the yard under the keywork profile", () => {
     await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
     pressLeader("h");
     await waitFor(() => expect(hubNames()).toEqual(["Wren at home", "sessions"]));
-    pressLeader("l");
+    pressLeader("h");
     await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
   });
 

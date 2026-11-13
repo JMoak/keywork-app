@@ -34,6 +34,7 @@ export type PtyEvent =
 export interface PtyConnection {
   write(data: string): void;
   attached(): boolean;
+  running(): Promise<readonly string[]>;
   dispose(): void;
 }
 
@@ -97,6 +98,7 @@ export function connectPty(
       if (id !== undefined) port.write(id, data);
     },
     attached: () => id !== undefined,
+    running: async () => (id === undefined ? [] : ((await port.running?.(id)) ?? [])),
     dispose: () => {
       live = false;
       stopListening();

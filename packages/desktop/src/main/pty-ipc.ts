@@ -1,8 +1,9 @@
+import { execFile } from "node:child_process";
 import { app, type WebContents } from "electron";
 import { z } from "zod";
 import { ptyChannels } from "../shared/channels.ts";
 import type { AppIpc } from "./app-page.ts";
-import { type PtyHost, ptyHost } from "./pty.ts";
+import { type PtyHost, processListing, ptyHost } from "./pty.ts";
 import { type NativePtyOptions, nativePtySeams } from "./pty-native.ts";
 
 export function registerPtyHandlers(
@@ -10,7 +11,7 @@ export function registerPtyHandlers(
   serves: (sender: WebContents, workspace: string) => boolean,
   options: NativePtyOptions,
 ): PtyHost {
-  const ptys = ptyHost(nativePtySeams(options));
+  const ptys = ptyHost({ ...nativePtySeams(options), listProcesses });
   const watched = new Set<number>();
   const watch = (sender: WebContents): void => {
     if (watched.has(sender.id)) return;
@@ -43,9 +44,25 @@ export function registerPtyHandlers(
     ptys.resize(event.sender.id, id, cols, rows),
   );
   ipc.on(ptyChannels.close, (event, id: number) => ptys.close(event.sender.id, id));
+  ipc.handle(ptyRunningChannel, (event, id: unknown) =>
+    ptys.running(event.sender.id, z.number().int().parse(id)),
+  );
   app.on("will-quit", () => ptys.closeAll());
   return ptys;
 }
+
+export const ptyRunningChannel = "pty:running";
+
+function listProcesses(): Promise<string> {
+  const { command, args } = processListing(process.platform);
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { timeout: listingTimeoutMs, windowsHide: true }, (error, stdout) =>
+      error === null ? resolve(stdout) : reject(error),
+    );
+  });
+}
+
+const listingTimeoutMs = 4000;
 
 const openRequest = z.object({
   workspace: z.string().min(1),

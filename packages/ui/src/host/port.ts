@@ -60,6 +60,7 @@ export interface PtyPort {
   write(id: number, data: string): void;
   resize(id: number, cols: number, rows: number): void;
   close(id: number): void;
+  running?(id: number): Promise<readonly string[]>;
   onData(id: number, listener: (bytes: Uint8Array) => void): () => void;
   onExit(id: number, listener: (exit: PtyExit) => void): () => void;
 }

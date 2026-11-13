@@ -13,6 +13,8 @@ import {
   type PtyLaunch,
   type PtyProcess,
   type PtySeams,
+  processListing,
+  programsUnder,
   ptyHost,
   scrubEnv,
   windowsTreeKill,
@@ -330,6 +332,43 @@ describe("the pty host", () => {
     expect(fake.killed).toEqual([]);
     host.close(7, 1);
     expect(process.alive).toBe(false);
+  });
+
+  it("names the programs running under a window's own shell, and nothing for another window", async () => {
+    const fake = fakeSeams();
+    fake.seams.listProcesses = async () =>
+      [
+        "4 0 System",
+        "101 9000 pwsh.exe",
+        "777 101 PING.EXE",
+        "778 101 C:\\tools\\node.exe",
+        "900 102 vim",
+      ].join("\r\n");
+    const host = ptyHost(fake.seams);
+    const request = { workspace: "C:\\work", program: "shell" as const, cols: 1, rows: 1 };
+    await host.open({ ...request, args: [] }, 7, silent);
+    expect(await host.running(7, 1)).toEqual(["PING", "node"]);
+    expect(await host.running(8, 1)).toEqual([]);
+    expect(await host.running(7, 2)).toEqual([]);
+  });
+
+  it("calls a shell idle when the process list cannot be read", async () => {
+    const fake = fakeSeams("linux");
+    fake.seams.listProcesses = async () => {
+      throw new Error("ps is missing");
+    };
+    const host = ptyHost(fake.seams);
+    await host.open({ workspace: "/w", program: "shell", args: [], cols: 1, rows: 1 }, 1, silent);
+    expect(await host.running(1, 1)).toEqual([]);
+  });
+
+  it("lists processes with ps outside Windows and through CIM on Windows", () => {
+    expect(processListing("linux")).toEqual({
+      command: "ps",
+      args: ["-A", "-o", "pid=,ppid=,comm="],
+    });
+    expect(processListing("win32").command).toBe("powershell.exe");
+    expect(programsUnder(12, "  30   12 /usr/bin/python3\n  31   13 less\n")).toEqual(["python3"]);
   });
 
   it("names the launch after the shell binary", async () => {

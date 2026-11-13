@@ -70,6 +70,8 @@ async function openWorkspace(): Promise<void> {
 const frames = () => [...document.querySelectorAll(".kw-frame")] as HTMLElement[];
 const focusedName = () =>
   document.querySelector(".kw-frame[data-focused] .kw-frame-name")?.textContent ?? undefined;
+const frameNames = () =>
+  [...document.querySelectorAll(".kw-frame-name")].map((name) => name.textContent);
 
 describe("keyboard workflows", () => {
   it("splits a new session pane with the leader, jumps by ordinal, zooms, and closes with focus handoff", async () => {
@@ -216,18 +218,36 @@ describe("keyboard workflows", () => {
     expect(frames()).toHaveLength(open);
   });
 
-  it("never makes a server session it has no room to show", async () => {
+  it("shows a new session in place of the last one used when the layout is full, and makes no server session for it", async () => {
     await openWorkspace();
     await fillTheMain();
     const open = frames().length;
     const made = created;
+    const lastUsed = focusedName() as string;
     fireEvent.click(screen.getByText("+ new session"));
-    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
+    await waitFor(() =>
+      expect(noticeText()).toBe(refusalNotices.shownInstead("new session", lastUsed, "ctrl+k t")),
+    );
+    expect(focusedName()).toBe("new session");
+    expect(frames()).toHaveLength(open);
+    expect(frameNames()).not.toContain(lastUsed);
     press("k", { ctrlKey: true });
     press("s");
     await settle();
     expect(frames()).toHaveLength(open);
     expect(created).toBe(made);
+  });
+
+  it("brings a listed session back into the pane last used when the layout is full", async () => {
+    await openWorkspace();
+    await fillTheMain();
+    const open = frames().length;
+    const lastUsed = focusedName() as string;
+    fireEvent.click(screen.getByText("+ new session"));
+    await waitFor(() => expect(focusedName()).toBe("new session"));
+    fireEvent.click(await screen.findByText(lastUsed, { selector: ".kw-tree-name" }));
+    await waitFor(() => expect(focusedName()).toBe(lastUsed));
+    expect(frames()).toHaveLength(open);
   });
 
   it("focuses the optional Stead pane on both its first and subsequent summons", async () => {

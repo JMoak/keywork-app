@@ -59,6 +59,7 @@ const pty = {
     ipcRenderer.send(ptyChannels.close, id);
     ptyStreams.get(id)?.end();
   },
+  running: (id: number) => ipcRenderer.invoke("pty:running", id) as Promise<readonly string[]>,
   onData: (id: number, listener: (bytes: Uint8Array) => void) => {
     let live = true;
     const pump = async (): Promise<void> => {

@@ -223,13 +223,12 @@ describe("the app's bindings", () => {
     expect(() => new Keymap({ bindings: appBindings, scopes: actionScopes })).not.toThrow();
   });
 
-  it("keep the hot path leaderless: zoom, mode, approve, deny, help, palette, pane jump, and the composer trio", () => {
+  it("keep the hot path leaderless: zoom, approve, deny, help, palette, pane jump, and the composer trio", () => {
     const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
     for (const action of hotPathActions) expect(map.isLeaderless(action), action).toBe(true);
     expect(hotPathActions).toEqual(
       expect.arrayContaining([
         "pane.zoom",
-        "mode.cycle",
         "ask.approve",
         "ask.deny",
         "help.toggle",
@@ -427,6 +426,13 @@ describe("a pane that owns the keyboard", () => {
       type: "action",
       action: "pane.zoom",
     });
+  });
+
+  it("leaves shift+tab to the platform in every pane", () => {
+    const keymap = keymapFromConfig();
+    for (const scope of ["conversation", "tree", "diff", undefined]) {
+      expect(press(keymap, "shift+tab", scope), String(scope)).toEqual({ type: "pass" });
+    }
   });
 
   it("sends the leader to the shell when it is pressed twice, and still cancels elsewhere", () => {

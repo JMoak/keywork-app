@@ -7,6 +7,7 @@ import { Keymap } from "../keys/keymap.ts";
 import { CommandRegistry } from "../palette/commands.ts";
 import { ratchetValue } from "../shell/frame-tick-ratchets.ts";
 import { paneActions, paneDefinitions, paneRegistry, parsePaneSpec } from "./index.ts";
+import { createCloseGate } from "./registry.ts";
 import {
   checkPaneDefinition,
   chordsIn,
@@ -145,3 +146,54 @@ function keymapBindings(): Record<string, string | readonly string[]> {
     Object.entries(appActions).map(([name, action]) => [name, action.chords]),
   );
 }
+
+describe("closing a pane that guards itself", () => {
+  it("holds the first close back with the pane's reason and lets the same close through on a second ask", async () => {
+    let now = 0;
+    const gate = createCloseGate(() => now);
+    gate.guard("terminal-1", async () => "ping is running");
+    expect(await gate.holdBack("terminal-1", () => 5000)).toBe("ping is running");
+    now = 4000;
+    expect(await gate.holdBack("terminal-1", () => 5000)).toBeUndefined();
+  });
+
+  it("lets a second ask through at once, without waiting on the pane again", async () => {
+    let now = 0;
+    let asked = 0;
+    const gate = createCloseGate(() => now);
+    gate.guard("terminal-1", async () => {
+      asked += 1;
+      now += 1500;
+      return "ping is running";
+    });
+    expect(await gate.holdBack("terminal-1", () => 2000)).toBe("ping is running");
+    now = 3400;
+    expect(await gate.holdBack("terminal-1", () => 2000)).toBeUndefined();
+    expect(asked).toBe(1);
+  });
+
+  it("asks again once the warning has lapsed or another pane was asked about", async () => {
+    let now = 0;
+    const gate = createCloseGate(() => now);
+    gate.guard("terminal-1", async () => "ping is running");
+    gate.guard("terminal-2", async () => "vim is running");
+    await gate.holdBack("terminal-1", () => 1000);
+    now = 2000;
+    expect(await gate.holdBack("terminal-1", () => 1000)).toBe("ping is running");
+    expect(await gate.holdBack("terminal-2", () => 1000)).toBe("vim is running");
+    expect(await gate.holdBack("terminal-1", () => 1000)).toBe("ping is running");
+  });
+
+  it("lets an idle pane or one with no guard close at once, and forgets a guard when its pane goes", async () => {
+    const gate = createCloseGate(() => 0);
+    const release = gate.guard("terminal-1", async () => "ping is running");
+    expect(gate.guards("terminal-1")).toBe(true);
+    expect(gate.guards("conversation-1")).toBe(false);
+    gate.guard("terminal-2", async () => undefined);
+    expect(await gate.holdBack("terminal-2", () => 1000)).toBeUndefined();
+    expect(await gate.holdBack("conversation-1", () => 1000)).toBeUndefined();
+    release();
+    expect(gate.guards("terminal-1")).toBe(false);
+    expect(await gate.holdBack("terminal-1", () => 1000)).toBeUndefined();
+  });
+});

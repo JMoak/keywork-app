@@ -40,7 +40,6 @@ export interface ActionTarget {
   summon(kind: PaneKind, argument?: string): void;
   paneAction(action: string, argument?: string): void;
   openPaneCommands(): void;
-  cycleMode(): void;
   answerAsk(pick: AskPick): void;
   toggleQuiet(): void;
   toggleHelp(): void;
@@ -189,13 +188,6 @@ export const coreActions: Record<string, AppAction> = {
     help: "shrink the focused pane",
     invoke: (target) => target.resizePane(-0.05),
     command: { name: "shrink", description: "shrink the focused pane" },
-  },
-  "mode.cycle": {
-    chords: "shift+tab",
-    help: "cycle the pane's mode",
-    hotPath: true,
-    invoke: (target) => target.cycleMode(),
-    command: { name: "mode", description: "cycle this pane's mode" },
   },
   "ask.approve": {
     chords: "ctrl+y",

@@ -45,6 +45,7 @@ export interface PaneDefinition<Spec extends PaneSpecBase> {
   component(props: PaneProps<Spec>): JSX.Element;
   readonly summon?: PaneSummon<Spec>;
   readonly localActions?: Readonly<Record<string, PaneLocalAction>>;
+  subject?(spec: Spec): unknown;
   adornments?(spec: Spec, shell: ShellSeams): PaneAdornments;
   lifecycle?(view: PaneView<Spec>, shell: ShellSeams): LifecycleState;
   onRestore?(spec: Spec, shell: ShellSeams): void;
@@ -56,6 +57,7 @@ export interface PaneSummon<Spec extends PaneSpecBase> {
   readonly help: string;
   readonly command: ActionCommand;
   readonly variants?: Readonly<Record<string, PaneSummonVariant>>;
+  readonly again?: "opens-another";
   spec(shell: ShellSeams, argument?: string): Spec | Promise<Spec>;
 }
 
@@ -106,9 +108,12 @@ export interface PaneView<Spec extends PaneSpecBase> {
 export interface PaneProps<Spec extends PaneSpecBase> extends PaneView<Spec> {
   readonly shell: ShellSeams;
   onAction(handler: PaneActionHandler): void;
+  guardClose?(guard: CloseGuard): void;
 }
 
 export type PaneActionHandler = (action: string, argument?: string) => void;
+
+export type CloseGuard = () => Promise<string | undefined>;
 
 export interface KeyHints {
   chord(action: string): string;
@@ -175,4 +180,31 @@ export function definePane<Spec extends PaneSpecBase>(
   definition: PaneDefinition<Spec>,
 ): PaneDefinition<Spec> {
   return definition;
+}
+
+export interface CloseGate {
+  guard(pane: PaneId, guard: CloseGuard): () => void;
+  guards(pane: PaneId): boolean;
+  holdBack(pane: PaneId, warningMs: (reason: string) => number): Promise<string | undefined>;
+}
+
+export function createCloseGate(now: () => number = () => performance.now()): CloseGate {
+  const guards = new Map<PaneId, CloseGuard>();
+  let warned: { readonly pane: PaneId; readonly until: number } | undefined;
+  return {
+    guard: (pane, guard) => {
+      guards.set(pane, guard);
+      return () => {
+        if (guards.get(pane) === guard) guards.delete(pane);
+      };
+    },
+    guards: (pane) => guards.has(pane),
+    holdBack: async (pane, warningMs) => {
+      const askedAgain = warned?.pane === pane && now() <= warned.until;
+      warned = undefined;
+      const reason = askedAgain ? undefined : await guards.get(pane)?.();
+      if (reason !== undefined) warned = { pane, until: now() + warningMs(reason) };
+      return reason;
+    },
+  };
 }
