@@ -33,6 +33,22 @@ export function isWholeFile(slice: Pick<FileSlice, "from" | "to" | "bytes">): bo
   return slice.from === 0 && slice.to >= slice.bytes;
 }
 
+export function rereadRange(slice: Pick<FileSlice, "from" | "to" | "bytes">): FileRange {
+  return isWholeFile(slice) ? {} : { from: slice.from, to: slice.to };
+}
+
+export function sameSlice(
+  left: Pick<FileSlice, "from" | "to" | "bytes" | "text">,
+  right: Pick<FileSlice, "from" | "to" | "bytes" | "text">,
+): boolean {
+  return (
+    left.from === right.from &&
+    left.to === right.to &&
+    left.bytes === right.bytes &&
+    left.text === right.text
+  );
+}
+
 export function sliceFacts(slice: Pick<FileSlice, "from" | "to" | "bytes" | "truncated">): string {
   if (isWholeFile(slice)) return `${sizeText(slice.bytes)}`;
   const span = `bytes ${slice.from}..${slice.to} of ${sizeText(slice.bytes)}`;

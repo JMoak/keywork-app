@@ -7,6 +7,11 @@ export interface TextMount {
   replace(text: string, numbering: LineNumbering, path?: string): void;
   scrollTo(edge: "top" | "end"): void;
   scrollBy(lines: number): void;
+  scrollPage(pages: number): void;
+  scrollOffset(): number;
+  scrollToOffset(offset: number): void;
+  land(line: number, lines: number): void;
+  lineCount(): number;
   lineAtTop(): number;
   find(query: string): FindReading;
   findStep(step: FindStep): FindReading;
@@ -51,6 +56,17 @@ export function mountTextView(
     scrollBy: (lines) => {
       shown.view.scrollDOM.scrollTop += lines * shown.view.defaultLineHeight;
     },
+    scrollPage: (pages) => {
+      const { scrollDOM, defaultLineHeight } = shown.view;
+      const page = Math.max(defaultLineHeight, scrollDOM.clientHeight - defaultLineHeight);
+      scrollDOM.scrollTop = Math.max(0, scrollDOM.scrollTop + pages * page);
+    },
+    scrollOffset: () => shown.view.scrollDOM.scrollTop,
+    scrollToOffset: (offset) => {
+      shown.view.scrollDOM.scrollTop = offset;
+    },
+    land: (line, lines) => landOn(shown.view, line, lines),
+    lineCount: () => shown.view.state.doc.lines,
     lineAtTop: () => shown.view.state.doc.lineAt(shown.view.viewport.from).number,
     find: (query) => reveal(searchFrom(shown.view, query, shown.view.viewport.from)),
     findStep: (step) => {
@@ -86,6 +102,39 @@ const found = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+const markLanded = StateEffect.define<DecorationSet>();
+
+const landed = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update: (marks, transaction) => {
+    for (const effect of transaction.effects) if (effect.is(markLanded)) return effect.value;
+    return marks.map(transaction.changes);
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+const landedLine = Decoration.line({ class: "kw-file-landed" });
+
+const landingContextLines = 3;
+
+function landOn(view: EditorView, line: number, lines: number): void {
+  const doc = view.state.doc;
+  const first = Math.min(Math.max(1, line), doc.lines);
+  const last = Math.min(first + lines - 1, doc.lines);
+  const marks = Array.from({ length: Math.max(0, last - first + 1) }, (_, offset) =>
+    landedLine.range(doc.line(first + offset).from),
+  );
+  view.dispatch({
+    effects: [
+      markLanded.of(Decoration.set(marks)),
+      EditorView.scrollIntoView(doc.line(first).from, {
+        y: "start",
+        yMargin: landingContextLines * view.defaultLineHeight,
+      }),
+    ],
+  });
+}
 
 const hitMark = Decoration.mark({ class: "kw-find-hit" });
 const currentHitMark = Decoration.mark({ class: "kw-find-hit kw-find-current" });
@@ -135,6 +184,7 @@ function build(host: HTMLElement, text: string, numbering: LineNumbering, path?:
       readOnlyCode,
       textTheme,
       found,
+      landed,
       lineNumbers({ formatNumber: (line) => numbering.label(line - 1) }),
       language.of([]),
     ],

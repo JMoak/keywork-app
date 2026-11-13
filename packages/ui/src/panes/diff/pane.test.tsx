@@ -18,10 +18,19 @@ import type {
   VerdictMark,
 } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it } from "vitest";
+import { createSignal } from "solid-js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
+import { landingFor } from "../file/landing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { availabilityLine, type DiffSpec, diffPane, fileNote, noBaselineLine } from "./index.tsx";
+import {
+  availabilityLine,
+  compactBelowPx,
+  type DiffSpec,
+  diffPane,
+  fileNote,
+  noBaselineLine,
+} from "./index.tsx";
 
 const fixture = (name: string): string =>
   readFileSync(join(process.cwd(), "packages/client/src/fixtures", name), "utf8");
@@ -41,8 +50,8 @@ interface Recorded {
 }
 
 interface Seams {
-  changes?: ChangesState;
-  file?: ChangedFileReading;
+  changes?: ChangesState | (() => ChangesState);
+  file?: ChangedFileReading | (() => ChangedFileReading);
   openInEditor?: boolean;
   controls?: Partial<SessionControls>;
   undo?: UndoReading;
@@ -64,7 +73,7 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
     });
   const shell: Partial<ShellSeams> = {
     store: {
-      changes: () => changes,
+      changes: () => (typeof changes === "function" ? changes() : changes),
       openChanges: async () => {
         recorded.reads += 1;
       },
@@ -84,7 +93,7 @@ function shellSeams(recorded: Recorded, seams: Seams = {}): ShellSeams {
       },
       changedFile: async (_id: string, path: string) => {
         recorded.fileReads.push(path);
-        return seams.file ?? recordedFile;
+        return typeof seams.file === "function" ? seams.file() : (seams.file ?? recordedFile);
       },
       prompt: async (_id: string, text: string) => {
         recorded.prompts.push(text);
@@ -344,10 +353,12 @@ describe("the changes pane's undo and redo", () => {
       }),
     );
     expect(verbStates().map(([, enabled]) => enabled)).toEqual(["yes", "no"]);
+    expect(recorded.reads).toBe(1);
     act("diff.undo");
     await settle();
     expect(recorded.verbs).toEqual([]);
     const question = document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement;
+    expect(question.closest("[data-keys-owned]")).not.toBeNull();
     expect(question.textContent).toBe(
       "undo the last turn and put back the files it changed? ctrl+k diff.redo redoes it · y confirms · any other key cancels",
     );
@@ -357,7 +368,7 @@ describe("the changes pane's undo and redo", () => {
       screen.getByText("undone · the prompt is back in the composer · files put back"),
     ).toBeTruthy();
     expect(recorded.verbs).toEqual(["undo s1"]);
-    expect(recorded.reads).toBe(1);
+    expect(recorded.reads).toBe(2);
   });
 
   it("asks the server when it has not yet said, and shows its refusal word for word", async () => {
@@ -397,6 +408,172 @@ describe("showing the changed file itself", () => {
     ]);
   });
 });
+
+describe("a file diff keeping up with the session", () => {
+  const twoHunks: ChangedFileReading = {
+    path: "notes.txt",
+    before: "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n",
+    after: "one\n2\nthree\nfour\nfive\nsix\nseven\neight\nnine\n10\n",
+    truncated: false,
+  };
+
+  it("rereads when the session's changes settle again, stays on its hunk and says the file changed", async () => {
+    const recorded = recording();
+    const [listing, setListing] = createSignal<ChangesState>(
+      changesSnapshot(emptyChangesState, { baseline: "session start", files: [] }),
+    );
+    const [onDisk, setOnDisk] = createSignal<ChangedFileReading>(twoHunks);
+    const act = mount(
+      { kind: "diff", sessionId: "s1", path: "notes.txt" },
+      recorded,
+      shellSeams(recorded, { changes: listing, file: onDisk }),
+    );
+    await settle();
+    act("diff.next");
+    expect(screen.getByText("hunk 2 of 2")).toBeTruthy();
+    const merge = document.querySelector(".kw-diff-merge") as HTMLElement;
+    const before = merge.querySelector(".cm-editor");
+    setListing({ ...listing(), stale: true });
+    setListing({ ...listing(), stale: false, files: [] });
+    await settle();
+    expect(recorded.fileReads).toEqual(["notes.txt", "notes.txt"]);
+    expect(merge.querySelector(".cm-editor")).toBe(before);
+    expect(document.querySelector("output.kw-diff-note")).toBeNull();
+    setOnDisk({ ...twoHunks, after: (twoHunks.after ?? "").replace("five", "FIVE") });
+    setListing({ ...listing(), files: [] });
+    await settle();
+    expect(merge.textContent).toContain("FIVE");
+    expect(screen.getByText("hunk 2 of 3")).toBeTruthy();
+    expect(
+      screen.getByText("the file changed since you opened it · this is its diff now"),
+    ).toBeTruthy();
+  });
+
+  it("rereads when the window comes back from another app", async () => {
+    const recorded = recording();
+    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
+    await settle();
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+    expect(recorded.fileReads).toEqual(["notes.txt", "notes.txt"]);
+  });
+
+  it("follows the session's changes even when opened straight onto a file", async () => {
+    const recorded = recording();
+    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
+    expect(recorded.reads).toBe(1);
+  });
+});
+
+describe("reading a long diff from the keyboard", () => {
+  const long: ChangedFileReading = {
+    path: "src/big.ts",
+    before: null,
+    after: Array.from({ length: 320 }, (_, index) => `line ${index + 1}`).join("\n"),
+    note: "new",
+    truncated: false,
+  };
+
+  it("scrolls by line with j and k, by page with page keys and space, and to either end", async () => {
+    const recorded = recording();
+    const act = mount(
+      { kind: "diff", sessionId: "s1", path: "src/big.ts" },
+      recorded,
+      shellSeams(recorded, { file: long }),
+    );
+    await settle();
+    const scroller = document.querySelector(".kw-diff-merge .cm-scroller") as HTMLElement;
+    act("diff.down");
+    const line = scroller.scrollTop;
+    expect(line).toBeGreaterThan(0);
+    act("diff.page-down");
+    expect(scroller.scrollTop).toBeGreaterThan(line);
+    act("diff.page-up");
+    act("diff.up");
+    expect(scroller.scrollTop).toBe(0);
+    const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(4800);
+    act("diff.end");
+    expect(scroller.scrollTop).toBe(4800);
+    height.mockRestore();
+    act("diff.top");
+    expect(scroller.scrollTop).toBe(0);
+    expect(recorded.rebound).toEqual([]);
+  });
+
+  it("binds page keys, space, home and end beside g and G, and every chord once", () => {
+    const chords = (action: string) => diffPane.localActions?.[action]?.chords;
+    expect(chords("diff.page-down")).toEqual(["pagedown", "space"]);
+    expect(chords("diff.page-up")).toBe("pageup");
+    expect(chords("diff.top")).toEqual(["g", "home"]);
+    expect(chords("diff.end")).toEqual(["shift+g", "end"]);
+  });
+
+  it("moves the list cursor to the first and last file with g and G", () => {
+    const recorded = recording();
+    const act = mount({ kind: "diff", sessionId: "s1" }, recorded);
+    act("diff.end");
+    act("diff.open");
+    act("diff.top");
+    act("diff.open");
+    expect(recorded.rebound).toEqual([
+      { kind: "diff", sessionId: "s1", path: "notes.txt" },
+      { kind: "diff", sessionId: "s1", path: "src/a.ts" },
+    ]);
+  });
+});
+
+describe("leaving a diff for the file", () => {
+  it("lands the file pane and the editor on the hunk under the cursor", async () => {
+    const recorded = recording();
+    const act = mount(
+      { kind: "diff", sessionId: "s1", path: "notes.txt" },
+      recorded,
+      shellSeams(recorded, {
+        openInEditor: true,
+        file: {
+          path: "notes.txt",
+          before: "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n",
+          after: "one\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n7½\neight\n",
+          truncated: false,
+        },
+      }),
+    );
+    await settle();
+    act("diff.file");
+    expect(landingFor("notes.txt")).toEqual({ path: "notes.txt", line: 7, lines: 2 });
+    expect(recorded.opened).toEqual([{ kind: "file", path: "notes.txt" }]);
+    fireEvent.click(screen.getByText("open in editor"));
+    expect(recorded.editor).toEqual([["notes.txt", 7]]);
+  });
+});
+
+describe("a file diff in a short pane", () => {
+  it("compacts its chrome below a pane's worth of height, keeping the verb row only while it speaks", async () => {
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
+    const recorded = recording();
+    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
+    await settle();
+    expect(document.querySelector(".kw-diff")?.hasAttribute("data-compact")).toBe(true);
+    height.mockReturnValue(compactBelowPx + 100);
+    cleanup();
+    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
+    await settle();
+    expect(document.querySelector(".kw-diff")?.hasAttribute("data-compact")).toBe(false);
+    height.mockRestore();
+    expect(diffCss).toMatch(
+      /\.kw-diff\[data-compact\] \.kw-diff-verbs:not\(:has\(\.kw-diff-verb-notice, \.kw-ov-line\)\),\s*\.kw-diff\[data-compact\] \.kw-diff-review-keys \{\s*display: none;/,
+    );
+  });
+
+  it("names a new file in its head row rather than spending a row on it", async () => {
+    const recorded = recording();
+    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
+    await settle();
+    expect(document.querySelector(".kw-diff-head-facts")?.textContent).toBe("new file");
+  });
+});
+
+const diffCss = readFileSync(join(process.cwd(), "packages/ui/src/panes/diff/diff.css"), "utf8");
 
 describe("the changes pane's definition", () => {
   it("titles the list and the file, and summons for the current session", () => {

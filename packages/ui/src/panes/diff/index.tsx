@@ -2,31 +2,49 @@ import {
   type ChangesState,
   changesByTurn,
   countsOf,
-  reviewTally,
   type TurnGroup,
   verdictFor,
-  verdictLine,
 } from "@keywork-app/client";
 import type { ChangedFileReading, ChangedPath, HunkVerdict } from "@keywork-app/protocol";
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  untrack,
+} from "solid-js";
 import { z } from "zod";
 import type { HostPort } from "../../host/port.ts";
 import { tierOf, type WidthTier } from "../../page/tiers.ts";
 import { ControlRow } from "../conversation/control-row.tsx";
 import { EmptyState } from "../empty-state.tsx";
+import { landFileAt } from "../file/landing.ts";
+import { rereadOnReturn } from "../file/rereading.ts";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
-import { type MergeHunk, type MergeMount, mergeLayoutFor, mountMergeView } from "./merge-view.ts";
+import {
+  type MergeHunk,
+  type MergeMount,
+  mergeLayoutFor,
+  mountMergeView,
+  type ScrollMove,
+} from "./merge-view.ts";
 import { unifiedPatch } from "./patch.ts";
 import {
+  changedNotice,
   createReviewTrail,
   fileTallyLine,
   hunkPlace,
+  markedNotice,
   noHunkNotice,
   type ReviewTrail,
   referenceOf,
-  reviewedLine,
   sessionGoneNotice,
+  shownReviewLine,
   talkedNotice,
   talkLabel,
   talkMessage,
@@ -45,6 +63,8 @@ const diffSpec = z.object({
 export type DiffSpec = z.output<typeof diffSpec>;
 
 export const noBaselineLine = "no baseline · checkpoints are off and this isn't a git repository";
+
+export const compactBelowPx = 420;
 
 export const diffPane = definePane<DiffSpec>({
   kind: "diff",
@@ -66,13 +86,39 @@ export const diffPane = definePane<DiffSpec>({
   localActions: {
     "diff.down": {
       chords: ["j", "down"],
-      help: "next file",
-      command: { name: "diff-next-file", description: "move to the next changed file" },
+      help: "next file, or down a line in a diff",
+      command: {
+        name: "diff-next-file",
+        description: "move to the next changed file, or scroll the open diff down a line",
+      },
     },
     "diff.up": {
       chords: ["k", "up"],
-      help: "previous file",
-      command: { name: "diff-previous-file", description: "move to the previous changed file" },
+      help: "previous file, or up a line in a diff",
+      command: {
+        name: "diff-previous-file",
+        description: "move to the previous changed file, or scroll the open diff up a line",
+      },
+    },
+    "diff.page-down": {
+      chords: ["pagedown", "space"],
+      help: "down a page",
+      command: { name: "diff-page-down", description: "scroll the open diff down a page" },
+    },
+    "diff.page-up": {
+      chords: "pageup",
+      help: "up a page",
+      command: { name: "diff-page-up", description: "scroll the open diff up a page" },
+    },
+    "diff.top": {
+      chords: ["g", "home"],
+      help: "the top",
+      command: { name: "diff-top", description: "go to the first file, or the top of the diff" },
+    },
+    "diff.end": {
+      chords: ["shift+g", "end"],
+      help: "the end",
+      command: { name: "diff-end", description: "go to the last file, or the end of the diff" },
     },
     "diff.open": {
       chords: "enter",
@@ -82,7 +128,10 @@ export const diffPane = definePane<DiffSpec>({
     "diff.file": {
       chords: "f",
       help: "show the file itself",
-      command: { name: "diff-file", description: "show the changed file as it reads now" },
+      command: {
+        name: "diff-file",
+        description: "show the changed file as it reads now, at the hunk under the cursor",
+      },
     },
     "diff.back": {
       chords: "escape",
@@ -101,13 +150,20 @@ export const diffPane = definePane<DiffSpec>({
     },
     "diff.keep": {
       chords: "y",
-      help: "keep this hunk",
-      command: { name: "keep-hunk", description: "record keep on the hunk under the cursor" },
+      help: "mark this hunk kept",
+      command: {
+        name: "keep-hunk",
+        description: "record a keep mark on the hunk under the cursor; nothing on disk changes",
+      },
     },
     "diff.drop": {
       chords: "d",
-      help: "drop this hunk",
-      command: { name: "drop-hunk", description: "record drop on the hunk under the cursor" },
+      help: "mark this hunk dropped (the file keeps it)",
+      command: {
+        name: "drop-hunk",
+        description:
+          "record a drop mark on the hunk under the cursor; the file stays as it is and the agent is not told",
+      },
     },
     "diff.ask": {
       chords: "a",
@@ -205,6 +261,9 @@ function DiffSlot(props: PaneProps<DiffSpec>) {
 function SessionDiff(props: PaneProps<DiffSpec> & { sessionId: string }) {
   const verbs = createTurnVerbs(props.shell, () => props.sessionId, props.shell.keys);
   const trail = createReviewTrail(props.shell, () => props.sessionId);
+  createEffect(() => {
+    void props.shell.store.openChanges(props.sessionId);
+  });
   return (
     <Show
       keyed
@@ -235,6 +294,7 @@ function FilesLevel(props: LevelProps) {
   const changes = () => props.shell.store.changes(props.sessionId);
   const groups = createMemo((): TurnGroup[] => changesByTurn(changes().files));
   const files = createMemo((): ChangedPath[] => groups().flatMap((group) => [...group.files]));
+  const lastFile = (): number => Math.max(files().length - 1, 0);
   const open = (file: ChangedPath | undefined): void => {
     if (file === undefined) return;
     props.shell.rebind(props.id, { kind: "diff", sessionId: props.sessionId, path: file.path });
@@ -248,10 +308,6 @@ function FilesLevel(props: LevelProps) {
     () => root,
     () => props.focused && props.verbs.asking() === undefined,
   );
-
-  createEffect(() => {
-    void props.shell.store.openChanges(props.sessionId);
-  });
 
   const [copied, setCopied] = createSignal<string>();
   const copyAtCursor = async (): Promise<void> => {
@@ -268,10 +324,16 @@ function FilesLevel(props: LevelProps) {
     answeringFirst(props.verbs, (action) => {
       switch (action) {
         case "diff.down":
-          setCursor((at) => Math.min(at + 1, Math.max(files().length - 1, 0)));
+          setCursor((at) => Math.min(at + 1, lastFile()));
           break;
         case "diff.up":
           setCursor((at) => Math.max(at - 1, 0));
+          break;
+        case "diff.top":
+          setCursor(0);
+          break;
+        case "diff.end":
+          setCursor(lastFile());
           break;
         case "diff.open":
           open(files()[cursor()]);
@@ -344,9 +406,21 @@ function FilesLevel(props: LevelProps) {
   );
 }
 
+const scrollMoves: Readonly<Record<string, ScrollMove>> = {
+  "diff.down": "line-down",
+  "diff.up": "line-up",
+  "diff.page-down": "page-down",
+  "diff.page-up": "page-up",
+  "diff.top": "top",
+  "diff.end": "end",
+};
+
 function FileLevel(props: LevelProps & { path: string }) {
-  const [reading, setReading] = createSignal<ChangedFileReading>();
+  const [reading, setReading] = createSignal<ChangedFileReading | undefined>(undefined, {
+    equals: sameReading,
+  });
   const [tier, setTier] = createSignal<WidthTier>("column");
+  const [compact, setCompact] = createSignal(false);
   const [hunks, setHunks] = createSignal<readonly MergeHunk[]>([]);
   const [at, setAt] = createSignal(0);
   const [talking, setTalking] = createSignal(false);
@@ -366,42 +440,73 @@ function FileLevel(props: LevelProps & { path: string }) {
     if (file.before === null && file.after === null) return undefined;
     return { before: file.before ?? "", after: file.after ?? "", path: props.path };
   };
-  const problem = (): string | undefined => {
+  const refusal = (): string | undefined => {
     const file = reading();
     if (file === "missing") return "this session is gone";
     if (file === "no-baseline") return noBaselineLine;
     if (file === "outside-scope") return "this path is outside the workspace";
-    return file === undefined ? undefined : fileNote(file);
+    return undefined;
+  };
+  const facts = (): string | undefined => {
+    const file = reading();
+    return typeof file === "object" ? fileNote(file) : undefined;
   };
   const reread = (): void => {
-    void props.shell.store.changedFile(props.sessionId, props.path).then(setReading);
+    void props.shell.store.changedFile(props.sessionId, props.path).then((fresh) => {
+      const shown = untrack(reading);
+      setReading(fresh);
+      if (shown !== undefined && !sameReading(shown, fresh)) setSaid(changedNotice);
+    });
   };
 
-  createEffect(reread);
+  const settledListing = createMemo(() => {
+    const changes = props.shell.store.changes(props.sessionId);
+    return changes.stale ? undefined : changes.files;
+  });
+  createEffect(
+    on(
+      settledListing,
+      (files) => {
+        if (files !== undefined) reread();
+      },
+      { defer: true },
+    ),
+  );
+  rereadOnReturn(() => props.focused, reread);
+  reread();
 
   onMount(() => {
-    if (host === undefined) return;
     const measure = (): void => {
       if (host !== undefined && host.clientWidth > 0) setTier(tierOf(host.clientWidth));
+      if (root !== undefined && root.clientHeight > 0) {
+        setCompact(root.clientHeight < compactBelowPx);
+      }
     };
     measure();
     if (typeof ResizeObserver !== "function") return;
     const observer = new ResizeObserver(measure);
-    observer.observe(host);
+    for (const element of [host, root]) if (element !== undefined) observer.observe(element);
     onCleanup(() => observer.disconnect());
   });
 
   createEffect(() => {
     const pair = sides();
-    const layout = mergeLayoutFor(tier());
+    const layout = mergeLayoutFor(tier(), pair);
+    const kept =
+      mounted === undefined ? undefined : { offset: mounted.scrollOffset(), hunk: untrack(at) };
     mounted?.destroy();
     mounted = undefined;
-    setHunks([]);
-    setAt(0);
-    if (host === undefined || pair === undefined) return;
+    if (host === undefined || pair === undefined) {
+      setHunks([]);
+      setAt(0);
+      return;
+    }
     host.replaceChildren();
     mounted = mountMergeView(host, pair, layout);
-    setHunks(mounted.hunks());
+    const shown = mounted.hunks();
+    setHunks(shown);
+    setAt(Math.min(kept?.hunk ?? 0, Math.max(shown.length - 1, 0)));
+    if (kept !== undefined) mounted.scrollToOffset(kept.offset);
   });
   onCleanup(() => mounted?.destroy());
 
@@ -418,6 +523,20 @@ function FileLevel(props: LevelProps & { path: string }) {
   const stepOn = (): void => {
     if (at() < hunks().length - 1) go(at() + 1);
   };
+  const scroll = (move: ScrollMove): void => {
+    if (mounted === undefined) return;
+    mounted.scroll(move);
+    const inView = mounted.hunksInView();
+    const first = inView[0];
+    if (first !== undefined && !inView.includes(at())) setAt(first);
+  };
+  const showFile = (): void => {
+    const hunk = current();
+    if (hunk !== undefined) {
+      landFileAt({ path: props.path, line: hunk.line, lines: hunk.added.length });
+    }
+    props.shell.openPane({ kind: "file", path: props.path });
+  };
   const judge = async (verdict: HunkVerdict): Promise<void> => {
     const hunk = reference();
     if (hunk === undefined) {
@@ -433,7 +552,7 @@ function FileLevel(props: LevelProps & { path: string }) {
       return;
     }
     props.trail.fold(recorded);
-    setSaid(verdictLine(recorded));
+    setSaid(markedNotice(recorded, props.shell.keys.chord("diff.talk")));
     stepOn();
   };
   const talk = async (words: string): Promise<void> => {
@@ -461,12 +580,17 @@ function FileLevel(props: LevelProps & { path: string }) {
         void judge(verdict);
         return;
       }
+      const move = scrollMoves[action];
+      if (move !== undefined) {
+        scroll(move);
+        return;
+      }
       switch (action) {
         case "diff.back":
           back();
           break;
         case "diff.file":
-          props.shell.openPane({ kind: "file", path: props.path });
+          showFile();
           break;
         case "diff.next":
           go(at() + 1);
@@ -492,7 +616,13 @@ function FileLevel(props: LevelProps & { path: string }) {
   );
 
   return (
-    <section class="kw-diff" aria-label="file diff" tabIndex={-1} ref={root}>
+    <section
+      class="kw-diff"
+      aria-label="file diff"
+      tabIndex={-1}
+      ref={root}
+      data-compact={compact() ? "" : undefined}
+    >
       <TurnVerbRow verbs={props.verbs} keys={props.shell.keys} />
       <Show when={copied()}>{(line) => <p class="kw-diff-note">{line()}</p>}</Show>
       <div class="kw-diff-head">
@@ -500,27 +630,28 @@ function FileLevel(props: LevelProps & { path: string }) {
           ‹ changes
         </button>
         <span class="kw-diff-head-path">{props.path}</span>
+        <Show when={facts()}>{(line) => <span class="kw-diff-head-facts">{line()}</span>}</Show>
         <span class="kw-diff-head-hunks">{hunkWord(hunks().length)}</span>
-        <button
-          type="button"
-          class="kw-diff-show"
-          onClick={() => props.shell.openPane({ kind: "file", path: props.path })}
-        >
-          the file
-        </button>
-        <Show when={props.shell.openInEditor}>
-          {(openInEditor) => (
-            <button
-              type="button"
-              class="kw-diff-editor"
-              onClick={() => void openInEditor()(props.path, 1).catch(() => undefined)}
-            >
-              open in editor
-            </button>
-          )}
-        </Show>
+        <span class="kw-diff-head-links">
+          <button type="button" class="kw-diff-show" onClick={showFile}>
+            the file
+          </button>
+          <Show when={props.shell.openInEditor}>
+            {(openInEditor) => (
+              <button
+                type="button"
+                class="kw-diff-editor"
+                onClick={() =>
+                  void openInEditor()(props.path, current()?.line ?? 1).catch(() => undefined)
+                }
+              >
+                open in editor
+              </button>
+            )}
+          </Show>
+        </span>
       </div>
-      <Show when={problem()}>{(line) => <p class="kw-diff-note">{line()}</p>}</Show>
+      <Show when={refusal()}>{(line) => <p class="kw-diff-note">{line()}</p>}</Show>
       <Show when={hunks().length > 0}>
         <ReviewRow
           place={hunkPlace(at() + 1, hunks().length)}
@@ -528,7 +659,7 @@ function FileLevel(props: LevelProps & { path: string }) {
             props.trail.marks(),
             reference() ?? { path: "", header: "", digest: "" },
           )}
-          reviewed={reviewedLine(reviewTally(props.trail.marks(), props.path), hunks().length)}
+          reviewed={shownReviewLine(props.trail.marks(), props.path, hunks())}
           keys={props.shell.keys}
         />
       </Show>
@@ -542,7 +673,7 @@ function FileLevel(props: LevelProps & { path: string }) {
         />
       </Show>
       <Show when={said()}>{(line) => <output class="kw-diff-note">{line()}</output>}</Show>
-      <div class="kw-diff-merge" data-layout={mergeLayoutFor(tier())} ref={host} />
+      <div class="kw-diff-merge" data-layout={mergeLayoutFor(tier(), sides())} ref={host} />
     </section>
   );
 }
@@ -560,13 +691,29 @@ function ReviewRow(props: {
         {props.verdict ?? "unreviewed"}
       </span>
       <span class="kw-diff-review-keys">
-        <span class="kw-diff-review-key">{props.keys.chord("diff.keep")} keep</span>
-        <span class="kw-diff-review-key">{props.keys.chord("diff.drop")} drop</span>
-        <span class="kw-diff-review-key">{props.keys.chord("diff.ask")} ask</span>
+        <span class="kw-diff-review-marks">
+          mark <span class="kw-diff-review-key">{props.keys.chord("diff.keep")} keep</span>
+          <span class="kw-diff-review-key">{props.keys.chord("diff.drop")} drop</span>
+          <span class="kw-diff-review-key">{props.keys.chord("diff.ask")} ask</span>
+        </span>
         <span class="kw-diff-review-key">{props.keys.chord("diff.talk")} talk</span>
       </span>
       <span class="kw-diff-review-reviewed">{props.reviewed}</span>
     </div>
+  );
+}
+
+function sameReading(
+  left: ChangedFileReading | undefined,
+  right: ChangedFileReading | undefined,
+): boolean {
+  if (typeof left !== "object" || typeof right !== "object") return left === right;
+  return (
+    left.path === right.path &&
+    left.before === right.before &&
+    left.after === right.after &&
+    left.note === right.note &&
+    left.truncated === right.truncated
   );
 }
 

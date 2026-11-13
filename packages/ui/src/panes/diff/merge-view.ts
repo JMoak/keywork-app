@@ -8,12 +8,14 @@ import {
   unifiedMergeView,
 } from "@codemirror/merge";
 import { Compartment, EditorSelection, type Extension, type Text } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, lineNumbers } from "@codemirror/view";
 import type { WidthTier } from "../../page/tiers.ts";
 import { codeHighlighting, codeTheme, readOnlyCode } from "../../theme/code.ts";
 import { dressInLanguage } from "../../theme/languages.ts";
 
 export type MergeLayout = "unified" | "split";
+
+export type ScrollMove = "line-down" | "line-up" | "page-down" | "page-up" | "top" | "end";
 
 export interface MergeSides {
   readonly before: string;
@@ -33,14 +35,19 @@ export interface MergeMount {
   hunkCount(): number;
   hunks(): readonly MergeHunk[];
   hunkAt(): number;
+  hunksInView(): readonly number[];
   goToHunk(index: number): void;
   nextHunk(): void;
   previousHunk(): void;
+  scroll(move: ScrollMove): void;
+  scrollOffset(): number;
+  scrollToOffset(offset: number): void;
   languageLoaded(): Promise<void>;
   destroy(): void;
 }
 
-export function mergeLayoutFor(tier: WidthTier): MergeLayout {
+export function mergeLayoutFor(tier: WidthTier, sides?: MergeSides): MergeLayout {
+  if (sides !== undefined && isOneSided(sides)) return "unified";
   return tier === "broadsheet" ? "split" : "unified";
 }
 
@@ -52,11 +59,32 @@ export function mountMergeView(
   return layout === "split" ? splitView(host, sides) : unifiedView(host, sides);
 }
 
+const signColumn = "2.5ch";
+
+const signGlyph = {
+  display: "inline-block",
+  width: "2ch",
+  marginLeft: "-2ch",
+  fontWeight: "bold",
+};
+
 export const mergeTheme: Extension = [
   codeTheme,
   codeHighlighting,
   EditorView.theme({
     ".cm-content": { caretColor: "transparent" },
+    ".cm-line, .cm-deletedChunk .cm-deletedLine": { paddingLeft: signColumn },
+    ".cm-deletedChunk": { paddingLeft: "0" },
+    "&.cm-merge-b .cm-changedLine::before": {
+      ...signGlyph,
+      content: '"+"',
+      color: "var(--kw-success)",
+    },
+    "&.cm-merge-a .cm-changedLine::before, .cm-deletedChunk .cm-deletedLine::before": {
+      ...signGlyph,
+      content: '"−"',
+      color: "var(--kw-error)",
+    },
     ".cm-changedLine, .cm-insertedLine": {
       backgroundColor: "var(--kw-diff-inserted-line)",
     },
@@ -83,10 +111,15 @@ export const mergeTheme: Extension = [
     },
     ".cm-mergeSpacer": { backgroundColor: "var(--kw-panel-lift)" },
     ".cm-merge-revert": { display: "none" },
+    "@media (forced-colors: active)": {
+      ".cm-content .cm-deletedLine del, .cm-content del.cm-deletedLine, .cm-content .cm-deletedText":
+        { textDecoration: "line-through" },
+      ".cm-content ins .cm-changedText": { textDecoration: "underline" },
+    },
   }),
 ];
 
-const readOnly: Extension = [readOnlyCode, EditorView.lineWrapping];
+const readOnly: Extension = [readOnlyCode, EditorView.lineWrapping, lineNumbers()];
 
 const collapseUnchanged = { margin: 3, minSize: 4 };
 
@@ -101,7 +134,7 @@ function unifiedView(host: HTMLElement, sides: MergeSides): MergeMount {
       unifiedMergeView({
         original: sides.before,
         mergeControls: false,
-        highlightChanges: true,
+        highlightChanges: !isOneSided(sides),
         gutter: true,
         collapseUnchanged,
       }),
@@ -115,9 +148,11 @@ function unifiedView(host: HTMLElement, sides: MergeSides): MergeMount {
     hunkCount: () => chunks().length,
     hunks: () => chunks().map((chunk) => hunkOf(chunk, getOriginalDoc(view.state), view.state.doc)),
     hunkAt: () => hunkIndexAt(chunks(), view.state.selection.main.head),
+    hunksInView: () => chunksInView(view, view.scrollDOM, chunks()),
     goToHunk: (index) => landOn(view, chunks()[index]),
     nextHunk: () => goToNextChunk({ state: view.state, dispatch: view.dispatch }),
     previousHunk: () => goToPreviousChunk({ state: view.state, dispatch: view.dispatch }),
+    ...scrolling(view.scrollDOM, () => view.defaultLineHeight),
     languageLoaded: () => languageLoaded,
     destroy: () => view.destroy(),
   };
@@ -130,7 +165,7 @@ function splitView(host: HTMLElement, sides: MergeSides): MergeMount {
     a: { doc: sides.before, extensions: [readOnly, mergeTheme, before.of([])] },
     b: { doc: sides.after, extensions: [readOnly, mergeTheme, after.of([])] },
     parent: host,
-    highlightChanges: true,
+    highlightChanges: !isOneSided(sides),
     gutter: true,
     collapseUnchanged,
   });
@@ -144,12 +179,61 @@ function splitView(host: HTMLElement, sides: MergeSides): MergeMount {
     hunkCount: () => chunks().length,
     hunks: () => chunks().map((chunk) => hunkOf(chunk, view.a.state.doc, view.b.state.doc)),
     hunkAt: () => hunkIndexAt(chunks(), view.b.state.selection.main.head),
+    hunksInView: () => chunksInView(view.b, view.dom, chunks()),
     goToHunk: (index) => landOn(view.b, chunks()[index]),
     nextHunk: () => goToNextChunk({ state: view.b.state, dispatch: view.b.dispatch }),
     previousHunk: () => goToPreviousChunk({ state: view.b.state, dispatch: view.b.dispatch }),
+    ...scrolling(view.dom, () => view.b.defaultLineHeight),
     languageLoaded: () => languageLoaded,
     destroy: () => view.destroy(),
   };
+}
+
+function isOneSided(sides: MergeSides): boolean {
+  return sides.before === "" || sides.after === "";
+}
+
+type Scrolling = Pick<MergeMount, "scroll" | "scrollOffset" | "scrollToOffset">;
+
+function scrolling(scroller: HTMLElement, lineHeight: () => number): Scrolling {
+  return {
+    scroll: (move) => {
+      scroller.scrollTop = offsetAfter(move, scroller, lineHeight());
+    },
+    scrollOffset: () => scroller.scrollTop,
+    scrollToOffset: (offset) => {
+      scroller.scrollTop = offset;
+    },
+  };
+}
+
+function offsetAfter(move: ScrollMove, scroller: HTMLElement, line: number): number {
+  const page = Math.max(line, scroller.clientHeight - line);
+  switch (move) {
+    case "line-down":
+      return scroller.scrollTop + line;
+    case "line-up":
+      return Math.max(0, scroller.scrollTop - line);
+    case "page-down":
+      return scroller.scrollTop + page;
+    case "page-up":
+      return Math.max(0, scroller.scrollTop - page);
+    case "top":
+      return 0;
+    case "end":
+      return scroller.scrollHeight;
+  }
+}
+
+function chunksInView(view: EditorView, scroller: HTMLElement, chunks: readonly Chunk[]): number[] {
+  const top = scroller.getBoundingClientRect().top - view.documentTop;
+  const bottom = top + scroller.clientHeight;
+  const length = view.state.doc.length;
+  return chunks.flatMap((chunk, index) => {
+    const from = view.lineBlockAt(Math.min(chunk.fromB, length)).top;
+    const to = view.lineBlockAt(Math.min(chunk.endB, length)).bottom;
+    return to >= top && from <= bottom ? [index] : [];
+  });
 }
 
 function hunkOf(chunk: Chunk, before: Text, after: Text): MergeHunk {

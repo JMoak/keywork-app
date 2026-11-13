@@ -95,7 +95,10 @@ export function createTurnVerbs(
 
 export function TurnVerbRow(props: { verbs: TurnVerbs; keys: KeyHints }) {
   return (
-    <div class="kw-diff-verbs">
+    <div
+      class="kw-diff-verbs"
+      data-keys-owned={props.verbs.asking() === undefined ? undefined : ""}
+    >
       <span class="kw-diff-verb" data-enabled={enabledWord(props.verbs.undoable())}>
         {props.keys.chord("diff.undo")} undo
       </span>

@@ -78,6 +78,15 @@ describe("the review trail", () => {
     expect(openAsks(marks)).toEqual([asked]);
   });
 
+  it("tallies only the hunks still shown, so a verdict on a hunk that changed since counts for none", () => {
+    const marks = [kept, asked, dropped];
+    const reshown = { ...kept, digest: "99999999" };
+    expect(reviewTally(marks, "src/a.ts", [kept, asked])).toEqual({ keep: 0, drop: 1, ask: 1 });
+    expect(reviewTally(marks, "src/a.ts", [reshown, asked])).toEqual({ keep: 0, drop: 0, ask: 1 });
+    expect(reviewTally(marks, "src/a.ts", [reshown])).toEqual({ keep: 0, drop: 0, ask: 0 });
+    expect(reviewTally(marks, "src/a.ts", [])).toEqual({ keep: 0, drop: 0, ask: 0 });
+  });
+
   it("reads the mark out of a notice only when it has the whole shape", () => {
     expect(reviewVerdictOf(reviewNotice(kept))).toEqual(kept);
     expect(

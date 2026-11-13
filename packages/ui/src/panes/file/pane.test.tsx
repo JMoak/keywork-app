@@ -1,37 +1,55 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ConsoleClient } from "@keywork-app/client";
-import type { FileRange, FileReading, FileSlice, TreeEntry } from "@keywork-app/protocol";
-import { cleanup, render, waitFor } from "@solidjs/testing-library";
+import type { BatchListener, ConsoleClient } from "@keywork-app/client";
+import type {
+  BusEnvelope,
+  FileRange,
+  FileReading,
+  FileSlice,
+  TreeEntry,
+} from "@keywork-app/protocol";
+import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fileWhole from "../../../../client/src/fixtures/file.json?raw";
 import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
-import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
+import { inertFeed, inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
 import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { describeRefusal, type FileSpec, filePane } from "./index.tsx";
+import { describeRefusal, type FileSpec, filePane, lineRefusal } from "./index.tsx";
+import { landFileAt, landingFor } from "./landing.ts";
 
 interface FakeMount {
   text: string;
   scrolled: string[];
+  offset: number;
+  replaced: number;
 }
 
 const mounts: FakeMount[] = [];
 
 vi.mock("./text-view.ts", () => ({
   mountTextView: (host: HTMLElement, text: string) => {
-    const mount: FakeMount = { text, scrolled: [] };
+    const mount: FakeMount = { text, scrolled: [], offset: 0, replaced: 0 };
     host.textContent = text;
     mounts.push(mount);
     return {
       replace: (next: string) => {
         mount.text = next;
+        mount.offset = 0;
+        mount.replaced += 1;
         host.textContent = next;
       },
       scrollTo: (edge: string) => void mount.scrolled.push(edge),
       scrollBy: (lines: number) => void mount.scrolled.push(`by ${lines}`),
+      scrollPage: (pages: number) => void mount.scrolled.push(`page ${pages}`),
+      scrollOffset: () => mount.offset,
+      scrollToOffset: (offset: number) => {
+        mount.offset = offset;
+      },
+      land: (line: number, lines: number) => void mount.scrolled.push(`land ${line}+${lines}`),
+      lineCount: () => mount.text.split("\n").length,
       lineAtTop: () => 7,
       destroy: () => undefined,
     };
@@ -85,7 +103,7 @@ function harness(
 }
 
 function mount(h: Harness, spec: FileSpec) {
-  let handle: (action: string) => void = () => {};
+  let handle: (action: string, argument?: string) => void = () => {};
   const view = render(() => (
     <filePane.component
       id="p1"
@@ -97,7 +115,7 @@ function mount(h: Harness, spec: FileSpec) {
       }}
     />
   ));
-  return { view, act: (action: string) => handle(action) };
+  return { view, act: (action: string, argument?: string) => handle(action, argument) };
 }
 
 afterEach(() => {
@@ -287,6 +305,169 @@ describe("the file pane's editor link", () => {
       expect(view.container.querySelector(".kw-file-note[data-level='error']")?.textContent).toBe(
         "couldn't open in your editor · Failed to open: The system cannot find the file specified. (0x2)",
       ),
+    );
+  });
+});
+
+function feedHarness(h: Harness) {
+  const listeners: BatchListener[] = [];
+  h.shell = {
+    ...h.shell,
+    feed: {
+      ...inertFeed(),
+      subscribe: (listener) => {
+        listeners.push(listener);
+        return () => void listeners.splice(listeners.indexOf(listener), 1);
+      },
+    },
+  };
+  return (envelope: BusEnvelope) => {
+    for (const listener of listeners) listener([envelope]);
+  };
+}
+
+const filesMoved = (replay = false): BusEnvelope => ({
+  id: 9,
+  ts: "2026-11-12T10:00:00.000Z",
+  sessionId: "s1",
+  type: "changes.updated",
+  payload: { paths: ["src/index.ts"], turn: 2, ...(replay && { replay }) },
+});
+
+describe("the file pane keeping up with the disk", () => {
+  it("rereads when a session's files move and keeps the reader's place", async () => {
+    let text = whole.text;
+    const h = harness(() => ({ ...whole, text, bytes: text.length, to: text.length }));
+    const announce = feedHarness(h);
+    mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    const shown = mounts[0] as FakeMount;
+    shown.offset = 120;
+    announce(filesMoved());
+    await waitFor(() => expect(h.requests).toHaveLength(2));
+    expect(shown.replaced).toBe(0);
+    text = `${whole.text}export const BYBASH = 3;\n`;
+    announce(filesMoved(true));
+    announce(filesMoved());
+    await waitFor(() => expect(shown.text).toBe(text));
+    expect(h.requests).toEqual([
+      ["src/index.ts", {}],
+      ["src/index.ts", {}],
+      ["src/index.ts", {}],
+    ]);
+    expect(shown.offset).toBe(120);
+    expect(mounts).toHaveLength(1);
+  });
+
+  it("rereads when the window comes back, and on r says so honestly when the file is gone", async () => {
+    let reading: FileReading = whole;
+    const h = harness(() => reading);
+    const { view, act } = mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    reading = { ...whole, text: "outside edit\n", bytes: 13, to: 13 };
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => expect(mounts[0]?.text).toBe("outside edit\n"));
+    reading = "missing";
+    act("file.refresh");
+    await waitFor(() =>
+      expect(view.container.querySelector(".kw-file-note[data-level='error']")?.textContent).toBe(
+        "no file at src/index.ts",
+      ),
+    );
+  });
+
+  it("binds r to reread, and pages with page keys and space beside g and G's home and end", () => {
+    const chords = (action: string) => filePane.localActions?.[action]?.chords;
+    expect(chords("file.refresh")).toBe("r");
+    expect(chords("file.page-down")).toEqual(["pagedown", "space"]);
+    expect(chords("file.page-up")).toBe("pageup");
+    expect(chords("file.top")).toEqual(["g", "home"]);
+    expect(chords("file.end")).toEqual(["shift+g", "end"]);
+    expect(chords("file.line")).toBe("ctrl+g");
+  });
+});
+
+describe("the file pane's reading keys", () => {
+  it("pages down and up", async () => {
+    const h = harness(() => whole);
+    const { act } = mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    act("file.page-down");
+    act("file.page-up");
+    expect(mounts[0]?.scrolled).toEqual(["page 1", "page -1"]);
+  });
+
+  it("goes to a typed line and marks it, and says why it cannot", async () => {
+    const h = harness(() => whole);
+    const { view, act } = mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
+    act("file.line", "2");
+    expect(mounts[0]?.scrolled).toEqual(["land 2+1"]);
+    act("file.line");
+    const input = view.container.querySelector(
+      "input[aria-label='go to line']",
+    ) as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+    input.value = "40";
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(view.container.querySelector(".kw-file-find-count")?.textContent).toBe(
+      "the file has 3 lines",
+    );
+    input.value = "1";
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(mounts[0]?.scrolled).toEqual(["land 2+1", "land 1+1"]);
+    expect(view.container.querySelector("input[aria-label='go to line']")).toBeNull();
+  });
+
+  it("refuses lines it cannot reach in so many words", () => {
+    const short = { from: 0, to: 10, bytes: 10 };
+    expect(lineRefusal("x", short, 3)).toBe("x is not a line number");
+    expect(lineRefusal("0", short, 3)).toBe("0 is not a line number");
+    expect(lineRefusal("3", short, 3)).toBeUndefined();
+    expect(lineRefusal("4", short, 3)).toBe("the file has 3 lines");
+    expect(lineRefusal("4", { from: 0, to: 10, bytes: 99 }, 3)).toBe(
+      "line 4 is past this slice · ] loads more",
+    );
+    expect(lineRefusal("1", { from: 5, to: 10, bytes: 99 }, 3)).toBe(
+      "this slice starts partway in · g reads from the top",
+    );
+  });
+
+  it("lands on the lines another pane asked for, once", async () => {
+    const h = harness(() => whole);
+    landFileAt({ path: "src/index.ts", line: 2, lines: 1 });
+    mount(h, { kind: "file", path: "src/index.ts" });
+    await waitFor(() => expect(mounts[0]?.scrolled).toEqual(["land 2+1"]));
+    expect(landingFor("src/index.ts")).toBeUndefined();
+    landFileAt({ path: "other.ts", line: 9, lines: 2 });
+    expect(mounts[0]?.scrolled).toEqual(["land 2+1"]);
+    landFileAt({ path: "src/index.ts", line: 1, lines: 0 });
+    expect(mounts[0]?.scrolled).toEqual(["land 2+1", "land 1+0"]);
+  });
+});
+
+describe("opening a file by name", () => {
+  it("offers the workspace's files to /open, walking folders and skipping ignored ones", async () => {
+    const entry = (name: string, kind: "file" | "dir", ignored = false): TreeEntry => ({
+      name,
+      kind,
+      ignored,
+      hidden: false,
+    });
+    const h = harness(() => whole, {
+      "": [entry("src", "dir"), entry("node_modules", "dir", true), entry("README.md", "file")],
+      src: [entry("long.ts", "file"), entry("util", "dir")],
+      "src/util": [entry("math.ts", "file")],
+      node_modules: [entry("left-pad.js", "file")],
+    });
+    const choices = () => filePane.summon?.command.argument?.choices?.(h.shell) ?? [];
+    expect(choices()).toEqual([]);
+    await waitFor(() =>
+      expect(choices()).toEqual([
+        { value: "README.md", description: "in the workspace" },
+        { value: "src/long.ts", description: "in src" },
+        { value: "src/util/math.ts", description: "in src/util" },
+      ]),
     );
   });
 });

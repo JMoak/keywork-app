@@ -13,6 +13,10 @@ function host(): HTMLElement {
   return element;
 }
 
+function stylesheet(): string {
+  return [...document.querySelectorAll("style")].map((style) => style.textContent ?? "").join("\n");
+}
+
 describe("the merge view", () => {
   it("picks side-by-side only at the broadsheet tier", () => {
     expect(mergeLayoutFor("broadsheet")).toBe("split");
@@ -64,6 +68,78 @@ describe("the merge view", () => {
     expect(element.querySelectorAll(".cm-editor")).toHaveLength(2);
     expect(mounted.hunkCount()).toBe(2);
     mounted.destroy();
+  });
+
+  it("shows a new or deleted file as one column whatever the width", () => {
+    const created = { before: "", after: "one\n" };
+    const deleted = { before: "one\n", after: "" };
+    expect(mergeLayoutFor("broadsheet", created)).toBe("unified");
+    expect(mergeLayoutFor("broadsheet", deleted)).toBe("unified");
+    expect(mergeLayoutFor("broadsheet", sides)).toBe("split");
+  });
+
+  it("numbers the lines of every side it shows", () => {
+    for (const [layout, editors] of [
+      ["unified", 1],
+      ["split", 2],
+    ] as const) {
+      const element = host();
+      const mounted = mountMergeView(element, sides, layout);
+      expect(element.querySelectorAll(".cm-lineNumbers")).toHaveLength(editors);
+      mounted.destroy();
+    }
+  });
+
+  it("leaves a new file's lines unmarked word by word, since every word is new", () => {
+    const element = host();
+    mountMergeView(element, { before: "", after: "one\ntwo\n" }, "unified");
+    expect(element.querySelectorAll(".cm-changedLine")).toHaveLength(2);
+    expect(element.querySelectorAll(".cm-changedText")).toHaveLength(0);
+  });
+
+  it("signs every added line + and every removed line − so colour is never the only cue", () => {
+    for (const layout of ["unified", "split"] as const) {
+      const element = host();
+      mountMergeView(element, sides, layout);
+      expect(element.querySelector(".cm-merge-b .cm-changedLine")).not.toBeNull();
+      expect(
+        element.querySelector(".cm-merge-a .cm-changedLine, .cm-deletedChunk .cm-deletedLine"),
+      ).not.toBeNull();
+    }
+    const css = stylesheet();
+    expect(css).toMatch(/\.cm-merge-b \.cm-changedLine::before \{[^}]*content: "\+"/);
+    expect(css).toMatch(
+      /\.cm-merge-a \.cm-changedLine::before, \S+ \.cm-deletedChunk \.cm-deletedLine::before \{[^}]*content: "−"/,
+    );
+  });
+
+  it("strikes removed text and underlines added words when the system forces its colours", () => {
+    mountMergeView(host(), sides, "unified");
+    const forced = stylesheet().slice(stylesheet().indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(/del\.cm-deletedLine[^{]*\{text-decoration: line-through;/);
+    expect(forced).toMatch(/ins \.cm-changedText \{text-decoration: underline;/);
+  });
+
+  it("scrolls by line, by page and to either edge, and keeps an offset it is handed", () => {
+    for (const layout of ["unified", "split"] as const) {
+      const element = host();
+      const mounted = mountMergeView(element, sides, layout);
+      mounted.scroll("line-down");
+      const line = mounted.scrollOffset();
+      expect(line).toBeGreaterThan(0);
+      mounted.scroll("page-down");
+      expect(mounted.scrollOffset()).toBeGreaterThan(line);
+      mounted.scroll("page-up");
+      mounted.scroll("line-up");
+      expect(mounted.scrollOffset()).toBe(0);
+      mounted.scroll("line-up");
+      expect(mounted.scrollOffset()).toBe(0);
+      mounted.scrollToOffset(42);
+      expect(mounted.scrollOffset()).toBe(42);
+      mounted.scroll("top");
+      expect(mounted.scrollOffset()).toBe(0);
+      mounted.destroy();
+    }
   });
 
   it("colors every rule from a flavor token and never a literal", () => {

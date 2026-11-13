@@ -89,10 +89,17 @@ export function openAsks(marks: readonly VerdictMark[]): VerdictMark[] {
   return latestVerdicts(marks).filter((mark) => mark.verdict === "ask");
 }
 
-export function reviewTally(marks: readonly VerdictMark[], path?: string): ReviewTally {
+export function reviewTally(
+  marks: readonly VerdictMark[],
+  path?: string,
+  shown?: readonly HunkReference[],
+): ReviewTally {
   const tally = { keep: 0, drop: 0, ask: 0 };
+  const current = shown === undefined ? undefined : new Set(shown.map(hunkKey));
   for (const mark of latestVerdicts(marks)) {
-    if (path === undefined || mark.path === path) tally[mark.verdict] += 1;
+    const onPath = path === undefined || mark.path === path;
+    const stillShown = current === undefined || current.has(hunkKey(mark));
+    if (onPath && stillShown) tally[mark.verdict] += 1;
   }
   return tally;
 }

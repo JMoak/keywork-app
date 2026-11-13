@@ -65,6 +65,15 @@
   text-overflow: ellipsis;
 }
 
+.kw-file-find-count[data-level="error"] {
+  color: var(--kw-error);
+}
+
+.kw-file-text .kw-file-landed {
+  background: var(--kw-panel-lift);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
 .kw-file-text .kw-find-hit {
   background: var(--kw-selection);
 }
