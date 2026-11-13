@@ -236,7 +236,13 @@ export function AskCard(props: AskCardProps) {
               </>
             }
           >
-            <NoteLine onSend={(note) => void answer(denialFor("other", note))} />
+            <NoteLine
+              onSend={(note) => void answer(denialFor("other", note))}
+              onBack={() => {
+                setNoting(false);
+                card?.focus();
+              }}
+            />
           </Show>
         </Show>
       </span>

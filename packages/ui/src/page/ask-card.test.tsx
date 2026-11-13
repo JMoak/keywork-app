@@ -234,12 +234,15 @@ describe("the ask card", () => {
     expect(card.hasAttribute("data-saying-why")).toBe(false);
   });
 
-  it("sends the denial without words when escape leaves the line", async () => {
-    const { container, answers, press } = mountCard(askingRun("g1"));
+  it("backs out of the line to the reasons on escape, sending nothing", async () => {
+    const { container, card, answers, press } = mountCard(askingRun("g1"));
     await press("n");
     await press("o");
     await typeNote(container, "half a thought", "Escape");
-    expect(answers).toEqual([{ verdict: "denied", scope: undefined, reason: "other" }]);
+    expect(answers).toEqual([]);
+    expect(container.querySelector(".kw-ask-note-input")).toBeNull();
+    expect(container.querySelector(".kw-ask-reason-prompt")?.textContent).toBe("why?");
+    expect(document.activeElement).toBe(card);
   });
 
   it("denies by click through the why step as well", async () => {

@@ -32,6 +32,7 @@ import {
   createMemo,
   createSignal,
   For,
+  Index,
   type JSX,
   Match,
   on,
@@ -142,16 +143,16 @@ export function ConversationPane(props: ConversationPaneProps) {
         <For each={props.ledger?.opening ?? []}>
           {(mark) => <MarkRow mark={mark} redoable={props.redoable} />}
         </For>
-        <For each={props.projection.entries}>
+        <Index each={props.projection.entries}>
           {(entry, index) => (
             <>
               <Entry
-                entry={entry}
-                forgotten={isForgotten(entry, props.forgotten)}
-                summary={summaryKindOf(props.projection, entry)}
-                streaming={props.projection.streaming === index()}
-                unfolded={unfolded(index())}
-                onToggle={() => toggle(index())}
+                entry={entry()}
+                forgotten={isForgotten(entry(), props.forgotten)}
+                summary={summaryKindOf(props.projection, entry())}
+                streaming={props.projection.streaming === index}
+                unfolded={unfolded(index)}
+                onToggle={() => toggle(index)}
                 onAnswerAsk={props.onAnswerAsk}
                 askChords={props.askChords}
                 quiet={props.quiet}
@@ -161,9 +162,9 @@ export function ConversationPane(props: ConversationPaneProps) {
                 onOpenSpill={props.onOpenSpill}
                 onResend={props.onResend}
                 untrusted={props.untrusted}
-                queuedBehind={callsQueuedBehind(props.projection.entries, index())}
+                queuedBehind={callsQueuedBehind(props.projection.entries, index)}
               />
-              <Show when={closingAt().get(index())}>
+              <Show when={closingAt().get(index)}>
                 {(turn) => (
                   <TurnClose
                     turn={turn()}
@@ -176,7 +177,7 @@ export function ConversationPane(props: ConversationPaneProps) {
               </Show>
             </>
           )}
-        </For>
+        </Index>
         <Show when={awaitingTheModel(props.projection)}>
           <Row voice="agent" streaming>
             <p class="kw-working">{workingLine}</p>
