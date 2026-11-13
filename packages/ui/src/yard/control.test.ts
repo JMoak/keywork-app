@@ -27,6 +27,20 @@ describe("the yard's control", () => {
     run.dispose();
   });
 
+  it("reaches the rail in tiles without leaving tiles, and gives focus back on the way out", () => {
+    const run = controlled("tiles");
+    const composer = document.createElement("textarea");
+    document.body.append(composer);
+    composer.focus();
+    run.control.focusRail();
+    expect(run.control.on()).toBe(false);
+    expect(run.control.railActive()).toBe(true);
+    run.control.leaveRail();
+    expect(run.control.on()).toBe(false);
+    expect(document.activeElement).toBe(composer);
+    run.dispose();
+  });
+
   it("asks for the rail at a node each time, even the same node twice", () => {
     const run = controlled();
     const asked: Array<string | undefined> = [];
@@ -46,18 +60,18 @@ describe("the yard's control", () => {
     expect(run.control.view()).toBe("now");
     run.control.toggleView();
     run.control.toggleView();
-    expect(run.said).toEqual(["the trail · newest branch first", "now · by depth"]);
+    expect(run.said).toEqual(["the trail · newest branch first", "now · most relevant first"]);
     expect(run.control.view()).toBe("now");
     run.dispose();
   });
 });
 
-function controlled() {
+function controlled(firstFrame: "yard" | "tiles" = "yard") {
   const said: string[] = [];
   let homes = 0;
   return createRoot((dispose) => {
     const control = createYardControl({
-      firstFrame: "yard",
+      firstFrame,
       chord: (action) => `chord for ${action}`,
       say: (line) => said.push(line),
       returnHome: () => {

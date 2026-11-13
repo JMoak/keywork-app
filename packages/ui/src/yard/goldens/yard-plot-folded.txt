@@ -1,12 +1,12 @@
 yard yard
 hub 0,0 1140×900
 rail 1152,16 272×192
-  head 0,0 272×40 1 of 6 unfolds · the next is free
+  head 0,0 272×40 1 of 6 panels opened in 10 min
   card 0,52 272×64 · plot of 2
     the sum and its test → src/sum.ts → src/sum.test.ts
-    2 panels folded as one
-    enter restores · x dismisses them all
+    2 closed panels
+    enter reopens · x dismisses them all
   card 0,128 272×64
     the nightly chore found two stale branches
-    Wren set out a note
+    Wren showed a note
     set out because you asked about it this morning

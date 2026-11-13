@@ -66,7 +66,7 @@ describe("the yard while a project is active", () => {
     await waitFor(() => cardCalled("the preview deploy is green"));
     run.home.emit([proposed(1, fromHome)]);
     const card = await waitFor(() => cardCalled("the nightly chore found two stale branches"));
-    expect(card.querySelector(".kw-yard-card-by")?.textContent).toBe("Wren set out a note");
+    expect(card.querySelector(".kw-yard-card-by")?.textContent).toBe("Wren showed a note");
 
     pressLeader("y");
     const cursor = document.querySelector(".kw-yard-card[data-cursor]");

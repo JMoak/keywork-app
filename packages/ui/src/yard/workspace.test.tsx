@@ -77,7 +77,7 @@ describe("the yard under the stead profile", () => {
     expect(satelliteOf("delivery")).toBe(first);
   });
 
-  it("holds unfolds past the budget back as cards and says so at the head of the rail", async () => {
+  it("holds unfolds past the budget back as cards and heads the rail with the budget, never with an absence", async () => {
     const yard = await openYard();
     yard.emit(
       Array.from({ length: 7 }, (_, index) =>
@@ -92,9 +92,10 @@ describe("the yard under the stead profile", () => {
         ),
       ),
     );
-    await screen.findByText("while you were away · 1 held back as a card", {
+    await screen.findByText(/^6 of 6 opened · next at /, {
       selector: ".kw-yard-rail-head",
     });
+    expect(screen.queryByText(/while you were away/)).toBeNull();
   });
 
   it("hangs a creature-less setting on its thread and answers it the same way", async () => {
@@ -122,21 +123,17 @@ describe("the yard under the stead profile", () => {
     key("j");
     expect(cardTitled("the nightly chore found two stale branches")?.dataset.cursor).toBe("");
     key("Enter");
-    await waitFor(() => satelliteOf("note"));
+    await waitFor(() => expect(satelliteOf("note").contains(document.activeElement)).toBe(true));
+    expect(document.querySelector(".kw-yard-rail[data-active]")).toBeNull();
     expect(yard.answered).toEqual([["delivery", "pinned"]]);
 
-    key("Enter");
-    await waitFor(() =>
-      expect(yard.answered).toEqual([
-        ["delivery", "pinned"],
-        ["note", "seen"],
-      ]),
-    );
-    expect(satelliteOf("note")).toBeTruthy();
-    yard.emit([settled(3, note, "seen")]);
+    pressLeader("y");
+    key("x");
+    await waitFor(() => expect(yard.answered.at(-1)).toEqual(["note", "dismissed"]));
+    yard.emit([settled(3, note, "dismissed")]);
     await waitFor(() => expect(document.querySelector('[data-setting="note"]')).toBeNull());
 
-    pressLeader("y");
+    expect(satelliteOf("delivery").dataset.cursor).toBe("");
     key("x");
     await waitFor(() => expect(yard.answered.at(-1)).toEqual(["delivery", "dismissed"]));
     expect(satelliteOf("delivery")).toBeTruthy();
@@ -184,7 +181,7 @@ describe("the yard under the stead profile", () => {
     expect(cardTitled("the parser fix")).toBeUndefined();
   });
 
-  it("enters a thread from the rail into the hub and marks it seen", async () => {
+  it("opens a card from the rail beside the hub and takes the keyboard into it, marking nothing seen", async () => {
     const yard = await openYard();
     const child = aSetting({
       id: "child",
@@ -197,15 +194,21 @@ describe("the yard under the stead profile", () => {
     await waitFor(() => cardCalled("a split conversation"));
     pressLeader("y");
     key("Enter");
-    await waitFor(() => satelliteOf("child"));
-    key("Enter");
-    await waitFor(() => expect(yard.answered).toEqual([["child", "seen"]]));
+    await waitFor(() => expect(satelliteOf("child").contains(document.activeElement)).toBe(true));
+    expect(yardField()?.dataset.mode).toBe("yard");
+    expect(yard.answered).toEqual([]);
+  });
+
+  it("marks a panel focused while the keyboard is inside it, so its own keys answer", async () => {
+    const yard = await openYard();
+    typing();
+    yard.emit([proposed(1, delivery)]);
+    const panel = await waitFor(() => satelliteOf("delivery"));
+    expect(panel.querySelector(".kw-frame")?.hasAttribute("data-focused")).toBe(false);
+    const inside = panel.querySelector<HTMLElement>(".kw-frame-body [tabindex]");
+    inside?.focus();
     await waitFor(() =>
-      expect(
-        [...document.querySelectorAll(".kw-yard-hub .kw-slot")].some(
-          (slot) => slot.querySelector(".kw-frame-name")?.textContent === "new session",
-        ),
-      ).toBe(true),
+      expect(panel.querySelector(".kw-frame")?.hasAttribute("data-focused")).toBe(true),
     );
   });
 
@@ -258,24 +261,33 @@ describe("the yard under the stead profile", () => {
     await waitFor(() => satelliteOf("delivery"));
     pressLeader("Y", { shiftKey: true });
     await waitFor(() => expect(yardField()?.dataset.mode).toBe("tiles"));
+    await waitFor(() => cardCalled("the parser fix"));
     expect(document.querySelector(".kw-yard-satellite")).toBeNull();
-    await screen.findByText("tiles · ctrl+k shift+y returns to the yard", {
-      selector: ".kw-status-notice",
-    });
+    await screen.findByText(
+      "tiles · what the model shows waits as cards · ctrl+k shift+y returns to the yard",
+      {
+        selector: ".kw-status-notice",
+      },
+    );
     pressLeader("Y", { shiftKey: true });
     await waitFor(() => satelliteOf("delivery"));
   });
 });
 
 describe("the yard under the keywork profile", () => {
-  it("opens on tiles and holds settings back until the keeper asks for the yard", async () => {
+  it("opens on tiles and shows what is set out as cards beside them, saying so", async () => {
     const yard = await openYard(keyworkProfile);
     expect(yardField()?.dataset.mode).toBe("tiles");
     expect(frameNamed("sessions")).toBeTruthy();
-    yard.emit([proposed(1, delivery), proposed(2, note)]);
     await waitFor(() => expect(yard.listed).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(document.querySelector(".kw-yard-satellite, .kw-yard-rail")).toBeNull();
+    yard.emit([proposed(1, delivery), proposed(2, note)]);
+    await waitFor(() => cardCalled("the parser fix"));
+    expect(cardTitled("the nightly chore found two stale branches")).toBeTruthy();
+    expect(document.querySelector(".kw-yard-satellite")).toBeNull();
+    expect(frameNamed("sessions")).toBeTruthy();
+    await screen.findByText("2 new things to see · ctrl+k y reaches them", {
+      selector: ".kw-status-notice",
+    });
 
     pressLeader("Y", { shiftKey: true });
     await waitFor(() => expect(yardField()?.dataset.mode).toBe("yard"));
@@ -321,6 +333,49 @@ describe("the yard under the keywork profile", () => {
     fireEvent.click(tabs[0] as HTMLElement);
     await waitFor(() => expect(screen.queryAllByRole("tab")).toEqual([]));
     expect(hubNames()).toEqual(["Wren at home"]);
+  });
+
+  it("reaches the rail in tiles without leaving tiles, and Esc gives the keyboard back", async () => {
+    const yard = await openYard(keyworkProfile);
+    const composer = typing();
+    yard.emit([proposed(1, note)]);
+    await waitFor(() => cardCalled("the nightly chore found two stale branches"));
+    pressLeader("y");
+    expect(document.activeElement).toBe(document.querySelector(".kw-yard-rail"));
+    expect(yardField()?.dataset.mode).toBe("tiles");
+    expect(frameNamed("sessions")).toBeTruthy();
+    key("Escape");
+    expect(document.activeElement).toBe(composer);
+    expect(yardField()?.dataset.mode).toBe("tiles");
+  });
+
+  it("opens a change from the rail as a tile, with the keyboard in it, and marks it seen", async () => {
+    const yard = await openYard(keyworkProfile);
+    typing();
+    yard.emit([proposed(1, delivery)]);
+    await waitFor(() => cardCalled("the parser fix"));
+    pressLeader("y");
+    key("Enter");
+    await waitFor(() => expect(yard.answered).toEqual([["delivery", "seen"]]));
+    const tile = frameNamed("changes")?.closest(".kw-slot");
+    expect(tile).toBeTruthy();
+    await waitFor(() => expect(tile?.contains(document.activeElement)).toBe(true));
+    expect(yardField()?.dataset.mode).toBe("tiles");
+  });
+
+  it("reads a note on the rail in tiles, marks it seen, and closes the reading with Esc", async () => {
+    const yard = await openYard(keyworkProfile);
+    typing();
+    yard.emit([proposed(1, note)]);
+    await waitFor(() => cardCalled("the nightly chore found two stale branches"));
+    pressLeader("y");
+    key("Enter");
+    const reading = await screen.findByRole("article");
+    expect(reading.textContent).toBe("the nightly chore found two stale branches");
+    await waitFor(() => expect(yard.answered).toEqual([["note", "seen"]]));
+    key("Escape");
+    expect(screen.queryByRole("article")).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector(".kw-yard-rail"));
   });
 
   it("answers from the same rail with the same keys", async () => {

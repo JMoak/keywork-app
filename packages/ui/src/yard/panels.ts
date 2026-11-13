@@ -3,8 +3,14 @@ import { type Accessor, createSignal } from "solid-js";
 import type { PaneKind } from "../panes/index.ts";
 import type { PaneActionHandler } from "../panes/registry.ts";
 
+export type DrawnAs = "panel" | "card";
+
+export type DrawnYard = ReadonlyMap<string, DrawnAs>;
+
 export interface YardPanels {
   readonly inside: Accessor<string | undefined>;
+  report(drawn: DrawnYard): void;
+  whenDrawn(id: string, landed: (as: DrawnAs) => void): void;
   mount(id: string, panel: MountedPanel): () => void;
   handle(id: string, handler: PaneActionHandler): () => void;
   focusWithin(id: string, within: boolean, target?: EventTarget | null): void;
@@ -30,7 +36,16 @@ export function createYardPanels(): YardPanels {
   const mounted = new Map<string, MountedPanel>();
   const handlers = new Map<string, PaneActionHandler>();
   const lastFocused = new Map<string, HTMLElement>();
+  const landings = new Map<string, (as: DrawnAs) => void>();
+  let drawn: DrawnYard = new Map();
   let awaited: string | undefined;
+  const land = (id: string): void => {
+    const as = drawn.get(id);
+    const landed = landings.get(id);
+    if (as === undefined || landed === undefined) return;
+    landings.delete(id);
+    landed(as);
+  };
   const focus = (id: string): boolean => {
     const panel = mounted.get(id);
     if (panel === undefined) return false;
@@ -46,6 +61,14 @@ export function createYardPanels(): YardPanels {
 
   return {
     inside,
+    report: (next) => {
+      drawn = next;
+      for (const id of [...landings.keys()]) land(id);
+    },
+    whenDrawn: (id, landed) => {
+      landings.set(id, landed);
+      land(id);
+    },
     mount: (id, panel) => {
       mounted.set(id, panel);
       if (awaited === id) {
@@ -94,12 +117,40 @@ export function keptByThePanel(panel: Element, next: EventTarget | null): boolea
   return panel.contains(next) || next.closest(overlaySelector) !== null;
 }
 
+export interface FocusLeaving {
+  refocus(): boolean;
+  leave(): void;
+}
+
+export function followFocusOut(panel: HTMLElement, event: FocusEvent, seams: FocusLeaving): void {
+  if (keptByThePanel(panel, event.relatedTarget)) return;
+  if (event.relatedTarget === null) afterRemovalSettles(panel, event.target, seams);
+  else seams.leave();
+}
+
+function afterRemovalSettles(panel: HTMLElement, lost: EventTarget | null, seams: FocusLeaving) {
+  queueMicrotask(() => {
+    const page = panel.ownerDocument;
+    if (panel.contains(page.activeElement)) return;
+    const removedUnderFocus = lost instanceof Node && !lost.isConnected;
+    const nowhere = page.activeElement === null || page.activeElement === page.body;
+    if (removedUnderFocus && nowhere && panel.isConnected && seams.refocus()) return;
+    seams.leave();
+  });
+}
+
 export function panelIdAt(target: EventTarget | null): string | undefined {
   if (!(target instanceof Element)) return undefined;
   return target.closest<HTMLElement>(panelSelector)?.dataset.setting;
 }
 
+const focusTargets = [".kw-frame-body [tabindex]", ".kw-frame-body textarea"] as const;
+
 function focusTargetIn(panel: HTMLElement, last: HTMLElement | undefined): HTMLElement | undefined {
   if (last?.isConnected && panel.contains(last)) return last;
-  return panel.querySelector<HTMLElement>(".kw-frame-body [tabindex]") ?? undefined;
+  for (const selector of focusTargets) {
+    const target = panel.querySelector<HTMLElement>(selector);
+    if (target !== null) return target;
+  }
+  return undefined;
 }

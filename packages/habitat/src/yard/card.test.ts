@@ -46,7 +46,7 @@ describe("the yard's own card", () => {
     expect(card.decisions).toBe(yard.decisions);
     expect(card.decisions.map((decision) => decision.reason)).toEqual([
       "you asked, it shows",
-      "unfold cooldown",
+      "its owner just opened another",
     ]);
     expect(yardCard(yard, noon + 5 * second + unfoldBudget.cooldownMs).cooldowns).toEqual([]);
   });

@@ -67,7 +67,7 @@ describe("the rail's trail view", () => {
   it("calls the keeper's own opening theirs, from the panel it grew out of", () => {
     renderTrail({ view: "now" });
     expect(byLineOf("file")).toBe("you opened it from the sum change");
-    expect(byLineOf("diff")).toBe("Wren set out a note");
+    expect(byLineOf("diff")).toBe("Wren showed a note");
   });
 });
 

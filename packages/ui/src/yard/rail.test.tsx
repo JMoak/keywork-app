@@ -79,10 +79,12 @@ describe("the rail", () => {
     ]);
     expect(drawn[1]?.style.top).toBe("128px");
     expect(drawn[1]?.dataset.pinned).toBe("");
-    expect(run.container.querySelector(".kw-yard-folded")?.textContent).toBe("3 more folded");
+    expect(run.container.querySelector(".kw-yard-folded")?.textContent).toBe(
+      "3 more below · j reaches them",
+    );
   });
 
-  it("heads the rail with what the unfold budget held back while the keeper was away", () => {
+  it("heads the rail with what was held back while the keeper was away", () => {
     const run = rail(false, 2);
     expect(run.container.querySelector(".kw-yard-rail-head")?.textContent).toBe(
       "while you were away · 2 held back as cards",

@@ -85,11 +85,12 @@ describe("a link followed inside a panel", () => {
 });
 
 describe("posting an opening", () => {
-  it("posts it as an unfolded keeper opening from the panel and says it opens beside it", async () => {
-    const openSetting = vi.fn(async () => aSetting({ id: "set-2" }));
-    expect(await openFrom({ openSetting }, { kind: "file", ref: "src/sum.ts" }, "set-1")).toBe(
-      "a file opens beside it",
-    );
+  it("posts it as an unfolded keeper opening from the panel and hands back what the server set out", async () => {
+    const opened = aSetting({ id: "set-2" });
+    const openSetting = vi.fn(async () => opened);
+    expect(await openFrom({ openSetting }, { kind: "file", ref: "src/sum.ts" }, "set-1")).toEqual({
+      opened,
+    });
     expect(openSetting).toHaveBeenCalledWith({
       what: { kind: "file", ref: "src/sum.ts" },
       from: "set-1",
@@ -101,17 +102,17 @@ describe("posting an opening", () => {
     const refusing = {
       openSetting: async () => ({ refused: "missing" as const, detail: "set-1 is not out" }),
     };
-    expect(await openFrom(refusing, { kind: "url", ref: "https://x.dev" }, "set-1")).toBe(
-      "not opened · set-1 is not out",
-    );
+    expect(await openFrom(refusing, { kind: "url", ref: "https://x.dev" }, "set-1")).toEqual({
+      unopened: "not opened · set-1 is not out",
+    });
     const failing = {
       openSetting: async () => {
         throw new Error("the server is gone");
       },
     };
-    expect(await openFrom(failing, { kind: "url", ref: "https://x.dev" }, "set-1")).toBe(
-      "not opened · the server is gone",
-    );
+    expect(await openFrom(failing, { kind: "url", ref: "https://x.dev" }, "set-1")).toEqual({
+      unopened: "not opened · the server is gone",
+    });
   });
 });
 

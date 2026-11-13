@@ -46,18 +46,27 @@ import {
   trailLabel,
   withdrawnMark,
 } from "./copy.ts";
+import { asCard, type PanelWay, raisedByHand, wayInto } from "./entering.ts";
 import {
   isPlot,
   type RailLayout,
   type RailRows,
   railRowsBeneath,
   type YardEntry,
+  type YardLayout,
   yardLayout,
 } from "./layout.ts";
 import { createGlide } from "./motion.ts";
-import { createYardPanels, type YardPanels } from "./panels.ts";
+import { createYardPanels, type DrawnAs, type DrawnYard, type YardPanels } from "./panels.ts";
 import { createPlotMotion } from "./plot-motion.ts";
-import { Rail, type RailCardSpot, type RailEntry, rectStyle, type YardCardView } from "./rail.tsx";
+import {
+  Rail,
+  type RailCardSpot,
+  type RailEntry,
+  type RailReading,
+  rectStyle,
+  type YardCardView,
+} from "./rail.tsx";
 import { SatelliteSlot } from "./satellite.tsx";
 import { titleOfSetting } from "./satellites.ts";
 import type { YardLineage } from "./trail.ts";
@@ -82,7 +91,7 @@ export interface YardProps {
   readonly now?: (() => number) | undefined;
   readonly panels?: YardPanels | undefined;
   readonly lineage?: YardLineage | undefined;
-  onEnter(setting: YardSetting): void;
+  onEnter(setting: YardSetting, way: PanelWay): void;
   onOpen?: ((from: YardSetting, what: SettingSubject) => void) | undefined;
   onInteract?: ((setting: YardSetting) => void) | undefined;
   onToggleView?: (() => void) | undefined;
@@ -115,15 +124,21 @@ export function Yard(props: YardProps) {
     return kept === undefined ? props.settings : [...props.settings, kept];
   });
   const floods = createFloods(drawn);
-  const layout = createMemo(() =>
+  const laidOut = createMemo(() => (props.on ? floods.gathered() : floods.gathered().map(asCard)));
+  const layoutOf = (settings: readonly YardSetting[], inside: string | undefined) =>
     yardLayout({
       viewport: viewport(),
-      settings: props.on ? floods.gathered() : [],
-      railWanted: props.on && props.railActive,
+      settings,
+      railWanted: props.railActive,
       prefs: { reducedMotion: props.reducedMotion, tier: "interact" },
-      inside: props.inside,
-    }),
-  );
+      inside,
+    });
+  const layout = createMemo(() => layoutOf(laidOut(), props.inside));
+  const roomBeside = (setting: YardSetting): boolean => {
+    const raised = laidOut().map((held) => (held.id === setting.id ? raisedByHand(held) : held));
+    return drawnAsPanel(layoutOf(raised, setting.id), setting.id);
+  };
+  const [reading, setReading] = createSignal<RailReading>();
   const trail = createMemo(() =>
     props.view === "trail" ? props.lineage?.trailOrder() : undefined,
   );
@@ -136,12 +151,32 @@ export function Yard(props: YardProps) {
       ),
   );
   const levelOf = (id: string): number | undefined => trail()?.find((row) => row.id === id)?.level;
-  const shownRail = createMemo((): ShownRail | undefined => {
+  const railList = createMemo((): readonly YardEntry[] => {
+    if (trail() !== undefined) return selectable();
+    const unfolded = new Set(layout().satellites.map((placement) => placement.id));
+    return selectable().filter((entry) => !unfolded.has(entry.id));
+  });
+  const railSlots = createMemo((): RailSlots | undefined => {
     const rail = layout().rail;
     if (rail === undefined) return undefined;
-    if (trail() === undefined) return railNow(rail, selectable());
+    if (trail() === undefined) return slotsNow(rail);
     const blocked = [layout().hub, ...layout().satellites.map((placement) => placement.rect)];
-    return railAlongTheTrail(rail, railRowsBeneath(rail.head, viewport(), blocked), selectable());
+    return slotsAlongTheTrail(rail, railRowsBeneath(rail.head, viewport(), blocked));
+  });
+  const railStart = createMemo<number>((start) => {
+    if (!props.railActive) return 0;
+    const at = railList().findIndex((entry) => entry.id === cursor());
+    return scrolledTo(start, at, railSlots()?.rects.length ?? 0, railList().length);
+  }, 0);
+  const railHasWords = (): boolean =>
+    props.railActive ||
+    railList().length > 0 ||
+    (props.heldBack ?? 0) > 0 ||
+    (props.foldedAway ?? []).length > 0;
+  const shownRail = createMemo((): ShownRail | undefined => {
+    const slots = railSlots();
+    if (slots === undefined || !railHasWords()) return undefined;
+    return windowOf(slots, railList(), railStart());
   });
   const settingOf = (id: string): YardSetting | undefined =>
     drawn().find((setting) => setting.id === id);
@@ -224,7 +259,7 @@ export function Yard(props: YardProps) {
     id: plot.id,
     title: props.lineage?.chainOf(plot.id) ?? plot.members.map(titleOfSetting).join(" → "),
     by: plotLine(plot.members.length),
-    why: plotHint,
+    why: plotHint(plot.members.length),
     shown: "card",
     pinned: false,
     plot: plot.members.length,
@@ -240,31 +275,54 @@ export function Yard(props: YardProps) {
   });
   const cardView = createMemo((): YardCardView | undefined => {
     const card = props.card;
-    if (card === undefined) return undefined;
+    if (card === undefined || !props.on) return undefined;
     return viewOfCard(card, titleOf, (ms) =>
       clockWord(ms, props.offsetMinutes ?? houseOffsetMinutes()),
     );
   });
+  const cursorPlace = createMemo<number>((held) => {
+    const at = entries().findIndex((entry) => entry.id === cursor());
+    return at === -1 ? held : at;
+  }, 0);
   const current = (): string | undefined => {
-    if (props.card !== undefined && cursor() === yardIds.card) return yardIds.card;
-    return entries().find((entry) => entry.id === cursor())?.id ?? entries()[0]?.id;
+    if (cardView() !== undefined && cursor() === yardIds.card) return yardIds.card;
+    const listed = entries();
+    const kept = listed.find((entry) => entry.id === cursor());
+    return (kept ?? listed[Math.min(cursorPlace(), listed.length - 1)])?.id;
   };
   createEffect(
     on(
       () => [props.railActive, props.railAt] as const,
       ([active, at]) => {
         if (active) setCursor(at ?? current());
-        else floods.closeAll();
+        else {
+          floods.closeAll();
+          setReading(undefined);
+        }
       },
     ),
   );
+  createEffect(() => panels.report(drawnOf(layout())));
+  const read = (setting: YardSetting): void => {
+    setReading({ title: titleOfSetting(setting), text: setting.what.ref });
+    if (setting.state !== "pinned") props.onAnswer(setting, "seen");
+  };
+  const enter = (setting: YardSetting): void => {
+    const way = wayInto(setting, {
+      yardOn: props.on,
+      drawnAsPanel: (id) => drawnAsPanel(layout(), id),
+      roomBeside,
+    });
+    if (way === "read") read(setting);
+    else props.onEnter(setting, way);
+  };
   const enterOrOpen = (entry: YardEntry): void => {
     if (isPlot(entry)) {
       props.onRestore?.(entry);
       return;
     }
     const group = floods.closedAt(entry.id);
-    if (group === undefined) props.onEnter(entry);
+    if (group === undefined) enter(entry);
     else floods.open(group);
   };
   const answerAll = (entry: YardEntry, outcome: KeeperShowOutcome): void => {
@@ -345,10 +403,13 @@ export function Yard(props: YardProps) {
               entries={entries()}
               cards={rail().spots.map((spot) => ({ ...spot, rect: within(rail(), spot.rect) }))}
               card={cardView()}
+              reading={reading()}
+              onCloseReading={() => setReading(undefined)}
               log={within(rail(), logBelowHead(rail().head, viewport()))}
               head={within(rail(), rail().head)}
               fold={withinOrNone(rail(), rail().fold)}
               folded={rail().folded}
+              above={rail().above}
               heldBack={props.heldBack ?? 0}
               foldedAway={props.foldedAway}
               active={props.railActive}
@@ -474,36 +535,47 @@ interface ShownRail {
   readonly spots: readonly RailCardSpot[];
   readonly fold: Rect | undefined;
   readonly folded: number;
+  readonly above: number;
 }
 
-function railNow(rail: RailLayout, ordered: readonly YardEntry[]): ShownRail {
-  const onRail = new Set(rail.cards.map((card) => card.id));
+interface RailSlots {
+  readonly region: Rect;
+  readonly head: Rect;
+  readonly rects: readonly Rect[];
+  readonly fold: Rect | undefined;
+}
+
+function slotsNow(rail: RailLayout): RailSlots {
   const rects = rail.cards.map((card) => card.rect).toSorted((a, b) => a.y - b.y);
-  const spots = ordered
-    .filter((setting) => onRail.has(setting.id))
-    .flatMap((setting, index) => {
-      const rect = rects[index];
-      return rect === undefined ? [] : [{ id: setting.id, rect }];
-    });
-  return { region: rail.region, head: rail.head, spots, fold: rail.fold, folded: rail.folded };
+  return { region: rail.region, head: rail.head, rects, fold: rail.fold };
 }
 
-function railAlongTheTrail(
-  rail: RailLayout,
-  rows: RailRows,
-  ordered: readonly YardEntry[],
-): ShownRail {
-  const spots = ordered.flatMap((setting, index) => {
-    const rect = rows.rows[index];
-    return rect === undefined ? [] : [{ id: setting.id, rect }];
+function slotsAlongTheTrail(rail: RailLayout, rows: RailRows): RailSlots {
+  return { region: rows.region, head: rail.head, rects: rows.rows, fold: rows.fold };
+}
+
+export function scrolledTo(start: number, at: number, size: number, total: number): number {
+  if (size === 0) return 0;
+  const last = Math.max(0, total - size);
+  if (at >= 0 && at < start) return at;
+  if (at >= start + size) return at - size + 1;
+  return Math.min(start, last);
+}
+
+function windowOf(slots: RailSlots, listed: readonly YardEntry[], start: number): ShownRail {
+  const spots = listed.slice(start, start + slots.rects.length).flatMap((entry, index) => {
+    const rect = slots.rects[index];
+    return rect === undefined ? [] : [{ id: entry.id, rect }];
   });
-  const folded = ordered.length - spots.length;
+  const above = Math.min(start, listed.length);
+  const folded = listed.length - above - spots.length;
   return {
-    region: rows.region,
-    head: rail.head,
+    region: slots.region,
+    head: slots.head,
     spots,
-    fold: folded > 0 ? rows.fold : undefined,
+    fold: above + folded > 0 ? slots.fold : undefined,
     folded,
+    above,
   };
 }
 
@@ -518,6 +590,20 @@ function plotCardsOnRail(
       const rect = spots.get(entry.id);
       return rect === undefined ? [] : entry.members.map((member) => [member.id, rect] as const);
     }),
+  );
+}
+
+function drawnAsPanel(layout: YardLayout, id: string): boolean {
+  return layout.satellites.some((placement) => placement.id === id && placement.size !== "card");
+}
+
+function drawnOf(layout: YardLayout): DrawnYard {
+  const panels = new Set(layout.satellites.map((placement) => placement.id));
+  return new Map(
+    layout.selectable.map((entry): [string, DrawnAs] => [
+      entry.id,
+      panels.has(entry.id) ? "panel" : "card",
+    ]),
   );
 }
 

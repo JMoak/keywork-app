@@ -19,6 +19,7 @@ import {
   type YardCard,
   type YardContext,
   type YardSetting,
+  type YardState,
   yardCard,
   yardOf,
 } from "@keywork-app/habitat";
@@ -116,7 +117,7 @@ export function createYardModel(seams: YardModelSeams): YardModel {
 
   return {
     settings: () => Object.values(yard().settings).filter(stillShown),
-    heldBack: () => digestOf(yard(), seams.signals().returnedAt).length,
+    heldBack: () => heldWhileAway(yard(), seams.signals().returnedAt),
     foldedAway: () =>
       plotsFoldedWhileAway(yard(), seams.signals().returnedAt).map((plot) => chainOf(yard(), plot)),
     inside: () => yard().visit?.id,
@@ -143,6 +144,10 @@ export function createYardModel(seams: YardModelSeams): YardModel {
     },
     answer: (setting, outcome) => answerSetting(shellOf(setting).client, setting.id, outcome),
   };
+}
+
+export function heldWhileAway(yard: YardState, returnedAt: number | undefined): number {
+  return digestOf(yard, returnedAt).length - digestOf(yard).length;
 }
 
 export function tierOf(visible: boolean, focused: boolean): PowerTier {
