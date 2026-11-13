@@ -1,6 +1,8 @@
+import type { Rect } from "./geometry.ts";
 import {
   type DropZone,
   dropZoneAt,
+  floatingAt,
   type Hit,
   hitAt,
   type Point,
@@ -11,7 +13,7 @@ import {
 } from "./hit.ts";
 import type { PaneId } from "./tree.ts";
 
-export type Grip = "title" | "body";
+export type Grip = "title" | "body" | "corner";
 
 export type PointerInput =
   | { readonly type: "down"; readonly x: number; readonly y: number; readonly grip: Grip }
@@ -23,12 +25,15 @@ export type PointerState =
   | { readonly phase: "idle" }
   | { readonly phase: "pressed"; readonly hit: Hit; readonly origin: Point; readonly grip: Grip }
   | { readonly phase: "resizing"; readonly seam: Seam }
-  | { readonly phase: "dragging"; readonly id: PaneId; readonly over: DropZone | undefined };
+  | { readonly phase: "dragging"; readonly id: PaneId; readonly over: DropZone | undefined }
+  | { readonly phase: "moving"; readonly id: PaneId; readonly grab: Point }
+  | { readonly phase: "sizing"; readonly id: PaneId; readonly anchor: Point };
 
 export type PointerIntent =
   | { readonly type: "focus"; readonly id: PaneId }
   | { readonly type: "resize"; readonly handle: SeamHandle; readonly ratio: number }
-  | { readonly type: "drop"; readonly id: PaneId; readonly zone: DropZone };
+  | { readonly type: "drop"; readonly id: PaneId; readonly zone: DropZone }
+  | { readonly type: "place"; readonly id: PaneId; readonly rect: Rect };
 
 export interface PointerStep {
   readonly state: PointerState;
@@ -63,6 +68,14 @@ export function advancePointer(
     case "dragging":
       if (input.type === "move") return { state: { ...state, over: dropZoneAt(scene, input) } };
       return { state: idlePointer, intent: dropIntent(state, scene) };
+    case "moving":
+      return input.type === "move"
+        ? { state, intent: placeIntent(state.id, movedRect(state, input, scene)) }
+        : { state: idlePointer };
+    case "sizing":
+      return input.type === "move"
+        ? { state, intent: placeIntent(state.id, sizedRect(state, input)) }
+        : { state: idlePointer };
   }
 }
 
@@ -85,8 +98,47 @@ function lift(
       scene,
     );
   }
-  if (state.grip !== "title" || !beyondThreshold(state.origin, input)) return { state };
-  return { state: { phase: "dragging", id: state.hit.id, over: dropZoneAt(scene, input) } };
+  if (state.grip === "body" || !beyondThreshold(state.origin, input)) return { state };
+  const afloat = floatingRect(scene, state.hit.id, state.origin);
+  if (afloat === undefined) {
+    if (state.grip !== "title") return { state };
+    return { state: { phase: "dragging", id: state.hit.id, over: dropZoneAt(scene, input) } };
+  }
+  const held: PointerState =
+    state.grip === "corner"
+      ? { phase: "sizing", id: state.hit.id, anchor: { x: afloat.x, y: afloat.y } }
+      : {
+          phase: "moving",
+          id: state.hit.id,
+          grab: { x: state.origin.x - afloat.x, y: state.origin.y - afloat.y },
+        };
+  return advancePointer(held, { type: "move", ...input }, scene);
+}
+
+function floatingRect(scene: Scene, id: PaneId, at: Point): Rect | undefined {
+  return floatingAt(scene, at) === id ? scene.rects.get(id) : undefined;
+}
+
+function movedRect(
+  state: Extract<PointerState, { phase: "moving" }>,
+  point: Point,
+  scene: Scene,
+): Rect | undefined {
+  const held = scene.rects.get(state.id);
+  if (held === undefined) return undefined;
+  return { ...held, x: point.x - state.grab.x, y: point.y - state.grab.y };
+}
+
+function sizedRect(state: Extract<PointerState, { phase: "sizing" }>, point: Point): Rect {
+  return {
+    ...state.anchor,
+    width: Math.max(0, point.x - state.anchor.x),
+    height: Math.max(0, point.y - state.anchor.y),
+  };
+}
+
+function placeIntent(id: PaneId, rect: Rect | undefined): PointerIntent | undefined {
+  return rect === undefined ? undefined : { type: "place", id, rect };
 }
 
 function dropIntent(

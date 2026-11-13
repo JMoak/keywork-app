@@ -1,4 +1,12 @@
-import { clamp, type LayoutNode, leafIds, type PaneId, removeLeaf, swapLeaves } from "./tree.ts";
+import {
+  clamp,
+  type LayoutNode,
+  leafIds,
+  type PaneId,
+  removeLeaf,
+  swapLeaves,
+  withoutLeaves,
+} from "./tree.ts";
 
 export type DockSide = "left" | "right";
 
@@ -67,6 +75,17 @@ export function lifted(arrangement: Arrangement, id: PaneId): Arrangement {
   }
   if (arrangement.tree === undefined) return arrangement;
   return withTree(arrangement, removeLeaf(arrangement.tree, id));
+}
+
+export function without(arrangement: Arrangement, gone: (id: PaneId) => boolean): Arrangement {
+  const kept = (dock: DockState): DockState => ({
+    ...dock,
+    panes: dock.panes.filter((pane) => !gone(pane)),
+  });
+  return {
+    tree: withoutLeaves(arrangement.tree, gone),
+    docks: { left: kept(arrangement.docks.left), right: kept(arrangement.docks.right) },
+  };
 }
 
 export function dockedAt(

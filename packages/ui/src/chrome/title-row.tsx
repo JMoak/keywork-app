@@ -38,6 +38,7 @@ export interface TitleRowProps {
   telemetry?: string | undefined;
   context?: ContextLevel | undefined;
   marked?: boolean | undefined;
+  pinned?: boolean | undefined;
   quiet?: boolean | undefined;
   ribbon?: string | undefined;
   themeMark?: ThemeMark | undefined;
@@ -48,6 +49,7 @@ export interface TitleRowProps {
 export const focusMark = "▎";
 export const paneMark = "▣";
 export const quietMark = "»";
+export const pinMark = "◆";
 
 export function titleZones(tier: WidthTier, focused: boolean): ReadonlySet<TitleZone> {
   switch (tier) {
@@ -98,6 +100,11 @@ export function TitleRow(props: TitleRowProps) {
       <Show when={props.marked}>
         <span class="kw-frame-mark" role="img" aria-label="marked">
           {paneMark}
+        </span>
+      </Show>
+      <Show when={props.pinned}>
+        <span class="kw-frame-pin" role="img" aria-label="pinned">
+          {pinMark}
         </span>
       </Show>
       <span class="kw-frame-name" data-state={props.state}>

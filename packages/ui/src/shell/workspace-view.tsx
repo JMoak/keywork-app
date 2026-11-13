@@ -22,6 +22,7 @@ import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
 import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { PaneShelf, type ShelfItem } from "../chrome/pane-shelf.tsx";
 import { useProductProfile } from "../chrome/product.ts";
 import { readingMs } from "../chrome/reading-time.ts";
 import { gapCells } from "../chrome/root-attributes.ts";
@@ -222,6 +223,13 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const [leaderArmed, setLeaderArmed] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
+  const [changingLayer, setChangingLayer] = createSignal<PaneId>();
+  const floatFocused = (): void => {
+    const pane = tiler.focused();
+    setChangingLayer(pane);
+    setTimeout(() => setChangingLayer((held) => (held === pane ? undefined : held)), layerChangeMs);
+    act(tiler.float(screen()));
+  };
   const localHandlers = new Map<PaneId, PaneActionHandler>();
   const awaitingHandlers = new Map<PaneId, () => void>();
   const [gestures, setGestures] = createSignal<PointerGestures>();
@@ -244,7 +252,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (isSurfaceRefusal(answer)) say(`${answer.detail} · worn in this window only`);
   };
   const act = (verdict: Verdict): void => {
-    if (!verdict.ok && verdict.notice !== undefined) say(verdict.notice);
+    if (verdict.notice !== undefined) say(verdict.notice);
   };
   const focusedSession = (): string | undefined => {
     const spec = tiler.focusedSpec();
@@ -559,7 +567,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     switchCompanion: companion.switchTo,
     closePane: () => act(tiler.closeFocused()),
     zoomPane: () => act(tiler.zoom()),
-    rotatePane: () => act(tiler.rotate()),
+    floatPane: floatFocused,
+    shelvePane: () => act(tiler.shelve()),
+    returnFromShelf: () => act(tiler.returnFromShelf(screen())),
+    pinPane: () => act(tiler.pin()),
+    focusAcrossLayers: () => act(tiler.focusAcrossLayers(screen())),
+    rotatePane: () => act(tiler.rotate(screen())),
     focusToward: (direction) => act(tiler.focusToward(direction, screen())),
     focusOrdinal: (ordinal) => act(tiler.focusOrdinal(ordinal)),
     movePane: (direction) => act(tiler.move(direction, screen())),
@@ -753,6 +766,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const applyGesture = (intent: PointerIntent): void => {
     if (intent.type === "focus") act(tiler.focus(intent.id));
     else if (intent.type === "resize") act(tiler.resizeSeam(intent.handle, intent.ratio, screen()));
+    else if (intent.type === "place") act(tiler.placeFloat(intent.id, intent.rect, screen()));
     else act(tiler.send(intent.id, intent.zone, screen()));
   };
 
@@ -822,7 +836,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     storage?.setItem(storageKey, JSON.stringify(tiler.snapshot()));
   });
 
-  const titleOf = (slot: PaneSlot): string => paneTitle(slot.spec);
+  const titleOf = (slot: Pick<PaneSlot, "spec">): string => paneTitle(slot.spec);
   const titleOfPane = (id: PaneId): string => {
     const slot = slots().find((held) => held.id === id);
     return slot === undefined ? "" : titleOf(slot);
@@ -869,8 +883,36 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     return state.phase === "dragging" ? state : undefined;
   };
   const dropZones = () => Object.entries(dropZoneRects(scene())) as [DropZone, Rect][];
-  const paneIds = createMemo(() => slots().map((slot) => slot.id));
-  const slotOf = (id: PaneId): PaneSlot | undefined => slots().find((slot) => slot.id === id);
+  const benched = createMemo((): PaneSlot[] =>
+    focusedPaneHub()
+      ? []
+      : tiler.shelf(screen()).map(({ id, spec, spawnRank }) => ({
+          id,
+          spec,
+          spawnRank,
+          focused: false,
+          rect: { x: 0, y: 0, ...screen() },
+        })),
+  );
+  const onShelf = (id: PaneId): boolean => benched().some((slot) => slot.id === id);
+  const shelfItems = createMemo((): ShelfItem[] =>
+    focusedPaneHub()
+      ? []
+      : tiler.shelf(screen()).map((entry) => {
+          const slot = benched().find((held) => held.id === entry.id);
+          return {
+            id: entry.id,
+            name: titleOf(entry),
+            ordinal: entry.spawnRank + 1,
+            why: entry.why,
+            pinned: entry.pinned,
+            state: slot === undefined ? "idle" : lifecycleOf(slot),
+          };
+        }),
+  );
+  const paneIds = createMemo(() => [...slots(), ...benched()].map((slot) => slot.id));
+  const slotOf = (id: PaneId): PaneSlot | undefined =>
+    slots().find((slot) => slot.id === id) ?? benched().find((slot) => slot.id === id);
   const needsYouPaneOpen = () => slots().some((slot) => slot.spec.kind === "needs-you");
   const focusedProjection = (): SessionProjection =>
     tiler.focusedSpec()?.kind === "conversation"
@@ -899,8 +941,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         class="kw-slot"
         data-pane-id={slot().id}
         data-lantern={yard.lanternOn(slot().spec) ? "" : undefined}
-        hidden={tabbedAway(slot().id) ? true : undefined}
-        style={rectStyle(slot().rect)}
+        data-floating={slot().floating === undefined ? undefined : ""}
+        data-changing-layer={changingLayer() === slot().id ? "" : undefined}
+        hidden={tabbedAway(slot().id) || onShelf(slot().id) ? true : undefined}
+        style={{ ...rectStyle(slot().rect), "--kw-float-z": slot().floating?.z }}
       >
         <PaneFrame
           name={titleOf(slot())}
@@ -916,6 +960,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           hueRank={adornmentsOf(slot()).hueRank}
           outfit={attire.outfit(slot().id)}
           marked={marks.has(slot().id)}
+          pinned={slot().pinned}
           quiet={adornmentsOf(slot()).quiet}
           onGauge={gaugeOpener(slot())}
           ribbon={adornmentsOf(slot()).ribbon}
@@ -944,6 +989,9 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
             )}
           </Show>
         </PaneFrame>
+        <Show when={slot().floating !== undefined}>
+          <div class="kw-float-grip" aria-hidden="true" />
+        </Show>
       </div>
     );
   };
@@ -1049,6 +1097,11 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       >
         {stageView}
       </Yard>
+      <PaneShelf
+        items={shelfItems()}
+        hint={keys.describe("pane.unshelve")}
+        onReturn={(id) => act(tiler.focus(id))}
+      />
       <TrustCard trust={trust} chord={shell.keys.chord("trust.workspace")} />
       <OpenFailureCard
         notice={props.openFailure}
@@ -1099,6 +1152,8 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     </div>
   );
 }
+
+export const layerChangeMs = 160;
 
 function markedNotice(count: number): string {
   const carry = count === 1 ? "carries" : "carry";

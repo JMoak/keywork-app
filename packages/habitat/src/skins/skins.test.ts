@@ -26,7 +26,7 @@ import * as tiles from "./world/tiles.ts";
 
 describe("the skin registry", () => {
   it("loads every registered skin, the kid by default", () => {
-    expect(skinIds()).toEqual(["kid", "placeholder"]);
+    expect(skinIds()).toEqual(["kid", "carter", "joiner", "placeholder"]);
     expect(defaultSkinId).toBe("kid");
     for (const id of skinIds()) {
       const loaded = loadSkin(id);

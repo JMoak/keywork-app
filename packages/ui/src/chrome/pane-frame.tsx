@@ -27,6 +27,7 @@ export interface PaneFrameProps {
   hueRank?: number | undefined;
   outfit?: Outfit | undefined;
   marked?: boolean | undefined;
+  pinned?: boolean | undefined;
   quiet?: boolean | undefined;
   ribbon?: string | undefined;
   onFocus?: (() => void) | undefined;
@@ -86,6 +87,7 @@ export function PaneFrame(props: PaneFrameProps) {
         telemetry={props.telemetry}
         context={props.context}
         marked={props.marked}
+        pinned={props.pinned}
         quiet={props.quiet}
         ribbon={props.ribbon}
         themeMark={dressed()}

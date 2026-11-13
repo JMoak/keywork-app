@@ -1,0 +1,74 @@
+.kw-shelf {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  padding: 0.25rem 0.75rem;
+  overflow: hidden;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  color: var(--kw-text-dim);
+  background: var(--kw-panel);
+  box-shadow: inset 0 1px 0 var(--kw-border);
+  user-select: none;
+}
+
+.kw-shelf-lead {
+  flex: none;
+  margin-right: 2ch;
+}
+
+.kw-shelf-pane {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: 1ch;
+  min-width: 0;
+  margin-right: 3ch;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--kw-text-mid);
+  background: none;
+  cursor: pointer;
+  transition: color var(--kw-tempo-quick);
+}
+.kw-shelf-pane:hover,
+.kw-shelf-pane:focus-visible {
+  color: var(--kw-text);
+}
+.kw-shelf-pane:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+.kw-shelf-pane[data-state="needs-you"],
+.kw-shelf-pane[data-state="finished-unseen"] {
+  color: var(--kw-text);
+}
+
+.kw-shelf-stamp {
+  flex: none;
+  color: var(--kw-density-full);
+}
+
+.kw-shelf-ordinal,
+.kw-shelf-pin,
+.kw-shelf-why {
+  flex: none;
+  color: var(--kw-text-dim);
+}
+
+.kw-shelf-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kw-shelf-hint {
+  flex: none;
+  margin-left: auto;
+  padding-left: 3ch;
+  font: inherit;
+  color: var(--kw-text-dim);
+}

@@ -1,7 +1,7 @@
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import type { Screen } from "../layout/index.ts";
-import { createTiler, type PaneSpec, parseTilerState } from "./tiler.ts";
+import { createTiler, type PaneSpec, parseTilerState, shelfNotices } from "./tiler.ts";
 
 const sessionsPaneId = "tree-1";
 const sessions: PaneSpec = { kind: "tree" };
@@ -239,35 +239,37 @@ describe("createTiler", () => {
 });
 
 describe("refusals in keywork's words", () => {
-  const full = (tiler: ReturnType<typeof createTiler>): void => {
-    tiler.summon(sessions, screen);
-    while (tiler.open(conversation(), screen).ok);
+  const filled = (tiler: ReturnType<typeof createTiler>, room: Screen): void => {
+    tiler.summon(sessions, room);
+    while (tiler.open(conversation(), room).notice === undefined);
+    tiler.closeFocused();
   };
 
-  it("names the full layout when a pane cannot be placed, and still closes on it", () => {
+  it("seats one pane more than the stage shows and says one waits on the shelf", () => {
     withTiler((tiler) => {
-      full(tiler);
-      const crowded = tiler.panes().length;
+      filled(tiler, screen);
+      const showing = tiler.slots(screen).length;
+      expect(tiler.shelf(screen)).toEqual([]);
       expect(tiler.open(conversation("one more"), screen)).toEqual({
-        ok: false,
-        refused: "no-room",
-        notice: "no room for another pane · close or resize one",
+        ok: true,
+        notice: shelfNotices.tucked(1),
       });
+      expect(tiler.slots(screen)).toHaveLength(showing);
+      expect(tiler.shelf(screen).map((entry) => entry.why)).toEqual(["tucked"]);
       expect(tiler.closeFocused()).toEqual({ ok: true });
-      expect(tiler.panes()).toHaveLength(crowded - 1);
-      expect(tiler.open(conversation("fits again"), screen).ok).toBe(true);
+      expect(tiler.shelf(screen)).toEqual([]);
+      expect(tiler.slots(screen)).toHaveLength(showing);
     });
   });
 
-  it("says which home has no room when a pane cannot move there", () => {
+  it("docks a pane the stage cannot show beside the rest and says what waits", () => {
     withTiler((tiler) => {
       const narrow = { width: 1000, height: 600 };
-      tiler.summon(sessions, narrow);
-      while (tiler.open(conversation(), narrow).ok);
-      const refusal = tiler.dock("right", narrow);
-      expect(refusal.ok || refusal.notice).toBe(
-        "no room in the right dock · close or resize a pane",
-      );
+      filled(tiler, narrow);
+      const docked = tiler.dock("right", narrow);
+      expect(docked).toEqual({ ok: true, notice: shelfNotices.tucked(1) });
+      expect(tiler.layout.dockSideOf(tiler.focused() as string)).toBe("right");
+      expect(tiler.slots(narrow).some((slot) => slot.focused)).toBe(true);
     });
   });
 
@@ -278,6 +280,96 @@ describe("refusals in keywork's words", () => {
         refused: "no-focus",
         notice: "no pane is focused · nothing to close",
       });
+    });
+  });
+});
+
+describe("floats, the shelf and pins", () => {
+  const three = (tiler: ReturnType<typeof createTiler>): void => {
+    tiler.open(conversation("s1"), screen);
+    tiler.open(conversation("s2"), screen);
+    tiler.open(conversation("s3"), screen);
+  };
+
+  it("marks a floating slot with its place in the stack and lets the tiling close under it", () => {
+    withTiler((tiler) => {
+      three(tiler);
+      expect(tiler.float(screen)).toEqual({ ok: true });
+      const slots = tiler.slots(screen);
+      expect(slots.find((slot) => slot.id === "conversation-3")?.floating).toEqual({ z: 1 });
+      expect(slots.filter((slot) => slot.floating === undefined).map((slot) => slot.id)).toEqual([
+        "conversation-1",
+        "conversation-2",
+      ]);
+      expect(tiler.float(screen)).toEqual({ ok: true });
+      expect(tiler.slots(screen).every((slot) => slot.floating === undefined)).toBe(true);
+    });
+  });
+
+  it("shelves the focused pane, lists it with its spec, and brings it back on summon", () => {
+    withTiler((tiler) => {
+      three(tiler);
+      expect(tiler.shelve()).toEqual({ ok: true });
+      expect(tiler.focused()).toBe("conversation-2");
+      expect(tiler.slots(screen).map((slot) => slot.id)).toEqual([
+        "conversation-1",
+        "conversation-2",
+      ]);
+      expect(tiler.shelf(screen)).toEqual([
+        {
+          id: "conversation-3",
+          spec: conversation("s3"),
+          why: "shelved",
+          pinned: false,
+          spawnRank: 2,
+        },
+      ]);
+      expect(tiler.summon(conversation("s3"), screen).ok).toBe(true);
+      expect(tiler.focused()).toBe("conversation-3");
+      expect(tiler.shelf(screen)).toEqual([]);
+    });
+  });
+
+  it("says why a verb did nothing: the last pane stays, the shelf is empty, nothing floats", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      expect(tiler.shelve()).toMatchObject({ ok: false, notice: shelfNotices.lastPaneStays });
+      expect(tiler.returnFromShelf(screen)).toMatchObject({
+        ok: false,
+        notice: shelfNotices.empty,
+      });
+      expect(tiler.focusAcrossLayers(screen)).toMatchObject({
+        ok: false,
+        notice: shelfNotices.nothingFloats,
+      });
+    });
+  });
+
+  it("pins and unpins the focused pane, says which, and carries the pin on its slot", () => {
+    withTiler((tiler) => {
+      three(tiler);
+      expect(tiler.pin()).toEqual({ ok: true, notice: shelfNotices.pinned });
+      expect(tiler.slots(screen).find((slot) => slot.focused)?.pinned).toBe(true);
+      expect(tiler.pin()).toEqual({ ok: true, notice: shelfNotices.unpinned });
+      expect(tiler.slots(screen).find((slot) => slot.focused)?.pinned).toBeUndefined();
+    });
+  });
+
+  it("restores floats, the shelf and pins from a snapshot", () => {
+    const snapshot = withTiler((tiler) => {
+      three(tiler);
+      tiler.pin();
+      tiler.float(screen);
+      tiler.focus("conversation-1");
+      tiler.shelve();
+      return JSON.parse(JSON.stringify(tiler.snapshot()));
+    });
+    createRoot((dispose) => {
+      const restored = createTiler(parseTilerState(snapshot));
+      expect(restored.shelf(screen).map((entry) => entry.id)).toEqual(["conversation-1"]);
+      const floating = restored.slots(screen).find((slot) => slot.floating !== undefined);
+      expect(floating).toMatchObject({ id: "conversation-3", pinned: true });
+      dispose();
     });
   });
 });
