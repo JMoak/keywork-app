@@ -28,6 +28,7 @@ import type {
 import {
   createEffect,
   createMemo,
+  createSignal,
   For,
   type JSX,
   Match,
@@ -41,7 +42,7 @@ import { createStore } from "solid-js/store";
 import { useProductProfile } from "../chrome/product.ts";
 import { AskCard, type AskChords } from "./ask-card.tsx";
 import { type BotLabel, childRowSpans, openChildHint, plainBot } from "./child-row.ts";
-import { followTail, type TailFollow } from "./follow.ts";
+import { followTail, type TailFollow, tailSlackPx } from "./follow.ts";
 import { LedgerLine, type LedgerVerbs, ledgerFacts, markText } from "./ledger.tsx";
 import { Markdown } from "./markdown.tsx";
 import { originLabel } from "./origin.ts";
@@ -71,6 +72,8 @@ export interface ConversationPaneProps {
   redoable?: boolean | undefined;
   forgotten?: ReadonlySet<string> | undefined;
   onOpenSpill?: ((run: ToolRun) => void) | undefined;
+  latestChord?: string | undefined;
+  tailRef?: ((tail: TailFollow) => void) | undefined;
 }
 
 export type Voice = "user" | "agent" | "machine" | "summary" | "blank";
@@ -115,20 +118,20 @@ export function ConversationPane(props: ConversationPaneProps) {
   let scroller: HTMLElement | undefined;
   let transcript: HTMLOListElement | undefined;
   let tail: TailFollow | undefined;
+  const [behind, setBehind] = createSignal(false);
   onMount(() => {
     if (scroller === undefined || transcript === undefined) return;
     const following = followTail(scroller, transcript);
     tail = following;
+    props.tailRef?.(following);
     onCleanup(() => following.dispose());
+    onCleanup(watchTail(scroller, transcript, setBehind));
   });
+  const sentAt = createMemo(() => lastSentPrompt(props.projection));
   createEffect(
-    on(
-      () => lastSentPrompt(props.projection),
-      (sent) => {
-        if (sent !== -1) tail?.resume();
-      },
-      { defer: true },
-    ),
+    on(sentAt, (sent, before) => {
+      if (before !== undefined && sent > before) tail?.resume();
+    }),
   );
   return (
     <section class="kw-pane" aria-label="conversation" ref={scroller}>
@@ -168,7 +171,23 @@ export function ConversationPane(props: ConversationPaneProps) {
             </>
           )}
         </For>
+        <Show when={awaitingTheModel(props.projection)}>
+          <Row voice="agent" streaming>
+            <p class="kw-working">{workingLine}</p>
+          </Row>
+        </Show>
       </ol>
+      <Show when={behind()}>
+        <button
+          type="button"
+          class="kw-latest"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => tail?.resume()}
+        >
+          {latestLine(props.latestChord)}
+        </button>
+      </Show>
       <p class="kw-masthead-tier" aria-hidden="true">
         <span class="kw-masthead-name">{props.title ?? headline(props.projection, profile)}</span>
       </p>
@@ -178,6 +197,38 @@ export function ConversationPane(props: ConversationPaneProps) {
 
 export function lastSentPrompt(projection: SessionProjection): number {
   return projection.entries.findLastIndex((entry) => entry.kind === "user" && !entry.replay);
+}
+
+export const workingLine = "working";
+
+export function latestLine(chord: string | undefined): string {
+  return chord === undefined ? "↓ latest" : `↓ latest · ${chord}`;
+}
+
+export function awaitingTheModel(projection: SessionProjection): boolean {
+  if (projection.turn === undefined || projection.streaming !== undefined) return false;
+  const last = projection.entries.at(-1);
+  if (last?.kind === "thinking") return last.sealed === true;
+  return last?.kind !== "tool" || (last.run.phase !== "running" && last.run.phase !== "asking");
+}
+
+export interface PromptFold {
+  readonly head: string;
+  readonly rest: string;
+}
+
+export const promptFoldLines = 12;
+export const promptFoldChars = 2_000;
+
+export function promptFold(text: string): PromptFold | undefined {
+  const cut = Math.min(lineBreakAfter(text, promptFoldLines), promptFoldChars);
+  if (cut >= text.length) return undefined;
+  const hiddenLines = linesIn(text.slice(cut)) - 1;
+  const rest =
+    hiddenLines > 0
+      ? `${hiddenLines} more ${hiddenLines === 1 ? "line" : "lines"}`
+      : `${text.length - cut} more characters`;
+  return { head: text.slice(0, cut), rest };
 }
 
 export function headline(
@@ -235,17 +286,12 @@ function Entry(props: EntryProps) {
       </Match>
       <Match when={as<UserEntry>(entry(), "user")}>
         {(user) => (
-          <Row voice="user" replay={user().replay}>
-            <p class="kw-user" data-forgotten={props.forgotten ? "" : undefined}>
-              {user().text}
-              <Show when={user().origin}>
-                {(origin) => <span class="kw-origin">{originLabel(origin())}</span>}
-              </Show>
-              <Show when={props.forgotten}>
-                <span class="kw-forgotten">{forgottenTag}</span>
-              </Show>
-            </p>
-          </Row>
+          <PromptRow
+            user={user()}
+            forgotten={props.forgotten}
+            unfolded={props.unfolded}
+            onToggle={() => props.onToggle()}
+          />
         )}
       </Match>
       <Match when={as<FlushEntry>(entry(), "flush")}>
@@ -328,9 +374,51 @@ function Entry(props: EntryProps) {
   );
 }
 
+interface PromptRowProps {
+  user: UserEntry;
+  forgotten: boolean;
+  unfolded: boolean;
+  onToggle: () => void;
+}
+
+function PromptRow(props: PromptRowProps) {
+  const fold = createMemo(() => promptFold(props.user.text));
+  const shown = () => {
+    const folded = fold();
+    return folded === undefined || props.unfolded ? props.user.text : `${folded.head}…`;
+  };
+  return (
+    <Row voice="user" replay={props.user.replay}>
+      <p class="kw-user" data-forgotten={props.forgotten ? "" : undefined}>
+        {shown()}
+        <Show when={props.user.origin}>
+          {(origin) => <span class="kw-origin">{originLabel(origin())}</span>}
+        </Show>
+        <Show when={props.forgotten}>
+          <span class="kw-forgotten">{forgottenTag}</span>
+        </Show>
+      </p>
+      <Show when={fold()}>
+        {(folded) => (
+          <button
+            type="button"
+            class="kw-prompt-fold"
+            data-walk=""
+            aria-expanded={props.unfolded}
+            onClick={() => props.onToggle()}
+          >
+            {props.unfolded ? "show less" : `${folded().rest} · show all`}
+          </button>
+        )}
+      </Show>
+    </Row>
+  );
+}
+
 interface RowProps {
   voice: Voice;
   replay?: boolean | undefined;
+  asking?: boolean | undefined;
   streaming?: boolean | undefined;
   stampLabel?: string | undefined;
   onStamp?: (() => void) | undefined;
@@ -339,7 +427,12 @@ interface RowProps {
 
 function Row(props: RowProps) {
   return (
-    <li class="kw-entry" data-voice={props.voice} data-replay={props.replay ? "" : undefined}>
+    <li
+      class="kw-entry"
+      data-voice={props.voice}
+      data-replay={props.replay ? "" : undefined}
+      data-asking={props.asking ? "" : undefined}
+    >
       <Show
         when={props.onStamp}
         fallback={
@@ -402,6 +495,7 @@ function ToolRow(props: ToolRowProps) {
       ...(openableSpill() ? [openSpillHint] : []),
     ];
   };
+  const asking = () => run().phase === "asking" && props.onAnswerAsk !== undefined;
   const disclosable = () => run().detail !== undefined && run().detail?.length !== 0;
   const actionable = () => disclosable() || openableChild() !== undefined || openableSpill();
   const activate = (): void => {
@@ -436,6 +530,7 @@ function ToolRow(props: ToolRowProps) {
     <Row
       voice="machine"
       replay={run().replay}
+      asking={asking()}
       stampLabel={props.unfolded ? "fold tool detail" : "unfold tool detail"}
       onStamp={disclosable() ? props.onToggle : undefined}
     >
@@ -460,7 +555,7 @@ function ToolRow(props: ToolRowProps) {
           {spanElements()}
         </button>
       </Show>
-      <Show when={run().phase === "asking" && props.onAnswerAsk !== undefined}>
+      <Show when={asking()}>
         <AskCard
           run={run()}
           onAnswer={(verdict, scope, reason, note) =>
@@ -527,6 +622,37 @@ function acceptedScopeOf(
   accepted: AskAcceptance | undefined,
 ): RememberedScope | undefined {
   return run.ask === undefined ? undefined : accepted?.(run.ask);
+}
+
+function watchTail(
+  scroller: HTMLElement,
+  content: HTMLElement,
+  behind: (away: boolean) => void,
+): () => void {
+  const measure = (): void =>
+    behind(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > tailSlackPx);
+  scroller.addEventListener("scroll", measure, { passive: true });
+  const observer = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : undefined;
+  observer?.observe(content);
+  return () => {
+    scroller.removeEventListener("scroll", measure);
+    observer?.disconnect();
+  };
+}
+
+function lineBreakAfter(text: string, lines: number): number {
+  let at = -1;
+  for (let line = 0; line < lines; line += 1) {
+    at = text.indexOf("\n", at + 1);
+    if (at === -1) return text.length;
+  }
+  return at;
+}
+
+function linesIn(text: string): number {
+  let count = 1;
+  for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1)) count += 1;
+  return count;
 }
 
 function spanPartOf(target: EventTarget | null): string | undefined {

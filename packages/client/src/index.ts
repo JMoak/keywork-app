@@ -122,6 +122,12 @@ export {
   verdictLine,
 } from "./projection/review.ts";
 export {
+  closesTurn,
+  joinSnapshot,
+  opensTurn,
+  type SnapshotSeam,
+} from "./projection/seam.ts";
+export {
   compactJson,
   durationText,
   elapsedText,

@@ -67,7 +67,8 @@
 }
 
 @container pane (max-width: 319.98px) {
-  .kw-transcript {
+  .kw-entry:not([data-asking]),
+  .kw-latest {
     display: none;
   }
   .kw-masthead-tier {
@@ -166,6 +167,39 @@
   margin-left: 1ch;
   font-family: var(--kw-font-mono);
   color: var(--kw-text-faint);
+}
+
+.kw-prompt-fold,
+.kw-latest {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--kw-font-mono);
+  font-size: 0.8125rem;
+  color: var(--kw-text-dim);
+  cursor: pointer;
+}
+.kw-prompt-fold:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+.kw-latest {
+  position: sticky;
+  bottom: var(--kw-half);
+  display: block;
+  margin: 0 var(--kw-pad) 0 auto;
+  padding: 0.125rem 1ch;
+  background: var(--kw-panel-lift);
+  color: var(--kw-text);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+
+.kw-working {
+  margin: 0;
+  font-family: var(--kw-font-mono);
+  color: var(--kw-text-dim);
 }
 
 .kw-origin {

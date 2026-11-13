@@ -15,7 +15,11 @@ import { promptIds, readJournal } from "./journal.ts";
 import { reviewNotice } from "./review.ts";
 import { emptyProjection, type SessionProjection } from "./types.ts";
 
-export function historyEnvelopes(detail: SessionDetail, journal?: SessionEntries): BusEnvelope[] {
+export function historyEnvelopes(
+  detail: SessionDetail,
+  journal?: SessionEntries,
+  until = detail.messages.length,
+): BusEnvelope[] {
   const stamp = { ts: detail.lastActivityAt, sessionId: detail.id };
   const marked = markedEntryIds(detail);
   const forgotten = forgottenPromptsAt(detail);
@@ -37,14 +41,14 @@ export function historyEnvelopes(detail: SessionDetail, journal?: SessionEntries
     for (const report of reports.get(index) ?? []) replayReport(report, emit);
     for (const verdict of verdicts.get(index) ?? []) replayVerdict(verdict, emit);
   };
-  detail.messages.forEach((message, index) => {
+  detail.messages.slice(0, until).forEach((message, index) => {
     replayForgottenAt(index);
     const entryId = marked.get(index) ?? placed.get(index);
     if (message.role === "user") replayPrompt(message, entryId, emit, frames.get(index));
     else if (message.role === "assistant") replayAssistant(message, calls, emit);
     else replayToolResults(message, calls, decisions, emit);
   });
-  replayForgottenAt(detail.messages.length);
+  replayForgottenAt(until);
   return envelopes;
 }
 
@@ -195,6 +199,6 @@ function replayToolResults(
   }
 }
 
-function textOf(message: Message): string {
+export function textOf(message: Message): string {
   return message.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
 }

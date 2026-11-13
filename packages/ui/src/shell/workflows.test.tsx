@@ -12,6 +12,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   prompts.length = 0;
+  created = 0;
 });
 
 function type(text: string): void {
@@ -24,21 +25,23 @@ function type(text: string): void {
 }
 
 const prompts: Array<[string, string]> = [];
+let created = 0;
 
 function quietClient(): ConsoleClient {
   const summaries: SessionSummary[] = [];
   return fakeClient({
     sessions: async () => summaries,
     createSession: async () => {
-      const created: SessionSummary = {
+      created += 1;
+      const made: SessionSummary = {
         id: `s${summaries.length + 1}`,
         title: `session ${summaries.length + 1}`,
         createdAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         messageCount: 0,
       };
-      summaries.unshift(created);
-      return created;
+      summaries.unshift(made);
+      return made;
     },
     prompt: async (id, text) => {
       prompts.push([id, text]);
@@ -73,17 +76,18 @@ describe("keyboard workflows", () => {
     await openWorkspace();
     expect(frames()).toHaveLength(2);
     expect(focusedName()).toBe("new session");
+    await startASession("the first prompt");
 
     press("k", { ctrlKey: true });
     expect(screen.getByText("ctrl+k …")).toBeTruthy();
     press("s");
     await waitFor(() => expect(frames()).toHaveLength(3));
-    expect(focusedName()).toBe("session 1");
+    expect(focusedName()).toBe("new session");
 
     press("1", { altKey: true });
     expect(focusedName()).toBe("sessions");
     press("3", { altKey: true });
-    expect(focusedName()).toBe("session 1");
+    expect(focusedName()).toBe("new session");
 
     press("z", { altKey: true });
     expect(frames()).toHaveLength(1);
@@ -93,14 +97,24 @@ describe("keyboard workflows", () => {
     press("k", { ctrlKey: true });
     press("x");
     await waitFor(() => expect(frames()).toHaveLength(2));
+    expect(focusedName()).toBe("session 1");
+  });
+
+  it("splits beside without making a server session, and focuses the fresh pane already waiting", async () => {
+    await openWorkspace();
+    press("k", { ctrlKey: true });
+    press("s");
+    await settle();
+    expect(frames()).toHaveLength(2);
     expect(focusedName()).toBe("new session");
+    expect(created).toBe(0);
+    await startASession("the first prompt");
+    expect(created).toBe(1);
   });
 
   it("summons the changes pane for the session whose composer holds the keyboard", async () => {
     await openWorkspace();
-    press("k", { ctrlKey: true });
-    press("s");
-    await waitFor(() => expect(focusedName()).toBe("session 1"));
+    await startASession("the first prompt");
     const composer = document.querySelector(
       ".kw-frame[data-focused] .kw-composer-input",
     ) as HTMLTextAreaElement;
@@ -155,6 +169,7 @@ describe("keyboard workflows", () => {
 
   it("runs a palette command by name", async () => {
     await openWorkspace();
+    await startASession("the first prompt");
     press("p", { ctrlKey: true, shiftKey: true });
     const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
     expect(palette.value).toBe("/");
@@ -201,6 +216,20 @@ describe("keyboard workflows", () => {
     expect(frames()).toHaveLength(open);
   });
 
+  it("never makes a server session it has no room to show", async () => {
+    await openWorkspace();
+    await fillTheMain();
+    const open = frames().length;
+    const made = created;
+    fireEvent.click(screen.getByText("+ new session"));
+    await waitFor(() => expect(noticeText()).toBe(refusalNotices.noRoomForPane));
+    press("k", { ctrlKey: true });
+    press("s");
+    await settle();
+    expect(frames()).toHaveLength(open);
+    expect(created).toBe(made);
+  });
+
   it("focuses the optional Stead pane on both its first and subsequent summons", async () => {
     await openWorkspace();
     expect(focusedName()).toBe("new session");
@@ -229,6 +258,15 @@ describe("keyboard workflows", () => {
 const noticeText = (): string | undefined =>
   document.querySelector(".kw-status-notice")?.textContent ?? undefined;
 
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+async function startASession(text: string): Promise<void> {
+  const sent = prompts.length;
+  type(text);
+  await waitFor(() => expect(prompts).toHaveLength(sent + 1));
+  await waitFor(() => expect(focusedName()).not.toBe("new session"));
+}
+
 async function fillTheMain(): Promise<void> {
   const room = createRoot((dispose) => {
     const tiler = createTiler();
@@ -242,11 +280,13 @@ async function fillTheMain(): Promise<void> {
     dispose();
     return fitted;
   });
+  await startASession("the first prompt");
   for (let split = 0; split < room; split++) {
     const open = frames().length;
     press("k", { ctrlKey: true });
     press("s");
     await waitFor(() => expect(frames()).toHaveLength(open + 1));
+    await startASession(`prompt ${split}`);
   }
 }
 
@@ -266,14 +306,16 @@ const slotOf = (name: string): HTMLElement =>
   )?.closest(".kw-slot") as HTMLElement;
 
 describe("the first run", () => {
-  it("teaches five keys while the workspace has no sessions and nothing once one exists", async () => {
+  it("teaches five keys until the first prompt makes a session, through a split", async () => {
     await openWorkspace();
     const block = document.querySelector(".kw-first-run") as HTMLElement;
     expect(block.querySelectorAll(".kw-first-run-row")).toHaveLength(5);
     expect(block.textContent).toContain("ctrl+k s");
     press("k", { ctrlKey: true });
     press("s");
-    await waitFor(() => expect(frames()).toHaveLength(3));
+    await settle();
+    expect(document.querySelector(".kw-first-run")).not.toBeNull();
+    await startASession("the first prompt");
     await waitFor(() => expect(document.querySelector(".kw-first-run")).toBeNull());
   });
 });

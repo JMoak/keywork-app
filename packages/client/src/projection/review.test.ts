@@ -137,6 +137,8 @@ describe("the review trail", () => {
     expect(reloaded.entries[1]).toMatchObject({ text: verdictLine(kept) });
     expect(reloaded.entries[3]).toMatchObject({ text: verdictLine(dropped) });
     const live = projectAll(emptyProjection, [noticeEnvelope(asked)]);
-    expect(live.entries).toEqual([{ kind: "notice", level: "info", text: verdictLine(asked) }]);
+    expect(live.entries).toEqual([
+      { kind: "notice", level: "info", text: verdictLine(asked), entryId: asked.entryId },
+    ]);
   });
 });

@@ -28,9 +28,11 @@ import {
   queueHint,
   setAsideNotice,
 } from "../../composer/queue-editor.ts";
+import type { SaveOutcome } from "../../host/port.ts";
 import { sessionContextLevel } from "../../instruments/context.ts";
 import { costReadout } from "../../instruments/cost-report.ts";
 import { askChordsOf } from "../../page/ask-card.tsx";
+import type { TailFollow } from "../../page/follow.ts";
 import { ConversationPane } from "../../page/pane.tsx";
 import type { DraftSeed } from "../../shell/controls-store.ts";
 import { composerHold, promptReturnedNotice } from "../../shell/server-standing.ts";
@@ -113,7 +115,7 @@ export const conversationPane = definePane<ConversationSpec>({
     chords: "leader s",
     help: "new session pane",
     command: { name: "split", description: "open a new session pane beside this one" },
-    spec: async (shell) => ({ kind: "conversation", sessionId: await shell.store.create() }),
+    spec: () => ({ kind: "conversation" }),
   },
   localActions: {
     "conversation.model": {
@@ -205,6 +207,11 @@ export const conversationPane = definePane<ConversationSpec>({
         description: "start a new session from the end of the focused turn, or the latest",
       },
     },
+    "conversation.latest": {
+      chords: "leader end",
+      help: "jump to the latest",
+      command: { name: "latest", description: "scroll to the newest line and follow it again" },
+    },
     "conversation.cost": {
       chords: "none",
       help: "cost per model",
@@ -273,9 +280,6 @@ export const conversationPane = definePane<ConversationSpec>({
     if (settled !== undefined) return settled;
     return shell.unseen(view, projection.usage.turns) ? "finished-unseen" : "idle";
   },
-  onRestore: (spec, shell) => {
-    if (spec.sessionId !== undefined) void shell.store.open(spec.sessionId);
-  },
 });
 
 interface PendingAsk {
@@ -306,7 +310,9 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
 
   createEffect(() => {
     const id = props.spec.sessionId;
-    if (id !== undefined) void props.shell.store.controls.watchReadings(id);
+    if (id === undefined) return;
+    void props.shell.store.open(id);
+    void props.shell.store.controls.watchReadings(id);
   });
 
   const [drafting, setDrafting] = createSignal(false);
@@ -315,12 +321,15 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   );
   onCleanup(() => props.shell.drafts?.mark(props.id, undefined));
 
+  const [lostItsSession, setLostItsSession] = createSignal(false);
   createEffect(() => {
     const id = props.spec.sessionId;
     if (id === undefined || !props.shell.store.gone(id)) return;
     props.shell.rebind(props.id, { kind: "conversation" });
-    say(sessionGoneNotice);
+    setLostItsSession(true);
   });
+  const emptyLine = (): string =>
+    lostItsSession() ? sessionGoneNotice : conversationPane.emptyState(props.shell.keys);
 
   createEffect(() => {
     const id = props.spec.sessionId;
@@ -386,10 +395,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   );
   const shownProjection = (): SessionProjection | undefined =>
     props.spec.sessionId === undefined ? undefined : projection();
+  let tail: TailFollow | undefined;
   const controls: Record<string, (argument?: string) => void> = {
     ...sessionControlsOf(props.shell, () => props.spec.sessionId, say, setPending),
     ...turns.actions,
     ...copyVerbs(props.shell.host, shownProjection, say),
+    "conversation.latest": () => tail?.resume(),
   };
   props.onAction((action, argument) => controls[action]?.(argument));
 
@@ -408,7 +419,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
           when={props.spec.sessionId !== undefined}
           fallback={
             <>
-              <EmptyState line={conversationPane.emptyState(props.shell.keys)} />
+              <EmptyState line={emptyLine()} />
               <Show when={props.shell.store.state.summaries.length === 0}>
                 <FirstRun keys={props.shell.keys} />
               </Show>
@@ -430,6 +441,10 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
             redoable={props.shell.store.controlsOf(props.spec.sessionId).redoable}
             forgotten={forgotten()}
             onOpenSpill={openSpill}
+            latestChord={props.shell.keys.chord("conversation.latest")}
+            tailRef={(following) => {
+              tail = following;
+            }}
           />
         </Show>
       </div>
@@ -461,6 +476,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
           composerInput = input;
         }}
         onDraft={setDrafting}
+        memory={props.shell.drafts?.memory(props.id, props.spec.sessionId)}
       />
     </div>
   );
@@ -650,7 +666,9 @@ function sessionControlsOf(
       const reading = await verbs.exportSession(id);
       if (!isSettled(reading)) return say(refusalNotice(reading));
       if (!("html" in reading)) return say(`session page written to ${reading.file}`);
-      const saved = await shell.host.saveAs(pageNameFor(currentTitle(shell, id)), reading.html);
+      const saved = await shell.host
+        .saveAs(pageNameFor(currentTitle(shell, id)), reading.html)
+        .catch(saveFailedWith);
       say(exportedNotice(reading.html, saved));
     }),
     "conversation.export-file": withSession(async (id) => {
@@ -750,3 +768,10 @@ function lastKnownName(
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
+
+function saveFailedWith(cause: unknown): SaveOutcome {
+  const reason = messageOf(cause).replace(relayedPrefix, "");
+  return { saved: false, refused: "failed", detail: `the save dialog failed · ${reason}` };
+}
+
+const relayedPrefix = /^Error invoking remote method '[^']*': (?:\w*Error: )?/;

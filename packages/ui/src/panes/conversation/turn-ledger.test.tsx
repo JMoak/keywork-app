@@ -3,6 +3,7 @@ import type {
   BusEnvelope,
   ChangesReading,
   Message,
+  RestorePreviewReading,
   SessionDetail,
   SessionEntries,
   SessionSummary,
@@ -53,6 +54,7 @@ const logs: Readonly<Record<Phase, SessionEntries>> = {
 interface ServerOptions {
   restore?: TurnRestoreReading;
   log?: SessionEntries | undefined;
+  preview?: RestorePreviewReading;
 }
 
 interface Server {
@@ -74,6 +76,7 @@ function scriptedServer(options: ServerOptions = {}): Server {
     changes: async (): Promise<ChangesReading> => recordedChanges,
     context: async () => "missing",
     cost: async () => "missing",
+    previewRestore: async () => options.preview ?? "missing",
     restoreTurn: async (id: string, turn: number) => {
       sent.push(`restore ${id} ${turn}`);
       const answer = options.restore ?? restored;
@@ -226,6 +229,35 @@ describe("the turn ledger in a live conversation", () => {
       ),
     );
     expect(ledgerLines()).toEqual([]);
+  });
+
+  it("lists every file going back, the ones no write of this session made first and flagged", async () => {
+    const preview: RestorePreviewReading = {
+      turn: 1,
+      prompt: { entryId: "q1", text: "write two lines to notes.txt" },
+      undoneTurns: 2,
+      files: [
+        { path: "notes.txt", added: 0, deleted: 2 },
+        { path: "docs/plan.md", added: 0, deleted: 4 },
+        { path: "README.md", added: 0, deleted: 1 },
+      ],
+      others: [{ sessionId: "s2", title: "plan the docs", paths: ["docs/plan.md"] }],
+    };
+    await mounted({ preview });
+    fireEvent.keyDown(ledgerOf(1), { key: "u" });
+    await waitFor(() => expect(confirmLine()).toBeTruthy());
+    expect(confirmLine()?.firstChild?.textContent).toBe(
+      'restore to before turn 1, "write two lines to notes.txt"? 2 turns and 3 files go back · it also undoes 1 file "plan the docs" changed · 1 of them this session never wrote · redo brings them back · y/n',
+    );
+    const items = [...document.querySelectorAll(".kw-controls-item")].map((item) => [
+      item.textContent,
+      item.hasAttribute("data-flagged"),
+    ]);
+    expect(items).toEqual([
+      ["README.md+0 −1 · this session never wrote it · your own change?", true],
+      ["notes.txt+0 −2 · this session wrote it", false],
+      ['docs/plan.md+0 −4 · "plan the docs" changed it', false],
+    ]);
   });
 
   it("shows the restore taken back once redo brings the turns home", async () => {

@@ -1,16 +1,19 @@
 import {
+  countsOf,
   latestLedger,
   type PathReading,
   type PathTurn,
   pathReading,
   type RestoreReach,
   restoreReach,
+  type SessionProjection,
   type TranscriptLedger,
   type TreeState,
   type TurnLedger,
   transcriptLedger,
 } from "@keywork-app/client";
 import type {
+  ChangedPath,
   EntryRefusal,
   OtherSessionFiles,
   RestorePreviewReading,
@@ -19,7 +22,7 @@ import type {
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { counted, type LedgerVerbs, ribbonText } from "../../page/ledger.tsx";
 import type { ShellSeams } from "../registry.ts";
-import type { ControlAsk } from "./control-row.tsx";
+import type { ConfirmItem, ControlAsk } from "./control-row.tsx";
 import { isSettled, leftUnchanged, refusalNotice } from "./controls.ts";
 
 export interface TurnLedgerPane {
@@ -64,8 +67,15 @@ export function createTurnLedger(
     if (place === undefined || reading === undefined) return say(unplacedNotice);
     const preview = await restorePreview(shell, id, place.turn);
     const reach = previewReach(preview) ?? restoreReach(reading, store.changes(id), place.turn);
+    const work = toolWorkFrom(store.projection(id), ledger(), place.turn);
+    const going = goingBack(preview, work);
+    const unwritten = { count: going.filter(isFlagged).length, commanded: work.commanded };
     confirm({
-      ask: { kind: "confirm", question: restoreQuestion(place, reach, othersIn(preview)) },
+      ask: {
+        kind: "confirm",
+        question: restoreQuestion(place, reach, othersIn(preview), unwritten),
+        items: going,
+      },
       answer: async (agreed) => {
         if (agreed !== true) return say(leftUnchanged);
         const restored = await store.controls.restoreTurn(id, place.turn);
@@ -126,9 +136,49 @@ export function restoreQuestion(
   place: PathTurn,
   reach: RestoreReach,
   others: readonly OtherSessionFiles[] = [],
+  unwritten?: UnwrittenFiles,
 ): string {
   const theirs = others.length === 0 ? "" : ` · ${othersClause(others)}`;
-  return `restore to before turn ${place.turn}, "${promptExcerpt(place.text)}"? ${goingBack(reach)}${theirs} · redo brings them back · y/n`;
+  const yours =
+    unwritten === undefined || unwritten.count === 0 ? "" : ` · ${unwrittenClause(unwritten)}`;
+  return `restore to before turn ${place.turn}, "${promptExcerpt(place.text)}"? ${reachClause(reach)}${theirs}${yours} · redo brings them back · y/n`;
+}
+
+export interface ToolWork {
+  readonly written: ReadonlySet<string>;
+  readonly commanded: boolean;
+}
+
+export interface UnwrittenFiles {
+  readonly count: number;
+  readonly commanded: boolean;
+}
+
+export function toolWorkFrom(
+  projection: SessionProjection,
+  ledger: TranscriptLedger,
+  turn: number,
+): ToolWork {
+  const runs = ledger.turns
+    .filter((settled) => (settled.place?.turn ?? 0) >= turn)
+    .flatMap((settled) => projection.entries.slice(settled.head, settled.end + 1))
+    .flatMap((entry) => (entry.kind === "tool" && entry.run.phase === "done" ? [entry.run] : []));
+  return {
+    written: new Set(
+      runs.filter((run) => fileWriters.has(run.name)).map((run) => workspacePath(run.subject)),
+    ),
+    commanded: runs.some((run) => commandRunners.has(run.name)),
+  };
+}
+
+export function goingBack(
+  preview: RestorePreviewReading | undefined,
+  work: ToolWork,
+): ConfirmItem[] {
+  if (preview === undefined || typeof preview === "string") return [];
+  return preview.files
+    .map((file) => goingBackItem(file, preview.others, work))
+    .sort((a, b) => Number(isFlagged(b)) - Number(isFlagged(a)));
 }
 
 export function restorePreview(
@@ -175,6 +225,53 @@ export const unplacedNotice =
 
 export const noSettledTurnNotice = "no turn has settled here yet";
 
+function goingBackItem(
+  file: ChangedPath,
+  others: readonly OtherSessionFiles[],
+  work: ToolWork,
+): ConfirmItem {
+  const counts = countsOf(file);
+  if (writtenBy(work, file.path)) {
+    return { text: file.path, note: `${counts} · this session wrote it` };
+  }
+  const other = others.find((session) => session.paths.includes(file.path));
+  if (other !== undefined) {
+    return { text: file.path, note: `${counts} · "${promptExcerpt(other.title)}" changed it` };
+  }
+  const whose = work.commanded
+    ? "no write or edit touched it · a command or your own change"
+    : "this session never wrote it · your own change?";
+  return { text: file.path, note: `${counts} · ${whose}`, flagged: true };
+}
+
+function isFlagged(item: ConfirmItem): boolean {
+  return item.flagged === true;
+}
+
+function writtenBy(work: ToolWork, path: string): boolean {
+  const wanted = workspacePath(path);
+  return [...work.written].some(
+    (written) =>
+      written === wanted || clippedPrefix(written, wanted) || wanted.endsWith(`/${written}`),
+  );
+}
+
+function clippedPrefix(subject: string, path: string): boolean {
+  return subject.endsWith("…") && path.startsWith(subject.slice(0, -1));
+}
+
+function workspacePath(path: string): string {
+  return path.replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+function unwrittenClause(unwritten: UnwrittenFiles): string {
+  const never = unwritten.commanded ? "no write or edit touched" : "this session never wrote";
+  return `${unwritten.count} of them ${never}`;
+}
+
+const fileWriters: ReadonlySet<string> = new Set(["write", "edit"]);
+const commandRunners: ReadonlySet<string> = new Set(["bash"]);
+
 function previewReach(preview: RestorePreviewReading | undefined): RestoreReach | undefined {
   if (preview === undefined || typeof preview === "string") return undefined;
   return { turns: preview.undoneTurns, files: preview.files.length };
@@ -193,7 +290,7 @@ function pathOf(tree: TreeState): PathReading | undefined {
   return tree.snapshot === undefined ? undefined : pathReading(tree.snapshot);
 }
 
-function goingBack(reach: RestoreReach): string {
+function reachClause(reach: RestoreReach): string {
   const turns = counted(reach.turns, "turn");
   if (reach.files === undefined || reach.files === 0) {
     return `${turns} ${reach.turns === 1 ? "goes" : "go"} back`;

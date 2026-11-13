@@ -99,6 +99,69 @@ describe("the session store's pending asks", () => {
   });
 });
 
+describe("the session store's seam between a snapshot and the live stream", () => {
+  const at = "2026-11-12T12:00:00.000Z";
+  const wren = { kind: "creature", creature: "wren", thread: "w1" } as const;
+  const frame = "You are Wren.";
+  const told = (id: number, type: BusEnvelope["type"], payload: unknown): BusEnvelope =>
+    ({ id, ts: at, sessionId: "w1", type, payload }) as BusEnvelope;
+  const introduction = [
+    told(1, "extension.notice", {
+      extension: "creature",
+      level: "info",
+      message: frame,
+      detail: { origin: wren, entryId: "f1", kind: "frame" },
+    }),
+    told(2, "turn.started", { userText: frame, origin: wren }),
+    told(3, "turn.delta", { delta: { type: "text", text: "I" } }),
+    told(4, "turn.delta", { delta: { type: "text", text: " am Wren." } }),
+  ];
+  const snapshot: SessionDetail = {
+    id: "w1",
+    title: "wren",
+    createdAt: at,
+    lastActivityAt: at,
+    messageCount: 1,
+    cwd: "/home",
+    live: true,
+    asOf: 3,
+    messages: [{ role: "user", parts: [{ type: "text", text: frame }] }],
+    reports: [{ index: 0, entryId: "f1", at, text: frame, origin: wren, kind: "frame" }],
+  };
+
+  it("keeps a thread's first words that streamed before it was opened, and draws its frame once", async () => {
+    const listeners: Array<(envelopes: readonly BusEnvelope[]) => void> = [];
+    const emit = (envelopes: readonly BusEnvelope[]) => {
+      for (const listener of listeners) listener(envelopes);
+    };
+    const client = {
+      session: async () => {
+        emit(introduction.slice(3));
+        return snapshot;
+      },
+      asks: async () => [],
+      entries: async () => undefined,
+      sessions: async () => [],
+    } as unknown as KeyworkClient;
+    const feed = {
+      subscribe: (listener: (envelopes: readonly BusEnvelope[]) => void) => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+      onNotice: () => () => undefined,
+      whenLost: () => () => undefined,
+    } as unknown as ServerFeed;
+    const store = createRoot(() => createSessionStore(client, feed));
+    emit(introduction.slice(0, 3));
+    await store.open("w1");
+    const drawn = store
+      .projection("w1")
+      .entries.map((entry) => ("text" in entry ? entry.text : ""));
+    expect(drawn).toEqual([frame, "I am Wren."]);
+    expect(store.projection("w1").turn).toMatchObject({ userText: frame });
+  });
+});
+
 describe("the session store's trees and changes", () => {
   it("keeps each session's tree and changes its own, and the empty readings empty", async () => {
     const logOf = (sessionId: string): SessionEntries => ({

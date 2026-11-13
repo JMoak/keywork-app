@@ -142,7 +142,7 @@ export interface WorkspaceViewProps {
   attached?: boolean | undefined;
   standing?: ServerStanding | undefined;
   keymap?: Keymap | undefined;
-  storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
+  storage?: Pick<Storage, "getItem" | "setItem" | "removeItem"> | undefined;
 }
 
 type Overlay =
@@ -201,7 +201,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
   const quiet = props.store.quiet;
-  const drafts = createDraftLedger();
+  const drafts = createDraftLedger({ storage, key: `${profile.id}.drafts:${props.workspace}` });
   const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
@@ -294,6 +294,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const paneShowing = (sessionId: string): PaneId | undefined => {
     tiler.version();
     return tiler.findPane((spec) => spec.kind === "conversation" && spec.sessionId === sessionId);
+  };
+  const focusedFreshConversation = (): PaneId | undefined => {
+    const spec = tiler.focusedSpec();
+    return spec?.kind === "conversation" && spec.sessionId === undefined
+      ? tiler.focused()
+      : undefined;
   };
   const showPlace = (place: NeedsYouPlace): void => {
     if (place.workspace !== props.workspace) {
@@ -429,20 +435,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     },
     sessions: {
       openSession: (sessionId) => {
-        const focused = tiler.focused();
-        const spec = tiler.focusedSpec();
-        if (
-          focused !== undefined &&
-          spec?.kind === "conversation" &&
-          spec.sessionId === undefined
-        ) {
-          tiler.bind(focused, { kind: "conversation", sessionId });
-        } else {
-          act(tiler.open({ kind: "conversation", sessionId }, screen()));
-        }
-        void props.store.open(sessionId);
+        const fresh = focusedFreshConversation();
+        const spec = { kind: "conversation", sessionId } as const;
+        if (fresh !== undefined && paneShowing(sessionId) === undefined) tiler.bind(fresh, spec);
+        else act(tiler.summon(spec, screen()));
       },
-      newSession: async () => shell.sessions.openSession(await props.store.create()),
+      newSession: () => summon(definitionOf("conversation")),
       startSession: async (paneId, text) => {
         const sessionId = await props.store.create();
         tiler.bind(paneId, { kind: "conversation", sessionId });
@@ -789,7 +787,6 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     tiler.summon({ kind: "tree" }, screen());
     const sessionId = props.store.state.summaries[0]?.id;
     act(tiler.open({ kind: "conversation", sessionId }, screen()));
-    if (sessionId !== undefined) void props.store.open(sessionId);
   };
   const openFirstHomeConversation = async (): Promise<void> => {
     const creatures = await creaturesListed(props.client);

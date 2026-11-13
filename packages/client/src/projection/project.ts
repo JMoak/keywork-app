@@ -26,6 +26,7 @@ import { compactJson, toolSubject } from "./tool-row.ts";
 import type {
   AssistantEntry,
   ChildMark,
+  NoticeEntry,
   NoticeLevel,
   SessionProjection,
   ThinkingEntry,
@@ -131,7 +132,7 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "extension.notice":
       return replay && !bareLine(envelope.payload)
         ? state
-        : notice(state, "info", noticeLine(envelope.payload, envelope.sessionId));
+        : journaledNotice(state, envelope.payload, envelope.sessionId);
     case "engine.error":
       return notice(
         endTurn({ ...state, lastError: envelope.payload.error.message }),
@@ -150,9 +151,12 @@ function startTurn(
   const origin = payload.origin !== undefined && { origin: payload.origin };
   const settled = settleFlush(settleStream(state));
   const framed = payload.origin?.kind === "creature";
+  const told = announcesReplayedPrompt(settled, payload, replay)
+    ? settled.entries.slice(0, -1)
+    : settled.entries;
   return {
     ...settled,
-    entries: framed ? settled.entries : [...settled.entries, promptEntry(state, payload, replay)],
+    entries: framed ? told : [...told, promptEntry(state, payload, replay)],
     turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
     usage: replay ? state.usage : withoutCacheMiss(state.usage),
   };
@@ -174,6 +178,18 @@ function promptEntry(
     ...(payload.origin !== undefined && { origin: payload.origin }),
     replay,
   };
+}
+
+function announcesReplayedPrompt(
+  state: SessionProjection,
+  payload: EnginePayloads["turn.started"],
+  replay: boolean,
+): boolean {
+  const last = state.entries.at(-1);
+  if (replay || state.turn !== undefined || last?.kind !== "user" || !last.replay) return false;
+  const sameEntry =
+    last.entryId === undefined || payload.entryId === undefined || last.entryId === payload.entryId;
+  return sameEntry && last.text === payload.userText;
 }
 
 function endTurn(state: SessionProjection): SessionProjection {
@@ -478,6 +494,32 @@ function bareLine(payload: ExtensionNotice): boolean {
 }
 
 export const crateDeliveredLine = "delivered · the crate is on the porch";
+
+function journaledNotice(
+  state: SessionProjection,
+  payload: ExtensionNotice,
+  sessionId: string,
+): SessionProjection {
+  const entryId = journalEntryOf(payload);
+  if (entryId !== undefined && drawsNotice(state, entryId)) return state;
+  const text = noticeLine(payload, sessionId);
+  const entry: NoticeEntry = {
+    kind: "notice",
+    level: "info",
+    text,
+    ...(entryId !== undefined && { entryId }),
+  };
+  return { ...state, entries: [...state.entries, entry] };
+}
+
+function journalEntryOf(payload: ExtensionNotice): string | undefined {
+  const detail = payload.detail as { entryId?: unknown } | null | undefined;
+  return typeof detail?.entryId === "string" ? detail.entryId : undefined;
+}
+
+function drawsNotice(state: SessionProjection, entryId: string): boolean {
+  return state.entries.some((entry) => entry.kind === "notice" && entry.entryId === entryId);
+}
 
 function noticeLine(payload: ExtensionNotice, sessionId: string): string {
   return labelsOwnTurn(payload, sessionId) ? crateDeliveredLine : extensionLine(payload);

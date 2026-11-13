@@ -5,16 +5,18 @@ import {
   changesState,
   childrenOf,
   childrenTouchedBy,
+  closesTurn,
   emptyChangesState,
   emptyLineage,
   emptyProjection,
   emptyTreeState,
-  historyEnvelopes,
+  joinSnapshot,
   type KeyworkClient,
   type LineageState,
   lineageOf,
   lineageOfProjection,
   lineageState,
+  opensTurn,
   projectAll,
   replayBase,
   type ServerFeed,
@@ -36,7 +38,6 @@ import type {
   ForkOutcome,
   LabelOutcome,
   LeafOutcome,
-  PendingAsk,
   PromptOutcome,
   PurgedTrash,
   QueueCancelReading,
@@ -148,6 +149,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     lost: undefined,
   });
   const arrivedWhileLoading = new Map<string, BusEnvelope[]>();
+  const turnsHeard = new Map<string, BusEnvelope[]>();
   const reloadAfterLoading = new Set<string>();
   const treeFetches = new Map<string, Promise<void>>();
   const changeFetches = new Map<string, Promise<void>>();
@@ -196,7 +198,27 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     }
   };
 
+  const hearTurns = (envelopes: readonly BusEnvelope[]): void => {
+    for (const envelope of envelopes) {
+      const id = envelope.sessionId;
+      const kept = turnsHeard.get(id);
+      const loading = arrivedWhileLoading.has(id);
+      if (opensTurn(envelope) && (!loading || kept === undefined)) turnsHeard.set(id, [envelope]);
+      else kept?.push(envelope);
+      if (closesTurn(envelope) && !loading) turnsHeard.delete(id);
+    }
+  };
+
+  const keepOnlyTheOpenTurn = (id: string): void => {
+    const kept = turnsHeard.get(id) ?? [];
+    const start = kept.findLastIndex(opensTurn);
+    const latest = start === -1 ? [] : kept.slice(start);
+    if (latest.length === 0 || latest.some(closesTurn)) turnsHeard.delete(id);
+    else turnsHeard.set(id, latest);
+  };
+
   const absorb = (envelopes: readonly BusEnvelope[]): void => {
+    hearTurns(envelopes);
     const rewritten = sessionsRewrittenBy(envelopes, (id) => state.projections[id]?.standing);
     const batches = bySession(envelopes);
     for (const [sessionId, batch] of batches) {
@@ -227,24 +249,28 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const load = async (id: string): Promise<void> => {
     arrivedWhileLoading.set(id, []);
     setState("loading", id, true);
-    const [detail, pendingAsks] = await Promise.all([
+    const [detail, pending] = await Promise.all([
       client.session(id),
       client.asks(),
       openTree(id, { force: true }).catch(() => undefined),
     ]);
-    const journal = state.trees[id]?.snapshot;
-    const history = detail === undefined ? [] : historyEnvelopes(detail, journal);
-    const asOf = detail?.asOf ?? -1;
-    const asks = detail === undefined ? [] : askEnvelopes(detail, pendingAsks);
-    const live = (arrivedWhileLoading.get(id) ?? []).filter(
-      (envelope) => envelope.id > asOf || carriesStanding(envelope),
-    );
+    const arrived = arrivedWhileLoading.get(id) ?? [];
+    const joined =
+      detail === undefined
+        ? arrived
+        : joinSnapshot({
+            detail,
+            journal: state.trees[id]?.snapshot,
+            pending,
+            heard: turnsHeard.get(id) ?? [],
+            arrived,
+          });
     arrivedWhileLoading.delete(id);
-    const base = replayBase(detail);
+    keepOnlyTheOpenTurn(id);
     setState(
       produce((draft) => {
         const standing = draft.projections[id]?.standing;
-        const loaded = projectAll(base, [...history, ...asks, ...live]);
+        const loaded = projectAll(replayBase(detail), joined);
         draft.projections[id] = loaded.standing === undefined ? { ...loaded, standing } : loaded;
         draft.lineage = lineageOfProjection(draft.lineage, id, loaded);
         draft.loading[id] = false;
@@ -328,7 +354,9 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
     feed.subscribe(absorb),
     onReconnected(feed, resync),
     feed.onNotice((notice) => {
-      if (notice.kind === "gap") setState("gap", { from: notice.from, to: notice.to });
+      if (notice.kind !== "gap") return;
+      turnsHeard.clear();
+      setState("gap", { from: notice.from, to: notice.to });
     }),
     feed.whenLost((reason) => setState("lost", reason.message)),
   ];
@@ -411,31 +439,6 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       for (const stop of stops) stop();
     },
   };
-}
-
-function askEnvelopes(detail: SessionDetail, pending: readonly PendingAsk[]): BusEnvelope[] {
-  return pending
-    .filter((ask) => ask.sessionId === detail.id)
-    .map((ask, index) => ({
-      id: -1_000_000 - index,
-      ts: ask.askedAt,
-      sessionId: detail.id,
-      type: "gate.ask" as const,
-      payload: {
-        ask: {
-          tool: ask.tool,
-          callId: ask.callId,
-          arguments: ask.arguments,
-          rule: "default" as const,
-          rules: ask.rules ?? [],
-          ...(ask.preview === undefined ? {} : { preview: ask.preview }),
-        },
-      },
-    }));
-}
-
-function carriesStanding(envelope: BusEnvelope): boolean {
-  return envelope.type === "session.state";
 }
 
 function isChildEvent(envelope: BusEnvelope): boolean {

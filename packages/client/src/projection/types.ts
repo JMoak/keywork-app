@@ -103,6 +103,7 @@ export interface NoticeEntry {
   readonly kind: "notice";
   readonly level: NoticeLevel;
   readonly text: string;
+  readonly entryId?: string;
 }
 
 export type ToolPhase = "proposed" | "asking" | "running" | "done" | "failed" | "refused";

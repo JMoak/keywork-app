@@ -9,13 +9,23 @@ export type ControlAsk =
       readonly initial: string;
       readonly choices: readonly string[];
     }
-  | { readonly kind: "confirm"; readonly question: string }
+  | {
+      readonly kind: "confirm";
+      readonly question: string;
+      readonly items?: readonly ConfirmItem[] | undefined;
+    }
   | {
       readonly kind: "pick";
       readonly label: string;
       readonly hint: string;
       readonly options: readonly PickOption[];
     };
+
+export interface ConfirmItem {
+  readonly text: string;
+  readonly note: string;
+  readonly flagged?: boolean | undefined;
+}
 
 export interface PickOption {
   readonly key: string;
@@ -39,7 +49,9 @@ export function ControlRow(props: ControlRowProps) {
           {(ask) => <TextAsk ask={ask} onAnswer={props.onAnswer} onDismiss={props.onDismiss} />}
         </Match>
         <Match when={confirmAskOf(props.ask)} keyed>
-          {(ask) => <ConfirmLine question={ask.question} onConfirm={props.onConfirm} />}
+          {(ask) => (
+            <ConfirmLine question={ask.question} items={ask.items} onConfirm={props.onConfirm} />
+          )}
         </Match>
         <Match when={pickAskOf(props.ask)} keyed>
           {(ask) => <PickAsk ask={ask} onAnswer={props.onAnswer} onDismiss={props.onDismiss} />}
@@ -120,7 +132,11 @@ function TextAsk(props: {
   );
 }
 
-function ConfirmLine(props: { question: string; onConfirm: (agreed: boolean) => void }) {
+function ConfirmLine(props: {
+  question: string;
+  items: readonly ConfirmItem[] | undefined;
+  onConfirm: (agreed: boolean) => void;
+}) {
   let line: HTMLDivElement | undefined;
   onMount(() => line?.focus());
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -140,6 +156,18 @@ function ConfirmLine(props: { question: string; onConfirm: (agreed: boolean) => 
       onKeyDown={onKeyDown}
     >
       {props.question}
+      <Show when={(props.items ?? []).length > 0}>
+        <ul class="kw-controls-items">
+          <For each={props.items}>
+            {(item) => (
+              <li class="kw-controls-item" data-flagged={item.flagged ? "" : undefined}>
+                <span class="kw-controls-item-text">{item.text}</span>
+                <span class="kw-controls-item-note">{item.note}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
     </div>
   );
 }
