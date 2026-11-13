@@ -46,6 +46,15 @@
   align-items: start;
   padding: 0.5rem 0.75rem 0.5rem 0;
 }
+.kw-composer-row:focus-within {
+  box-shadow: inset 0 -1px 0 var(--kw-border-focus);
+}
+@media (forced-colors: active) {
+  .kw-composer-row:focus-within {
+    outline: 1px solid var(--kw-border-focus);
+    outline-offset: -1px;
+  }
+}
 
 .kw-composer-prompt {
   text-align: center;

@@ -199,7 +199,7 @@ export const coreActions: Record<string, AppAction> = {
   },
   "ask.approve": {
     chords: "ctrl+y",
-    help: "approve the pending ask once",
+    help: "approve the pending ask once · redo while typing when none waits",
     hotPath: true,
     invoke: (target) => target.answerAsk("approve"),
     command: {

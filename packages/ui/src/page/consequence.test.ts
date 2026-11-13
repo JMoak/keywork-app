@@ -26,8 +26,33 @@ describe("what an ask would do", () => {
       tool: "write",
       preview,
     });
-    expect(consequenceOf({ tool: "edit", arguments: { path: "a.ts" } })).toEqual({
+    expect(consequenceOf({ tool: "edit", arguments: { path: "a.ts" } })).toMatchObject({
       kind: "unpreviewed",
+    });
+  });
+
+  it("tables an unpreviewed edit's arguments and names why an edit goes unpreviewed", () => {
+    const edit = { path: "src/math.ts", oldText: "zzz", newText: "y" };
+    expect(consequenceOf({ tool: "edit", arguments: edit })).toEqual({
+      kind: "unpreviewed",
+      head: "edit src/math.ts",
+      rows: [
+        { name: "oldText", value: "zzz", fold: undefined },
+        { name: "newText", value: "y", fold: undefined },
+      ],
+      reason:
+        "no preview from the server · the old text is not in the file exactly once, or the file is missing, too large or binary",
+    });
+  });
+
+  it("names why a write goes unpreviewed and folds its content to one line", () => {
+    const write = { path: "big.bin", content: "one\ntwo\nthree" };
+    expect(consequenceOf({ tool: "write", arguments: write })).toEqual({
+      kind: "unpreviewed",
+      head: "write big.bin",
+      rows: [{ name: "content", value: "one", fold: "… 2 more lines" }],
+      reason:
+        "no preview from the server · the file is too large or binary to show, or it is a memory note",
     });
   });
 

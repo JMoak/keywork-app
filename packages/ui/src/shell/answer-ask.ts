@@ -1,5 +1,7 @@
 import type { SessionProjection, ToolRun } from "@keywork-app/client";
 import { type DenyReason, isAskRefusal } from "@keywork-app/protocol";
+import { redoLastUndo } from "../composer/undoable.ts";
+import { isTextField } from "../keys/typing.ts";
 import { type AskPick, askChoiceFor } from "../page/ask-card.tsx";
 import { askWhy, stopAskingWhy } from "../page/ask-card-why.ts";
 import type { SessionStore } from "./session-store.ts";
@@ -24,7 +26,7 @@ export async function answerHeldAsk(
   note?: string,
 ): Promise<string | undefined> {
   const run = askingRun(answering.store.projection(held.sessionId), held.callId);
-  if (run === undefined) return nothingAsking;
+  if (run === undefined) return pick === "approve" && redoWhileTyping() ? undefined : nothingAsking;
   const choice = askChoiceFor(pick, run);
   if (choice === undefined) return onceOnlyNotice(answering.approveKey);
   if (choice.verdict === "denied" && reason === undefined) {
@@ -57,4 +59,8 @@ export function askingRun(projection: SessionProjection, callId?: string): ToolR
 
 export function onceOnlyNotice(approveKey: string): string {
   return `this ask can only be answered once · ${approveKey} approves it`;
+}
+
+function redoWhileTyping(): boolean {
+  return isTextField(document.activeElement) && redoLastUndo();
 }

@@ -5,7 +5,12 @@ import "./queue-editor.css";
 export interface QueueKeys {
   selected(): string | undefined;
   editing(): boolean;
-  handle(event: QueueKeyEvent, draftEmpty: boolean): boolean;
+  handle(event: QueueKeyEvent, draft: QueueDraft): boolean;
+}
+
+export interface QueueDraft {
+  readonly empty: boolean;
+  edit(text: string): void;
 }
 
 export interface QueueEdits {
@@ -22,7 +27,7 @@ export type QueueKeyEvent = Pick<
 >;
 
 export const queueHint =
-  "queue · ↑↓ picks · shift+↑↓ moves it · del drops it · enter sends it now · esc is done";
+  "queue · ↑↓ picks · shift+↑↓ moves it · e edits it · del drops it · enter sends it now · esc is done";
 
 export function createQueueEditor(edits: QueueEdits): QueueKeys {
   const [chosen, setChosen] = createSignal<string>();
@@ -72,8 +77,15 @@ export function createQueueEditor(edits: QueueEdits): QueueKeys {
     done();
     if (held !== undefined) edits.sendNow(held);
   };
+  const takeIntoDraft = (draft: QueueDraft): void => {
+    const held = prompt();
+    done();
+    if (held === undefined) return;
+    edits.cancel(held);
+    draft.edit(held.text);
+  };
 
-  const whileEditing = (event: QueueKeyEvent): boolean => {
+  const whileEditing = (event: QueueKeyEvent, draft: QueueDraft): boolean => {
     if (modifierKeys.has(event.key)) return false;
     const step = stepOf(event.key);
     if (step !== undefined && !event.ctrlKey && !event.metaKey) {
@@ -81,8 +93,12 @@ export function createQueueEditor(edits: QueueEdits): QueueKeys {
       else stepTo(step);
       return true;
     }
-    if (event.key === "Backspace" || event.key === "Delete") {
+    if (event.key === "Delete") {
       drop();
+      return true;
+    }
+    if (isEditKey(event)) {
+      takeIntoDraft(draft);
       return true;
     }
     if (event.key === "Enter" && !event.shiftKey && !event.altKey) {
@@ -96,11 +112,11 @@ export function createQueueEditor(edits: QueueEdits): QueueKeys {
   return {
     selected: () => prompt()?.id,
     editing: () => at() !== undefined,
-    handle: (event, draftEmpty) => {
+    handle: (event, draft) => {
       if (event.isComposing) return false;
-      if (at() !== undefined) return whileEditing(event);
+      if (at() !== undefined) return whileEditing(event, draft);
       const step = stepOf(event.key);
-      const entering = draftEmpty && step !== undefined && event.altKey && !event.ctrlKey;
+      const entering = draft.empty && step !== undefined && event.altKey && !event.ctrlKey;
       return entering && !event.metaKey && enter(step);
     },
   };
@@ -125,6 +141,10 @@ function stepOf(key: string): Step | undefined {
   if (key === "ArrowUp") return -1;
   if (key === "ArrowDown") return 1;
   return undefined;
+}
+
+function isEditKey(event: QueueKeyEvent): boolean {
+  return event.key.toLowerCase() === "e" && !event.altKey && !event.ctrlKey && !event.metaKey;
 }
 
 function clamp(index: number, count: number): number {

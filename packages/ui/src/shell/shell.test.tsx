@@ -314,7 +314,7 @@ describe("the app shell", () => {
     await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
   });
 
-  it("lets the ask card take the keys from a composer that just sent its prompt", async () => {
+  it("keeps the keys in the composer that just sent its prompt, so typing ahead never answers the ask", async () => {
     const fake = servedClient();
     render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
     await openWorkspace("C:/work");
@@ -324,10 +324,12 @@ describe("the app shell", () => {
     fireEvent.input(input);
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(fake.prompts).toEqual(["s1: run echo served"]));
-    expect(document.activeElement).toBe(input);
     fake.emit(liveAsk);
     const card = await screen.findByRole("group", { name: "permission ask" });
-    await waitFor(() => expect(document.activeElement).toBe(card));
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key: "w" });
+    expect(fake.answers).toEqual([]);
+    card.focus();
     fireEvent.keyDown(card, { key: "w" });
     await waitFor(() => expect(fake.answers).toEqual(["c1:granted:workspace"]));
   });

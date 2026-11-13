@@ -12,7 +12,12 @@ import {
 
 export type Consequence =
   | { readonly kind: "file"; readonly tool: string; readonly preview: ToolPreview }
-  | { readonly kind: "unpreviewed" }
+  | {
+      readonly kind: "unpreviewed";
+      readonly head: string;
+      readonly rows: readonly ArgumentRow[];
+      readonly reason: string;
+    }
   | { readonly kind: "command"; readonly parts: readonly CommandPart[] }
   | {
       readonly kind: "call";
@@ -44,14 +49,11 @@ export interface FileChange {
 
 export type AskShape = Pick<PermissionAsk, "tool" | "arguments" | "preview">;
 
-export const unpreviewedLine =
-  "no preview from the server · too large, binary, a memory note, or an edit that would not apply";
-
 export function consequenceOf(ask: AskShape | undefined): Consequence {
   if (ask === undefined) return { kind: "arguments" };
   if (onceOnlyTools.has(ask.tool)) {
     return ask.preview === undefined
-      ? { kind: "unpreviewed" }
+      ? unpreviewedConsequence(ask)
       : { kind: "file", tool: ask.tool, preview: ask.preview };
   }
   const command = ask.tool === "bash" ? stringField(ask.arguments, "command") : undefined;
@@ -130,6 +132,23 @@ export function ruleWords(rule: PermissionRule): string {
   const held = heldBack(head);
   return held.length === 0 ? `any ${head} command` : `any ${head} command but ${held.join(", ")}`;
 }
+
+function unpreviewedConsequence(ask: AskShape): Consequence {
+  const { path, ...rest }: Readonly<Record<string, unknown>> = isRecord(ask.arguments)
+    ? ask.arguments
+    : {};
+  return {
+    kind: "unpreviewed",
+    head: typeof path === "string" ? `${ask.tool} ${path}` : ask.tool,
+    rows: argumentRows(rest),
+    reason: ask.tool === "edit" ? unpreviewedEdit : unpreviewedWrite,
+  };
+}
+
+const unpreviewedEdit =
+  "no preview from the server · the old text is not in the file exactly once, or the file is missing, too large or binary";
+const unpreviewedWrite =
+  "no preview from the server · the file is too large or binary to show, or it is a memory note";
 
 const mcpToolSeparator = "__";
 const wildcardTail = " *";

@@ -2,6 +2,10 @@
   color: var(--kw-text-mid);
 }
 
+.kw-ask-answer[data-tone="back"] {
+  color: var(--kw-text-mid);
+}
+
 .kw-ask-note {
   display: flex;
   flex: 1 1 100%;

@@ -8,21 +8,20 @@ export function graphemesOf(text: string): string[] {
 }
 
 export function clusterBefore(text: string, caret: number): TextSpan {
-  return clusterWhere(text, (span) => span.start < caret && caret <= span.end) ?? at(caret);
+  return caret > 0 ? clusterHolding(text, caret - 1) : at(caret);
 }
 
 export function clusterAfter(text: string, caret: number): TextSpan {
-  return clusterWhere(text, (span) => span.start <= caret && caret < span.end) ?? at(caret);
+  return caret < text.length ? clusterHolding(text, caret) : at(caret);
 }
 
 const clusters = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-function clusterWhere(text: string, holds: (span: TextSpan) => boolean): TextSpan | undefined {
-  for (const cluster of clusters.segment(text)) {
-    const span = { start: cluster.index, end: cluster.index + cluster.segment.length };
-    if (holds(span)) return span;
-  }
-  return undefined;
+function clusterHolding(text: string, index: number): TextSpan {
+  const cluster = clusters.segment(text).containing(index);
+  return cluster === undefined
+    ? at(index)
+    : { start: cluster.index, end: cluster.index + cluster.segment.length };
 }
 
 function at(caret: number): TextSpan {

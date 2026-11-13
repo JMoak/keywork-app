@@ -1,7 +1,9 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
+import { CommandRegistry } from "../palette/commands.ts";
 import { Composer, intentOf } from "./composer.tsx";
+import type { DraftMemory, KeptDraft } from "./kept-draft.ts";
 
 function mount() {
   const sent: string[] = [];
@@ -139,6 +141,213 @@ describe("the composer's seed", () => {
     fireEvent.input(input);
     setSeed(undefined);
     expect(input.value).toBe("write hello.txt twice");
+  });
+
+  it("plants a seed once, so a later read of the same seed never overwrites the new draft", () => {
+    const [seed, setSeed] = createSignal<{ text: string } | undefined>();
+    const [layout, setLayout] = createSignal(0);
+    const { container } = render(() => (
+      <Composer
+        queue={[]}
+        seed={layout() >= 0 ? seed() : undefined}
+        onSteer={() => {}}
+        onQueue={() => {}}
+        onInterrupt={() => {}}
+      />
+    ));
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    setSeed({ text: "write notes/second.txt hello from turn two" });
+    input.value = "my own new idea";
+    fireEvent.input(input);
+    setLayout(1);
+    setLayout(2);
+    expect(input.value).toBe("my own new idea");
+    setSeed({ text: "write notes/second.txt hello from turn two" });
+    expect(input.value).toBe("write notes/second.txt hello from turn two");
+  });
+});
+
+describe("escape on a slash draft", () => {
+  it("closes the menu and keeps the text, then stops the turn on the next press", () => {
+    const commands = new CommandRegistry();
+    commands.register({ name: "model", description: "switch the model", run: () => {} });
+    let interrupts = 0;
+    const { container } = render(() => (
+      <Composer
+        queue={[]}
+        commands={commands}
+        onSteer={() => {}}
+        onQueue={() => {}}
+        onInterrupt={() => {
+          interrupts += 1;
+        }}
+      />
+    ));
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    input.value = "/etc/hosts has a stale entry for localhost";
+    fireEvent.input(input);
+    expect(container.querySelector(".kw-slash-empty")).not.toBeNull();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input.value).toBe("/etc/hosts has a stale entry for localhost");
+    expect(container.querySelector(".kw-slash-empty")).toBeNull();
+    expect(interrupts).toBe(0);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(interrupts).toBe(1);
+    expect(input.value).toBe("/etc/hosts has a stale entry for localhost");
+  });
+
+  it("shows the menu again once the draft leaves the slash and comes back", () => {
+    const commands = new CommandRegistry();
+    commands.register({ name: "model", description: "switch the model", run: () => {} });
+    const { container } = render(() => (
+      <Composer
+        queue={[]}
+        commands={commands}
+        onSteer={() => {}}
+        onQueue={() => {}}
+        onInterrupt={() => {}}
+      />
+    ));
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    const type = (text: string): void => {
+      input.value = text;
+      fireEvent.input(input);
+    };
+    type("/mo");
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(container.querySelector(".kw-slash")).toBeNull();
+    type("");
+    type("/mo");
+    expect(container.querySelector(".kw-slash")).not.toBeNull();
+  });
+});
+
+describe("prompt history", () => {
+  function sentThree() {
+    const composer = mount();
+    for (const prompt of ["first", "second\nwith a second line", "third"]) {
+      composer.type(prompt);
+      fireEvent.keyDown(composer.input, { key: "Enter" });
+    }
+    const press = (key: string, init: KeyboardEventInit = {}): boolean =>
+      fireEvent.keyDown(composer.input, { key, ...init });
+    return { ...composer, press };
+  }
+
+  it("recalls this composer's prompts newest first on up from an empty draft, and back down to empty", () => {
+    const { input, press } = sentThree();
+    press("ArrowUp");
+    expect(input.value).toBe("third");
+    input.setSelectionRange(0, 0);
+    press("ArrowUp");
+    expect(input.value).toBe("second\nwith a second line");
+    input.setSelectionRange(0, 0);
+    press("ArrowUp");
+    expect(input.value).toBe("first");
+    press("ArrowDown");
+    expect(input.value).toBe("second\nwith a second line");
+    input.setSelectionRange(input.value.length, input.value.length);
+    press("ArrowDown");
+    expect(input.value).toBe("third");
+    press("ArrowDown");
+    expect(input.value).toBe("");
+  });
+
+  it("leaves up and down to the caret inside a multi-line prompt", () => {
+    const { input, press } = sentThree();
+    press("ArrowUp");
+    input.setSelectionRange(0, 0);
+    press("ArrowUp");
+    input.setSelectionRange(input.value.length, input.value.length);
+    expect(press("ArrowUp")).toBe(true);
+    expect(input.value).toBe("second\nwith a second line");
+    input.setSelectionRange(0, 0);
+    expect(press("ArrowDown")).toBe(true);
+    expect(input.value).toBe("second\nwith a second line");
+  });
+
+  it("never replaces a draft the person is writing, and lets modified arrows through", () => {
+    const { input, type, press } = sentThree();
+    type("a new thought");
+    expect(press("ArrowUp")).toBe(true);
+    expect(input.value).toBe("a new thought");
+    type("");
+    expect(press("ArrowUp", { altKey: true })).toBe(true);
+    expect(input.value).toBe("");
+  });
+
+  it("stops browsing once a recalled prompt is edited, keeping the edit", () => {
+    const { input, type, press } = sentThree();
+    press("ArrowUp");
+    type("third, but louder");
+    press("ArrowDown");
+    expect(input.value).toBe("third, but louder");
+  });
+});
+
+describe("a remembered draft", () => {
+  function remembering(stored?: KeptDraft) {
+    const kept: KeptDraft[] = [];
+    const memory: DraftMemory = { recall: () => stored, keep: (draft) => kept.push(draft) };
+    const queued: string[] = [];
+    const view = render(() => (
+      <Composer
+        queue={[]}
+        memory={memory}
+        onSteer={() => {}}
+        onQueue={(text) => queued.push(text)}
+        onInterrupt={() => {}}
+      />
+    ));
+    const input = view.container.querySelector("textarea") as HTMLTextAreaElement;
+    return { ...view, input, kept, queued };
+  }
+
+  it("comes back from memory with the pastes its placeholders hold", () => {
+    const flood = Array.from({ length: 9 }, (_, line) => `line ${line}`).join("\n");
+    const placeholder = "[pasted #3, 9 lines, 62 B]";
+    const { input, queued } = remembering({
+      text: `look: ${placeholder}`,
+      pastes: [[3, flood]],
+    });
+    expect(input.value).toBe(`look: ${placeholder}`);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(queued).toEqual([`look: ${flood}`]);
+  });
+
+  it("keeps every change and forgets the draft once it is sent", () => {
+    const { input, kept } = remembering();
+    expect(kept).toEqual([]);
+    input.value = "an unsent draft that matters";
+    fireEvent.input(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(kept).toEqual([
+      { text: "an unsent draft that matters", pastes: [] },
+      { text: "", pastes: [] },
+    ]);
+  });
+
+  it("lets a remembered draft win over a standing seed when a composer mounts again", () => {
+    const seed = { text: "write notes/second.txt hello from turn two" };
+    const mountWith = (memory?: DraftMemory) =>
+      render(() => (
+        <Composer
+          queue={[]}
+          seed={seed}
+          memory={memory}
+          onSteer={() => {}}
+          onQueue={() => {}}
+          onInterrupt={() => {}}
+        />
+      ));
+    const forgetful = mountWith();
+    expect(forgetful.container.querySelector("textarea")?.value).toBe(seed.text);
+    forgetful.unmount();
+    const remembering = mountWith({
+      recall: () => ({ text: "my own new idea", pastes: [] }),
+      keep: () => {},
+    });
+    expect(remembering.container.querySelector("textarea")?.value).toBe("my own new idea");
   });
 });
 

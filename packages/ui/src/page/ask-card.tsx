@@ -6,10 +6,11 @@ import {
   type DenyReason,
   isAskRefusal,
   onceOnlyTools,
+  type PermissionAsk,
   type PermissionRule,
   type RememberedScope,
 } from "@keywork-app/protocol";
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import {
   askingWhy,
@@ -17,6 +18,7 @@ import {
   readWhyKeys,
   reasonOffers,
   stopAskingWhy,
+  takeBackOffer,
   whyPrompt,
 } from "./ask-card-why.ts";
 import { coverageLines } from "./consequence.ts";
@@ -129,6 +131,10 @@ export function AskCard(props: AskCardProps) {
     if (isBareDenial(choice)) askWhy(props.run.callId);
     else void answer(choice);
   };
+  const takeBack = (): void => {
+    stopAskingWhy(props.run.callId);
+    card?.focus({ preventScroll: true });
+  };
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (sayingWhy()) return;
@@ -148,9 +154,6 @@ export function AskCard(props: AskCardProps) {
   createEffect(() => {
     if (sayingWhy() && card !== undefined && focusRestsNear(card)) card.focus();
   });
-  onMount(() => {
-    if (card !== undefined && mayClaimFocus(card)) card.focus({ preventScroll: true });
-  });
   onCleanup(() => {
     if (card?.contains(document.activeElement)) keyboard?.returnHome();
   });
@@ -161,13 +164,14 @@ export function AskCard(props: AskCardProps) {
       aria-label="permission ask"
       tabIndex={-1}
       ref={card}
+      data-walk=""
       data-call-id={props.run.callId}
       onKeyDown={onKeyDown}
       data-answering={answering() ? "" : undefined}
       data-quiet={quiet() ? "" : undefined}
       data-saying-why={sayingWhy() ? "" : undefined}
     >
-      <span class="kw-ask-why">{askReason(props.run.ask?.rule)}</span>
+      <span class="kw-ask-why">{askReason(props.run.ask)}</span>
       <AskConsequence run={props.run} />
       <Show when={rules().length > 0 && !sayingWhy()}>
         <span class="kw-ask-rules">
@@ -222,6 +226,12 @@ export function AskCard(props: AskCardProps) {
                     />
                   )}
                 </For>
+                <AnswerButton
+                  label={takeBackOffer.label}
+                  chord={takeBackOffer.key}
+                  tone="back"
+                  onPress={takeBack}
+                />
               </>
             }
           >
@@ -289,14 +299,14 @@ export function blanketProgram(rule: PermissionRule): string | undefined {
   return codeRunners.has(program) && second?.startsWith("-") === true ? program : undefined;
 }
 
-export function askReason(rule: "policy" | "default" | "trusted" | undefined): string {
-  switch (rule) {
+export function askReason(ask: Pick<PermissionAsk, "tool" | "rule"> | undefined): string {
+  switch (ask?.rule) {
     case "policy":
       return "a rule asks before this tool runs";
     case "trusted":
       return "trusted reads ask before this form runs";
     default:
-      return "this tool changes things";
+      return defaultAskReason(ask?.tool);
   }
 }
 
@@ -347,6 +357,13 @@ const onceGrant: AskChoice = { verdict: "granted" };
 const sessionGrant: AskChoice = { verdict: "granted", scope: "session" };
 const workspaceGrant: AskChoice = { verdict: "granted", scope: "workspace" };
 const denial: AskChoice = { verdict: "denied" };
+
+function defaultAskReason(tool: string | undefined): string {
+  if (tool === "bash")
+    return "shell commands ask before they run · in a trusted folder plain reads don't";
+  if (tool !== undefined && onceOnlyTools.has(tool)) return "this changes a file";
+  return "this tool asks before it runs";
+}
 
 function askKeyPick(event: KeyboardEvent): AskPick | undefined {
   if (event.ctrlKey || event.altKey || event.metaKey) return undefined;
@@ -414,7 +431,7 @@ const codeRunners: ReadonlySet<string> = new Set([
   "php",
 ]);
 
-type AnswerTone = "grant" | "deny";
+type AnswerTone = "grant" | "deny" | "back";
 
 interface AnswerButtonProps {
   label: string;
@@ -440,11 +457,6 @@ function toneOf(choice: AskChoice): AnswerTone {
   return choice.verdict === "denied" ? "deny" : "grant";
 }
 
-function mayClaimFocus(card: HTMLElement): boolean {
-  const active = document.activeElement;
-  return focusRestsNear(card) && (active === null || !holdsDraft(active));
-}
-
 function focusRestsNear(card: HTMLElement): boolean {
   const active = document.activeElement;
   if (active === null || active === document.body) return true;
@@ -453,9 +465,4 @@ function focusRestsNear(card: HTMLElement): boolean {
 
 function paneOf(card: HTMLElement): Element | null {
   return card.closest(".kw-frame") ?? card.closest(".kw-frame-body");
-}
-
-function holdsDraft(element: Element): boolean {
-  const editable = element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement;
-  return editable && element.value.trim() !== "";
 }
