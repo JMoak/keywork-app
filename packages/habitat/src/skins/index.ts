@@ -1,10 +1,14 @@
 import type { Skin } from "../pose/skin.ts";
+import { carterSkin } from "./carter/index.ts";
+import { joinerSkin } from "./joiner/index.ts";
 import { kidSkin } from "./kid/index.ts";
 import { type LoadedSkin, loadSkin as loadFrom, type SkinSource } from "./loader.ts";
 import { placeholderSkin } from "./placeholder.ts";
 
 export const skins: Readonly<Record<string, SkinSource>> = {
   kid: () => kidSkin() as Skin,
+  carter: () => carterSkin() as Skin,
+  joiner: () => joinerSkin() as Skin,
   placeholder: placeholderSkin,
 };
 

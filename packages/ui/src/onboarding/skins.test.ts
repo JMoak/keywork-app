@@ -3,7 +3,7 @@ import { chosenSkin, offeredSkins, skinChoices, surprise, surpriseMe } from "./s
 
 describe("the skins on offer", () => {
   it("offers every registered skin but the placeholder, and the tinkerer when nothing else is registered", () => {
-    expect(offeredSkins()).toEqual(["kid"]);
+    expect(offeredSkins()).toEqual(["kid", "carter", "joiner"]);
     expect(offeredSkins(["kid", "placeholder", "owl"])).toEqual(["kid", "owl"]);
     expect(offeredSkins(["placeholder"])).toEqual(["kid"]);
   });
