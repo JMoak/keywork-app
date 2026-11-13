@@ -14,7 +14,9 @@ export type LayoutNode =
     };
 
 export type SplitNode = Extract<LayoutNode, { kind: "split" }>;
-export type SplitPath = readonly ("first" | "second")[];
+export type SplitSide = "first" | "second";
+export type SplitPath = readonly SplitSide[];
+export type Shown = (id: PaneId) => boolean;
 
 export interface SplitSeam {
   readonly path: SplitPath;
@@ -101,15 +103,16 @@ export function attachAtEdge(
   };
 }
 
-export function resizeAroundLeaf(node: LayoutNode, id: PaneId, delta: number): LayoutNode {
-  if (node.kind === "leaf") return node;
-  if (isLeaf(node.first, id)) return { ...node, ratio: steppedRatio(node.ratio + delta) };
-  if (isLeaf(node.second, id)) return { ...node, ratio: steppedRatio(node.ratio - delta) };
-  return {
-    ...node,
-    first: resizeAroundLeaf(node.first, id, delta),
-    second: resizeAroundLeaf(node.second, id, delta),
-  };
+export function resizeAroundLeaf(
+  node: LayoutNode,
+  id: PaneId,
+  delta: number,
+  shown: Shown = everyLeaf,
+): LayoutNode {
+  return aroundLeaf(node, id, shown, (split, side) => ({
+    ...split,
+    ratio: steppedRatio(split.ratio + (side === "first" ? delta : -delta)),
+  }));
 }
 
 export function withRatioAt(node: LayoutNode, path: SplitPath, ratio: number): LayoutNode {
@@ -139,16 +142,41 @@ export function collectSeams(
   return into;
 }
 
-export function rotateAroundLeaf(node: LayoutNode, id: PaneId): LayoutNode {
-  if (node.kind === "leaf") return node;
-  if (isLeaf(node.first, id) || isLeaf(node.second, id)) {
-    return { ...node, orientation: node.orientation === "row" ? "column" : "row" };
-  }
-  return {
-    ...node,
-    first: rotateAroundLeaf(node.first, id),
-    second: rotateAroundLeaf(node.second, id),
-  };
+export function rotateAroundLeaf(
+  node: LayoutNode,
+  id: PaneId,
+  shown: Shown = everyLeaf,
+): LayoutNode {
+  return aroundLeaf(node, id, shown, (split) => ({
+    ...split,
+    orientation: split.orientation === "row" ? "column" : "row",
+  }));
+}
+
+export function survivingSplitPaths(
+  node: LayoutNode,
+  shown: Shown,
+  path: SplitPath = [],
+  into: SplitPath[] = [],
+): SplitPath[] {
+  if (node.kind === "leaf") return into;
+  if (anyShown(node.first, shown) && anyShown(node.second, shown)) into.push(path);
+  survivingSplitPaths(node.first, shown, [...path, "first"], into);
+  survivingSplitPaths(node.second, shown, [...path, "second"], into);
+  return into;
+}
+
+export function withoutLeaves(
+  node: LayoutNode | undefined,
+  gone: (id: PaneId) => boolean,
+): LayoutNode | undefined {
+  if (node === undefined) return undefined;
+  if (node.kind === "leaf") return gone(node.id) ? undefined : node;
+  const first = withoutLeaves(node.first, gone);
+  const second = withoutLeaves(node.second, gone);
+  if (first === undefined) return second;
+  if (second === undefined) return first;
+  return first === node.first && second === node.second ? node : { ...node, first, second };
 }
 
 export function minWidth(node: LayoutNode): number {
@@ -217,8 +245,38 @@ function seamBetween(split: SplitNode, rect: Rect, first: Rect, path: SplitPath)
   };
 }
 
-function isLeaf(node: LayoutNode, id: PaneId): boolean {
-  return node.kind === "leaf" && node.id === id;
+const everyLeaf: Shown = () => true;
+
+function aroundLeaf(
+  node: LayoutNode,
+  id: PaneId,
+  shown: Shown,
+  change: (split: SplitNode, side: SplitSide) => SplitNode,
+): LayoutNode {
+  if (node.kind === "leaf") return node;
+  const side = sideHolding(node, id);
+  if (side === undefined) return node;
+  const deeper = aroundLeaf(node[side], id, shown, change);
+  if (deeper !== node[side]) return { ...node, [side]: deeper };
+  const across = side === "first" ? node.second : node.first;
+  return anyShown(across, shown) ? change(node, side) : node;
+}
+
+function sideHolding(split: SplitNode, id: PaneId): SplitSide | undefined {
+  if (holdsLeaf(split.first, id)) return "first";
+  return holdsLeaf(split.second, id) ? "second" : undefined;
+}
+
+function holdsLeaf(node: LayoutNode, id: PaneId): boolean {
+  return node.kind === "leaf"
+    ? node.id === id
+    : holdsLeaf(node.first, id) || holdsLeaf(node.second, id);
+}
+
+function anyShown(node: LayoutNode, shown: Shown): boolean {
+  return node.kind === "leaf"
+    ? shown(node.id)
+    : anyShown(node.first, shown) || anyShown(node.second, shown);
 }
 
 function divide(total: number, ratio: number, minFirst: number, minSecond: number): number {

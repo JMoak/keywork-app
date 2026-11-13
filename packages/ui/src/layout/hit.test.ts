@@ -17,7 +17,7 @@ function layoutWith(main: readonly string[], docked: Partial<Record<"left" | "ri
   const layout = new Layout();
   for (const id of main) expect(layout.open(id, screen).ok).toBe(true);
   for (const [side, id] of Object.entries(docked)) {
-    expect(layout.openInDock(id, side as "left" | "right", screen).ok).toBe(true);
+    expect(layout.openInDock(id, side as "left" | "right").ok).toBe(true);
   }
   return layout;
 }
