@@ -189,11 +189,11 @@ describe("the creature profile", () => {
     }));
     act("creature.skin");
     expect(container.querySelector("[data-tone='ask']")?.textContent).toBe(
-      "body for Wren · 1 kid · 2 placeholder · any other key cancels",
+      "body for Wren · 1 kid · 2 carter · 3 joiner · 4 placeholder · any other key cancels",
     );
     choose(container, "2");
     await settle();
-    expect(lastCall(harness.served, "PATCH")?.body).toEqual({ body: { skin: "placeholder" } });
+    expect(lastCall(harness.served, "PATCH")?.body).toEqual({ body: { skin: "carter" } });
     act("creature.policy");
     expect(container.querySelector("[data-tone='ask']")?.textContent).toBe(
       "which class of Wren's models · s strong · l loop · d decide · v vision · any other key cancels",
