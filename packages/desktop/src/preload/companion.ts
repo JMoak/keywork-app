@@ -11,6 +11,7 @@ import {
   type NudgeStep,
   type Tier,
 } from "../main/companion/channels.ts";
+import { servesRendererPage } from "../shared/renderer-page.ts";
 
 function subscribe<Payload>(channel: string): (listener: (payload: Payload) => void) => () => void {
   return (listener) => {
@@ -37,4 +38,6 @@ const port = {
     ipcRenderer.send(companionChannels.wakeups, report),
 };
 
-contextBridge.exposeInMainWorld(companionGlobal, port);
+if (servesRendererPage(process.argv, location.href)) {
+  contextBridge.exposeInMainWorld(companionGlobal, port);
+}

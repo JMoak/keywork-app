@@ -252,6 +252,16 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(h.fs.files.has(workspaceTicketFile) && _case === "absent").toBe(false);
   });
 
+  it("says quitting stops only an engine it spawned, never one it attached to", async () => {
+    const spawning = workspaceHost(harness({}).seams);
+    const attaching = workspaceHost(harness({ ticket: terminalTicket }).seams);
+    await spawning.open("/work");
+    await attaching.open("/work");
+    expect(spawning.stopsWithTheApp("/work")).toBe(true);
+    expect(attaching.stopsWithTheApp("/work")).toBe(false);
+    expect(spawning.stopsWithTheApp("/elsewhere")).toBe(false);
+  });
+
   it("attaches to a running server of another release that speaks the same contract", async () => {
     const h = harness({ ticket: terminalTicket, ticketAnswers: "old" });
     const opened = await workspaceHost(h.seams).open("/work");

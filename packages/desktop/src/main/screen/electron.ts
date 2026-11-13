@@ -18,7 +18,6 @@ import {
   desktopCapturer,
   dialog,
   globalShortcut,
-  type IpcMainEvent,
   ipcMain,
   nativeTheme,
   screen,
@@ -27,6 +26,8 @@ import {
   type WebContents,
   webContents,
 } from "electron";
+import { isAppPage, trustedIpc } from "../app-page.ts";
+import { sentFrom } from "../trusted-ipc.ts";
 import {
   type SenderCommand,
   screenChannels,
@@ -67,7 +68,7 @@ import {
   type Rect,
   wornThemeSlot,
 } from "./indicator.ts";
-import { registerControlHandlers, registerScreenHandlers } from "./ipc.ts";
+import { type IpcMainSeam, registerControlHandlers, registerScreenHandlers } from "./ipc.ts";
 import { type InboundRouter, routedTransport, type SignalingRouter } from "./routes.ts";
 import type { Indicator, IndicatorBanner, SenderWindows } from "./sharer.ts";
 import { type SnapshotServer, startSnapshotServer } from "./snapshot.ts";
@@ -147,8 +148,9 @@ export async function wireScreen(options: ScreenWiringOptions): Promise<ScreenWi
   });
   senders.bind(host);
   guardSenderPartition(host, senders);
-  const unregisterScreen = registerScreenHandlers(ipcMain, host, senders);
-  const unregisterControl = registerControlHandlers(ipcMain, host, senders);
+  const ipc = screenIpc();
+  const unregisterScreen = registerScreenHandlers(ipc, host, senders);
+  const unregisterControl = registerControlHandlers(ipc, host, senders);
   const stopListening = options.inbound === undefined ? () => {} : host.listen();
   const stopTicking = host.startTicking();
   const displaysChanged = (): void => void host.sharer.displaysChanged();
@@ -372,20 +374,17 @@ function overlayWindows(
 }
 
 function receiveWornTheme(wear: (name: unknown) => void): () => void {
-  const received = (event: IpcMainEvent, name: unknown): void => {
-    if (isConsolePage(event.sender)) wear(name);
-  };
-  ipcMain.on(screenChannels.wornTheme, received);
-  return () => ipcMain.removeListener(screenChannels.wornTheme, received);
+  const ipc = trustedIpc();
+  const received = (_event: unknown, name: unknown): void => wear(name);
+  ipc.on(screenChannels.wornTheme, received);
+  return () => ipc.removeListener(screenChannels.wornTheme, received);
 }
 
-function isConsolePage(contents: WebContents): boolean {
-  return (
-    !contents.isDestroyed() &&
-    contents.getType() === "window" &&
-    contents.session === session.defaultSession &&
-    !contents.getURL().startsWith("data:")
-  );
+function screenIpc(): IpcMainSeam {
+  return {
+    ...trustedIpc(sentFrom((url) => isAppPage(url) || isSenderOrigin(url))),
+    removeHandler: (channel: string) => ipcMain.removeHandler(channel),
+  };
 }
 
 // Windows grows a frameless window to its minimum track size (about 28 by 36 DIP here), so a

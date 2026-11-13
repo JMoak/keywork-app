@@ -11,6 +11,7 @@ export {
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { type ConsoleClient, keyworkClient } from "@keywork-app/client";
+import type { SessionRow } from "@keywork-app/protocol";
 import { keyworkNight } from "@keywork-app/ui/theme";
 import { app, BrowserWindow, dialog, protocol } from "electron";
 import { startElectronCompanion, startForegroundFeed } from "./companion/index.ts";
@@ -26,9 +27,11 @@ import {
 import { aboutInfo, createWorkspaces, pickFolder, registerHostHandlers } from "./host.ts";
 import { type Chords, type MenuAction, menuModel } from "./menu.ts";
 import { installApplicationMenu, trayMark } from "./native.ts";
+import { guardEveryNavigation } from "./navigation-electron.ts";
 import { prepareSharedRuntime } from "./node-consent-electron.ts";
 import { appUserModelIdFor } from "./notify.ts";
 import { aboutBox } from "./product.ts";
+import { interruptWork, mayQuit, workAcross } from "./quit.ts";
 import {
   inboundSignaling,
   prepareScreenBeforeReady,
@@ -65,6 +68,7 @@ export function startDesktop(profile: ProductProfile): void {
   else app.quit();
 
   function launch(): void {
+    guardEveryNavigation();
     nameTheAppForToasts();
     registerProtocolClient(protocolHandlerFor(invocation));
     prepareScreenBeforeReady({ commandLine: app.commandLine, protocol });
@@ -72,6 +76,7 @@ export function startDesktop(profile: ProductProfile): void {
     let deliver = (request: OpenRequest): void => {
       queued.push(request);
     };
+    let reveal = (): void => undefined;
     app.on("open-url", (event, url) => {
       event.preventDefault();
       deliver(requestFromUrl(url, profile));
@@ -79,6 +84,7 @@ export function startDesktop(profile: ProductProfile): void {
     app.on("second-instance", (_event, argv) => {
       const request = requestFromArgv(argv, invocation.defaultApp, profile);
       if (request !== undefined) deliver(request);
+      else reveal();
     });
 
     app.whenReady().then(async () => {
@@ -91,6 +97,7 @@ export function startDesktop(profile: ProductProfile): void {
         workspaces,
         states: windowStateBook(join(userData, "windows.json"), fileSeams),
         platform: process.platform,
+        onLastWindowClosing: process.platform === "darwin" ? undefined : () => app.quit(),
       });
       const dev = !app.isPackaged;
       const tray = trayMark(process.platform);
@@ -152,7 +159,7 @@ export function startDesktop(profile: ProductProfile): void {
         tray.update(
           trayModel(desktop.windows.list(), screen.host.sharer.sessions(), profile),
           act,
-          () => desktop.focusMostRecent(),
+          () => desktop.showConsole(),
         );
       };
       const route = (request: OpenRequest): void => {
@@ -169,24 +176,28 @@ export function startDesktop(profile: ProductProfile): void {
       await refreshMenu();
       refreshTray();
 
-      const gate = quitGate(async () => {
-        host.abortRelays();
-        (await companionReady).dispose();
-        surroundings.dispose();
-        foreground?.stop();
-        await screen.dispose();
-        tray.destroy();
-        return workspaces.closeAll();
+      const gate = quitGate({
+        mayQuit: () => askBeforeStoppingWork(workspaces, desktop),
+        stopEverything: async () => {
+          await desktop.leave();
+          await interruptWorkStoppingWithTheApp(workspaces);
+          host.abortRelays();
+          (await companionReady).dispose();
+          surroundings.dispose();
+          foreground?.stop();
+          await screen.dispose();
+          tray.destroy();
+          return workspaces.closeAll();
+        },
       });
       app.on("before-quit", (event) => gate(event, () => app.quit()));
-      app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0) void desktop.openWindow();
-      });
+      app.on("activate", () => desktop.showConsole());
 
       const first = requestFromLaunch(invocation, profile);
       await Promise.all([desktop.openWindow(first?.ok ? first.path : undefined), companionReady]);
       if (first !== undefined && !first.ok) route(first);
       deliver = route;
+      reveal = () => desktop.showConsole();
       for (const request of queued) route(request);
     });
   }
@@ -212,6 +223,46 @@ export function startDesktop(profile: ProductProfile): void {
     if (handler.kind === "dev-app") {
       app.setAsDefaultProtocolClient(protocolScheme, process.execPath, [resolve(handler.appPath)]);
     }
+  }
+
+  function askBeforeStoppingWork(
+    workspaces: WorkspaceHost,
+    desktop: DesktopShell,
+  ): Promise<boolean> {
+    return mayQuit(
+      {
+        work: () => workAcross(stoppingWithTheApp(workspaces), sessionsIn(workspaces)),
+        ask: async (warning) => {
+          const recent = desktop.windows.mostRecentlyActive();
+          const parent = recent === undefined ? null : BrowserWindow.fromId(recent);
+          if (parent === null) return (await dialog.showMessageBox(warning)).response;
+          desktop.focusWindow(parent.id);
+          return (await dialog.showMessageBox(parent, warning)).response;
+        },
+      },
+      profile,
+    );
+  }
+
+  function interruptWorkStoppingWithTheApp(workspaces: WorkspaceHost): Promise<void> {
+    return interruptWork(stoppingWithTheApp(workspaces), {
+      sessionsOf: sessionsIn(workspaces),
+      abort: async (root, sessionId) => {
+        const ticket = workspaces.ticketFor(root);
+        if (ticket !== undefined) await keyworkClient(ticket).abort(sessionId);
+      },
+    });
+  }
+
+  function stoppingWithTheApp(workspaces: WorkspaceHost): string[] {
+    return workspaces.openRoots().filter((root) => workspaces.stopsWithTheApp(root));
+  }
+
+  function sessionsIn(workspaces: WorkspaceHost) {
+    return async (root: string): Promise<readonly SessionRow[]> => {
+      const ticket = workspaces.ticketFor(root);
+      return ticket === undefined ? [] : keyworkClient(ticket).sessions();
+    };
   }
 
   async function askAnyServer<Answer>(

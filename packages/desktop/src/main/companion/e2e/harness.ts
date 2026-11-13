@@ -57,7 +57,7 @@ app.whenReady().then(async () => {
 
   const ports = electronCompanionPorts({
     desktop: {
-      focusMostRecent: () => probe.focus(),
+      showConsole: () => probe.focus(),
       broadcast: () => undefined,
     } as unknown as Parameters<typeof electronCompanionPorts>[0]["desktop"],
     platform: process.platform,

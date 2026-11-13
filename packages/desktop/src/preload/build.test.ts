@@ -7,6 +7,8 @@ import { resolveConfig } from "electron-vite";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { companionGlobal } from "../main/companion/channels.ts";
+import { rendererPageArgument } from "../shared/renderer-page.ts";
+import { appPage } from "./page-testing.ts";
 
 const desktop = resolve(import.meta.dirname, "../..");
 const preloads = ["companion.js", "index.js"];
@@ -42,6 +44,10 @@ describe("the built preloads", () => {
       companionGlobal,
     ]);
   });
+
+  it.each(preloads)("%s exposes nothing to a page the window was navigated to", async (name) => {
+    expect([...loadSandboxed(await builtPreload(name), "https://example.com/").keys()]).toEqual([]);
+  });
 });
 
 async function buildPreloads(into: string): Promise<void> {
@@ -61,7 +67,7 @@ function builtPreload(name: string): Promise<string> {
 const sandboxModules = new Set(["events", "timers", "url"]);
 const nodeRequire = createRequire(import.meta.url);
 
-function loadSandboxed(code: string): Map<string, unknown> {
+function loadSandboxed(code: string, href = appPage): Map<string, unknown> {
   const exposed = new Map<string, unknown>();
   const electron = {
     contextBridge: { exposeInMainWorld: (name: string, api: unknown) => exposed.set(name, api) },
@@ -72,8 +78,9 @@ function loadSandboxed(code: string): Map<string, unknown> {
     if (sandboxModules.has(specifier)) return nodeRequire(specifier);
     throw new Error(`module not found: ${specifier}`);
   };
-  const preload = compileFunction(code, ["require", "module", "exports", "process"]);
+  const preload = compileFunction(code, ["require", "module", "exports", "process", "location"]);
   const module = { exports: {} };
-  preload(sandboxRequire, module, module.exports, { argv: [], env: {} });
+  const process = { argv: [rendererPageArgument(appPage)], env: {} };
+  preload(sandboxRequire, module, module.exports, process, { href });
   return exposed;
 }

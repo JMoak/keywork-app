@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { companionChannels, companionGlobal } from "../main/companion/channels.ts";
+import { appPage, loadedOn } from "./page-testing.ts";
 
 const exposed = new Map<string, unknown>();
 const sent: Array<[string, unknown[]]> = [];
@@ -19,7 +20,7 @@ vi.mock("electron", () => ({
 }));
 
 beforeAll(async () => {
-  await import("./companion.ts");
+  await loadedOn(`${appPage}?companion=1`, () => import("./companion.ts"));
 });
 
 describe("the companion preload", () => {

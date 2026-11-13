@@ -13,6 +13,7 @@ import {
   type Surroundings,
 } from "../shared/channels.ts";
 import { type ChunkQueue, chunkQueue } from "../shared/chunk-queue.ts";
+import { servesRendererPage } from "../shared/renderer-page.ts";
 import { companionHostPort } from "./companion-host.ts";
 import { isScreenSenderWindow, screenPort, startScreenSender } from "./screen.ts";
 import { pushWornTheme } from "./worn-theme.ts";
@@ -185,7 +186,7 @@ function consoleHost() {
 }
 
 if (isScreenSenderWindow(process.argv)) startScreenSender(ipcRenderer);
-else {
+else if (servesRendererPage(process.argv, location.href)) {
   contextBridge.exposeInMainWorld("keyworkHost", {
     productId: process.argv.includes("--keywork-product=stead") ? "stead" : "keywork",
     ...consoleHost(),

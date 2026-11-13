@@ -83,17 +83,19 @@ describe("quitGate", () => {
   it("holds the first quit until everything has stopped, then lets the retry through", async () => {
     let stops = 0;
     let release: () => void = () => undefined;
-    const gate = quitGate(
-      () =>
+    const gate = quitGate({
+      mayQuit: async () => true,
+      stopEverything: () =>
         new Promise<void>((resolve) => {
           stops += 1;
           release = resolve;
         }),
-    );
+    });
     const events: string[] = [];
     const event = { preventDefault: () => events.push("prevented") };
     gate(event, () => events.push("quit"));
     gate(event, () => events.push("quit"));
+    await settle();
     expect(events).toEqual(["prevented", "prevented"]);
     expect(stops).toBe(1);
     release();
@@ -104,13 +106,74 @@ describe("quitGate", () => {
   });
 
   it("still quits when stopping fails", async () => {
-    const gate = quitGate(() => Promise.reject(new Error("stuck")));
+    const gate = quitGate({
+      mayQuit: async () => true,
+      stopEverything: () => Promise.reject(new Error("stuck")),
+    });
     let quit = false;
     gate({ preventDefault: () => undefined }, () => {
       quit = true;
     });
     await settle();
     expect(quit).toBe(true);
+  });
+
+  it("stops nothing and stays open when the quit is cancelled, then asks again next time", async () => {
+    const answers = [false, true];
+    let asked = 0;
+    let stops = 0;
+    const gate = quitGate({
+      mayQuit: async () => answers[asked++] ?? true,
+      stopEverything: async () => {
+        stops += 1;
+      },
+    });
+    const quits: string[] = [];
+    const event = { preventDefault: () => undefined };
+    gate(event, () => quits.push("quit"));
+    await settle();
+    expect({ asked, stops, quits }).toEqual({ asked: 1, stops: 0, quits: [] });
+    gate(event, () => quits.push("quit"));
+    await settle();
+    expect({ asked, stops, quits }).toEqual({ asked: 2, stops: 1, quits: ["quit"] });
+  });
+
+  it("asks once while a question is open, however many quits arrive", async () => {
+    let asked = 0;
+    let answer: (stop: boolean) => void = () => undefined;
+    const gate = quitGate({
+      mayQuit: () => {
+        asked += 1;
+        return new Promise<boolean>((resolve) => {
+          answer = resolve;
+        });
+      },
+      stopEverything: async () => undefined,
+    });
+    const quits: string[] = [];
+    const event = { preventDefault: () => undefined };
+    gate(event, () => quits.push("menu"));
+    gate(event, () => quits.push("tray"));
+    answer(true);
+    await settle();
+    expect(asked).toBe(1);
+    expect(quits).toEqual(["menu"]);
+  });
+
+  it("quits rather than trapping the app when it cannot tell whether work is running", async () => {
+    let stops = 0;
+    const gate = quitGate({
+      mayQuit: () => Promise.reject(new Error("dialog failed")),
+      stopEverything: async () => {
+        stops += 1;
+      },
+    });
+    let quit = false;
+    gate({ preventDefault: () => undefined }, () => {
+      quit = true;
+    });
+    await settle();
+    expect({ stops, quit }).toEqual({ stops: 1, quit: true });
   });
 });
 

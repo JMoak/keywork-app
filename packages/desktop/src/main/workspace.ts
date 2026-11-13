@@ -96,6 +96,7 @@ export interface WorkspaceHost {
   closeAll(): Promise<void>;
   recent(): Promise<readonly RecentWorkspace[]>;
   openRoots(): readonly string[];
+  stopsWithTheApp(path: string): boolean;
   ticketFor(path: string): ServerTicket | undefined;
   suspect(path: string): void;
   onServerLost(listener: (loss: ServerLoss) => void): () => void;
@@ -451,6 +452,7 @@ export function workspaceHost(seams: WorkspaceSeams): WorkspaceHost {
     },
     recent: () => seams.recents.list(),
     openRoots: () => [...held.keys()],
+    stopsWithTheApp: (path) => held.get(path)?.process !== undefined,
     servingOf: (path) => {
       const entry = held.get(path);
       if (entry === undefined) return undefined;

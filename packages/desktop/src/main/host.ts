@@ -4,13 +4,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { keyworkClient, type ServerTicket } from "@keywork-app/client";
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from "electron";
+import { app, BrowserWindow, clipboard, dialog, shell, type WebContents } from "electron";
 import {
   type EditorOpened,
   hostChannels,
   type KeybindingsWatch,
   type RelayRequest,
 } from "../shared/channels.ts";
+import { type AppIpc, trustedIpc } from "./app-page.ts";
 import { freePort, spawnChild } from "./child.ts";
 import { type EditorSeams, openInEditor, startDetached } from "./editor.ts";
 import { followKeybindingFiles, keybindingFileSeams, keybindingFilesFor } from "./keybindings.ts";
@@ -152,18 +153,21 @@ export function registerHostHandlers(
   onWorkspaceOpened: () => void,
   profile: ProductProfile = keyworkProfile,
 ): HostHandlers {
+  const ipc = trustedIpc();
   const homeReaders = new Set<number>();
   const relays = new Map<number, ServerRelay>();
+  const serves = (sender: WebContents, workspace: string): boolean => {
+    const window = BrowserWindow.fromWebContents(sender);
+    const project = window !== null && desktop.windows.workspaceOf(window.id) === workspace;
+    const home = workspace === managedHomePath && homeReaders.has(sender.id);
+    return project || home;
+  };
   const relayFor = (sender: WebContents): ServerRelay => {
     const present = relays.get(sender.id);
     if (present !== undefined) return present;
     const relay = serverRelay({
-      ticketFor: (workspace) => {
-        const window = BrowserWindow.fromWebContents(sender);
-        const project = window !== null && desktop.windows.workspaceOf(window.id) === workspace;
-        const home = workspace === managedHomePath && homeReaders.has(sender.id);
-        return project || home ? workspaces.ticketFor(workspace) : undefined;
-      },
+      ticketFor: (workspace) =>
+        serves(sender, workspace) ? workspaces.ticketFor(workspace) : undefined,
       fetch: (input, init) => fetch(input, init),
       suspect: (workspace) => workspaces.suspect(workspace),
     });
@@ -176,15 +180,15 @@ export function registerHostHandlers(
     return relay;
   };
 
-  ipcMain.handle(hostChannels.about, () => aboutInfo());
-  ipcMain.handle(hostChannels.pickFolder, () => pickFolder());
-  ipcMain.handle(hostChannels.recentWorkspaces, () => workspaces.recent());
-  ipcMain.handle(hostChannels.enableRuntime, async (event) => {
+  ipc.handle(hostChannels.about, () => aboutInfo());
+  ipc.handle(hostChannels.pickFolder, () => pickFolder());
+  ipc.handle(hostChannels.recentWorkspaces, () => workspaces.recent());
+  ipc.handle(hostChannels.enableRuntime, async (event) => {
     if (!app.isPackaged) return;
     const result = await retrySharedRuntime(profile, BrowserWindow.fromWebContents(event.sender));
     if (result.kind === "failed") throw new Error(result.detail);
   });
-  ipcMain.handle(hostChannels.openHome, async (event) => {
+  ipc.handle(hostChannels.openHome, async (event) => {
     if (workspaces.openHome === undefined) {
       return {
         ok: false,
@@ -201,7 +205,7 @@ export function registerHostHandlers(
     relayFor(event.sender);
     return { ok: true, opened: publicView(result.opened) };
   });
-  ipcMain.handle(hostChannels.openWorkspace, async (event, path: string) => {
+  ipc.handle(hostChannels.openWorkspace, async (event, path: string) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     const result = await workspaces.open(path);
     if (!result.ok) {
@@ -214,44 +218,44 @@ export function registerHostHandlers(
     onWorkspaceOpened();
     return { ok: true, opened: publicView(result.opened) };
   });
-  ipcMain.handle(hostChannels.restartServer, async (_event, path: string) => {
+  ipc.handle(hostChannels.restartServer, async (_event, path: string) => {
     const result = await workspaces.restart(path);
     return result.ok
       ? { ok: true, opened: publicView(result.opened) }
       : { ok: false, failure: publicFailure(result.failure, profile) };
   });
-  ipcMain.handle(hostChannels.servingOf, (_event, path: string) => workspaces.servingOf(path));
-  ipcMain.handle(hostChannels.stopServing, async (_event, path: string) => {
+  ipc.handle(hostChannels.servingOf, (_event, path: string) => workspaces.servingOf(path));
+  ipc.handle(hostChannels.stopServing, async (_event, path: string) => {
     const result = await workspaces.stopServing(path);
     if (result.ok) onWorkspaceOpened();
     return result.ok
       ? { ok: true, opened: publicView(result.opened) }
       : { ok: false, failure: publicFailure(result.failure, profile) };
   });
-  ipcMain.handle(hostChannels.closeWorkspace, async (event, path: string) => {
+  ipc.handle(hostChannels.closeWorkspace, async (event, path: string) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window !== null && desktop.windows.workspaceOf(window.id) === path) {
       await desktop.unbindWindow(window.id);
     }
   });
-  ipcMain.handle(hostChannels.listOpenWorkspaces, () => desktop.windows.list());
-  ipcMain.handle(hostChannels.switchWorkspace, (_event, path: string) => desktop.openPath(path));
-  ipcMain.handle(hostChannels.setNeedsYou, (event, count: number) => {
+  ipc.handle(hostChannels.listOpenWorkspaces, () => desktop.windows.list());
+  ipc.handle(hostChannels.switchWorkspace, (_event, path: string) => desktop.openPath(path));
+  ipc.handle(hostChannels.setNeedsYou, (event, count: number) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window !== null) desktop.windows.setNeedsYou(window.id, count);
   });
   const openableRoots = (): readonly string[] => [...workspaces.openRoots(), userMemoryVault];
-  ipcMain.handle(hostChannels.openExternal, (_event, url: string) =>
+  ipc.handle(hostChannels.openExternal, (_event, url: string) =>
     openExternal(url, openableRoots()),
   );
-  ipcMain.handle(hostChannels.openInEditor, (_event, request: unknown) =>
+  ipc.handle(hostChannels.openInEditor, (_event, request: unknown) =>
     openInEditorAt(request, openableRoots()),
   );
-  ipcMain.handle(hostChannels.writeClipboard, (_event, text: unknown) => {
+  ipc.handle(hostChannels.writeClipboard, (_event, text: unknown) => {
     if (typeof text === "string") clipboard.writeText(text);
   });
-  registerKeybindingWatches((workspace) => workspaces.openRoots().includes(workspace));
-  ipcMain.handle(hostChannels.notify, (event, notice: unknown) => {
+  registerKeybindingWatches(ipc, (workspace) => workspaces.openRoots().includes(workspace));
+  ipc.handle(hostChannels.notify, (event, notice: unknown) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window === null || !isNotice(notice)) return false;
     if (!shouldNotify(notice.trigger, window.isFocused())) return false;
@@ -260,22 +264,22 @@ export function registerHostHandlers(
       window.webContents.send(hostChannels.notificationActivated, notice.trigger);
     });
   });
-  ipcMain.handle(hostChannels.saveAs, (event, request: unknown) => {
+  ipc.handle(hostChannels.saveAs, (event, request: unknown) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     return saveAs(request, {
-      folder: app.getPath("downloads"),
+      folder: () => app.getPath("downloads"),
       choosePath: (defaultPath) => chooseSavePath(window, defaultPath),
       writeText: (path, text) => writeFile(path, text, "utf8"),
     });
   });
-  ipcMain.handle(hostChannels.serverFetch, (event, request: RelayRequest) =>
+  ipc.handle(hostChannels.serverFetch, (event, request: RelayRequest) =>
     relayFor(event.sender).start(request, {
       chunk: (requestId, bytes) =>
         sendUnlessGone(event.sender, hostChannels.serverChunk, requestId, bytes),
       end: (end) => sendUnlessGone(event.sender, hostChannels.serverEnd, end),
     }),
   );
-  ipcMain.on(hostChannels.serverAbort, (event, requestId: number) =>
+  ipc.on(hostChannels.serverAbort, (event, requestId: number) =>
     relays.get(event.sender.id)?.abort(requestId),
   );
   workspaces.onServerLost((loss) =>
@@ -290,7 +294,7 @@ export function registerHostHandlers(
   desktop.onOpenWorkspacesChanged((open) =>
     desktop.broadcast(hostChannels.openWorkspacesChanged, open),
   );
-  registerPtyHandlers({
+  registerPtyHandlers(ipc, serves, {
     keyworkBinary: () => launchableEngine(engineSeams()),
     secretsFor: (workspace) => [workspaces.ticketFor(workspace)?.token ?? ""],
   });
@@ -376,13 +380,13 @@ const editorSeams: EditorSeams = {
   reveal: (path) => shell.showItemInFolder(path),
 };
 
-function registerKeybindingWatches(isOpen: (workspace: string) => boolean): void {
+function registerKeybindingWatches(ipc: AppIpc, isOpen: (workspace: string) => boolean): void {
   const watches = new Map<string, () => void>();
   const stop = (key: string): void => {
     watches.get(key)?.();
     watches.delete(key);
   };
-  ipcMain.on(hostChannels.watchKeybindings, (event, request: unknown) => {
+  ipc.on(hostChannels.watchKeybindings, (event, request: unknown) => {
     if (!isKeybindingsWatch(request)) return;
     const key = `${event.sender.id}:${request.id}`;
     stop(key);
@@ -395,7 +399,7 @@ function registerKeybindingWatches(isOpen: (workspace: string) => boolean): void
     );
     event.sender.once("destroyed", () => stop(key));
   });
-  ipcMain.on(hostChannels.unwatchKeybindings, (event, id: unknown) => {
+  ipc.on(hostChannels.unwatchKeybindings, (event, id: unknown) => {
     if (typeof id === "number") stop(`${event.sender.id}:${id}`);
   });
 }

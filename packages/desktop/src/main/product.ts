@@ -8,8 +8,23 @@ export interface AboutBox {
   detail: string;
 }
 
-export function windowTitle(needsYou: number, profile: ProductProfile = keyworkProfile): string {
-  return needsYou === 0 ? profile.name : `(${needsYou}) ${profile.name}`;
+export function windowTitle(
+  needsYou: number,
+  profile: ProductProfile = keyworkProfile,
+  workspace?: string,
+): string {
+  const named =
+    workspace === undefined ? profile.name : `${folderName(workspace)} · ${profile.name}`;
+  return needsYou === 0 ? named : `(${needsYou}) ${named}`;
+}
+
+export function folderName(path: string): string {
+  return (
+    path
+      .split(/[\\/]/)
+      .filter((part) => part !== "")
+      .at(-1) ?? path
+  );
 }
 
 export function aboutBox(about: HostAbout, profile: ProductProfile = keyworkProfile): AboutBox {

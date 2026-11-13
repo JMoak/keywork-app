@@ -11,7 +11,7 @@ export interface SaveRequest {
 }
 
 export interface SaveSeams {
-  folder: string | undefined;
+  folder(): string | undefined;
   choosePath(defaultPath: string): Promise<string | undefined>;
   writeText(path: string, text: string): Promise<void>;
 }
@@ -20,7 +20,17 @@ export async function saveAs(request: unknown, seams: SaveSeams): Promise<SaveOu
   if (!isSaveRequest(request)) {
     return { saved: false, refused: "invalid", detail: "a save needs a file name and its text" };
   }
-  const chosen = await seams.choosePath(defaultPathFor(request.suggestedName, seams.folder));
+  const offered = defaultPathFor(request.suggestedName, folderIfAny(seams));
+  let chosen: string | undefined;
+  try {
+    chosen = await seams.choosePath(offered);
+  } catch (cause) {
+    return {
+      saved: false,
+      refused: "failed",
+      detail: `the save dialog failed: ${messageOf(cause)}`,
+    };
+  }
   if (chosen === undefined) return { saved: false, refused: "cancelled" };
   try {
     await seams.writeText(chosen, request.text);
@@ -40,6 +50,14 @@ export function defaultPathFor(suggestedName: string, folder: string | undefined
 }
 
 const untitledPage = "session.html";
+
+function folderIfAny(seams: SaveSeams): string | undefined {
+  try {
+    return seams.folder();
+  } catch {
+    return undefined;
+  }
+}
 
 function isSaveRequest(request: unknown): request is SaveRequest {
   if (typeof request !== "object" || request === null) return false;

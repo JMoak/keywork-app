@@ -1,5 +1,6 @@
 import { app, BrowserWindow, type Display, ipcMain, screen } from "electron";
 import { hostChannels } from "../shared/channels.ts";
+import { trustedIpc } from "./app-page.ts";
 import { ownWindows } from "./companion/electron.ts";
 import { type ForegroundFeed, holdsForeground, type ScreenRect } from "./companion/foreground.ts";
 import {
@@ -32,7 +33,7 @@ export function wireSurroundings(seams: SurroundingsWiringSeams): SurroundingsWi
     sharedDisplays: seams.sharedDisplays,
   });
   const push = (): void => relay.push();
-  ipcMain.handle(hostChannels.surroundings, (event) => {
+  trustedIpc().handle(hostChannels.surroundings, (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     return relay.read(window === null ? undefined : surroundingsWindowOf(window));
   });

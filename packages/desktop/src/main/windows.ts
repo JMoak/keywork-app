@@ -117,19 +117,28 @@ export function windowRegistry(): WindowRegistry {
 
 export type QuitGate = (event: { preventDefault(): void }, quit: () => void) => void;
 
-export function quitGate(stopEverything: () => Promise<void>): QuitGate {
-  let stopping: Promise<void> | undefined;
+export interface QuitSteps {
+  mayQuit(): Promise<boolean>;
+  stopEverything(): Promise<void>;
+}
+
+export function quitGate(steps: QuitSteps): QuitGate {
+  let deciding = false;
   let stopped = false;
+  const decide = async (quit: () => void): Promise<void> => {
+    if (await steps.mayQuit().catch(() => true)) {
+      await steps.stopEverything().catch(() => undefined);
+      stopped = true;
+      quit();
+    }
+    deciding = false;
+  };
   return (event, quit) => {
     if (stopped) return;
     event.preventDefault();
-    if (stopping !== undefined) return;
-    stopping = stopEverything()
-      .catch(() => undefined)
-      .then(() => {
-        stopped = true;
-        quit();
-      });
+    if (deciding) return;
+    deciding = true;
+    void decide(quit);
   };
 }
 
