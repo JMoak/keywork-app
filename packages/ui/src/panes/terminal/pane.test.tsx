@@ -4,6 +4,8 @@ import { render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
+import type { HostPort } from "../../host/port.ts";
+import { createKeyboardScope, KeyboardScopeProvider } from "../../shell/keyboard-claim.ts";
 import { inertShellExtras } from "../../shell/trust-testing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { type TerminalSpec, terminalPane } from "./index.tsx";
@@ -43,7 +45,21 @@ const bashTurn: BusEnvelope[] = [
   },
 ];
 
-function shellSeams(rebound: PaneSpecBase[] = []): ShellSeams {
+function recordingHost(written: string[]): HostPort {
+  const host = browserHost();
+  return {
+    ...host,
+    pty: {
+      ...host.pty,
+      write: (id, data) => {
+        written.push(data);
+        host.pty.write(id, data);
+      },
+    },
+  };
+}
+
+function shellSeams(rebound: PaneSpecBase[] = [], host: HostPort = browserHost()): ShellSeams {
   const projection = projectAll(emptyProjection, bashTurn);
   return {
     store: {
@@ -56,7 +72,7 @@ function shellSeams(rebound: PaneSpecBase[] = []): ShellSeams {
       newSession: async () => {},
       startSession: async () => {},
     },
-    host: browserHost(),
+    host,
     workspace: "C:/work",
     currentSession: () => "s1",
     focusedPane: () => undefined,
@@ -95,7 +111,7 @@ describe("the terminal pane", () => {
     surface.grow({ cols: 132, rows: 50 });
     expect(surface.text()).toContain("[132x50]");
     handle("terminal.clear");
-    expect(surface.clears).toBe(1);
+    expect(surface.text().endsWith("\f")).toBe(true);
   });
 
   it("renders a bash turn in mirror mode and offers the session picker without one", async () => {
@@ -164,5 +180,107 @@ describe("the terminal pane", () => {
       sessionId: "s1",
     });
     expect(terminalPane.summon?.spec(shell)).toEqual({ kind: "terminal", mode: "shell" });
+  });
+});
+
+describe("a shell in the terminal pane", () => {
+  function mountShell(shell: ShellSeams, keyboard = createKeyboardScope()) {
+    let handle: (action: string) => void = () => {};
+    const view = render(() => (
+      <KeyboardScopeProvider value={keyboard}>
+        <terminalPane.component
+          id="p1"
+          spec={{ kind: "terminal", mode: "shell" }}
+          focused={true}
+          shell={shell}
+          onAction={(handler) => {
+            handle = handler;
+          }}
+        />
+      </KeyboardScopeProvider>
+    ));
+    return { view, act: (action: string) => handle(action) };
+  }
+
+  function stubClipboard(): string[] {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => void copied.push(text),
+        readText: async () => "pasted",
+      },
+    });
+    return copied;
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("takes the keyboard back when an overlay that covered it closes", async () => {
+    const keyboard = createKeyboardScope();
+    mountShell(shellSeams(), keyboard);
+    await settle();
+    const surface = surfaces[0] as FakeSurface;
+    expect(surface.focused).toBe(true);
+    surface.blur();
+    keyboard.returnHome();
+    expect(surface.focused).toBe(true);
+  });
+
+  it("copies only a real selection, so copying nothing leaves the clipboard alone", async () => {
+    const copied = stubClipboard();
+    const { act } = mountShell(shellSeams());
+    await settle();
+    const surface = surfaces[0] as FakeSurface;
+    surface.selected = "";
+    act("terminal.copy");
+    surface.selected = "git status";
+    act("terminal.copy");
+    await settle();
+    expect(copied).toEqual(["git status"]);
+  });
+
+  it("clears through the shell so a wrapped prompt survives, and on screen once the shell is gone", async () => {
+    const written: string[] = [];
+    const { act } = mountShell(shellSeams([], recordingHost(written)));
+    await settle();
+    const surface = surfaces[0] as FakeSurface;
+    act("terminal.clear");
+    expect(written).toEqual(["\f"]);
+    expect(surface.clears).toBe(0);
+    surface.type("\rexit\r");
+    await settle();
+    act("terminal.clear");
+    expect(surface.clears).toBe(1);
+  });
+
+  it("hands the leader to the shell when it is pressed twice", async () => {
+    const written: string[] = [];
+    const { act } = mountShell(shellSeams([], recordingHost(written)));
+    await settle();
+    act("terminal.send-leader");
+    expect(written).toEqual(["\x0b"]);
+  });
+
+  it("starts the shell again in place when enter is pressed after it exits", async () => {
+    const { view, act } = mountShell(shellSeams());
+    await settle();
+    const surface = surfaces[0] as FakeSurface;
+    act("terminal.restart");
+    expect(surface.resets).toBe(1);
+    surface.type("exit\r");
+    await settle();
+    expect(view.container.textContent).toContain("exited with code 0 · enter starts it again");
+    surface.type("x");
+    expect(surface.resets).toBe(1);
+    surface.type("\r");
+    await settle();
+    expect(surface.resets).toBe(2);
+    expect(view.container.textContent).not.toContain("exited");
+    expect(surface.text()).toContain("C:/work> ");
+    surface.type("dir\r");
+    expect(surface.text()).toContain("dir\r\ndir\r\n");
   });
 });

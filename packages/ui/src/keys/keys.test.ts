@@ -400,4 +400,48 @@ describe("a pane that owns the keyboard", () => {
     expect(keymap.describe("terminal.summon")).toBe("ctrl+k shift+t");
     expect(keymap.describe("terminal.summon.mirror")).toBeUndefined();
   });
+
+  it("still yields the app's reserved chords, so pane numbers, zoom and the palette work from a shell", () => {
+    const keymap = keymapFromConfig();
+    expect(press(keymap, "alt+3", "terminal")).toEqual({ type: "action", action: "focus.pane3" });
+    expect(press(keymap, "alt+z", "terminal")).toEqual({ type: "action", action: "pane.zoom" });
+    expect(press(keymap, "ctrl+shift+p", "terminal")).toEqual({
+      type: "action",
+      action: "palette.commands",
+    });
+    for (const shellKey of ["ctrl+p", "ctrl+y", "ctrl+n", "f1", "shift+tab", "alt+b", "/"]) {
+      expect(press(keymap, shellKey, "terminal"), shellKey).toEqual({ type: "pass" });
+    }
+  });
+
+  it("gives a reserved chord back to the shell once nothing in the app is bound to it", () => {
+    const unbound = keymapFromConfig({ bindings: { "pane.zoom": "none" } });
+    expect(press(unbound, "alt+z", "terminal")).toEqual({ type: "pass" });
+    const unreserved = new Keymap({
+      bindings: { "pane.zoom": "alt+z" },
+      exclusiveScopes: ["terminal"],
+      reserved: [],
+    });
+    expect(press(unreserved, "alt+z", "terminal")).toEqual({ type: "pass" });
+    expect(press(unreserved, "alt+z", "conversation")).toEqual({
+      type: "action",
+      action: "pane.zoom",
+    });
+  });
+
+  it("sends the leader to the shell when it is pressed twice, and still cancels elsewhere", () => {
+    const keymap = keymapFromConfig();
+    expect(press(keymap, "ctrl+k", "terminal")).toEqual({ type: "leader-pending" });
+    expect(press(keymap, "ctrl+k", "terminal", 10)).toEqual({
+      type: "action",
+      action: "terminal.send-leader",
+    });
+    expect(keymap.armed(20)).toBe(false);
+    expect(press(keymap, "ctrl+k", "conversation", 30)).toEqual({ type: "leader-pending" });
+    expect(press(keymap, "ctrl+k", "conversation", 40)).toEqual({ type: "cancelled" });
+    expect(keymap.describe("terminal.send-leader")).toBe("ctrl+k ctrl+k");
+    expect(keymapFromConfig({ leader: "ctrl+b" }).describe("terminal.send-leader")).toBe(
+      "ctrl+b ctrl+b",
+    );
+  });
 });

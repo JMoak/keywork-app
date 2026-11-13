@@ -33,6 +33,7 @@ export type PtyEvent =
 
 export interface PtyConnection {
   write(data: string): void;
+  attached(): boolean;
   dispose(): void;
 }
 
@@ -80,6 +81,8 @@ export function connectPty(
           if (id !== undefined) port.resize(id, next.cols, next.rows);
         }),
       );
+      const settled = surface.size();
+      if (!sameSize(settled, size)) port.resize(opened.id, settled.cols, settled.rows);
       remember(
         port.onExit(opened.id, (exit) => {
           id = undefined;
@@ -93,6 +96,7 @@ export function connectPty(
     write: (data) => {
       if (id !== undefined) port.write(id, data);
     },
+    attached: () => id !== undefined,
     dispose: () => {
       live = false;
       stopListening();
@@ -122,4 +126,8 @@ export function mirrorPainter(surface: TerminalSurface): MirrorPainter {
 export function bridgeArgs(spec: { sessionId?: string | undefined; verb?: string | undefined }) {
   if (spec.verb === "connect") return ["connect"];
   return spec.sessionId === undefined ? ["attach"] : ["attach", "--session", spec.sessionId];
+}
+
+function sameSize(left: TerminalSize, right: TerminalSize): boolean {
+  return left.cols === right.cols && left.rows === right.rows;
 }

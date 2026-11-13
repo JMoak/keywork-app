@@ -12,6 +12,7 @@
 
 .kw-model-setup {
   container-type: inline-size;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .kw-model-heading,
@@ -159,8 +160,10 @@
 }
 
 .kw-model-terminal {
+  min-width: 0;
   min-height: 14rem;
   height: clamp(14rem, 32vh, 24rem);
+  overflow: hidden;
   border: 1px solid var(--kw-border);
 }
 

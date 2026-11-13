@@ -26,6 +26,42 @@ describe("a shell over the pty seam", () => {
     connection.dispose();
   });
 
+  it("tells the pty about a refit that landed while it was still opening", async () => {
+    const surface = fakeSurface({ cols: 55, rows: 42 });
+    const port = echoPty();
+    const resized: Array<[number, number]> = [];
+    const watched = {
+      ...port,
+      resize: (id: number, cols: number, rows: number) => {
+        resized.push([cols, rows]);
+        port.resize(id, cols, rows);
+      },
+    };
+    connectPty(surface, watched, link, () => {});
+    surface.grow({ cols: 54, rows: 42 });
+    await settle();
+    expect(resized).toEqual([[54, 42]]);
+    surface.grow({ cols: 60, rows: 42 });
+    expect(resized).toEqual([
+      [54, 42],
+      [60, 42],
+    ]);
+  });
+
+  it("does not resize a pty that opened at the size the surface still has", async () => {
+    const surface = fakeSurface({ cols: 80, rows: 24 });
+    const port = echoPty();
+    const resized: Array<[number, number]> = [];
+    connectPty(
+      surface,
+      { ...port, resize: (_id, cols, rows) => resized.push([cols, rows]) },
+      link,
+      () => {},
+    );
+    await settle();
+    expect(resized).toEqual([]);
+  });
+
   it("reports the exit and ignores input afterwards", async () => {
     const surface = fakeSurface();
     const events: PtyEvent[] = [];

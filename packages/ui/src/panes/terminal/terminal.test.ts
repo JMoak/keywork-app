@@ -10,10 +10,11 @@ import {
   themeVariables as variablesOfTheme,
 } from "../../theme/index.ts";
 import { nextMode } from "./index.tsx";
-import { terminalKeeps } from "./keys.ts";
+import { leaderChord, terminalKeeps, typedBy } from "./keys.ts";
 import { bashCommand, mirrorDelta, mirrorText } from "./mirror.ts";
-import { chooseRenderer, probeWebgl2 } from "./renderer.ts";
+import { chooseRenderer, probeAtlasFont, probeWebgl2 } from "./renderer.ts";
 import { bridgeArgs } from "./session.ts";
+import { installRenderer, readableContrast, terminalOptions, watchPixelRatio } from "./surface.ts";
 import {
   type FontFaces,
   terminalTheme,
@@ -205,10 +206,38 @@ describe("the font watch", () => {
 });
 
 describe("the renderer choice", () => {
-  it("takes WebGL only when a context exists and has not been lost", () => {
-    expect(chooseRenderer({ webgl2: true })).toBe("webgl");
-    expect(chooseRenderer({ webgl2: false })).toBe("dom");
-    expect(chooseRenderer({ webgl2: true, contextLost: true })).toBe("dom");
+  it("takes WebGL only when a context exists, the glyph atlas can set its font, and nothing was lost", () => {
+    expect(chooseRenderer({ webgl2: true, atlasFont: true })).toBe("webgl");
+    expect(chooseRenderer({ webgl2: false, atlasFont: true })).toBe("dom");
+    expect(chooseRenderer({ webgl2: true, atlasFont: false })).toBe("dom");
+    expect(chooseRenderer({ webgl2: true, atlasFont: true, contextLost: true })).toBe("dom");
+  });
+
+  it("refuses the atlas font where the canvas drops a font that starts with a space, as Chromium 156 does", () => {
+    const canvasKeeping = (accepts: (font: string) => boolean) => () =>
+      ({
+        getContext: () => {
+          let font = "10px sans-serif";
+          return {
+            get font() {
+              return font;
+            },
+            set font(next: string) {
+              if (accepts(next)) font = next.trim().replace(/^normal /, "");
+            },
+          };
+        },
+      }) as unknown as HTMLCanvasElement;
+    expect(probeAtlasFont(canvasKeeping((font) => !/^\s/.test(font)))).toBe(false);
+    expect(probeAtlasFont(canvasKeeping(() => true))).toBe(true);
+    expect(probeAtlasFont(() => ({ getContext: () => null }) as unknown as HTMLCanvasElement)).toBe(
+      false,
+    );
+    expect(
+      probeAtlasFont(() => {
+        throw new Error("no canvas");
+      }),
+    ).toBe(false);
   });
 
   it("treats a throwing or null context as no WebGL", () => {
@@ -223,6 +252,87 @@ describe("the renderer choice", () => {
     expect(probeWebgl2(() => ({ getContext: () => ({}) }) as unknown as HTMLCanvasElement)).toBe(
       true,
     );
+  });
+
+  it("drops a lost WebGL context and hands the terminal back to be measured again", () => {
+    let lose: () => void = () => {};
+    const loaded: unknown[] = [];
+    const webgl = {
+      disposed: false,
+      activate: () => {},
+      dispose: () => {
+        webgl.disposed = true;
+      },
+      onContextLoss: (listener: () => void) => {
+        lose = listener;
+      },
+    };
+    let remeasured = 0;
+    const terminal = { loadAddon: (addon: unknown) => void loaded.push(addon) };
+    const choice = installRenderer(
+      terminal,
+      "webgl",
+      () => (remeasured += 1),
+      () => webgl,
+    );
+    expect(choice).toBe("webgl");
+    expect(loaded).toEqual([webgl]);
+    lose();
+    expect(webgl.disposed).toBe(true);
+    expect(remeasured).toBe(1);
+    expect(installRenderer(terminal, "dom", () => {})).toBe("dom");
+    expect(loaded).toHaveLength(1);
+  });
+});
+
+describe("the surface options", () => {
+  it("lifts faint ANSI colours to a readable contrast against the panel", () => {
+    const options = terminalOptions({
+      theme: {},
+      fontFamily: "monospace",
+      fontSize: 14,
+      windows: true,
+    });
+    expect(options.minimumContrastRatio).toBe(readableContrast);
+    expect(readableContrast).toBeGreaterThanOrEqual(4.5);
+    expect(options.windowsPty).toEqual({ backend: "conpty" });
+  });
+});
+
+describe("the pixel ratio watch", () => {
+  function fakeView(ratio: number) {
+    const lists: Array<{ query: string; listeners: Set<() => void> }> = [];
+    const view = {
+      devicePixelRatio: ratio,
+      matchMedia: (query: string) => {
+        const listeners = new Set<() => void>();
+        lists.push({ query, listeners });
+        return {
+          addEventListener: (_: string, listener: () => void) => void listeners.add(listener),
+          removeEventListener: (_: string, listener: () => void) => void listeners.delete(listener),
+        };
+      },
+    };
+    const change = (next: number) => {
+      view.devicePixelRatio = next;
+      for (const listener of [...(lists.at(-1)?.listeners ?? [])]) listener();
+    };
+    return { view: view as unknown as Window, lists, change };
+  }
+
+  it("re-measures when zoom or a monitor move changes the ratio, and listens at the new one", () => {
+    const { view, lists, change } = fakeView(2);
+    let measured = 0;
+    const stop = watchPixelRatio(view, () => {
+      measured += 1;
+    });
+    expect(lists.map((list) => list.query)).toEqual(["(resolution: 2dppx)"]);
+    change(1.25);
+    expect(measured).toBe(1);
+    expect(lists.at(-1)?.query).toBe("(resolution: 1.25dppx)");
+    stop();
+    expect(lists.at(-1)?.listeners.size).toBe(0);
+    expect(() => watchPixelRatio(null, () => {})()).not.toThrow();
   });
 });
 
@@ -246,6 +356,17 @@ describe("keys inside a terminal", () => {
     expect(terminalKeeps(key({ key: "k", ctrlKey: true }), "ctrl+space")).toBe(true);
     expect(terminalKeeps(key({ key: "Control" }), "ctrl+k")).toBe(true);
     expect(terminalKeeps(key({ key: "л", ctrlKey: true, code: "KeyK" }), "ctrl+k")).toBe(false);
+  });
+
+  it("knows what the leader types, so leader twice can hand it to the shell", () => {
+    expect(typedBy(leaderChord("ctrl+k"))).toBe("\x0b");
+    expect(typedBy(leaderChord("ctrl+shift+k"))).toBe("\x0b");
+    expect(typedBy(leaderChord("ctrl+space"))).toBe("\x00");
+    expect(typedBy(leaderChord("ctrl+]"))).toBe("\x1d");
+    expect(typedBy(leaderChord("alt+x"))).toBe("\x1bx");
+    expect(typedBy(leaderChord("shift+a"))).toBe("A");
+    expect(typedBy(leaderChord("f12"))).toBeUndefined();
+    expect(typedBy(leaderChord("ctrl+1"))).toBeUndefined();
   });
 });
 
