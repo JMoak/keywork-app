@@ -47,6 +47,8 @@ function inertClient(): KeyworkClient {
     restoreSession: async () => "missing",
     discardTrashedSession: async () => "missing",
     purgeTrash: async () => ({ purged: 0 }),
+    work: async () => ({ sessions: [], asks: 0, children: 0 }),
+    shutDown: async () => ({ sessions: [], asks: 0 }),
     asks: async () => [],
     routineNeeds: async () => [],
     answerAsk: async () => "settled",

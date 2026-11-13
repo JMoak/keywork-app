@@ -16,11 +16,13 @@ import {
   type AskPick,
   acceptedLine,
   askChoiceFor,
+  askReason,
   blanketWarning,
   cardKeys,
   quietStillAsks,
   rememberableRules,
   ruleText,
+  untrustedAskReason,
 } from "./ask-card.tsx";
 import { stopAskingWhy } from "./ask-card-why.ts";
 import { ConversationPane } from "./pane.tsx";
@@ -79,7 +81,7 @@ function mountCard(run: ToolRun, outcome: AnswerOutcome = "settled", quiet = fal
   return { ...view, card, answers, press };
 }
 
-const whyLabels = ["unsafe u", "not now n", "other o"];
+const whyLabels = ["unsafe u", "not now n", "other o", "back esc"];
 
 async function typeNote(container: HTMLElement, words: string, key: "Enter" | "Escape") {
   const input = container.querySelector(".kw-ask-note-input") as HTMLInputElement;
@@ -205,12 +207,42 @@ describe("the ask card", () => {
     ]);
   });
 
-  it("sends the denial without words when escape leaves the line", async () => {
-    const { container, answers, press } = mountCard(askingRun("g1"));
+  it("takes an accidental deny back on escape, so the ask waits undecided again", async () => {
+    const { container, card, answers, press } = mountCard(askingRun("g1"));
+    await press("n");
+    expect(container.querySelector(".kw-ask-reason-prompt")?.textContent).toBe("why?");
+    await press("Escape");
+    expect(answers).toEqual([]);
+    expect(card.hasAttribute("data-saying-why")).toBe(false);
+    expect(answerLabels(container)).toEqual([
+      "once y",
+      "this session s",
+      "this workspace w",
+      "deny n",
+    ]);
+    await press("y");
+    expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
+  });
+
+  it("takes a deny back by click on back as well", async () => {
+    const { container, card, answers } = mountCard(askingRun("g3"));
+    fireEvent.click(buttonLabelled(container, "deny n"));
+    await settle();
+    fireEvent.click(buttonLabelled(container, "back esc"));
+    await settle();
+    expect(answers).toEqual([]);
+    expect(card.hasAttribute("data-saying-why")).toBe(false);
+  });
+
+  it("backs out of the line to the reasons on escape, sending nothing", async () => {
+    const { container, card, answers, press } = mountCard(askingRun("g1"));
     await press("n");
     await press("o");
     await typeNote(container, "half a thought", "Escape");
-    expect(answers).toEqual([{ verdict: "denied", scope: undefined, reason: "other" }]);
+    expect(answers).toEqual([]);
+    expect(container.querySelector(".kw-ask-note-input")).toBeNull();
+    expect(container.querySelector(".kw-ask-reason-prompt")?.textContent).toBe("why?");
+    expect(document.activeElement).toBe(card);
   });
 
   it("denies by click through the why step as well", async () => {
@@ -288,9 +320,22 @@ describe("the ask card", () => {
     expect(answers).toEqual([{ verdict: "granted", scope: "workspace" }]);
   });
 
-  it("takes the keys when nothing else holds them", () => {
+  it("never takes the keys when it arrives, even when nothing else holds them", () => {
     const { card } = mountCard(askingRun("g1"));
-    expect(document.activeElement).toBe(card);
+    expect(document.activeElement).not.toBe(card);
+    expect(card.contains(document.activeElement)).toBe(false);
+  });
+
+  it("answers its letters once the person moves to it", async () => {
+    const { card, answers, press } = mountCard(askingRun("g1"));
+    card.focus();
+    await press("y");
+    expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
+  });
+
+  it("is a stop on the transcript walk, so tab from the composer reaches it", () => {
+    const { card } = mountCard(askingRun("g1"));
+    expect(card.hasAttribute("data-walk")).toBe(true);
   });
 
   it("never takes the keys from a draft being typed in its pane", () => {
@@ -313,14 +358,21 @@ describe("the ask card", () => {
     expect(document.activeElement).toBe(draft);
   });
 
-  it("takes the keys from its frame's composer once the prompt has been sent", () => {
+  it("leaves the keys with the empty composer the prompt was just sent from, so typing ahead never answers it", async () => {
     const run = askingRun("g1");
+    const answers: AskVerdict[] = [];
     const [asking, setAsking] = createSignal(false);
     const { container } = render(() => (
       <section class="kw-frame">
         <div class="kw-frame-body">
           <Show when={asking()}>
-            <AskCard run={run} onAnswer={async () => "settled" as const} />
+            <AskCard
+              run={run}
+              onAnswer={async (verdict) => {
+                answers.push(verdict);
+                return "settled" as const;
+              }}
+            />
           </Show>
         </div>
         <textarea class="composer" />
@@ -330,7 +382,13 @@ describe("the ask card", () => {
     composer.focus();
 
     setAsking(true);
-    expect(document.activeElement).toBe(container.querySelector(".kw-ask"));
+    for (const key of ["y", "o", "u", " ", "k", "n", "o", "w", "s"]) {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key });
+    }
+    await settle();
+    expect(document.activeElement).toBe(composer);
+    expect(answers).toEqual([]);
+    expect(container.querySelector(".kw-ask")?.hasAttribute("data-saying-why")).toBe(false);
   });
 
   it("shows the chords it is handed, so the card names keys that work from anywhere", () => {
@@ -522,6 +580,39 @@ describe("the ask card in a quiet session", () => {
   });
 });
 
+describe("why the card asks", () => {
+  it.each([
+    [
+      "bash",
+      "default",
+      "shell commands ask before they run · in a trusted folder plain reads don't",
+    ],
+    ["write", "default", "this changes a file"],
+    ["edit", "default", "this changes a file"],
+    ["github__create_issue", "default", "this tool asks before it runs"],
+    ["bash", "policy", "a rule asks before this tool runs"],
+    ["bash", "trusted", "trusted reads ask before this form runs"],
+  ] as const)("names why %s asks under the %s rule", (tool, rule, line) => {
+    expect(askReason({ tool, rule })).toBe(line);
+  });
+
+  it("never calls a read-only shell command a change", () => {
+    const { container } = mountCard(askingRun("g1"));
+    expect(container.querySelector(".kw-ask-why")?.textContent).not.toContain("changes");
+  });
+
+  it("says the folder isn't trusted when that is why it asks, but keeps a rule's own reason", () => {
+    expect(askReason({ tool: "bash", rule: "default" }, true)).toBe(untrustedAskReason);
+    expect(askReason({ tool: "bash", rule: "policy" }, true)).toBe(
+      "a rule asks before this tool runs",
+    );
+    const { container } = render(() => (
+      <AskCard run={askingRun("g1")} onAnswer={() => undefined} untrusted />
+    ));
+    expect(container.querySelector(".kw-ask-why")?.textContent).toBe(untrustedAskReason);
+  });
+});
+
 describe("askChoiceFor", () => {
   const picks: readonly AskPick[] = ["approve", "once", "session", "workspace", "deny"];
   const scopes = (run: ToolRun) =>
@@ -579,11 +670,12 @@ describe("the consequence on the card", () => {
     expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
   });
 
-  it("says in one dim line that the server sent no preview, and keeps the arguments", () => {
+  it("says in one dim line why the server sent no preview, and tables the arguments", () => {
     const { container } = mountCard(withoutPreview(askingRun("g4"), "edit"));
-    expect(container.querySelector(".kw-ask-args")?.textContent).toContain("notes.txt");
+    expect(container.querySelector(".kw-ask-consequence-head")?.textContent).toContain("notes.txt");
+    expect(container.querySelector(".kw-ask-args")).toBeNull();
     expect(container.querySelector(".kw-ask-unpreviewed")?.textContent).toBe(
-      "no preview from the server · too large, binary, a memory note, or an edit that would not apply",
+      "no preview from the server · the old text is not in the file exactly once, or the file is missing, too large or binary",
     );
     expect(container.querySelector(".kw-ask-diff")).toBeNull();
   });

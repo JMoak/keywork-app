@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  acceptQuestion,
   budgetWords,
   costWords,
   cronWords,
@@ -28,6 +29,16 @@ import {
   thursdayMorning,
 } from "./testing.ts";
 import type { ChoreRow } from "./wire.ts";
+
+describe("accepting a chore's grants", () => {
+  it("says what accepting a chore with no grants means instead of counting zero", () => {
+    expect(acceptQuestion(0)).toBe(
+      "accept it with no standing grants, so each write asks you as it happens?",
+    );
+    expect(acceptQuestion(1)).toBe("accept this grant?");
+    expect(acceptQuestion(3)).toBe("accept these 3 grants?");
+  });
+});
 
 describe("the chores pane's words", () => {
   it("hold no exclamation mark and no emoji in any string", () => {

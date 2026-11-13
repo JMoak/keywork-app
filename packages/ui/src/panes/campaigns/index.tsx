@@ -1,11 +1,20 @@
 import { type CampaignsClient, campaignsOverFetch } from "@keywork-app/client";
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { z } from "zod";
 import { hostFetch } from "../../host/transport.ts";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneDefinition, type PaneProps, type ShellSeams } from "../registry.ts";
 import { CampaignForm } from "./form.tsx";
-import { campaignModelChoices, type ModelChoice, moment, money } from "./model.ts";
+import {
+  admittedChoices,
+  campaignAdmits,
+  campaignModelChoices,
+  campaignModelsLine,
+  type ModelChoice,
+  moment,
+  money,
+  noCampaignModelLine,
+} from "./model.ts";
 import { createCampaignMonitor } from "./store.ts";
 import { CampaignDetail } from "./views.tsx";
 import "./campaigns.css";
@@ -71,6 +80,7 @@ function Campaigns(props: { pane: PaneProps<CampaignSpec>; seams: CampaignPaneSe
   const monitor = createCampaignMonitor(client);
   const [creating, setCreating] = createSignal(false);
   const [models, setModels] = createSignal<ModelChoice[]>([]);
+  const runnable = createMemo(() => admittedChoices(models()));
   let root: HTMLElement | undefined;
   let disposed = false;
   keepKeyboardHome(
@@ -85,6 +95,7 @@ function Campaigns(props: { pane: PaneProps<CampaignSpec>; seams: CampaignPaneSe
     setCreating(false);
     monitor.close();
     props.pane.shell.rebind(props.pane.id, { kind: "campaigns" });
+    root?.focus({ preventScroll: true });
   };
   props.pane.onAction((action) => {
     if (action === "campaigns.new" && monitor.state.available === true) setCreating(true);
@@ -183,14 +194,17 @@ function Campaigns(props: { pane: PaneProps<CampaignSpec>; seams: CampaignPaneSe
                 campaign={reading().campaign}
                 monitor={monitor}
                 client={client}
-                models={models()}
+                models={runnable()}
               />
             )}
           </Show>
         }
       >
         <CampaignForm
-          models={models()}
+          models={runnable()}
+          modelNote={runnable().length === 0 ? noCampaignModelLine : campaignModelsLine}
+          admits={campaignAdmits}
+          refusal={monitor.state.createRefusal}
           busy={monitor.state.busy}
           submit={async (input) => {
             const saved = await monitor.create(input);
@@ -201,7 +215,10 @@ function Campaigns(props: { pane: PaneProps<CampaignSpec>; seams: CampaignPaneSe
               });
             return saved;
           }}
-          close={() => setCreating(false)}
+          close={() => {
+            setCreating(false);
+            root?.focus({ preventScroll: true });
+          }}
           cancel={back}
         />
       </Show>

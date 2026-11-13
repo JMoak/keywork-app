@@ -103,7 +103,10 @@ describe("the digest at the keeper's return", () => {
       asked,
       noon + 10 * second,
     );
-    expect(reasonsOf(cooled)).toEqual(["n1 you asked, it shows", "n2 unfold cooldown"]);
+    expect(reasonsOf(cooled)).toEqual([
+      "n1 you asked, it shows",
+      "n2 its owner just opened another",
+    ]);
     expect(digestOf(cooled).map((setting) => setting.id)).toEqual(["n2"]);
   });
 });
@@ -122,7 +125,7 @@ describe("folding back an unfold the keeper left alone", () => {
       id: "n1",
       verdict: "reduce",
       rung: "card",
-      reason: "folded back",
+      reason: "closed again",
     });
   });
 

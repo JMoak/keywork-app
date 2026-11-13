@@ -20,6 +20,7 @@ export interface CampaignMonitorState {
   problem: string | null;
   busy: boolean;
   requested: string | null;
+  createRefusal: string | null;
 }
 
 export interface MonitorClock {
@@ -42,6 +43,7 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
     problem: null,
     busy: false,
     requested: null,
+    createRefusal: null,
   });
   let lifetime = new AbortController();
   let generation = 0;
@@ -219,7 +221,7 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
   const create = async (input: CampaignCreateRequest): Promise<boolean> => {
     if (state.busy || disposed) return false;
     const turn = generation;
-    setState({ busy: true, problem: null });
+    setState({ busy: true, problem: null, createRefusal: null });
     try {
       const created = await client.create(input);
       if (disposed || turn !== generation) return false;
@@ -229,7 +231,10 @@ export function createCampaignMonitor(client: CampaignsClient, clock = liveMonit
       await open(created.campaign.id);
       return !disposed && generation === opened;
     } catch (cause) {
-      if (!disposed && turn === generation) setState("problem", messageOf(cause));
+      if (!disposed && turn === generation) {
+        if (refusedRequest(cause)) setState("createRefusal", creationRefusal(cause, input));
+        else setState("problem", messageOf(cause));
+      }
       return false;
     } finally {
       if (!disposed && turn === generation) setState("busy", false);
@@ -304,6 +309,17 @@ export type CampaignMonitor = ReturnType<typeof createCampaignMonitor>;
 
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+function refusedRequest(cause: unknown): cause is CampaignRequestError {
+  return cause instanceof CampaignRequestError && cause.status >= 400 && cause.status < 500;
+}
+
+function creationRefusal(cause: CampaignRequestError, input: CampaignCreateRequest): string {
+  const start = input.artifactPath;
+  if (start !== undefined && /\bENOENT\b/.test(cause.message))
+    return `${start} is not in this folder. Check the starting file or folder.`;
+  return cause.message;
 }
 
 function waitFor(ms: number, signal: AbortSignal): Promise<void> {

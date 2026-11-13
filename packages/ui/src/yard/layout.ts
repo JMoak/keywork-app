@@ -66,12 +66,12 @@ export function yardLayout(input: YardLayoutInput): YardLayout {
     (placement) => entries.has(placement.id) && placement.rung === "card",
   );
   const placed = [...satellites, ...cards].flatMap((placement) => entries.get(placement.id) ?? []);
-  const folded = foldedOf(placements, input.settings).length;
+  const folded = foldedOf(placements, input.settings);
   return {
     hub: placements.find((placement) => placement.id === yardIds.hub)?.rect ?? hub,
-    rail: railOf(placements, cards, folded, hub, input.railWanted),
+    rail: railOf(placements, cards, folded.length, hub, input.railWanted),
     satellites,
-    selectable: placed,
+    selectable: [...placed, ...folded],
   };
 }
 

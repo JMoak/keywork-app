@@ -100,7 +100,9 @@ describe("the show gate", () => {
     expect(decided({ rung: "unfold" }, asked, spentBudget(5))).toBe(
       "play:unfold:you asked, it shows",
     );
-    expect(decided({ rung: "unfold" }, asked, spentBudget(6))).toBe("hold:card:unfold budget");
+    expect(decided({ rung: "unfold" }, asked, spentBudget(6))).toBe(
+      "hold:card:too many opened lately",
+    );
     const tenMinutesOn = { played: spentBudget(6).played.map((time) => time - 9 * minute) };
     expect(unfoldsSpent(tenMinutesOn, noon)).toBe(1);
     expect(decided({ rung: "unfold" }, asked, tenMinutesOn)).toBe(
@@ -109,7 +111,7 @@ describe("the show gate", () => {
   });
 
   it("never stages without a rule, and stages by a rule", () => {
-    expect(decided({ rung: "stage" }, asked)).toBe("reduce:unfold:stage needs a rule or your hand");
+    expect(decided({ rung: "stage" }, asked)).toBe("reduce:unfold:the whole view needs your say");
     expect(decided({ rung: "stage" })).toBe("hold:card:a card unless you asked");
     const stageRule: YardRule = { creature: "bea", kind: "note", rung: "stage", lasts: "always" };
     expect(decided({ rung: "card" }, { rules: [stageRule] })).toBe("play:stage:your rule");
@@ -117,7 +119,7 @@ describe("the show gate", () => {
       "hold:card:another app fullscreen",
     );
     expect(decided({ rung: "stage" }, { rules: [stageRule] }, spentBudget(6))).toBe(
-      "hold:card:unfold budget",
+      "hold:card:too many opened lately",
     );
   });
 

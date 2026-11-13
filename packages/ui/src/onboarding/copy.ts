@@ -11,7 +11,9 @@ export function titleLine(workspace: string): string {
   return `a creature for ${workspace}`;
 }
 
-export const readingLine = "reading what this machine supports and what is reachable";
+export const homeTitle = "a creature for your home";
+
+export const readingLine = "checking what this computer can run";
 
 export const nameAsk = "Name it, or take one it proposes.";
 export const nameField = "name";
@@ -21,13 +23,17 @@ export function nameProposals(names: readonly string[]): string {
   return names.map((name, index) => `${index + 1} ${name}`).join(" · ");
 }
 
+export const backKey = "backspace goes back";
+export const notNowKey = "esc not now";
+export const acceptRestKey = "a keeps the suggestions for the rest";
+
 export function nameKeys(first: string): string {
-  return `enter keeps the name · 1 2 3 take a proposal · esc skips and it answers to ${first} until you rename it`;
+  return `enter keeps what you type, or ${first} · 1 2 3 take a proposal · ${notNowKey}`;
 }
 
 export const skinAsk = "How it looks on the stead.";
 export const surpriseWord = "surprise me";
-export const skinKeys = "j k move · enter keeps · esc skips and takes the tinkerer";
+export const skinKeys = "j k move · enter keeps";
 
 const skinWords: Readonly<Record<string, string>> = {
   kid: "the tinkerer · a small ranch hand in a leather apron, tools on its belt",
@@ -37,33 +43,34 @@ export function skinLabel(id: string): string {
   return skinWords[id] ?? id;
 }
 
-export const workshopAsk = "Where its threads run.";
+export const workshopAsk = "Where its commands run.";
 export const substrateWords = {
-  host: "a bare host workshop on this machine",
-  sbx: "a sealed microVM on this machine (sbx)",
+  host: "directly on this computer",
+  sbx: "in a sealed sandbox on this computer",
 } as const;
-export const hostLimitation = "commands run unconfined on this machine and nothing is sealed";
+export const hostLimitation =
+  "no sandbox: commands run with your account's access · anything beyond reading its own folder asks you first";
 export const installStep =
-  "one install step: Docker Sandboxes (sbx), winget install -h Docker.sbx on Windows; the workshop pane raises a sealed one afterwards";
+  "a sealed sandbox needs Docker Sandboxes installed first (on Windows: winget install -h Docker.sbx) · you can move it into one later from its workshop";
 
 export function noWorkshopsServed(detail: string | undefined): string {
   const because = detail === undefined ? "" : ` (${detail})`;
-  return `this node serves no workshops yet${because}; threads run on the bare node`;
+  return `no sandbox is available here yet${because} · its commands run directly on this computer`;
 }
 
 export function workshopKeys(installOffered: boolean): string {
-  const install = installOffered ? " · i opens a terminal for the install step" : "";
-  return `j k move · enter keeps${install} · esc skips and takes what this machine has`;
+  const install = installOffered ? " · i opens a terminal to install it" : "";
+  return `j k move · enter keeps${install}`;
 }
 
-export const modelsAsk = "Which models answer, local first.";
-export const localFirstWord = "local first";
-export const inheritWord = "inherit everywhere";
+export const modelsAsk = "Which models it uses.";
+export const localFirstWord = "models on this computer first";
+export const inheritWord = "the model your conversations use";
 export const cloudNeverRequired =
-  "a cloud key is never required · inherit keeps whatever model the server already answers with";
-export const nothingReachableLine = "nothing is reachable that the console can see";
-export const connectKey = "c opens `keywork connect` in a terminal pane";
-export const modelsKeys = "j k move · enter keeps · esc skips and inherits everywhere";
+  "no cloud account needed · it answers with whatever model already answers you here";
+export const nothingReachableLine = "no model is connected yet";
+export const connectKey = "c connects a model in a terminal (`keywork connect`)";
+export const modelsKeys = "j k move · enter keeps";
 export const noInventoryLine = (detail: string | undefined): string =>
   detail === undefined
     ? "this node serves no model inventory"
@@ -95,44 +102,40 @@ export function reachableModelLine(facts: {
   return `${facts.model} on ${facts.node} (${facts.server}) · ${classes}${loaded}`;
 }
 
-export const acceptRestKey = "a accepts the rest";
-export const backKey = "backspace goes back";
-export const notNowKey = "x not now";
-
 export function makingLine(name: string): string {
   return `making ${name}`;
 }
 
 export function madeLine(name: string): string {
-  return `${name} is made · its workshop rises on the stead`;
+  return `${name} is ready · you will find it on the stead`;
 }
 
 export function workshopRaisedLine(substrate: "host" | "sbx"): string {
   return substrate === "sbx"
-    ? "a sealed workshop is raised and stopped until its first thread"
-    : "a bare host workshop is raised";
+    ? "its sandbox is ready and starts with its first task"
+    : "its commands run directly on this computer";
 }
 
 export function workshopRefusedLine(detail: string): string {
-  return `no workshop was raised: ${detail} · threads run on the bare node`;
+  return `no sandbox was set up (${detail}) · its commands run directly on this computer`;
 }
 
 export function threadLine(name: string, through?: string): string {
-  const line = `${name} opens its first thread and introduces itself`;
+  const line = `${name} opens its first conversation and introduces itself`;
   return through === undefined ? line : `${line} through ${through}`;
 }
 
 export function threadWaitsLine(name: string, refusal?: string): string {
-  const line = `${name} opens its first thread and introduces itself once a model is reachable`;
-  return refusal === undefined ? line : `${line} · inherit resolves nothing: ${refusal}`;
+  const line = `${name} introduces itself once a model is connected`;
+  return refusal === undefined ? line : `${line} · ${refusal}`;
 }
 
 export function threadRefusedLine(detail: string): string {
-  return `its first thread did not open: ${detail}`;
+  return `its first conversation did not open: ${detail}`;
 }
 
 export function notMadeLine(detail: string): string {
-  return `not made: ${detail} · ${backKey}`;
+  return `not made: ${detail} · ${backKey} · ${notNowKey}`;
 }
 
-export const madeKeys = "enter closes this card · the thread stays open";
+export const madeKeys = "enter closes this card · the conversation stays open";

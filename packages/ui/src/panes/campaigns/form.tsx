@@ -1,10 +1,15 @@
 import type { CampaignCreateRequest } from "@keywork-app/protocol";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type { ModelChoice } from "./model.ts";
+
+export const notConfirmedLine = "Creation not confirmed. Check campaigns before trying again.";
 
 export function CampaignForm(props: {
   models: readonly ModelChoice[];
   busy: boolean;
+  modelNote?: string | undefined;
+  admits?: ((model: string) => boolean) | undefined;
+  refusal?: string | null | undefined;
   submit(input: CampaignCreateRequest): Promise<boolean>;
   close(): void;
   cancel(): void;
@@ -18,7 +23,9 @@ export function CampaignForm(props: {
   const unavailable = () => modelChoice() !== "custom" && selectedModel() === undefined;
   const busy = () => props.busy || pending();
   let modelSelect: HTMLSelectElement | undefined;
+  let titleField: HTMLInputElement | undefined;
   let disposed = false;
+  onMount(() => titleField?.focus({ preventScroll: true }));
   createEffect(() => {
     props.models;
     const choice = modelChoice();
@@ -62,6 +69,10 @@ export function CampaignForm(props: {
       setProblem("Select a model or enter its configured provider and model name.");
       return;
     }
+    if (props.admits?.(model) === false) {
+      setProblem(props.modelNote ?? "This model cannot run a campaign.");
+      return;
+    }
     setProblem(undefined);
     setPending(true);
     try {
@@ -79,9 +90,9 @@ export function CampaignForm(props: {
       });
       if (disposed) return;
       if (saved) props.close();
-      else setProblem("Creation not confirmed. Check campaigns before trying again.");
+      else setProblem(props.refusal ?? notConfirmedLine);
     } catch {
-      if (!disposed) setProblem("Creation not confirmed. Check campaigns before trying again.");
+      if (!disposed) setProblem(notConfirmedLine);
     } finally {
       if (!disposed) setPending(false);
     }
@@ -91,7 +102,7 @@ export function CampaignForm(props: {
       <h2>New campaign</h2>
       <label>
         Title
-        <input name="title" required maxLength={512} disabled={busy()} />
+        <input name="title" required maxLength={512} disabled={busy()} ref={titleField} />
       </label>
       <label>
         Work
@@ -150,6 +161,7 @@ export function CampaignForm(props: {
           <option value="custom">Configured provider and model…</option>
         </select>
       </label>
+      <Show when={props.modelNote}>{(note) => <p class="kw-campaign-note">{note()}</p>}</Show>
       <Show when={modelChoice() === "custom"}>
         <label>
           Provider

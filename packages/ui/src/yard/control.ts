@@ -59,7 +59,6 @@ export function createYardControl(options: YardControlOptions): YardControl {
     focusRail: (at) => {
       if (!railActive()) returnTo = activeElementOf(document);
       setRailAt(at);
-      setOn(true);
       setRailActive(true);
     },
     leaveRail,

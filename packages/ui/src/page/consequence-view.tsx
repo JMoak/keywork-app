@@ -8,7 +8,6 @@ import {
   type Consequence,
   consequenceOf,
   fileHead,
-  unpreviewedLine,
 } from "./consequence.ts";
 import "./consequence.css";
 
@@ -20,14 +19,24 @@ export function AskConsequence(props: { run: ToolRun }) {
         {(file) => <FileConsequence tool={file().tool} preview={file().preview} />}
       </Match>
       <Match when={ofKind(consequence(), "unpreviewed")}>
-        <RawArguments text={props.run.args} />
-        <span class="kw-ask-unpreviewed">{unpreviewedLine}</span>
+        {(unpreviewed) => (
+          <>
+            <ArgumentTable kind="unpreviewed" head={unpreviewed().head} rows={unpreviewed().rows} />
+            <span class="kw-ask-unpreviewed">{unpreviewed().reason}</span>
+          </>
+        )}
       </Match>
       <Match when={ofKind(consequence(), "command")}>
         {(command) => <CommandConsequence parts={command().parts} />}
       </Match>
       <Match when={ofKind(consequence(), "call")}>
-        {(call) => <CallConsequence server={call().server} tool={call().tool} rows={call().rows} />}
+        {(call) => (
+          <ArgumentTable
+            kind="call"
+            head={`${call().server} · ${call().tool}`}
+            rows={call().rows}
+          />
+        )}
       </Match>
     </Switch>
   );
@@ -64,12 +73,14 @@ function CommandConsequence(props: { parts: readonly CommandPart[] }) {
   );
 }
 
-function CallConsequence(props: { server: string; tool: string; rows: readonly ArgumentRow[] }) {
+function ArgumentTable(props: {
+  kind: "call" | "unpreviewed";
+  head: string;
+  rows: readonly ArgumentRow[];
+}) {
   return (
-    <figure class="kw-ask-consequence" data-kind="call">
-      <figcaption class="kw-ask-consequence-head">
-        {props.server} · {props.tool}
-      </figcaption>
+    <figure class="kw-ask-consequence" data-kind={props.kind}>
+      <figcaption class="kw-ask-consequence-head">{props.head}</figcaption>
       <Show when={props.rows.length > 0} fallback={<p class="kw-ask-call-empty">no arguments</p>}>
         <dl class="kw-ask-call-args">
           <For each={props.rows}>

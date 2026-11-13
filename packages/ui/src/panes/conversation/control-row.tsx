@@ -9,13 +9,35 @@ export type ControlAsk =
       readonly initial: string;
       readonly choices: readonly string[];
     }
-  | { readonly kind: "confirm"; readonly question: string }
+  | {
+      readonly kind: "confirm";
+      readonly question: string;
+      readonly items?: readonly ConfirmItem[] | undefined;
+      readonly widen?: ConfirmWidening | undefined;
+    }
   | {
       readonly kind: "pick";
       readonly label: string;
       readonly hint: string;
       readonly options: readonly PickOption[];
     };
+
+export interface ConfirmItem {
+  readonly text: string;
+  readonly note: string;
+  readonly flagged?: boolean | undefined;
+  readonly staying?: boolean | undefined;
+}
+
+export interface ConfirmWidening {
+  readonly key: string;
+  readonly question: string;
+  readonly items: readonly ConfirmItem[];
+}
+
+export type ConfirmAnswer = boolean | typeof widenedAnswer;
+
+export const widenedAnswer = "widened";
 
 export interface PickOption {
   readonly key: string;
@@ -27,7 +49,7 @@ export interface ControlRowProps {
   ask: ControlAsk | undefined;
   lines: readonly string[];
   onAnswer: (text: string) => void;
-  onConfirm: (agreed: boolean) => void;
+  onConfirm: (answer: ConfirmAnswer) => void;
   onDismiss: () => void;
 }
 
@@ -39,7 +61,7 @@ export function ControlRow(props: ControlRowProps) {
           {(ask) => <TextAsk ask={ask} onAnswer={props.onAnswer} onDismiss={props.onDismiss} />}
         </Match>
         <Match when={confirmAskOf(props.ask)} keyed>
-          {(ask) => <ConfirmLine question={ask.question} onConfirm={props.onConfirm} />}
+          {(ask) => <ConfirmLine ask={ask} onConfirm={props.onConfirm} />}
         </Match>
         <Match when={pickAskOf(props.ask)} keyed>
           {(ask) => <PickAsk ask={ask} onAnswer={props.onAnswer} onDismiss={props.onDismiss} />}
@@ -120,29 +142,63 @@ function TextAsk(props: {
   );
 }
 
-function ConfirmLine(props: { question: string; onConfirm: (agreed: boolean) => void }) {
+function ConfirmLine(props: { ask: ConfirmAskShape; onConfirm: (answer: ConfirmAnswer) => void }) {
+  const [widened, setWidened] = createSignal(false);
+  const shown = () => {
+    const widen = props.ask.widen;
+    return widened() && widen !== undefined ? widen : props.ask;
+  };
   let line: HTMLDivElement | undefined;
   onMount(() => line?.focus());
   const onKeyDown = (event: KeyboardEvent): void => {
     const key = event.key.toLowerCase();
-    if (key === "y" || key === "enter") props.onConfirm(true);
-    else if (key === "n" || key === "escape") props.onConfirm(false);
-    else return;
+    if (widened()) answerWidened(key);
+    else answerNarrow(key);
+    if (!confirmKeys.has(key) && key !== props.ask.widen?.key) return;
     event.preventDefault();
     event.stopPropagation();
+  };
+  const answerNarrow = (key: string): void => {
+    if (key === "y" || key === "enter") props.onConfirm(true);
+    else if (key === "n" || key === "escape") props.onConfirm(false);
+    else if (key === props.ask.widen?.key) setWidened(true);
+  };
+  const answerWidened = (key: string): void => {
+    if (key === "y") props.onConfirm(widenedAnswer);
+    else if (key === "n" || key === "escape") setWidened(false);
   };
   return (
     <div
       ref={line}
       class="kw-controls-confirm"
       role="alertdialog"
+      aria-label={shown().question}
+      data-widened={widened() ? "" : undefined}
       tabIndex={-1}
       onKeyDown={onKeyDown}
     >
-      {props.question}
+      {shown().question}
+      <Show when={(shown().items ?? []).length > 0}>
+        <ul class="kw-controls-items">
+          <For each={shown().items}>
+            {(item) => (
+              <li
+                class="kw-controls-item"
+                data-flagged={item.flagged ? "" : undefined}
+                data-staying={item.staying ? "" : undefined}
+              >
+                <span class="kw-controls-item-text">{item.text}</span>
+                <span class="kw-controls-item-note">{item.note}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
     </div>
   );
 }
+
+const confirmKeys: ReadonlySet<string> = new Set(["y", "n", "enter", "escape"]);
 
 function PickAsk(props: {
   ask: PickAskShape;

@@ -15,7 +15,7 @@ describe("a setting withdrawn while the keeper is inside it", () => {
     const kept = cardTitled("first");
     expect(kept?.dataset.withdrawn).toBe("");
     expect(kept?.querySelector(".kw-yard-card-by")?.textContent).toBe(
-      "withdrawn · Wren set out a note",
+      "taken back · Wren showed a note",
     );
     keyOnRail("j");
     expect(cardTitled("first")).toBeUndefined();
@@ -35,7 +35,7 @@ describe("a setting withdrawn while the keeper is inside it", () => {
     expect(cardTitled("first")).toBeUndefined();
   });
 
-  it("stays as a pane while the keeper's focus is inside the panel, and folds when focus leaves", () => {
+  it("stays as a pane while the keeper's focus is inside the panel, and folds when focus leaves", async () => {
     const yard = renderYard([card("panel", 9, "unfold")], { railActive: false });
     const satellite = satelliteOf("panel");
     const inside = satellite.querySelector(".kw-yard-note") as HTMLElement;
@@ -44,8 +44,9 @@ describe("a setting withdrawn while the keeper is inside it", () => {
     expect(satelliteOf("panel").dataset.withdrawn).toBe("");
     expect(
       satelliteOf("panel").querySelector(".kw-frame-ribbon, .kw-frame")?.textContent,
-    ).toContain("withdrawn");
+    ).toContain("taken back");
     fireEvent.focusOut(inside, { relatedTarget: null });
+    await Promise.resolve();
     expect(document.querySelector('[data-setting="panel"]')).toBeNull();
   });
 
@@ -72,25 +73,53 @@ describe("the rail while the keeper is in it", () => {
   });
 });
 
+describe("a rail longer than the window", () => {
+  const eight = Array.from({ length: 8 }, (_, index) => card(`n${index + 1}`, 9 - index));
+
+  it("walks past the last card it shows into the ones beyond, scrolling to keep the cursor in view", () => {
+    renderYard(eight);
+    expect(railOrder()).toEqual(["n1", "n2", "n3", "n4", "n5"]);
+    expect(foldLine()).toBe("3 more below · j reaches them");
+    for (let step = 0; step < 6; step += 1) keyOnRail("j");
+    expect(cardTitled("n7")?.dataset.cursor).toBe("");
+    expect(railOrder()).toEqual(["n3", "n4", "n5", "n6", "n7"]);
+    expect(foldLine()).toBe("2 above · 1 below · j k reach them");
+    for (let step = 0; step < 6; step += 1) keyOnRail("k");
+    expect(railOrder()).toEqual(["n1", "n2", "n3", "n4", "n5"]);
+    expect(cardTitled("n1")?.dataset.cursor).toBe("");
+  });
+
+  it("leaves the cursor where it was when the card under it goes", () => {
+    const yard = renderYard(eight.slice(0, 4));
+    keyOnRail("j");
+    keyOnRail("j");
+    expect(cardTitled("n3")?.dataset.cursor).toBe("");
+    yard.settle("n3");
+    expect(cardTitled("n4")?.dataset.cursor).toBe("");
+    yard.settle("n4");
+    expect(cardTitled("n2")?.dataset.cursor).toBe("");
+  });
+});
+
 describe("the yard's own card", () => {
-  it("heads the rail with the unfold budget and when the next unfold is free", () => {
+  it("heads the rail with how many panels opened lately and when the next can open", () => {
     renderYard([card("a", 5)], { railActive: false, card: spentCard });
-    expect(railHead().textContent).toBe("6 of 6 unfolds · next free at 09:10");
+    expect(railHead().textContent).toBe("6 of 6 opened · next at 09:10");
     cleanup();
     renderYard([card("a", 5)], { railActive: false, card: { ...spentCard, used: 2 } });
-    expect(railHead().textContent).toBe("2 of 6 unfolds · the next is free");
+    expect(railHead().textContent).toBe("2 of 6 panels opened in 10 min");
   });
 
   it("is selectable above the first card and opens its last decisions with Enter, newest first", () => {
     renderYard([card("a", 5)], { card: spentCard });
     keyOnRail("k");
     expect(railHead().dataset.cursor).toBe("");
-    expect(railHead().textContent).toBe("6 of 6 unfolds · next free at 09:10");
+    expect(railHead().textContent).toBe("6 of 6 opened · next at 09:10");
     keyOnRail("Enter");
     expect(railHead().textContent).toBe("the yard's last decisions · enter closes");
     expect(decisionLines()).toEqual([
-      "09:02 · a · card · unfold budget",
-      "09:01 · a note · unfold · a delivery in your thread",
+      "09:02 · a · kept as a card · too many opened lately",
+      "09:01 · a note · opened beside · a delivery in your thread",
     ]);
     expect(cardTitled("a")).toBeUndefined();
     keyOnRail("Enter");
@@ -130,7 +159,7 @@ describe("the return digest", () => {
       </Yard>
     ));
     expect(railHead().textContent).toBe(
-      "while you were away · 1 held back as a card · the sum and its test → sum.ts folded",
+      "while you were away · 1 held back as a card · the sum and its test → sum.ts closed",
     );
   });
 });
@@ -152,7 +181,7 @@ describe("a flood from one owner", () => {
     expect(gathered).toHaveLength(1);
     expect(gathered[0]?.dataset.group).toBe("4");
     expect(gathered[0]?.querySelector(".kw-yard-card-by")?.textContent).toBe(
-      "Wren set out 4 things",
+      "Wren showed 4 things",
     );
     keyOnRail("x");
     expect(answered).toEqual([
@@ -193,13 +222,17 @@ const spentCard: YardCard = {
       proposed: "unfold",
       rung: "card",
       verdict: "hold",
-      reason: "unfold budget",
+      reason: "too many opened lately",
     },
   ],
 };
 
 function railHead(): HTMLElement {
   return document.querySelector(".kw-yard-rail-head") as HTMLElement;
+}
+
+function foldLine(): string | null | undefined {
+  return document.querySelector(".kw-yard-folded")?.textContent;
 }
 
 function decisionLines(): string[] {

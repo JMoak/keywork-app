@@ -6,6 +6,7 @@ import type { ProductProfile } from "@keywork-app/product";
 import {
   app,
   BrowserWindow,
+  type BrowserWindowConstructorOptions,
   desktopCapturer,
   globalShortcut,
   ipcMain,
@@ -15,6 +16,7 @@ import {
   powerMonitor,
   screen,
 } from "electron";
+import { appPageArgument, trustedIpc } from "../app-page.ts";
 import { witnessForeground } from "../notify.ts";
 import type { DesktopShell } from "../shell.ts";
 import { fileSeams } from "../system.ts";
@@ -125,6 +127,7 @@ export function sessionSignalsOf(seams: ElectronCompanionSeams): SessionSignals 
 export function electronCompanionPorts(seams: ElectronCompanionSeams): CompanionPorts {
   const natives = new WeakMap<CompanionWindowLike, BrowserWindow>();
   const companionContents = new Set<number>();
+  const ipc = trustedIpc();
   return {
     platform: seams.platform,
     ...(seams.profile !== undefined && { profile: seams.profile }),
@@ -134,7 +137,7 @@ export function electronCompanionPorts(seams: ElectronCompanionSeams): Companion
     preferences: preferenceBook(join(seams.userData, "companion.json"), fileSeams),
     windows: {
       create: (options) => {
-        const native = new BrowserWindow(options);
+        const native = new BrowserWindow(namingTheAppPage(options));
         const like = windowLike(native);
         natives.set(like, native);
         companionContents.add(like.webContents.id);
@@ -203,18 +206,14 @@ export function electronCompanionPorts(seams: ElectronCompanionSeams): Companion
     },
     console: {
       isConsole: (sender) => !companionContents.has(sender.id) && isAppWindow(sender),
-      focusThread: () => seams.desktop.focusMostRecent(),
+      focusThread: () => seams.desktop.showConsole(),
       send: (channel, payload) => seams.desktop.broadcast(channel, payload),
     },
     ipc: {
       handle: (channel, handler) =>
-        ipcMain.handle(channel, (event, payload: unknown) =>
-          handler({ id: event.sender.id }, payload),
-        ),
+        ipc.handle(channel, (event, payload: unknown) => handler({ id: event.sender.id }, payload)),
       on: (channel, listener) =>
-        ipcMain.on(channel, (event, payload: unknown) =>
-          listener({ id: event.sender.id }, payload),
-        ),
+        ipc.on(channel, (event, payload: unknown) => listener({ id: event.sender.id }, payload)),
       release: () => {
         for (const channel of Object.values(companionChannels)) {
           ipcMain.removeHandler(channel);
@@ -455,6 +454,19 @@ function listen(event: "lock-screen" | "unlock-screen", listener: () => void): (
   return () => {
     if (event === "lock-screen") powerMonitor.off("lock-screen", listener);
     else powerMonitor.off("unlock-screen", listener);
+  };
+}
+
+function namingTheAppPage(
+  options: BrowserWindowConstructorOptions,
+): BrowserWindowConstructorOptions {
+  const web = options.webPreferences ?? {};
+  return {
+    ...options,
+    webPreferences: {
+      ...web,
+      additionalArguments: [...(web.additionalArguments ?? []), appPageArgument()],
+    },
   };
 }
 

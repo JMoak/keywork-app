@@ -3,12 +3,19 @@ import { createServer } from "node:net";
 import type { ChildHandle, Spawn } from "./serve-process.ts";
 import { spawnsThroughShell } from "./system.ts";
 
+export interface ChildLaunch {
+  file: string;
+  args: readonly string[];
+  verbatim: boolean;
+}
+
 export const spawnChild: Spawn = (command, args, cwd) => {
-  const child = spawnProcess(command, [...args], {
+  const launch = childLaunch(command, args, process.platform, process.env.ComSpec);
+  const child = spawnProcess(launch.file, [...launch.args], {
     cwd,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
-    shell: spawnsThroughShell(command, process.platform),
+    windowsVerbatimArguments: launch.verbatim,
   });
   const exited = new Promise<number | null>((resolve) => {
     child.once("exit", (code) => resolve(code));
@@ -25,6 +32,17 @@ export const spawnChild: Spawn = (command, args, cwd) => {
   };
   return handle;
 };
+
+export function childLaunch(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform,
+  comspec = "cmd.exe",
+): ChildLaunch {
+  if (!spawnsThroughShell(command, platform)) return { file: command, args, verbatim: false };
+  const line = [caretEscaped(command), ...args.map(batchArgument)].join(" ");
+  return { file: comspec, args: ["/d", "/s", "/c", `"${line}"`], verbatim: true };
+}
 
 export function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -61,6 +79,21 @@ export async function commandOutput(
   await Promise.race([read, gaveUp]);
   clearTimeout(timer);
   return text;
+}
+
+// cmd.exe reads the line once to start the batch file and again when the batch expands %*, so
+// an argument is quoted the way the final program splits arguments, then caret-escaped twice.
+function batchArgument(arg: string): string {
+  return caretEscaped(caretEscaped(argvQuoted(arg)));
+}
+
+function argvQuoted(arg: string): string {
+  const escaped = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1");
+  return `"${escaped}"`;
+}
+
+function caretEscaped(text: string): string {
+  return text.replace(/[()[\]%!^"`<>&|;, *?]/g, "^$&");
 }
 
 async function* lines(stream: NodeJS.ReadableStream | null): AsyncIterable<string> {

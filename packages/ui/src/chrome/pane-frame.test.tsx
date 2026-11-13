@@ -1,4 +1,6 @@
-import { cleanup, render } from "@solidjs/testing-library";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { assumedContextLevel } from "../instruments/context.ts";
@@ -33,7 +35,7 @@ describe("PaneFrame", () => {
         state="needs-you"
         focused
         spawnRank={4}
-        telemetry="12 tokens"
+        telemetry="12 tokens · $0.01"
         modeWord="plan"
       >
         <p>body</p>
@@ -45,8 +47,36 @@ describe("PaneFrame", () => {
     expect(frame.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
     expect(container.querySelector(".kw-frame-stamp")?.textContent).toBe("█");
     expect(container.querySelector(".kw-frame-name")?.textContent).toBe("fix the tests");
-    expect(container.querySelector(".kw-frame-telemetry")?.textContent).toBe("12 tokens");
+    expect(container.querySelector(".kw-frame-usage")?.textContent).toBe("12 tokens · $0.01");
+    expect(container.querySelector(".kw-frame-usage-compact")?.textContent).toBe("$0.01");
     expect(container.querySelector(".kw-frame-mode")?.textContent).toBe("plan");
+  });
+
+  it("marks the focused pane the same way in every chrome weight, forced colours included", () => {
+    const css = readFileSync(join(process.cwd(), "packages/ui/src/chrome/pane-frame.css"), "utf8");
+    expect(css).toMatch(
+      /\.kw-frame\[data-focused\] \.kw-frame-title \{\s*box-shadow: inset 0 -2px 0 var\(--kw-pane-hue\);/,
+    );
+    expect(css).toMatch(/\.kw-frame\[data-focused\] \.kw-frame-name \{\s*color: var\(--kw-text\);/);
+    const forced = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(
+      /\.kw-frame\[data-focused\]::before \{[^}]*border: 2px solid Highlight;/,
+    );
+    expect(forced).toMatch(
+      /\.kw-frame\[data-focused\] \.kw-frame-name \{[^}]*background: Highlight;/,
+    );
+  });
+
+  it("is a region named after its title, which a heading carries in full", () => {
+    render(() => (
+      <PaneFrame name="a long session name" state="idle" focused={false} spawnRank={0}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const region = screen.getByRole("region", { name: "a long session name pane" });
+    const heading = within(region).getByRole("heading", { level: 2 });
+    expect(heading.textContent).toBe("a long session name");
+    expect(heading.getAttribute("title")).toBe("a long session name");
   });
 
   it("omits the mode word and telemetry when absent and blanks the idle stamp", () => {

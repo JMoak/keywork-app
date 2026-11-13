@@ -3,9 +3,17 @@ import { z } from "zod";
 import { sessionName } from "../../chrome/session-name.ts";
 import type { PtyExit } from "../../host/port.ts";
 import type { ArgumentChoice } from "../../palette/commands.ts";
+import { useKeyboardScope } from "../../shell/keyboard-claim.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
-import { bridgeArgs, connectPty, mirrorPainter, type TerminalSurface } from "./session.ts";
+import { leaderChord, typedBy } from "./keys.ts";
+import {
+  bridgeArgs,
+  connectPty,
+  mirrorPainter,
+  type PtyConnection,
+  type TerminalSurface,
+} from "./session.ts";
 import { xtermSurface } from "./surface.ts";
 import { monoFontOf, themeOfElement, watchFonts, watchTheme } from "./theme.ts";
 import "@xterm/xterm/css/xterm.css";
@@ -61,6 +69,7 @@ export const terminalPane = definePane<TerminalSpec>({
       },
     },
     spec: (shell, variant) => specFor(shell, variant),
+    again: "opens-another",
   },
   localActions: {
     "terminal.clear": {
@@ -82,6 +91,16 @@ export const terminalPane = definePane<TerminalSpec>({
       chords: "leader m",
       help: "cycle shell → mirror → bridge",
       command: { name: "terminal-mode", description: "cycle this terminal's mode" },
+    },
+    "terminal.send-leader": {
+      chords: "leader leader",
+      help: "send the leader itself to the shell",
+      command: { name: "send-leader", description: "type the leader chord into this terminal" },
+    },
+    "terminal.restart": {
+      chords: "none",
+      help: "start the program again after it exits",
+      command: { name: "restart", description: "start this terminal's program again once it ends" },
     },
   },
   adornments: (spec) => ({ modeWord: spec.mode }),
@@ -120,9 +139,14 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
   const [exit, setExit] = createSignal<PtyExit>();
   const [failure, setFailure] = createSignal<string>();
   const [surface, setSurface] = createSignal<TerminalSurface>();
+  const [starts, setStarts] = createSignal(0);
+  const keyboard = useKeyboardScope();
   let holder: HTMLDivElement | undefined;
-  let write: (data: string) => void = () => {};
+  let pty: PtyConnection | undefined;
 
+  const startAgain = (): void => {
+    if (exit() !== undefined) setStarts((count) => count + 1);
+  };
   const needsSession = () => props.spec.mode === "mirror" && props.spec.sessionId === undefined;
   const attachment = createMemo(() =>
     JSON.stringify({
@@ -155,11 +179,12 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
   createEffect(() => {
     const live = surface();
     if (live === undefined) return;
+    starts();
     const spec = JSON.parse(attachment()) as Pick<TerminalSpec, "mode" | "sessionId" | "verb">;
     setExit(undefined);
     setFailure(undefined);
     live.reset();
-    write = () => {};
+    pty = undefined;
     if (spec.mode === "mirror") {
       const painter = mirrorPainter(live);
       createEffect(() => painter.paint(props.shell.store.projection(spec.sessionId)));
@@ -173,32 +198,54 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
       if (event.kind === "exit") setExit(event.exit);
       if (event.kind === "failed") setFailure("the host could not open it");
     });
-    write = connection.write;
+    pty = connection;
     onCleanup(() => connection.dispose());
   });
 
   createEffect(() => {
+    const live = surface();
+    if (live === undefined || exit() === undefined) return;
+    onCleanup(
+      live.onInput((data) => {
+        if (data === enter) startAgain();
+      }),
+    );
+  });
+
+  createEffect(() => {
+    keyboard?.homeVersion();
     const live = surface();
     if (live === undefined) return;
     if (props.focused) live.focus();
     else live.blur();
   });
 
+  props.guardClose?.(async () => stillRunningNotice((await pty?.running()) ?? []));
+
   props.onAction((action) => {
     const live = surface();
     if (live === undefined) return;
     switch (action) {
       case "terminal.clear":
-        live.clear();
+        if (pty?.attached()) pty.write(formFeed);
+        else live.clear();
         return;
       case "terminal.copy":
-        void navigator.clipboard?.writeText(live.selection());
+        copySelection(live.selection());
         return;
       case "terminal.paste":
-        void navigator.clipboard?.readText().then((text) => write(text));
+        void navigator.clipboard?.readText().then((text) => pty?.write(text));
         return;
       case "terminal.mode.cycle":
         props.shell.rebind(props.id, { ...props.spec, mode: nextMode(props.spec.mode) });
+        return;
+      case "terminal.send-leader": {
+        const typed = typedBy(leaderChord(props.shell.keys.leader()));
+        if (typed !== undefined) pty?.write(typed);
+        return;
+      }
+      case "terminal.restart":
+        startAgain();
         return;
     }
   });
@@ -217,11 +264,22 @@ function TerminalSlot(props: PaneProps<TerminalSpec>) {
       <Show when={exit()}>
         {(ended) => (
           <p class="kw-terminal-exit">
-            exited with code {ended().exitCode} · {props.shell.keys.chord("terminal.summon")} opens
-            another
+            exited with code {ended().exitCode} · enter starts it again
           </p>
         )}
       </Show>
     </div>
   );
+}
+
+const enter = "\r";
+const formFeed = "\f";
+
+function stillRunningNotice(programs: readonly string[]): string | undefined {
+  if (programs.length === 0) return undefined;
+  return `${programs.join(", ")} ${programs.length === 1 ? "is" : "are"} still running in this shell`;
+}
+
+function copySelection(selected: string): void {
+  if (selected !== "") void navigator.clipboard?.writeText(selected);
 }

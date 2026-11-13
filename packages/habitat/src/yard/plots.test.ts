@@ -131,7 +131,7 @@ describe("a plot folds as one", () => {
       id: "d",
       verdict: "reduce",
       rung: "card",
-      reason: "folded back",
+      reason: "closed again",
     });
     expect(stepYard(grown, { ...asked, focusedThread: "s2" }, at(20)).settings.c?.folded).toBe(
       "plot:d",
@@ -214,7 +214,7 @@ describe("a plot folds as one", () => {
   it("names in the return digest the plots that folded back while the keeper was away", () => {
     const away = stepYard(grown, { ...asked, visible: false }, noon + 10 * minute);
     expect(away.settings.d?.folded).toBe("plot:d");
-    expect(away.decisions.at(-1)?.reason).toBe("folded back while you were away");
+    expect(away.decisions.at(-1)?.reason).toBe("closed while you were away");
     expect(plotsFoldedWhileAway(away)).toEqual([]);
     expect(plotsFoldedWhileAway(away, noon + 11 * minute)).toEqual(["plot:d"]);
     const present = stepYard(grown, asked, noon + 10 * minute);

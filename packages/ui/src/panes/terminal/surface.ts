@@ -1,8 +1,8 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { type ITheme, Terminal } from "@xterm/xterm";
+import { type ITerminalAddon, type ITerminalOptions, type ITheme, Terminal } from "@xterm/xterm";
 import { terminalKeeps } from "./keys.ts";
-import { chooseRenderer, probeWebgl2, type RendererChoice } from "./renderer.ts";
+import { chooseRenderer, probeRenderer, type RendererChoice } from "./renderer.ts";
 import type { TerminalSize, TerminalSurface } from "./session.ts";
 
 export interface SurfaceOptions {
@@ -20,16 +20,10 @@ export interface XtermSurface extends TerminalSurface {
   renderer(): RendererChoice;
 }
 
+export const readableContrast = 4.5;
+
 export function xtermSurface(container: HTMLElement, options: SurfaceOptions): XtermSurface {
-  const terminal = new Terminal({
-    cursorBlink: true,
-    scrollback: scrollbackLines,
-    fontFamily: options.fontFamily,
-    fontSize: options.fontSize,
-    theme: options.theme,
-    allowProposedApi: true,
-    ...(options.windows && { windowsPty: { backend: "conpty" } }),
-  });
+  const terminal = new Terminal(terminalOptions(options));
   const fit = new FitAddon();
   terminal.loadAddon(fit);
   const leader = options.leader;
@@ -37,10 +31,19 @@ export function xtermSurface(container: HTMLElement, options: SurfaceOptions): X
     terminal.attachCustomKeyEventHandler((event) => terminalKeeps(event, leader));
   }
   terminal.open(container);
-  let renderer = installRenderer(terminal, (lost) => {
-    renderer = lost;
+  const remeasure = (): void => {
+    const size = terminal.options.fontSize ?? options.fontSize;
+    terminal.options.fontSize = size + 1;
+    terminal.options.fontSize = size;
+    terminal.clearTextureAtlas();
+    fit.fit();
+  };
+  let renderer = installRenderer(terminal, chooseRenderer(probeRenderer()), () => {
+    renderer = "dom";
+    remeasure();
   });
-  const observer = observeSize(container, () => fit.fit());
+  const stopObservingSize = observeSize(container, () => fit.fit());
+  const stopWatchingRatio = watchPixelRatio(container.ownerDocument.defaultView, remeasure);
   fit.fit();
   return {
     write: (data) => terminal.write(data),
@@ -57,39 +60,67 @@ export function xtermSurface(container: HTMLElement, options: SurfaceOptions): X
     setTheme: (theme) => {
       terminal.options.theme = theme;
     },
-    remeasure: () => {
-      const size = terminal.options.fontSize ?? options.fontSize;
-      terminal.options.fontSize = size + 1;
-      terminal.options.fontSize = size;
-      terminal.clearTextureAtlas();
-      fit.fit();
-    },
+    remeasure,
     fit: () => fit.fit(),
     renderer: () => renderer,
     dispose: () => {
-      observer();
+      stopWatchingRatio();
+      stopObservingSize();
       terminal.dispose();
     },
   };
 }
 
-function installRenderer(
-  terminal: Terminal,
-  onFallback: (choice: RendererChoice) => void,
+export function terminalOptions(options: SurfaceOptions): ITerminalOptions {
+  return {
+    cursorBlink: true,
+    scrollback: scrollbackLines,
+    fontFamily: options.fontFamily,
+    fontSize: options.fontSize,
+    theme: options.theme,
+    minimumContrastRatio: readableContrast,
+    allowProposedApi: true,
+    ...(options.windows && { windowsPty: { backend: "conpty" } }),
+  };
+}
+
+export interface WebglRenderer extends ITerminalAddon {
+  onContextLoss(listener: () => void): unknown;
+}
+
+export function installRenderer(
+  terminal: { loadAddon(addon: ITerminalAddon): void },
+  choice: RendererChoice,
+  onContextLost: () => void,
+  makeWebgl: () => WebglRenderer = () => new WebglAddon(),
 ): RendererChoice {
-  const choice = chooseRenderer({ webgl2: probeWebgl2() });
   if (choice === "dom") return choice;
   try {
-    const webgl = new WebglAddon();
+    const webgl = makeWebgl();
     webgl.onContextLoss(() => {
       webgl.dispose();
-      onFallback(chooseRenderer({ webgl2: true, contextLost: true }));
+      onContextLost();
     });
     terminal.loadAddon(webgl);
     return "webgl";
   } catch {
     return "dom";
   }
+}
+
+export function watchPixelRatio(view: Window | null, onChange: () => void): () => void {
+  if (view === null || typeof view.matchMedia !== "function") return () => {};
+  let current: MediaQueryList | undefined;
+  const listen = (): void => {
+    current = view.matchMedia(`(resolution: ${view.devicePixelRatio}dppx)`);
+    current.addEventListener("change", changed, { once: true });
+  };
+  const changed = (): void => {
+    listen();
+    onChange();
+  };
+  listen();
+  return () => current?.removeEventListener("change", changed);
 }
 
 function observeSize(container: HTMLElement, onChange: () => void): () => void {

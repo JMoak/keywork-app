@@ -21,6 +21,7 @@ import type {
   SteadProjectContext,
   SteadSessionReference,
 } from "./panes/stead/home-scope.ts";
+import { homeShell } from "./panes/stead/home-shell.ts";
 import { frameTick } from "./shell/frame-tick.ts";
 import {
   createNeedsYouQueue,
@@ -387,43 +388,6 @@ async function attach(
       trust?.dispose();
       store.dispose();
       feed.close();
-    },
-  };
-}
-
-function homeShell(
-  surface: ShellSeams,
-  home: Connection,
-  openPane: (spec: PaneSpecBase) => void,
-  openSession: (session: string) => void,
-): SteadHomeScope["shell"] {
-  return {
-    host: surface.host,
-    workspace: home.opened().workspace,
-    store: home.store,
-    feed: home.feed,
-    client: home.client,
-    keys: surface.keys,
-    trust: home.trust ?? surface.trust,
-    ...(surface.onboarding !== undefined && { onboarding: surface.onboarding }),
-    ...(surface.companion !== undefined && { companion: surface.companion }),
-    ...(surface.creatureNames !== undefined && { creatureNames: surface.creatureNames }),
-    ...(surface.needsYou !== undefined && { needsYou: surface.needsYou }),
-    ...(surface.drafts !== undefined && { drafts: surface.drafts }),
-    currentSession: () => undefined,
-    focusedPane: surface.focusedPane,
-    openPane,
-    rebind: (_pane, spec) => openPane(spec),
-    unseen: () => false,
-    server: home.standing,
-    sessions: {
-      openSession,
-      newSession: async () => openSession(await home.store.create()),
-      startSession: async (_pane, text) => {
-        const session = await home.store.create();
-        await home.store.prompt(session, text, "queue");
-        openSession(session);
-      },
     },
   };
 }

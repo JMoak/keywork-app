@@ -4,6 +4,7 @@ import type {
   ContextInjection,
   ForkOrigin,
   MemoryDecision,
+  OutcomeMark,
   PermissionAsk,
   PermissionDecision,
   PromptOrigin,
@@ -12,6 +13,7 @@ import type {
   SessionState,
   SpillReference,
   SummaryKind,
+  TurnOutcome,
   Usage,
 } from "@keywork-app/protocol";
 
@@ -31,6 +33,7 @@ export interface SessionProjection {
   readonly diagnostics: Readonly<Record<string, number>>;
   readonly summaries: Readonly<Record<string, SummaryKind>>;
   readonly flushes: Readonly<Record<string, readonly string[]>>;
+  readonly outcomes: Readonly<Record<string, OutcomeMark>>;
   readonly forkedFrom?: ForkOrigin;
   readonly lastError: string | undefined;
   readonly lastEventId: number | undefined;
@@ -60,7 +63,8 @@ export type TranscriptEntry =
   | ThinkingEntry
   | ToolEntry
   | NoticeEntry
-  | FlushEntry;
+  | FlushEntry
+  | EndingEntry;
 
 export interface UserEntry {
   readonly kind: "user";
@@ -97,12 +101,23 @@ export interface ToolEntry {
   readonly run: ToolRun;
 }
 
+export type TurnEnding = Exclude<TurnOutcome, "completed">;
+
+export interface EndingEntry {
+  readonly kind: "ending";
+  readonly outcome: TurnEnding;
+  readonly text: string;
+  readonly prompt: string | undefined;
+  readonly replay: boolean;
+}
+
 export type NoticeLevel = "info" | "error" | "progress";
 
 export interface NoticeEntry {
   readonly kind: "notice";
   readonly level: NoticeLevel;
   readonly text: string;
+  readonly entryId?: string;
 }
 
 export type ToolPhase = "proposed" | "asking" | "running" | "done" | "failed" | "refused";
@@ -116,6 +131,9 @@ export interface ToolRun {
   readonly phase: ToolPhase;
   readonly startedAt: string | undefined;
   readonly live: string | undefined;
+  readonly streamed?: string | undefined;
+  readonly exitNote?: string | undefined;
+  readonly stopped?: boolean | undefined;
   readonly reason: string | undefined;
   readonly durationMs: number | undefined;
   readonly askedAt: string | undefined;
@@ -168,6 +186,7 @@ export const emptyProjection: SessionProjection = {
   diagnostics: {},
   summaries: {},
   flushes: {},
+  outcomes: {},
   lastError: undefined,
   lastEventId: undefined,
 };

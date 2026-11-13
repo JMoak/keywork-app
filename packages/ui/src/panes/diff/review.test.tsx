@@ -134,7 +134,7 @@ describe("reviewing a delivery hunk by hunk", () => {
     expect(recorded.reads).toBe(1);
     expect(row(".kw-diff-review-place")).toBe("hunk 1 of 2");
     expect(row(".kw-diff-review-verdict")).toBe("unreviewed");
-    expect(row(".kw-diff-review-keys")).toBe("y keepd dropa askt talk");
+    expect(row(".kw-diff-review-keys")).toBe("mark y keepd dropa askt talk");
     expect(row(".kw-diff-review-reviewed")).toBe("1 of 2 reviewed · 1 ask");
     await act("diff.next");
     await act("diff.next");
@@ -166,6 +166,35 @@ describe("reviewing a delivery hunk by hunk", () => {
     await act("diff.drop");
     expect(row(".kw-diff-review-verdict")).toBe("drop");
     expect(row(".kw-diff-review-reviewed")).toBe("2 of 2 reviewed");
+  });
+
+  it("counts only the hunks still shown and names the marks left on hunks that changed since", async () => {
+    const recorded = recording();
+    const gone: MergeHunk = { header: "@@ -2,1 +2,1 @@", removed: ["two"], added: ["II"], line: 2 };
+    await mountSettled(recorded, {
+      verdicts: [mark(gone, "keep", "v1"), mark(gone, "drop", "v2"), mark(firstHunk, "ask", "v3")],
+    });
+    expect(row(".kw-diff-review-reviewed")).toBe(
+      "1 of 2 reviewed · 1 ask · 1 mark on a hunk since changed",
+    );
+    expect(reviewedLine({ keep: 0, drop: 0, ask: 0 }, 2, 3)).toBe(
+      "0 of 2 reviewed · 3 marks on hunks since changed",
+    );
+  });
+
+  it("says a drop is a mark only and how to have the change taken out", async () => {
+    const recorded = recording();
+    const act = await mountSettled(recorded);
+    await act("diff.drop");
+    const digest = hunkDigest(firstHunk.removed, firstHunk.added);
+    expect(
+      screen.getByText(
+        `drop · notes.txt @@ -2,1 +2,1 @@ · hunk ${digest} · a mark only, the file still has it · t asks the agent to take it out`,
+      ),
+    ).toBeTruthy();
+    expect(diffPane.localActions?.["diff.drop"]?.help).toBe(
+      "mark this hunk dropped (the file keeps it)",
+    );
   });
 
   it("says plainly when the server records no verdicts and writes nothing", async () => {

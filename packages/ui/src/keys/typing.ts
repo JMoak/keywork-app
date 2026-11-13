@@ -11,11 +11,11 @@ export function keyFocusOf(
   focusedKind: string | undefined,
   target: EventTarget | null,
   keymap: KeyboardOwnership,
+  focusInside = true,
 ): KeyFocus {
-  return {
-    scope: focusedKind,
-    typing: isTextField(target) && !keymap.ownsKeyboard(focusedKind),
-  };
+  const owned = keymap.ownsKeyboard(focusedKind);
+  if (owned && !focusInside) return { scope: undefined, typing: isTextField(target) };
+  return { scope: focusedKind, typing: isTextField(target) && !owned };
 }
 
 export function isTextField(target: EventTarget | null): boolean {

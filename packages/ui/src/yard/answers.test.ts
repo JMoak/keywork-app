@@ -4,9 +4,9 @@ import { answerSetting, pinAnswer, type SettingAnswers } from "./answers.ts";
 describe("the keeper's answers", () => {
   it("post the outcome to the wire and say what follows, settling nothing here", async () => {
     const answers = { answerSetting: vi.fn(async () => undefined) };
-    expect(await answerSetting(answers, "set-1", "dismissed")).toBe("dismissed · it folds");
-    expect(await answerSetting(answers, "set-1", "pinned")).toBe("pinned · it stays out");
-    expect(await answerSetting(answers, "set-1", "seen")).toBe("seen · it folds");
+    expect(await answerSetting(answers, "set-1", "dismissed")).toBe("dismissed · it closes");
+    expect(await answerSetting(answers, "set-1", "pinned")).toBe("pinned · it stays open");
+    expect(await answerSetting(answers, "set-1", "seen")).toBe("marked seen · it leaves the yard");
     expect(answers.answerSetting.mock.calls).toEqual([
       ["set-1", "dismissed"],
       ["set-1", "pinned"],

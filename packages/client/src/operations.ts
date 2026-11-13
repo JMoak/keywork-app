@@ -46,6 +46,8 @@ export const operationOfMethod = {
   restoreSession: "restoreSession",
   discardTrashedSession: "discardTrashedSession",
   purgeTrash: "purgeTrash",
+  work: "readWork",
+  shutDown: "shutDown",
   setModel: "setSessionModel",
   setThinking: "setSessionThinking",
   setEffort: "setSessionEffort",

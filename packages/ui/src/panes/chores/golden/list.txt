@@ -13,5 +13,5 @@
   × broken                   unreadable
       routines/broken.json does not parse: trigger.expr: not a five-field cron expression (minute hour day month weekday)
 ▾ Tam                      0 chores
-  Digest times and quiet hours: this node does not serve them yet.
-  Node settings, read-only here: change them in the node's config. A run that needs you rings at once, after quiet hours.
+  Digest times and quiet hours are not available here yet.
+  Scheduled chores run only while their engine runs: with background work off, quitting the app pauses them until you open it again. A run that needs you notifies you at once, or after quiet hours. Digest times and quiet hours are set in the engine's config.

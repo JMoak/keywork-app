@@ -9,7 +9,12 @@ import {
   refusalNotice,
   undoneNotice,
 } from "../conversation/controls.ts";
-import { othersClause, promptExcerpt, restorePreview } from "../conversation/turn-ledger.ts";
+import {
+  goingBackCount,
+  othersClause,
+  promptExcerpt,
+  restorePreview,
+} from "../conversation/turn-ledger.ts";
 import { ConfirmLine } from "../overview/rows.tsx";
 import type { KeyHints, ShellSeams } from "../registry.ts";
 
@@ -34,7 +39,7 @@ export function undoQuestion(
   const known = preview === undefined || typeof preview === "string" ? undefined : preview;
   const theirs =
     known === undefined || known.others.length === 0 ? "" : ` · ${othersClause(known.others)}`;
-  return `undo turn ${last.turn}, "${promptExcerpt(last.text)}"? ${filesGoingBack(known?.files.length)}${theirs} · ${redoKey} redoes it`;
+  return `undo turn ${last.turn}, "${promptExcerpt(last.text)}"? ${filesGoingBack(goingBackCount(preview))}${theirs} · ${redoKey} redoes it`;
 }
 
 function filesGoingBack(files: number | undefined): string {
@@ -95,7 +100,10 @@ export function createTurnVerbs(
 
 export function TurnVerbRow(props: { verbs: TurnVerbs; keys: KeyHints }) {
   return (
-    <div class="kw-diff-verbs">
+    <div
+      class="kw-diff-verbs"
+      data-keys-owned={props.verbs.asking() === undefined ? undefined : ""}
+    >
       <span class="kw-diff-verb" data-enabled={enabledWord(props.verbs.undoable())}>
         {props.keys.chord("diff.undo")} undo
       </span>

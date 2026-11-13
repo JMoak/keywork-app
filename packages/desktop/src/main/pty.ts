@@ -5,9 +5,10 @@ import { spawnsThroughShell } from "./system.ts";
 
 export interface PtyHost {
   open(request: PtyOpenRequest, owner: number, sink: PtySink): Promise<PtyOpened>;
-  write(id: number, data: string): void;
-  resize(id: number, cols: number, rows: number): void;
-  close(id: number): void;
+  write(owner: number, id: number, data: string): void;
+  resize(owner: number, id: number, cols: number, rows: number): void;
+  close(owner: number, id: number): void;
+  running(owner: number, id: number): Promise<readonly string[]>;
   closeOwned(owner: number): void;
   closeAll(): void;
 }
@@ -43,6 +44,7 @@ export interface PtySeams {
   keyworkBinary(): Promise<string>;
   secretsFor(workspace: string): readonly string[];
   treeKill(pid: number): void;
+  listProcesses?: (() => Promise<string>) | undefined;
   schedule?: ((flush: () => void) => void) | undefined;
 }
 
@@ -51,6 +53,10 @@ export const batchLimitBytes = 4096;
 export function ptyHost(seams: PtySeams): PtyHost {
   const held = new Map<number, { process: PtyProcess; owner: number }>();
   const ids = idMinter();
+  const ownedBy = (owner: number, id: number): PtyProcess | undefined => {
+    const entry = held.get(id);
+    return entry?.owner === owner ? entry.process : undefined;
+  };
   return {
     open: async (request, owner, sink) => {
       const id = ids.next();
@@ -69,15 +75,22 @@ export function ptyHost(seams: PtySeams): PtyHost {
       held.set(id, { process, owner });
       return { id, title: titleOf(launch, request) };
     },
-    write: (id, data) => held.get(id)?.process.write(data),
-    resize: (id, cols, rows) => {
-      if (cols > 0 && rows > 0) held.get(id)?.process.resize(cols, rows);
+    write: (owner, id, data) => ownedBy(owner, id)?.write(data),
+    resize: (owner, id, cols, rows) => {
+      if (cols > 0 && rows > 0) ownedBy(owner, id)?.resize(cols, rows);
     },
-    close: (id) => {
-      const entry = held.get(id);
-      if (entry === undefined) return;
+    close: (owner, id) => {
+      const process = ownedBy(owner, id);
+      if (process === undefined) return;
       held.delete(id);
-      end(entry.process, seams);
+      end(process, seams);
+    },
+    running: async (owner, id) => {
+      const process = ownedBy(owner, id);
+      const listing = await seams.listProcesses?.().catch(() => undefined);
+      return process === undefined || listing === undefined
+        ? []
+        : programsUnder(process.pid, listing);
     },
     closeOwned: (owner) => {
       for (const [id, entry] of [...held]) {
@@ -212,12 +225,40 @@ export function idMinter(): { next(): number } {
   return { next: () => ++last };
 }
 
+export function processListing(platform: NodeJS.Platform): {
+  command: string;
+  args: string[];
+} {
+  return platform === "win32"
+    ? {
+        command: "powershell.exe",
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name)" }',
+        ],
+      }
+    : { command: "ps", args: ["-A", "-o", "pid=,ppid=,comm="] };
+}
+
+export function programsUnder(pid: number, listing: string): string[] {
+  return listing.split("\n").flatMap((line) => {
+    const [, , parent, program] = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/) ?? [];
+    return Number(parent) === pid && program !== undefined ? [programName(program)] : [];
+  });
+}
+
 export function windowsTreeKill(pid: number, run: (command: string, args: string[]) => void): void {
   const kill = treeKillCommand(pid, "win32");
   if (kill !== undefined) run(kill.command, kill.args);
 }
 
 const encoder = new TextEncoder();
+
+function programName(program: string): string {
+  return (program.replace(/\\/g, "/").split("/").at(-1) ?? program).replace(/\.exe$/i, "");
+}
 
 function namesASecret(name: string): boolean {
   return /^KEYWORK_.*(TOKEN|SECRET)/i.test(name);

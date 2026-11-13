@@ -5,8 +5,8 @@ unfold readable mid 884,16 540×360
 unfold readable mid 884,388 540×360
   src/sum.test.ts · you opened it from src/sum.ts
 rail 600,16 272×116
-  head 0,0 272×40 1 of 6 unfolds · the next is free
+  head 0,0 272×40 1 of 6 panels opened in 10 min
   card 0,52 272×64
     the nightly chore found two stale branches
-    Wren set out a note
+    Wren showed a note
     set out because you asked about it this morning

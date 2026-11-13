@@ -40,7 +40,11 @@
   white-space: nowrap;
   color: var(--kw-text-dim);
   cursor: grab;
+  box-shadow: inset 0 -2px 0 transparent;
   transition: box-shadow var(--kw-tempo-quick);
+}
+.kw-frame[data-focused] .kw-frame-title {
+  box-shadow: inset 0 -2px 0 var(--kw-pane-hue);
 }
 .kw-stage[data-gesture="dragging"] .kw-frame-title {
   cursor: grabbing;
@@ -78,14 +82,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0 0.5ch;
-  margin-left: -0.5ch;
+  margin: 0 0 0 -0.5ch;
+  font: inherit;
   color: var(--kw-text-mid);
   transition:
     color var(--kw-tempo-quick),
     background-color var(--kw-tempo-quick);
 }
 .kw-frame[data-focused] .kw-frame-name {
-  color: var(--kw-pane-ink);
+  color: var(--kw-text);
+  font-weight: 600;
 }
 .kw-frame .kw-frame-name[data-state="finished-unseen"] {
   color: var(--kw-text);
@@ -164,6 +170,15 @@
   color: var(--kw-text-dim);
 }
 
+.kw-frame-usage-compact,
+.kw-frame-title[data-telemetry="compact"] :is(.kw-frame-usage, .kw-gauge-unit, .kw-gauge-counted),
+.kw-frame-title[data-telemetry="hidden"] .kw-frame-telemetry {
+  display: none;
+}
+.kw-frame-title[data-telemetry="compact"] .kw-frame-usage-compact {
+  display: inline;
+}
+
 .kw-frame-gauge {
   font: inherit;
   color: inherit;
@@ -197,14 +212,27 @@
   display: none;
 }
 
-.kw-frame[data-chrome="seams"] .kw-frame-title {
-  box-shadow: inset 0 -1px 0 transparent;
-}
-.kw-frame[data-chrome="seams"][data-focused] .kw-frame-title,
-.kw-frame[data-chrome="seams"][data-state="needs-you"] .kw-frame-title {
+.kw-frame[data-chrome="seams"][data-state="needs-you"]:not([data-focused]) .kw-frame-title {
   box-shadow: inset 0 -1px 0 var(--kw-pane-ink);
 }
 
 .kw-frame[data-chrome="borderless"][data-focused] {
   --kw-pane-ground: var(--kw-panel);
+}
+
+@media (forced-colors: active) {
+  .kw-frame[data-focused]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border: 2px solid Highlight;
+    pointer-events: none;
+    forced-color-adjust: none;
+  }
+  .kw-frame[data-focused] .kw-frame-name {
+    color: HighlightText;
+    background: Highlight;
+    forced-color-adjust: none;
+  }
 }

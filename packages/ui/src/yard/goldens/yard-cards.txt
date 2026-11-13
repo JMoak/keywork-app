@@ -1,10 +1,10 @@
 yard yard
 hub 0,0 1140×900
 rail 1152,16 272×420
-  head 0,0 272×40 0 of 6 unfolds · the next is free
+  head 0,0 272×40 0 of 6 panels opened in 10 min
   card 0,52 272×64 · group of 4
     the nightly chore found two stale branches
-    Wren set out 4 things
+    Wren showed 4 things
     set out because you asked about it this morning
   card 0,128 272×64
     https://example.com/parser-spec
@@ -12,13 +12,13 @@ rail 1152,16 272×420
     set out because you asked about it this morning
   card 0,204 272×64
     this week's spend is under the cap
-    Tam set out a note
+    Tam showed a note
     set out because you asked about it this morning
   card 0,280 272×64
     two new lint warnings in scripts
-    Ada set out a note
+    Ada showed a note
     set out because you asked about it this morning
   card 0,356 272×64
     the events doc gained the show events
-    Tam set out a note
+    Tam showed a note
     set out because you asked about it this morning

@@ -27,7 +27,9 @@
 }
 .kw-open-sheet {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
+  min-width: 0;
   margin-bottom: 12vh;
 }
 
@@ -54,7 +56,11 @@
 
 .kw-open-workspaces {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.25rem;
+}
+.kw-open-workspaces > .kw-open-model-button {
+  justify-self: start;
 }
 .kw-open-input {
   width: 100%;
@@ -108,9 +114,12 @@
 .kw-open-pick:focus-visible,
 .kw-open-recent:hover,
 .kw-open-recent:focus-visible {
-  outline: none;
   color: var(--kw-text);
   background: var(--kw-panel);
+}
+.kw-open-pick:focus-visible,
+.kw-open-recent:focus-visible {
+  box-shadow: inset 2px 0 0 var(--kw-accent);
 }
 
 .kw-open-note,
@@ -118,10 +127,15 @@
   display: flex;
   margin: 0;
   color: var(--kw-text-mid);
+  overflow-wrap: anywhere;
 }
 .kw-open-failure {
   padding-left: 1.5rem;
   color: var(--kw-error);
+}
+.kw-open-sheet .kw-open-failure-of {
+  margin: 0;
+  padding-left: 1.5rem;
 }
 .kw-open-waited {
   margin-left: 1ch;

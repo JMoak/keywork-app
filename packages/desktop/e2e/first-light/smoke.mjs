@@ -23,8 +23,8 @@
 //   stead        stead profile, started exactly as Stead's entry starts it but from this build: a
 //                project the engine refuses for want of a model says so in the yard; then step 4
 //                at home, where this profile keeps a creature's chores on screen (/chores): a
-//                creature made through the card its first frame shows, a read-only chore that
-//                completes and a write chore that parks.
+//                creature made through "Customize first" on the creature its first frame meets,
+//                a read-only chore that completes and a write chore that parks.
 //   creature     stead profile, started at home with no project: the creature's model sets out a
 //                note with a rung and a size and it opens beside the hub; the keeper dismisses it
 //                from the rail by key and the model's next request hears that; the model lists
@@ -401,13 +401,24 @@ async function stepHomeChores(world) {
   const { page } = world;
   await page.click(".kw-open-failure-card button:has-text('dismiss')");
   await page.waitForSelector(".kw-open-failure-card", { state: "detached", timeout: 10_000 });
-  await page.click(".kw-onboard[data-phase=step] input");
+  await customizeTheCreatureItMeets(page);
   await walkTheOnboardingCard(page);
   await page.waitForSelector(".kw-onboard[data-phase=made]", { timeout: 60_000 });
   const creatures = await served(page, "/creatures", world.creatureHome);
   expect(creatures.creatures?.length === 1, `GET /creatures lists ${creatures.creatures?.length}`);
   world.creature = creatures.creatures[0].slug;
   return stepFour(world);
+}
+
+async function customizeTheCreatureItMeets(page) {
+  const meeting = page.locator(".kw-meet-creature");
+  await meeting.waitFor({ timeout: 60_000 }).catch(async () => {
+    throw new Error(`the stead never offered to meet a creature: ${await screenText(page)}`);
+  });
+  await meeting.getByRole("button", { name: "Customize first", exact: true }).click();
+  await page.waitForSelector(".kw-onboard[data-phase=step] .kw-onboard-step[data-current]", {
+    timeout: 60_000,
+  });
 }
 
 async function walkTheOnboardingCard(page) {
@@ -555,7 +566,7 @@ async function stepCreatureSetsOut(world) {
   const { page } = world;
   mkdirSync(creatureShots, { recursive: true });
   await page.waitForSelector(".kw-yard[data-mode='yard'] .kw-stead", { timeout: 120_000 });
-  await page.click(".kw-onboard[data-phase=step] input");
+  await customizeTheCreatureItMeets(page);
   await walkTheOnboardingCard(page);
   await page.waitForSelector(".kw-onboard[data-phase=made]", { timeout: 60_000 });
   await page.keyboard.press("Enter");

@@ -40,6 +40,7 @@ import {
   arrangementOf,
   type LayoutState,
   layoutStateOf,
+  openingOrderOf,
   parseLayoutState,
   standingOf,
 } from "./state.ts";
@@ -85,6 +86,7 @@ export class Layout {
   private focusedId: PaneId | undefined;
   private zoomedId: PaneId | undefined;
   private trail: PaneId[] = [];
+  private opened: PaneId[] = [];
   private floats = new Map<PaneId, UnitRect>();
   private shelf: PaneId[] = [];
   private pins = new Set<PaneId>();
@@ -94,7 +96,7 @@ export class Layout {
   }
 
   toJSON(): LayoutState {
-    return layoutStateOf(this.arrangement, this.focusedId, {
+    return layoutStateOf(this.arrangement, this.focusedId, this.opened, {
       floats: this.floats,
       shelved: this.shelf,
       pinned: this.pins,
@@ -104,6 +106,7 @@ export class Layout {
   load(state: LayoutState): void {
     const standing = standingOf(state);
     this.arrangement = arrangementOf(state);
+    this.opened = openingOrderOf(state);
     this.floats = new Map(standing.floats);
     this.shelf = [...standing.shelved];
     this.pins = new Set(standing.pinned);
@@ -128,6 +131,14 @@ export class Layout {
     return [...this.trail];
   }
 
+  openingOrder(): PaneId[] {
+    return [...this.opened];
+  }
+
+  mainCount(): number {
+    return mainPanes(this.arrangement).length;
+  }
+
   dockSideOf(id: PaneId): DockSide | undefined {
     return sideOf(this.arrangement, id);
   }
@@ -137,7 +148,7 @@ export class Layout {
   }
 
   spawnRank(id: PaneId): number {
-    return this.panes().indexOf(id);
+    return this.opened.indexOf(id);
   }
 
   isFloating(id: PaneId): boolean {
@@ -211,33 +222,29 @@ export class Layout {
 
   open(id: PaneId, screen: Screen, beside: PaneId | undefined = this.focusedId): Verdict {
     if (this.panes().includes(id)) return refused("already-open");
-    const anchor = this.tiledAnchor(screen, beside);
-    const anchorSide = anchor === undefined ? undefined : this.dockSideOf(anchor);
-    if (anchor !== undefined && anchorSide !== undefined) {
-      const index = this.arrangement.docks[anchorSide].panes.indexOf(anchor) + 1;
-      return this.seatFocusing(dockedAt(this.arrangement, anchorSide, id, index), id);
-    }
-    const tree = this.arrangement.tree;
-    if (tree === undefined) return this.seatFocusing(withTree(this.arrangement, leaf(id)), id);
-    if (anchor === undefined) return this.seatFocusing(this.atMainEdge(tree, id), id);
-    const orientation = splitOrientation(this.tiledRects(screen).get(anchor));
-    const grown = splitLeaf(tree, anchor, leaf(id), orientation);
-    return this.seatFocusing(withTree(this.arrangement, grown), id);
+    return this.seatFocusing(this.seatedBeside(id, screen, beside), id);
   }
 
   openInMain(id: PaneId, screen: Screen): Verdict {
     if (this.panes().includes(id)) return refused("already-open");
-    const tree = this.arrangement.tree;
-    if (tree === undefined) return this.seatFocusing(withTree(this.arrangement, leaf(id)), id);
-    const target = this.largestMainLeaf(screen);
-    if (target === undefined) return this.seatFocusing(this.atMainEdge(tree, id), id);
-    const grown = splitLeaf(tree, target.id, leaf(id), splitOrientation(target.rect));
-    return this.seatFocusing(withTree(this.arrangement, grown), id);
+    return this.seatFocusing(this.seatedInMain(id, screen), id);
   }
 
   openInDock(id: PaneId, side: DockSide): Verdict {
     if (this.panes().includes(id)) return refused("already-open");
     return this.seatFocusing(dockedAt(this.arrangement, side, id), id);
+  }
+
+  hasRoomBeside(screen: Screen, beside: PaneId | undefined = this.focusedId): boolean {
+    return this.showsWithoutTucking(this.seatedBeside(newcomer, screen, beside), screen);
+  }
+
+  hasRoomInMain(screen: Screen): boolean {
+    return this.showsWithoutTucking(this.seatedInMain(newcomer, screen), screen);
+  }
+
+  hasRoomInDock(side: DockSide, screen: Screen): boolean {
+    return this.showsWithoutTucking(dockedAt(this.arrangement, side, newcomer), screen);
   }
 
   close(id: PaneId): Verdict {
@@ -246,6 +253,7 @@ export class Layout {
     const slot = side === undefined ? -1 : this.arrangement.docks[side].panes.indexOf(id);
     this.arrangement = lifted(this.arrangement, id);
     this.trail = this.trail.filter((pane) => pane !== id);
+    this.opened = this.opened.filter((pane) => pane !== id);
     this.shelf = this.shelf.filter((pane) => pane !== id);
     this.floats.delete(id);
     this.pins.delete(id);
@@ -265,15 +273,21 @@ export class Layout {
   }
 
   focusOrdinal(ordinal: number): Verdict {
-    const id = this.panes()[ordinal - 1];
+    const id = this.opened[ordinal - 1];
     return id === undefined ? refused("unknown-pane") : this.focus(id);
   }
 
   moveFocus(direction: Direction, screen: Screen): Verdict {
-    const neighbor = this.neighbor(direction, screen);
-    if (neighbor === undefined) return refused("nothing-to-do");
-    this.focusOn(neighbor);
-    return ok;
+    const neighbor = this.tiledNeighborToward(direction, screen);
+    return neighbor === undefined ? refused("nothing-to-do") : this.focus(neighbor);
+  }
+
+  neighborToward(direction: Direction, shown: ReadonlyMap<PaneId, Rect>): PaneId | undefined {
+    return this.neighbor(direction, shown);
+  }
+
+  tiledNeighborToward(direction: Direction, screen: Screen): PaneId | undefined {
+    return this.neighbor(direction, this.tiledWithTheFocusedFloat(screen));
   }
 
   focusAcrossLayers(screen: Screen): Verdict {
@@ -431,7 +445,37 @@ export class Layout {
     if (tree === undefined || this.dockSideOf(id) !== undefined) return refused("nothing-to-do");
     const tiled = this.tiledRects(screen);
     const resized = resizeAroundLeaf(tree, id, delta, (pane) => tiled.has(pane));
+    if (JSON.stringify(resized) === JSON.stringify(tree)) return refused("nothing-to-do");
     return this.resize(withTree(this.arrangement, resized), screen);
+  }
+
+  private seatedBeside(id: PaneId, screen: Screen, beside: PaneId | undefined): Arrangement {
+    const anchor = this.tiledAnchor(screen, beside);
+    const anchorSide = anchor === undefined ? undefined : this.dockSideOf(anchor);
+    if (anchor !== undefined && anchorSide !== undefined) {
+      const index = this.arrangement.docks[anchorSide].panes.indexOf(anchor) + 1;
+      return dockedAt(this.arrangement, anchorSide, id, index);
+    }
+    const tree = this.arrangement.tree;
+    if (tree === undefined) return withTree(this.arrangement, leaf(id));
+    if (anchor === undefined) return this.atMainEdge(tree, id);
+    const orientation = splitOrientation(this.tiledRects(screen).get(anchor));
+    return withTree(this.arrangement, splitLeaf(tree, anchor, leaf(id), orientation));
+  }
+
+  private seatedInMain(id: PaneId, screen: Screen): Arrangement {
+    const tree = this.arrangement.tree;
+    if (tree === undefined) return withTree(this.arrangement, leaf(id));
+    const target = this.largestMainLeaf(screen);
+    if (target === undefined) return this.atMainEdge(tree, id);
+    const grown = splitLeaf(tree, target.id, leaf(id), splitOrientation(target.rect));
+    return withTree(this.arrangement, grown);
+  }
+
+  private showsWithoutTucking(candidate: Arrangement, screen: Screen): boolean {
+    const staged = without(candidate, (id) => this.isShelved(id) || this.isFloating(id));
+    const waiting = tuckedFor(staged, [newcomer, ...this.standing()], screen);
+    return waiting.length <= this.tucked(screen).length;
   }
 
   private staged(): Arrangement {
@@ -525,6 +569,14 @@ export class Layout {
     return arrangementRects(this.showing(screen), screen);
   }
 
+  private tiledWithTheFocusedFloat(screen: Screen): Map<PaneId, Rect> {
+    const tiled = this.tiledRects(screen);
+    const focused = this.focusedId;
+    const float = focused === undefined ? undefined : this.floats.get(focused);
+    if (focused === undefined || float === undefined) return tiled;
+    return new Map([...tiled, [focused, floatRectOn(screen, float)]]);
+  }
+
   private tiledAnchor(screen: Screen, preferred: PaneId | undefined): PaneId | undefined {
     const tiled = this.tiledRects(screen);
     return [preferred, this.focusedId, ...this.trail, ...tiled.keys()].find(
@@ -544,6 +596,7 @@ export class Layout {
 
   private seatFocusing(candidate: Arrangement, id: PaneId): Verdict {
     this.seat(candidate);
+    if (!this.opened.includes(id)) this.opened.push(id);
     this.focusOn(id);
     return ok;
   }
@@ -631,7 +684,9 @@ export class Layout {
     const tree = this.arrangement.tree;
     if (tree === undefined) return refused("nothing-to-do");
     const main = mainPanes(this.arrangement);
-    const neighbor = this.neighbor(direction, screen, (candidate) => main.includes(candidate));
+    const neighbor = this.neighbor(direction, this.tiledRects(screen), (candidate) =>
+      main.includes(candidate),
+    );
     if (neighbor !== undefined) {
       this.arrangement = withTree(this.arrangement, swapLeaves(tree, id, neighbor));
       return ok;
@@ -649,12 +704,11 @@ export class Layout {
 
   private neighbor(
     direction: Direction,
-    screen: Screen,
+    rects: ReadonlyMap<PaneId, Rect>,
     eligible: (id: PaneId) => boolean = () => true,
   ): PaneId | undefined {
     const focused = this.focusedId;
     if (focused === undefined) return undefined;
-    const rects = this.rects(screen);
     const origin = rects.get(focused);
     if (origin === undefined) return undefined;
     const tiled = [...rects].filter(
@@ -667,6 +721,7 @@ export class Layout {
 }
 
 const ok: Verdict = { ok: true };
+const newcomer: PaneId = "\u0000newcomer";
 
 function refused(refusal: Refusal): Verdict {
   return { ok: false, refused: refusal };

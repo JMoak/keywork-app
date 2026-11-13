@@ -35,7 +35,13 @@ export function createSlashInput(seams: SlashInputSeams): SlashInput {
     return registry === undefined ? undefined : { registry, scope: seams.scope() };
   };
   const typed = createMemo(() => slashTextOf(seams.draft()));
-  const active = (): boolean => typed() !== undefined && context() !== undefined;
+  const [dismissed, setDismissed] = createSignal(false);
+  createEffect(
+    on(typed, (text) => {
+      if (text === undefined) setDismissed(false);
+    }),
+  );
+  const active = (): boolean => typed() !== undefined && context() !== undefined && !dismissed();
   const suggestions = createMemo((): readonly Suggestion[] => {
     const text = typed();
     const known = context();
@@ -78,7 +84,7 @@ export function createSlashInput(seams: SlashInputSeams): SlashInput {
       if (!active() || event.isComposing) return false;
       switch (event.key) {
         case "Escape":
-          seams.setDraft("");
+          setDismissed(true);
           return true;
         case "ArrowDown":
           step(1);

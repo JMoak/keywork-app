@@ -468,3 +468,49 @@ describe("every verb together", () => {
     }
   });
 });
+
+describe("room for a newcomer", () => {
+  const exactlyTwo: Screen = {
+    width: minPaneSize.width * 2 + 40,
+    height: minPaneSize.height + 100,
+  };
+
+  it("says whether one more pane would show without another leaving the stage", () => {
+    const layout = columns(["a", "b"]);
+    expect(layout.hasRoomBeside(screen)).toBe(true);
+    expect(layout.hasRoomInMain(screen)).toBe(true);
+    expect(layout.hasRoomInDock("left", screen)).toBe(true);
+    expect(layout.hasRoomBeside(exactlyTwo)).toBe(false);
+    expect(layout.hasRoomInMain(exactlyTwo)).toBe(false);
+    expect(layout.hasRoomInDock("left", exactlyTwo)).toBe(false);
+  });
+
+  it("asks without seating anything", () => {
+    const layout = columns(["a", "b"]);
+    const saved = JSON.stringify(layout.toJSON());
+    layout.hasRoomBeside(exactlyTwo);
+    layout.hasRoomInDock("right", exactlyTwo);
+    expect(JSON.stringify(layout.toJSON())).toBe(saved);
+    expect(layout.panes()).toEqual(["a", "b"]);
+  });
+
+  it("agrees with what opening then shows", () => {
+    for (const at of [screen, exactlyTwo, twoColumns, oneColumn]) {
+      const layout = columns(["a", "b"]);
+      const roomy = layout.hasRoomBeside(at);
+      const waiting = layout.shelved(at).length;
+      layout.open("c", at);
+      expect(layout.shelved(at).length <= waiting, JSON.stringify(at)).toBe(roomy);
+    }
+  });
+
+  it("counts a shelved or a floating pane as taking no room", () => {
+    const shelving = columns(["a", "b"]);
+    shelving.shelve("a");
+    expect(shelving.hasRoomBeside(exactlyTwo)).toBe(true);
+    const floating = columns(["a", "b"]);
+    floating.floatToggle(exactlyTwo);
+    floating.focus("a");
+    expect(floating.hasRoomBeside(exactlyTwo)).toBe(true);
+  });
+});

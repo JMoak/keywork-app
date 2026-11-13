@@ -3,24 +3,34 @@ import type { TextSpan } from "./graphemes.ts";
 export const pasteCollapseLines = 6;
 export const pasteCollapseChars = 4096;
 
+export type HeldPastes = readonly (readonly [ordinal: number, text: string])[];
+
 export interface PasteVault {
   hold(text: string): string;
   expandAll(draft: string): string;
   spanEndingAt(draft: string, caret: number): TextSpan | undefined;
   spanStartingAt(draft: string, caret: number): TextSpan | undefined;
-  clear(): void;
+  heldIn(draft: string): HeldPastes;
+  restore(pastes: HeldPastes): void;
 }
 
 export function createPasteVault(): PasteVault {
   const held = new Map<number, string>();
-  const heldSpans = (draft: string): TextSpan[] =>
-    Array.from(draft.matchAll(placeholderPattern))
-      .filter((match) => held.has(Number(match[1])))
-      .map((match) => ({ start: match.index, end: match.index + match[0].length }));
+  const heldSpansWithin = (draft: string, from: number, to: number): TextSpan[] => {
+    const start = Math.max(0, from);
+    return heldMatches(draft.slice(start, to)).map((match) => ({
+      start: start + match.index,
+      end: start + match.index + match[0].length,
+    }));
+  };
+  const heldMatches = (text: string): RegExpExecArray[] =>
+    held.size === 0
+      ? []
+      : Array.from(text.matchAll(placeholderPattern)).filter((match) => held.has(Number(match[1])));
   return {
     hold: (text) => {
       if (!overflows(text)) return text;
-      const ordinal = held.size + 1;
+      const ordinal = Math.max(0, ...held.keys()) + 1;
       held.set(ordinal, text);
       return placeholderFor(ordinal, text);
     },
@@ -29,9 +39,19 @@ export function createPasteVault(): PasteVault {
         placeholderPattern,
         (token, ordinal: string) => held.get(Number(ordinal)) ?? token,
       ),
-    spanEndingAt: (draft, caret) => heldSpans(draft).find((span) => span.end === caret),
-    spanStartingAt: (draft, caret) => heldSpans(draft).find((span) => span.start === caret),
-    clear: () => held.clear(),
+    spanEndingAt: (draft, caret) =>
+      heldSpansWithin(draft, caret - placeholderReach, caret).find((span) => span.end === caret),
+    spanStartingAt: (draft, caret) =>
+      heldSpansWithin(draft, caret, caret + placeholderReach).find((span) => span.start === caret),
+    heldIn: (draft) =>
+      heldMatches(draft).map((match) => {
+        const ordinal = Number(match[1]);
+        return [ordinal, held.get(ordinal) ?? ""] as const;
+      }),
+    restore: (pastes) => {
+      held.clear();
+      for (const [ordinal, text] of pastes) held.set(ordinal, text);
+    },
   };
 }
 
@@ -52,6 +72,8 @@ export function humanBytes(bytes: number): string {
 }
 
 const placeholderPattern = /\[pasted #(\d+), \d+ lines?, [\d.]+ [KM]?B\]/g;
+
+const placeholderReach = 96;
 
 function overflows(text: string): boolean {
   return text.length > pasteCollapseChars || lineCount(text) > pasteCollapseLines;

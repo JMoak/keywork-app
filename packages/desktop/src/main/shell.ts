@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { BrowserWindow, screen } from "electron";
 import { hostChannels } from "../shared/channels.ts";
+import { appPageArgument } from "./app-page.ts";
 import { markImage } from "./native.ts";
 import { windowTitle } from "./product.ts";
 import { trayModel } from "./tray.ts";
@@ -21,7 +22,8 @@ export interface DesktopShell {
   bindWindow(windowId: number, workspace: string): Promise<void>;
   unbindWindow(windowId: number): Promise<void>;
   focusWindow(windowId: number): void;
-  focusMostRecent(): void;
+  showConsole(): void;
+  leave(): Promise<void>;
   broadcast(channel: string, payload: unknown): void;
   onOpenWorkspacesChanged(listener: (open: readonly OpenWorkspace[]) => void): () => void;
 }
@@ -31,12 +33,22 @@ export interface ShellSeams {
   workspaces: WorkspaceHost;
   states: WindowStateBook;
   platform: NodeJS.Platform;
+  onLastWindowClosing?: (() => void) | undefined;
 }
 
 export function desktopShell(seams: ShellSeams): DesktopShell {
   const windows = windowRegistry();
   const consoleWindows = new Set<number>();
   const { workspaces, states, profile = keyworkProfile } = seams;
+  let leaving = false;
+
+  const remember = (window: BrowserWindow): Promise<void> =>
+    states
+      .write(windowStateKey(windows.workspaceOf(window.id), seams.platform), stateOf(window))
+      .catch(() => undefined);
+
+  const closesTheLastWindow = (windowId: number): boolean =>
+    consoleWindows.size === 1 && consoleWindows.has(windowId);
 
   const releaseIfLast = async (
     release: { workspace: string; lastWindow: boolean } | undefined,
@@ -62,7 +74,7 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
   const titleFor = (windowId: number): string => {
     const workspace = windows.workspaceOf(windowId);
     const open = windows.list().find((entry) => entry.workspace === workspace);
-    return windowTitle(open?.needsYou ?? 0, profile);
+    return windowTitle(open?.needsYou ?? 0, profile, workspace);
   };
 
   const openWindow = async (workspace?: string): Promise<BrowserWindow> => {
@@ -76,11 +88,14 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
       window.setTitle(titleFor(window.id));
     });
     window.on("focus", () => windows.focused(window.id));
-    window.on("close", () => {
-      void states.write(
-        windowStateKey(windows.workspaceOf(window.id), seams.platform),
-        stateOf(window),
-      );
+    window.on("close", (event) => {
+      if (leaving) return;
+      if (seams.onLastWindowClosing !== undefined && closesTheLastWindow(window.id)) {
+        event.preventDefault();
+        seams.onLastWindowClosing();
+        return;
+      }
+      void remember(window);
     });
     window.on("closed", () => {
       consoleWindows.delete(window.id);
@@ -135,9 +150,16 @@ export function desktopShell(seams: ShellSeams): DesktopShell {
     },
     unbindWindow: (windowId) => releaseIfLast(windows.unbind(windowId)),
     focusWindow,
-    focusMostRecent: () => {
+    showConsole: () => {
+      if (leaving) return;
       const recent = windows.mostRecentlyActive();
       if (recent !== undefined) focusWindow(recent);
+      else void openWindow();
+    },
+    leave: async () => {
+      leaving = true;
+      const open = [...consoleWindows].flatMap((id) => BrowserWindow.fromId(id) ?? []);
+      await Promise.all(open.map(remember));
     },
     broadcast: (channel, payload) => {
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send(channel, payload);
@@ -157,7 +179,7 @@ function createWindow(remembered: WindowState, profile: ProductProfile): Browser
     title: windowTitle(0, profile),
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.js"),
-      additionalArguments: [`--keywork-product=${profile.id}`],
+      additionalArguments: [`--keywork-product=${profile.id}`, appPageArgument()],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

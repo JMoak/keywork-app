@@ -78,6 +78,7 @@ import type {
   ResolutionFailure,
   RestoreOutcome,
   RestorePreviewReading,
+  RestoreScope,
   RevertReply,
   ReviewVerdict,
   RevokeOutcome,
@@ -100,9 +101,11 @@ import type {
   UndoReading,
   VerdictRecording,
   VerdictsReading,
+  WorkInFlight,
   WorkspaceChoice,
   WorkspaceUse,
   WorkspaceView,
+  WoundDown,
   WriteResult,
 } from "@keywork-app/protocol";
 import { type CreatureProjectsClient, creatureProjectClient } from "./creature-projects.ts";
@@ -142,14 +145,16 @@ export interface KeyworkClient {
   restoreSession(id: string): Promise<RestoreOutcome>;
   discardTrashedSession(id: string): Promise<DiscardTrashedOutcome>;
   purgeTrash(): Promise<PurgedTrash>;
+  work(): Promise<WorkInFlight | "unreported">;
+  shutDown(): Promise<WoundDown | "unavailable">;
   setModel(id: string, reference: string): Promise<ModelReading>;
   setThinking(id: string, on: boolean): Promise<ThinkingReading>;
   setEffort(id: string, level: EffortLevel | null): Promise<EffortReading>;
   compact(id: string, focus?: string): Promise<CompactReading>;
   undo(id: string): Promise<UndoReading>;
   redo(id: string): Promise<RedoReading>;
-  restoreTurn(id: string, turn: number): Promise<TurnRestoreReading>;
-  previewRestore(id: string, turn: number): Promise<RestorePreviewReading>;
+  restoreTurn(id: string, turn: number, scope?: RestoreScope): Promise<TurnRestoreReading>;
+  previewRestore(id: string, turn: number, scope?: RestoreScope): Promise<RestorePreviewReading>;
   context(id: string): Promise<ContextReading>;
   cost(id: string): Promise<CostReading>;
   exportSession(id: string, request?: ExportRequest): Promise<ExportReading>;
@@ -404,6 +409,7 @@ function clientOver(url: string, transport: Fetch, seams: ClientSeams): ConsoleC
       return json<VerdictRecording>(response);
     },
     ...lifecycleRoutes(request),
+    ...workRoutes(request),
     asks: async () => {
       const listed = await json<{ asks: PendingAsk[] }>(await request("GET", "/asks"));
       return listed.asks;
@@ -490,9 +496,10 @@ function sessionVerbRoutes(request: Request): SessionVerbRoutes {
       answered(await verb(id, "compact", focus === undefined ? {} : { focus })),
     undo: async (id) => answered(await verb(id, "undo")),
     redo: async (id) => answered(await verb(id, "redo")),
-    restoreTurn: async (id, turn) => answered(await verb(id, "restore", { turn })),
-    previewRestore: async (id, turn) => {
-      const response = await reading(id, `restore?turn=${turn}`);
+    restoreTurn: async (id, turn, scope) =>
+      answered(await verb(id, "restore", { turn, ...(scope !== undefined && { scope }) })),
+    previewRestore: async (id, turn, scope) => {
+      const response = await reading(id, `restore?${restoreQuery(turn, scope)}`);
       if (response.status !== 404) return json(response);
       return (await refusalDetail(response)) === missingSessionDetail ? "missing" : "unknown-turn";
     },
@@ -587,6 +594,12 @@ function rangeQuery(range: FileRange): string {
   return text === "" ? "" : `?${text}`;
 }
 
+function restoreQuery(turn: number, scope: RestoreScope | undefined): string {
+  const query = new URLSearchParams({ turn: String(turn) });
+  if (scope !== undefined) query.set("scope", scope);
+  return query.toString();
+}
+
 type LifecycleRoutes = Pick<
   KeyworkClient,
   "removeSession" | "listTrash" | "restoreSession" | "discardTrashedSession" | "purgeTrash"
@@ -614,6 +627,21 @@ function lifecycleRoutes(request: Request): LifecycleRoutes {
       return "discarded";
     },
     purgeTrash: () => request("DELETE", "/trash").then(json<PurgedTrash>),
+  };
+}
+
+type WorkRoutes = Pick<KeyworkClient, "work" | "shutDown">;
+
+function workRoutes(request: Request): WorkRoutes {
+  return {
+    work: async () => {
+      const response = await request("GET", "/work");
+      return response.status === 503 ? "unreported" : json<WorkInFlight>(response);
+    },
+    shutDown: async () => {
+      const response = await request("POST", "/shutdown");
+      return response.status === 503 ? "unavailable" : json<WoundDown>(response);
+    },
   };
 }
 

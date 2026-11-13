@@ -172,6 +172,43 @@ describe("campaign creation", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it("shows the server's refusal in its own words and refuses a model campaigns cannot run on", async () => {
+    const [refusal, setRefusal] = createSignal<string | null>(null);
+    const submit = vi.fn(async () => {
+      setRefusal("notes/todo.md is not in this folder. Check the starting file or folder.");
+      return false;
+    });
+    render(() => (
+      <CampaignForm
+        models={[first]}
+        busy={false}
+        admits={(model) => model !== "nope"}
+        modelNote="Only some models can run a campaign."
+        refusal={refusal()}
+        submit={submit}
+        close={() => undefined}
+        cancel={() => undefined}
+      />
+    ));
+    expect(document.activeElement).toBe(screen.getByLabelText("Title"));
+    expect(screen.getByText("Only some models can run a campaign.")).toBeDefined();
+    await fillBrief();
+    await submitForm();
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe(
+        "notes/todo.md is not in this folder. Check the starting file or folder.",
+      ),
+    );
+    await fireEvent.change(screen.getByRole("combobox", { name: "Model" }), {
+      target: { value: "custom" },
+    });
+    await fireEvent.input(screen.getByLabelText("Provider"), { target: { value: "anywhere" } });
+    await fireEvent.input(screen.getByLabelText("Model identifier"), { target: { value: "nope" } });
+    await submitForm();
+    expect(screen.getByRole("alert").textContent).toBe("Only some models can run a campaign.");
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
   it("closes only after confirmed creation", async () => {
     const close = vi.fn();
     const cancel = vi.fn();

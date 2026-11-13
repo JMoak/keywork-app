@@ -1,7 +1,14 @@
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import type { Screen } from "../layout/index.ts";
-import { createTiler, type PaneSpec, parseTilerState, shelfNotices } from "./tiler.ts";
+import { definitionOf, type PaneDefinition, type PaneKind } from "../panes/index.ts";
+import {
+  createTiler,
+  type PaneDefinitions,
+  type PaneSpec,
+  parseTilerState,
+  shelfNotices,
+} from "./tiler.ts";
 
 const sessionsPaneId = "tree-1";
 const sessions: PaneSpec = { kind: "tree" };
@@ -9,12 +16,24 @@ const conversation = (sessionId?: string): PaneSpec => ({ kind: "conversation", 
 
 const screen: Screen = { width: 1600, height: 1000 };
 
-function withTiler<T>(body: (tiler: ReturnType<typeof createTiler>) => T): T {
+function withTiler<T>(
+  body: (tiler: ReturnType<typeof createTiler>) => T,
+  definitions: PaneDefinitions = definitionOf,
+): T {
   return createRoot((dispose) => {
-    const result = body(createTiler());
+    const result = body(createTiler(undefined, definitions));
     dispose();
     return result;
   });
+}
+
+type Revision = (definition: PaneDefinition<PaneSpec>) => PaneDefinition<PaneSpec>;
+
+function withDefinitions(revisions: Partial<Record<PaneKind, Revision>>): PaneDefinitions {
+  return (kind) => {
+    const revise = revisions[kind];
+    return revise === undefined ? definitionOf(kind) : revise(definitionOf(kind));
+  };
 }
 
 describe("createTiler", () => {
@@ -100,6 +119,75 @@ describe("createTiler", () => {
       expect(tiler.focused()).toBe("conversation-1");
       expect(tiler.summon(conversation("s2"), screen).ok).toBe(true);
       expect(tiler.panes().filter((id) => id.startsWith("conversation"))).toHaveLength(2);
+    });
+  });
+
+  it("opens another pane when a summon that asks for it comes from a pane of its own kind", () => {
+    const shells = withDefinitions({
+      terminal: (definition) =>
+        definition.summon === undefined
+          ? definition
+          : { ...definition, summon: { ...definition.summon, again: "opens-another" } },
+    });
+    withTiler((tiler) => {
+      const shell: PaneSpec = { kind: "terminal", mode: "shell" };
+      tiler.open(conversation("s1"), screen);
+      expect(tiler.summon(shell, screen).ok).toBe(true);
+      tiler.focus("conversation-1");
+      expect(tiler.summon(shell, screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("terminal"))).toEqual(["terminal-1"]);
+      expect(tiler.summon(shell, screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("terminal"))).toEqual([
+        "terminal-1",
+        "terminal-2",
+      ]);
+      expect(tiler.focused()).toBe("terminal-2");
+    }, shells);
+  });
+
+  it("finds the pane already showing a summon's subject and moves it to the new view", () => {
+    const byPath = withDefinitions({
+      file: (definition) => ({
+        ...definition,
+        subject: (spec) => (spec.kind === "file" ? [spec.path, spec.spill] : spec),
+      }),
+    });
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.summon({ kind: "file", path: "src/long.ts", from: 100, to: 160 }, screen);
+      tiler.focus("conversation-1");
+      expect(tiler.summon({ kind: "file", path: "src/long.ts" }, screen).ok).toBe(true);
+      expect(tiler.panes().filter((id) => id.startsWith("file"))).toEqual(["file-1"]);
+      expect(tiler.spec("file-1")).toEqual({ kind: "file", path: "src/long.ts" });
+      expect(tiler.focused()).toBe("file-1");
+      tiler.summon({ kind: "file", path: "src/math.ts" }, screen);
+      expect(tiler.panes().filter((id) => id.startsWith("file"))).toHaveLength(2);
+    }, byPath);
+  });
+
+  it("knows the last focused pane of a kind, and moves focus by the rects another view shows", () => {
+    withTiler((tiler) => {
+      tiler.summon(sessions, screen);
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      tiler.focus("conversation-1");
+      tiler.focus(sessionsPaneId);
+      expect(tiler.lastFocusedOf("conversation")).toBe("conversation-1");
+      const mirrored = new Map([
+        [sessionsPaneId, { x: 1200, y: 0, width: 400, height: 1000 }],
+        ["conversation-1", { x: 0, y: 0, width: 1200, height: 1000 }],
+      ]);
+      expect(tiler.focusShownToward("left", screen, mirrored).ok).toBe(true);
+      expect(tiler.focused()).toBe("conversation-1");
+      expect(tiler.focusShownToward("left", screen, mirrored)).toEqual({
+        ok: false,
+        refused: "nothing-to-do",
+      });
+      const conversationAlone = new Map([
+        ["conversation-1", { x: 0, y: 0, width: 1600, height: 1000 }],
+      ]);
+      expect(tiler.focusShownToward("left", screen, conversationAlone).ok).toBe(true);
+      expect(tiler.focused()).toBe(sessionsPaneId);
     });
   });
 
@@ -370,6 +458,43 @@ describe("floats, the shelf and pins", () => {
       const floating = restored.slots(screen).find((slot) => slot.floating !== undefined);
       expect(floating).toMatchObject({ id: "conversation-3", pinned: true });
       dispose();
+    });
+  });
+});
+
+describe("a full stage", () => {
+  const filledAroundAKnownSession = (tiler: ReturnType<typeof createTiler>): void => {
+    tiler.summon(sessions, screen);
+    tiler.open(conversation("known"), screen);
+    let filler = 0;
+    while (tiler.open(conversation(`filler-${filler}`), screen).notice === undefined) filler += 1;
+    tiler.closeFocused();
+    tiler.focus(sessionsPaneId);
+  };
+
+  it("says a pane that would send another to the shelf crowds the stage", () => {
+    withTiler((tiler) => {
+      filledAroundAKnownSession(tiler);
+      expect(tiler.shelf(screen)).toEqual([]);
+      expect(tiler.crowds(conversation("one more"), screen)).toBe(true);
+      expect(tiler.shelf(screen)).toEqual([]);
+    });
+  });
+
+  it("does not count a summon that only focuses a pane already open", () => {
+    withTiler((tiler) => {
+      filledAroundAKnownSession(tiler);
+      expect(tiler.crowds(conversation("known"), screen)).toBe(false);
+      expect(tiler.crowds(sessions, screen)).toBe(false);
+    });
+  });
+
+  it("stops crowding once a pane closes", () => {
+    withTiler((tiler) => {
+      filledAroundAKnownSession(tiler);
+      const closing = tiler.findPane((spec) => spec.kind === "conversation");
+      expect(tiler.close(closing as string).ok).toBe(true);
+      expect(tiler.crowds(conversation("one more"), screen)).toBe(false);
     });
   });
 });

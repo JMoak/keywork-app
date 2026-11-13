@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { build, type Plugin, type ResolvedConfig, type Rollup } from "vite";
 import solid from "vite-plugin-solid";
+import { contentPolicyPlugin } from "./src/shared/content-policy.ts";
 
 const ui = resolve(import.meta.dirname, "../ui");
 
@@ -55,7 +56,7 @@ export default defineConfig({
   },
   renderer: {
     root: ui,
-    plugins: [solid(), tailwindcss()],
+    plugins: [solid(), tailwindcss(), contentPolicyPlugin()],
     build: { rollupOptions: { input: resolve(ui, "index.html") } },
   },
 });

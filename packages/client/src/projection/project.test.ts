@@ -7,8 +7,9 @@ import type {
 } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { coalesceEnvelopes } from "./coalesce.ts";
-import { crateDeliveredLine, project, projectAll } from "./project.ts";
-import { toolRowText } from "./tool-row.ts";
+import { historyEnvelopes } from "./history.ts";
+import { crateDeliveredLine, emptyReplyLine, project, projectAll } from "./project.ts";
+import { toolRowSpans, toolRowText } from "./tool-row.ts";
 import { emptyProjection } from "./types.ts";
 
 let nextId = 0;
@@ -95,6 +96,122 @@ describe("project", () => {
     });
     expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · 1.5s · done");
     expect(settled.running).toEqual({});
+  });
+
+  it("shows the latest whole line of live output, never lines glued together, and how long it has run", () => {
+    const started = projectAll(emptyProjection, [
+      at("turn.started", { userText: "ping" }),
+      at("tool.started", { call }),
+    ]);
+    const startedAt = Date.parse(runOf(started, 1).startedAt ?? "");
+    const tailed = projectAll(started, [
+      at("tool.output", { chunk: "line1\r\n", callId: "c1" }),
+      at("tool.output", { chunk: "line2\r\n", callId: "c1" }),
+      at("tool.output", { chunk: "line3\n", callId: "c1" }),
+    ]);
+    expect(runOf(tailed, 1).live).toBe("line3");
+    expect(toolRowText(runOf(tailed, 1))).toBe("bash echo hi · line3");
+    expect(
+      toolRowSpans(runOf(tailed, 1), { now: startedAt + 4_200 })
+        .map((span) => span.text)
+        .join(""),
+    ).toBe("bash echo hi · 4.0s · line3");
+  });
+
+  it("keeps what a stopped command printed and calls the stop a stop, not a failure", () => {
+    const stopped = projectAll(emptyProjection, [
+      at("turn.started", { userText: "ping" }),
+      at("tool.started", { call }),
+      at("tool.output", {
+        chunk: "Reply from 127.0.0.103\nReply from 127.0.0.103\n",
+        callId: "c1",
+      }),
+      at("tool.finished", { callId: "c1", output: "Command aborted", isError: true }, 17_900),
+      at("turn.interrupted", { message: { role: "assistant", parts: [] } }),
+    ]);
+    expect(runOf(stopped, 1)).toMatchObject({
+      stopped: true,
+      reason: undefined,
+      detail: ["Reply from 127.0.0.103", "Reply from 127.0.0.103"],
+    });
+    expect(toolRowText(runOf(stopped, 1))).toBe("bash echo hi · 17.9s · stopped");
+  });
+
+  it("reads a non-zero exit from the wire's exit code instead of calling it done", () => {
+    const finished = (output: string, exitCode?: number) =>
+      runOf(
+        projectAll(emptyProjection, [
+          at("turn.started", { userText: "ls" }),
+          at("tool.started", { call }),
+          at(
+            "tool.finished",
+            { callId: "c1", output, isError: false, ...(exitCode !== undefined && { exitCode }) },
+            255,
+          ),
+        ]),
+        1,
+      );
+    expect(toolRowText(finished("ls: nope_dir: No such file\n(exit code 2)", 2))).toBe(
+      "bash echo hi · 255ms · exit 2",
+    );
+    expect(toolRowSpans(finished("(exit code 2)", 2)).at(-1)).toMatchObject({ tone: "bad" });
+    expect(finished("(shell exited; a fresh shell starts on the next command)").exitNote).toBe(
+      "shell exited",
+    );
+    expect(toolRowText(finished("all good", 0))).toBe("bash echo hi · 255ms · done");
+    expect(toolRowText(finished("(exit code 2)"))).toBe("bash echo hi · 255ms · done");
+  });
+
+  it("keeps a stored exit code when a reload replays the tool", () => {
+    const detail = {
+      id: "s1",
+      title: "ls",
+      createdAt: "2026-09-06T12:00:00.000Z",
+      lastActivityAt: "2026-09-06T12:00:00.000Z",
+      messageCount: 3,
+      cwd: "/work",
+      live: false,
+      asOf: 0,
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "ls" }] },
+        { role: "assistant", parts: [{ ...call }] },
+        {
+          role: "tool",
+          parts: [{ type: "tool-result", callId: "c1", output: "", isError: false, exitCode: 2 }],
+        },
+      ],
+    } as const;
+    const replayed = projectAll(emptyProjection, historyEnvelopes(detail));
+    expect(runOf(replayed, 1).exitNote).toBe("exit 2");
+  });
+
+  it("says a missing file plainly instead of the system's error and absolute path", () => {
+    const read = {
+      type: "tool-call",
+      callId: "r1",
+      name: "read",
+      arguments: { path: "nope.txt" },
+    } as const;
+    const failed = projectAll(emptyProjection, [
+      at("turn.started", { userText: "read it" }),
+      at("tool.started", { call: read }),
+      at("tool.finished", {
+        callId: "r1",
+        output: "ENOENT: no such file or directory, open 'C:\\Users\\k\\workspace\\nope.txt'",
+        isError: true,
+      }),
+    ]);
+    expect(runOf(failed, 1).reason).toBe("nope.txt not found");
+  });
+
+  it("keeps every line of a settled tool's output for the reader to unfold", () => {
+    const output = Array.from({ length: 40 }, (_, line) => `line ${line + 1}`).join("\n");
+    const settled = projectAll(emptyProjection, [
+      at("turn.started", { userText: "cat" }),
+      at("tool.started", { call }),
+      at("tool.finished", { callId: "c1", output, isError: false }),
+    ]);
+    expect(runOf(settled, 1).detail).toHaveLength(40);
   });
 
   it("times the tool's own run apart from the minute it waited for a human answer", () => {
@@ -184,12 +301,83 @@ describe("project", () => {
       "assistant",
       "user",
       "assistant",
-      "notice",
+      "ending",
     ]);
     expect(state.entries[1]).toEqual({ kind: "thinking", text: "hmm", replay: true });
     expect(state.turn).toBeUndefined();
     expect(state.usage.turns).toBe(0);
-    expect(state.entries.at(-1)).toEqual({ kind: "notice", level: "info", text: "· interrupted" });
+    expect(state.entries.at(-1)).toEqual({
+      kind: "ending",
+      outcome: "interrupted",
+      text: "interrupted",
+      prompt: "new",
+      replay: false,
+    });
+  });
+
+  it("ends a turn that failed with its error and its prompt, ready to try again", () => {
+    const state = projectAll(emptyProjection, [
+      at("turn.started", { userText: "summarize the log", entryId: "p1" }),
+      at("turn.delta", { delta: { type: "text", text: "Reading" } }),
+      at("engine.error", { error: { name: "Error", message: "upstream 529 overloaded" } }),
+    ]);
+    expect(state.turn).toBeUndefined();
+    expect(state.lastError).toBe("upstream 529 overloaded");
+    expect(state.entries.at(-1)).toEqual({
+      kind: "ending",
+      outcome: "failed",
+      text: "upstream 529 overloaded",
+      prompt: "summarize the log",
+      replay: false,
+    });
+  });
+
+  it("draws a failed turn once when a snapshot that already held its outcome is followed by its live retelling", () => {
+    const error = { name: "Error", message: "upstream 529 overloaded" };
+    const state = projectAll(emptyProjection, [
+      at("turn.started", { userText: "failnow", entryId: "p1", replay: true }),
+      at("engine.error", { error, replay: true }),
+      at("turn.started", { userText: "failnow", entryId: "p1" }),
+      at("engine.error", { error }),
+    ]);
+    expect(state.entries.map((entry) => entry.kind)).toEqual(["user", "ending"]);
+    expect(state.entries[1]).toMatchObject({ outcome: "failed", replay: false });
+  });
+
+  it("offers no resend for a turn a creature framed, whose prompt the keeper never wrote", () => {
+    const origin = { kind: "creature", creature: "wren", thread: "s1" } as const;
+    const state = projectAll(emptyProjection, [
+      at("turn.started", { userText: "You are Wren.", origin }),
+      at("turn.interrupted", { message: { role: "assistant", parts: [] } }),
+    ]);
+    expect(state.entries).toEqual([
+      {
+        kind: "ending",
+        outcome: "interrupted",
+        text: "interrupted",
+        prompt: undefined,
+        replay: false,
+      },
+    ]);
+  });
+
+  it("leaves a trace when the model answers with nothing at all", () => {
+    const empty = { role: "assistant", parts: [] } as const;
+    const usage = { inputTokens: 3, outputTokens: 0 };
+    const state = projectAll(emptyProjection, [
+      at("turn.started", { userText: "nothing" }),
+      at("turn.delta", { delta: { type: "done", usage } }),
+      at("turn.completed", { message: empty, usage }),
+      at("turn.started", { userText: "say hi" }),
+      at("turn.delta", { delta: { type: "text", text: "hi there" } }),
+      at("turn.completed", { message: assistant, usage }),
+    ]);
+    expect(state.entries.map((entry) => ("text" in entry ? entry.text : entry.kind))).toEqual([
+      "nothing",
+      emptyReplyLine,
+      "say hi",
+      "hi there",
+    ]);
   });
 
   it("tracks queue, preset, mode, injections, diagnostics and errors", () => {
@@ -291,9 +479,19 @@ describe("a creature's report lines", () => {
       message: "Hal reads the workspace and introduces itself.",
       detail: { kind: "frame", origin: { kind: "creature", creature: "hal", thread: "s1" } },
     });
-    expect(lines(projectAll(emptyProjection, [frame]))).toEqual([
-      "Hal reads the workspace and introduces itself.",
-    ]);
+    expect(lines(projectAll(emptyProjection, [frame]))).toEqual([]);
+  });
+
+  it("keeps a frame, the creature's own instructions, out of the transcript live and replayed", () => {
+    const frame = (replay: boolean) =>
+      at("extension.notice", {
+        extension: "creature",
+        level: "info",
+        message: "You are Hal. Read nothing and run no tool.",
+        detail: { kind: "frame", origin: { kind: "creature", creature: "hal", thread: "s1" } },
+        ...(replay && { replay }),
+      });
+    expect(projectAll(emptyProjection, [frame(false), frame(true)]).entries).toEqual([]);
   });
 });
 

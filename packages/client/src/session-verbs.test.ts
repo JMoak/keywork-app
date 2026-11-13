@@ -233,6 +233,33 @@ describe("restoring to just before a turn", () => {
     expect(sent).toEqual([{ method: "POST", path: "/sessions/s%201/restore", body: { turn: 1 } }]);
   });
 
+  it("asks for everything only when told to, and leaves the session scope to the server's default", async () => {
+    const { restored } = await recorded();
+    const { client, sent } = replaying(restored);
+    await client.restoreTurn("s1", 2);
+    await client.restoreTurn("s1", 2, "everything");
+    expect(sent.map((call) => call.body)).toEqual([{ turn: 2 }, { turn: 2, scope: "everything" }]);
+  });
+
+  it("previews a restore under the scope it names", async () => {
+    const { client, sent } = serverAnswering(() =>
+      json(200, {
+        turn: 1,
+        prompt: { entryId: "q1", text: "hi" },
+        undoneTurns: 1,
+        scope: "everything",
+        files: [],
+        others: [],
+      }),
+    );
+    await client.previewRestore("s 1", 1);
+    await client.previewRestore("s 1", 1, "everything");
+    expect(sent.map((call) => call.path)).toEqual([
+      "/sessions/s%201/restore?turn=1",
+      "/sessions/s%201/restore?turn=1&scope=everything",
+    ]);
+  });
+
   it("reads an unknown turn as nothing to restore and a turn below one as invalid", async () => {
     const { restoreUnknownTurn, restoreMalformed } = await recorded();
     expect(await replaying(restoreUnknownTurn).client.restoreTurn("s1", 9)).toEqual({
@@ -241,8 +268,34 @@ describe("restoring to just before a turn", () => {
     });
     expect(await replaying(restoreMalformed).client.restoreTurn("s1", 0)).toEqual({
       refused: "invalid",
-      detail: "the body must be { turn: a positive integer }",
+      detail: 'the body must be { turn: a positive integer, scope?: "session" | "everything" }',
     });
+  });
+});
+
+describe("the server's work and its graceful stop", () => {
+  it("reads what is in flight and asks the server to stop, naming a host that cannot", async () => {
+    const inFlight = {
+      sessions: [{ id: "s1", title: "slow", working: true, queued: 1, asks: 0, children: 0 }],
+      asks: 0,
+      children: 0,
+    };
+    const woundDown = {
+      sessions: [{ id: "s1", interrupted: true, setAside: [] }],
+      asks: 0,
+    };
+    const { client, sent } = serverAnswering(({ path }) =>
+      json(200, path === "/work" ? inFlight : woundDown),
+    );
+    expect(await client.work()).toEqual(inFlight);
+    expect(await client.shutDown()).toEqual(woundDown);
+    expect(sent.map((call) => `${call.method} ${call.path}`)).toEqual([
+      "GET /work",
+      "POST /shutdown",
+    ]);
+    const unable = serverAnswering(() => json(503, { error: "not started by keywork serve" }));
+    expect(await unable.client.work()).toBe("unreported");
+    expect(await unable.client.shutDown()).toBe("unavailable");
   });
 });
 

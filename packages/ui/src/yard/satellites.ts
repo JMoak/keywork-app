@@ -12,7 +12,7 @@ export function satelliteOf(setting: Setting): Satellite {
     case "file":
       return { kind: "pane", spec: { kind: "file", path: ref } };
     case "diff":
-      return { kind: "pane", spec: { kind: "diff", sessionId: setting.sessionId } };
+      return { kind: "pane", spec: diffSpecOf(setting.sessionId, ref) };
     case "report":
       return setting.creature === null
         ? { kind: "pane", spec: { kind: "conversation", sessionId: setting.sessionId } }
@@ -40,6 +40,23 @@ export function satellitePaneId(setting: Pick<Setting, "id">): string {
 
 export function titleOfSetting(setting: Setting): string {
   return setting.what.title ?? shortRef(setting.what.ref);
+}
+
+export const wholeSessionScope = "every change in the session";
+
+export function panelTitleOf(setting: Setting): string {
+  const title = titleOfSetting(setting);
+  const shown = satelliteOf(setting);
+  const wholeSession = shown.kind === "pane" && shown.spec.kind === "diff" && !shown.spec.path;
+  return wholeSession ? `${title} · ${wholeSessionScope}` : title;
+}
+
+export function namesAPath(ref: string): boolean {
+  return !/\s/.test(ref) && /[./]/.test(ref) && !/^[a-z]+:\/\//i.test(ref);
+}
+
+function diffSpecOf(sessionId: string, ref: string): PaneSpec {
+  return namesAPath(ref) ? { kind: "diff", sessionId, path: ref } : { kind: "diff", sessionId };
 }
 
 export function showsSubject(setting: Setting, spec: PaneSpec): boolean {

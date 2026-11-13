@@ -1,9 +1,9 @@
 import type { ConsoleClient } from "@keywork-app/client";
-import { isServedRefusal, type SettingSubject } from "@keywork-app/protocol";
+import { isServedRefusal, type Setting, type SettingSubject } from "@keywork-app/protocol";
 import type { PaneId } from "../layout/index.ts";
 import { type PaneSpec, parsePaneSpec } from "../panes/index.ts";
 import type { PaneSpecBase, ShellSeams } from "../panes/registry.ts";
-import { openedLine, unopenedLine } from "./copy.ts";
+import { unopenedLine } from "./copy.ts";
 
 export type OpeningClient = Pick<ConsoleClient, "openSetting">;
 
@@ -49,16 +49,18 @@ export function linkOpened(event: MouseEvent): SettingSubject | undefined {
   return /^https?:\/\//i.test(href) ? { kind: "url", ref: href } : undefined;
 }
 
+export type Opening = { readonly opened: Setting } | { readonly unopened: string };
+
 export async function openFrom(
   client: OpeningClient,
   what: SettingSubject,
   from: string,
-): Promise<string> {
+): Promise<Opening> {
   try {
     const answer = await client.openSetting({ what, from, rung: "unfold" });
-    return isServedRefusal(answer) ? unopenedLine(answer.detail) : openedLine(what);
+    return isServedRefusal(answer) ? { unopened: unopenedLine(answer.detail) } : { opened: answer };
   } catch (cause) {
-    return unopenedLine(cause instanceof Error ? cause.message : String(cause));
+    return { unopened: unopenedLine(cause instanceof Error ? cause.message : String(cause)) };
   }
 }
 

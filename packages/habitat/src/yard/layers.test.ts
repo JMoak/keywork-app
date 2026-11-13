@@ -46,7 +46,9 @@ function unfoldedBy(owner: YardOwner, at: number, outside = false): YardBudget {
 describe("the layered unfold budget", () => {
   it("cools an owner for two minutes after its last unfold, unless the keeper spoke there since", () => {
     const beaJustUnfolded = unfoldedBy(bea, noon - minute);
-    expect(decided({ rung: "unfold" }, asked, beaJustUnfolded)).toBe("hold:card:unfold cooldown");
+    expect(decided({ rung: "unfold" }, asked, beaJustUnfolded)).toBe(
+      "hold:card:its owner just opened another",
+    );
     expect(decided({ rung: "unfold" }, askedIn("s1", noon - 30 * second), beaJustUnfolded)).toBe(
       "play:unfold:you asked, it shows",
     );
@@ -62,7 +64,7 @@ describe("the layered unfold budget", () => {
   it("cools a creature-less thread as its own owner", () => {
     const threadJustUnfolded = unfoldedBy(threadOne, noon - minute);
     expect(decided({ rung: "unfold", creature: null }, asked, threadJustUnfolded)).toBe(
-      "hold:card:unfold cooldown",
+      "hold:card:its owner just opened another",
     );
     expect(decided({ rung: "unfold" }, asked, threadJustUnfolded)).toBe(
       "play:unfold:you asked, it shows",
@@ -78,7 +80,7 @@ describe("the layered unfold budget", () => {
     );
     const veyOutside = unfoldedBy(vey, noon - 9 * minute, true);
     expect(decided({ rung: "card", sessionId: "s2" }, elsewhere, veyOutside)).toBe(
-      "hold:card:one unfold outside your thread",
+      "hold:card:one already opened outside your thread",
     );
     expect(decided({ rung: "card" }, elsewhere, veyOutside)).toBe("play:unfold:your rule");
     const veyInside = unfoldedBy(vey, noon - 9 * minute, false);
@@ -101,7 +103,9 @@ describe("the layered unfold budget", () => {
       unfoldedBy(bea, noon - 9 * minute),
     );
     expect(unfoldsSpent(six, noon)).toBe(unfoldBudget.unfolds + 1);
-    expect(decided({ rung: "unfold", creature: "a" }, asked, six)).toBe("hold:card:unfold budget");
+    expect(decided({ rung: "unfold", creature: "a" }, asked, six)).toBe(
+      "hold:card:too many opened lately",
+    );
   });
 
   it("forgets what fell out of each window when it admits the next unfold", () => {
@@ -142,7 +146,7 @@ describe("the gate waits for a breakpoint", () => {
       "hold:card:a card unless you asked",
     );
     expect(decided({ rung: "unfold" }, writing, unfoldedBy(bea, noon - minute))).toBe(
-      "hold:card:unfold cooldown",
+      "hold:card:its owner just opened another",
     );
   });
 });

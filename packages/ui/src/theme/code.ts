@@ -1,75 +1,100 @@
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting, type TagStyle } from "@codemirror/language";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Tag, tags } from "@lezer/highlight";
+import { type Highlighter, type Tag, tagHighlighter, tags } from "@lezer/highlight";
 import type { SyntaxKey } from "./sections.ts";
 
+interface Ink {
+  readonly key: SyntaxKey;
+  readonly tags: readonly Tag[];
+  readonly bold?: boolean;
+}
+
+const inks: readonly Ink[] = [
+  {
+    key: "comment",
+    tags: [tags.comment, tags.lineComment, tags.blockComment, tags.docComment, tags.meta],
+  },
+  {
+    key: "keyword",
+    tags: [
+      tags.keyword,
+      tags.controlKeyword,
+      tags.definitionKeyword,
+      tags.moduleKeyword,
+      tags.operatorKeyword,
+      tags.modifier,
+      tags.self,
+    ],
+  },
+  {
+    key: "string",
+    tags: [tags.string, tags.docString, tags.character, tags.regexp, tags.special(tags.string)],
+  },
+  { key: "number", tags: [tags.number, tags.integer, tags.float] },
+  {
+    key: "type",
+    tags: [tags.typeName, tags.className, tags.namespace, tags.standard(tags.typeName)],
+  },
+  {
+    key: "function",
+    tags: [
+      tags.function(tags.variableName),
+      tags.function(tags.propertyName),
+      tags.function(tags.definition(tags.variableName)),
+      tags.macroName,
+    ],
+  },
+  {
+    key: "variable",
+    tags: [tags.variableName, tags.definition(tags.variableName), tags.labelName],
+  },
+  {
+    key: "constant",
+    tags: [
+      tags.bool,
+      tags.null,
+      tags.atom,
+      tags.unit,
+      tags.escape,
+      tags.constant(tags.variableName),
+      tags.standard(tags.variableName),
+    ],
+  },
+  {
+    key: "operator",
+    tags: [
+      tags.operator,
+      tags.derefOperator,
+      tags.arithmeticOperator,
+      tags.logicOperator,
+      tags.compareOperator,
+      tags.definitionOperator,
+      tags.updateOperator,
+    ],
+  },
+  {
+    key: "punctuation",
+    tags: [
+      tags.punctuation,
+      tags.separator,
+      tags.bracket,
+      tags.angleBracket,
+      tags.brace,
+      tags.paren,
+      tags.squareBracket,
+    ],
+  },
+  { key: "tag", tags: [tags.tagName] },
+  { key: "attribute", tags: [tags.attributeName, tags.propertyName] },
+  { key: "heading", tags: [tags.heading], bold: true },
+  { key: "link", tags: [tags.link, tags.url] },
+  { key: "invalid", tags: [tags.invalid] },
+];
+
 export const codeHighlightStyle: HighlightStyle = HighlightStyle.define([
-  dressed("comment", [
-    tags.comment,
-    tags.lineComment,
-    tags.blockComment,
-    tags.docComment,
-    tags.meta,
-  ]),
-  dressed("keyword", [
-    tags.keyword,
-    tags.controlKeyword,
-    tags.definitionKeyword,
-    tags.moduleKeyword,
-    tags.operatorKeyword,
-    tags.modifier,
-    tags.self,
-  ]),
-  dressed("string", [
-    tags.string,
-    tags.docString,
-    tags.character,
-    tags.regexp,
-    tags.special(tags.string),
-  ]),
-  dressed("number", [tags.number, tags.integer, tags.float]),
-  dressed("type", [tags.typeName, tags.className, tags.namespace, tags.standard(tags.typeName)]),
-  dressed("function", [
-    tags.function(tags.variableName),
-    tags.function(tags.propertyName),
-    tags.function(tags.definition(tags.variableName)),
-    tags.macroName,
-  ]),
-  dressed("variable", [tags.variableName, tags.definition(tags.variableName), tags.labelName]),
-  dressed("constant", [
-    tags.bool,
-    tags.null,
-    tags.atom,
-    tags.unit,
-    tags.escape,
-    tags.constant(tags.variableName),
-    tags.standard(tags.variableName),
-  ]),
-  dressed("operator", [
-    tags.operator,
-    tags.derefOperator,
-    tags.arithmeticOperator,
-    tags.logicOperator,
-    tags.compareOperator,
-    tags.definitionOperator,
-    tags.updateOperator,
-  ]),
-  dressed("punctuation", [
-    tags.punctuation,
-    tags.separator,
-    tags.bracket,
-    tags.angleBracket,
-    tags.brace,
-    tags.paren,
-    tags.squareBracket,
-  ]),
-  dressed("tag", [tags.tagName]),
-  dressed("attribute", [tags.attributeName, tags.propertyName]),
-  { tag: tags.heading, color: syntaxVariable("heading"), fontWeight: "bold" },
-  dressed("link", [tags.link, tags.url]),
+  ...inks.map(dressed),
   { tag: tags.link, textDecoration: "underline" },
-  dressed("invalid", [tags.invalid]),
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strong, fontWeight: "bold" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
@@ -78,6 +103,17 @@ export const codeHighlightStyle: HighlightStyle = HighlightStyle.define([
 ]);
 
 export const codeHighlighting: Extension = syntaxHighlighting(codeHighlightStyle);
+
+export const syntaxClassPrefix = "kw-syntax-";
+
+export const proseCodeHighlighter: Highlighter = tagHighlighter([
+  ...inks.map((ink) => ({ tag: [...ink.tags], class: syntaxClass(ink.key) })),
+  { tag: tags.emphasis, class: `${syntaxClassPrefix}emphasis` },
+  { tag: tags.strong, class: `${syntaxClassPrefix}strong` },
+  { tag: tags.strikethrough, class: `${syntaxClassPrefix}struck` },
+  { tag: tags.inserted, class: `${syntaxClassPrefix}inserted` },
+  { tag: tags.deleted, class: `${syntaxClassPrefix}deleted` },
+]);
 
 // CodeMirror cancels a press's native focus and focuses its content element itself, then blurs
 // whatever held focus; read-only content is focusable only through a tabindex.
@@ -121,6 +157,11 @@ export function syntaxVariable(key: SyntaxKey): string {
   return `var(--kw-syntax-${key})`;
 }
 
-function dressed(key: SyntaxKey, tagged: readonly Tag[]) {
-  return { tag: [...tagged], color: syntaxVariable(key) };
+export function syntaxClass(key: SyntaxKey): string {
+  return `${syntaxClassPrefix}${key}`;
+}
+
+function dressed(ink: Ink): TagStyle {
+  const colored = { tag: [...ink.tags], color: syntaxVariable(ink.key) };
+  return ink.bold === true ? { ...colored, fontWeight: "bold" } : colored;
 }

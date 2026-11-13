@@ -12,6 +12,7 @@ import {
   type ExtensionNotice,
   type ExtensionNoticeLevel,
   type MemoryDecision,
+  type Message,
   type ModelFallback,
   type PermissionAsk,
   type PermissionDecision,
@@ -26,13 +27,17 @@ import { compactJson, toolSubject } from "./tool-row.ts";
 import type {
   AssistantEntry,
   ChildMark,
+  EndingEntry,
+  NoticeEntry,
   NoticeLevel,
   SessionProjection,
   ThinkingEntry,
   ToolEntry,
   ToolRun,
   TranscriptEntry,
+  TurnEnding,
   UsageLedger,
+  UserEntry,
 } from "./types.ts";
 
 export function project(state: SessionProjection, envelope: BusEnvelope): SessionProjection {
@@ -59,9 +64,15 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "turn.delta":
       return streamDelta(state, envelope.payload.delta, envelope.ts, replay);
     case "turn.completed":
-      return endTurn(settleUsage(state, envelope.payload.usage, replay));
+      return endTurn(
+        settleUsage(
+          noteEmptyReply(state, envelope.payload.message),
+          envelope.payload.usage,
+          replay,
+        ),
+      );
     case "turn.interrupted":
-      return notice(endTurn(state), "info", "· interrupted");
+      return endTurnWith(state, "interrupted", undefined, replay);
     case "turn.waiting":
       return notice(
         state,
@@ -106,6 +117,7 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
       return replay ? state : settled(state, envelope.payload);
     case "session.tree":
     case "changes.updated":
+    case "workspace.changed":
     case "memory.inbox":
     case "surface.changed":
     case "session.removed":
@@ -129,17 +141,15 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "model.fallback":
       return replay ? state : notice(state, "info", fallbackLine(envelope.payload));
     case "extension.notice":
-      return replay && !bareLine(envelope.payload)
+      return (replay && !bareLine(envelope.payload)) || isFrame(envelope.payload)
         ? state
-        : notice(state, "info", noticeLine(envelope.payload, envelope.sessionId));
+        : journaledNotice(state, envelope.payload, envelope.sessionId);
     case "engine.error":
-      return notice(
-        endTurn({ ...state, lastError: envelope.payload.error.message }),
-        "error",
-        envelope.payload.error.message,
-      );
+      return failTurn(state, envelope.payload.error.message, replay);
   }
 }
+
+export const emptyReplyLine = "· the model returned nothing";
 
 function startTurn(
   state: SessionProjection,
@@ -150,9 +160,11 @@ function startTurn(
   const origin = payload.origin !== undefined && { origin: payload.origin };
   const settled = settleFlush(settleStream(state));
   const framed = payload.origin?.kind === "creature";
+  const retold = replayedEntriesRetold(settled, payload, replay);
+  const told = retold === 0 ? settled.entries : settled.entries.slice(0, -retold);
   return {
     ...settled,
-    entries: framed ? settled.entries : [...settled.entries, promptEntry(state, payload, replay)],
+    entries: framed ? told : [...told, promptEntry(state, payload, replay)],
     turn: replay ? state.turn : { startedAt: ts, userText: payload.userText, ...origin },
     usage: replay ? state.usage : withoutCacheMiss(state.usage),
   };
@@ -176,8 +188,89 @@ function promptEntry(
   };
 }
 
+function replayedEntriesRetold(
+  state: SessionProjection,
+  payload: EnginePayloads["turn.started"],
+  replay: boolean,
+): number {
+  if (replay || state.turn !== undefined) return 0;
+  const tail = state.entries.at(-1);
+  const ending = tail?.kind === "ending" && tail.replay ? 1 : 0;
+  const prompt = state.entries.at(-1 - ending);
+  if (prompt?.kind !== "user" || !prompt.replay) return 0;
+  const sameEntry =
+    prompt.entryId === undefined ||
+    payload.entryId === undefined ||
+    prompt.entryId === payload.entryId;
+  return sameEntry && prompt.text === payload.userText ? 1 + ending : 0;
+}
+
 function endTurn(state: SessionProjection): SessionProjection {
   return { ...settleFlush(settleStream(state)), turn: undefined };
+}
+
+function endTurnWith(
+  state: SessionProjection,
+  outcome: TurnEnding,
+  error: string | undefined,
+  replay: boolean,
+): SessionProjection {
+  const ended = endTurn(state);
+  return { ...ended, entries: [...ended.entries, endingOf(state, outcome, error, replay)] };
+}
+
+function failTurn(state: SessionProjection, message: string, replay: boolean): SessionProjection {
+  const told = { ...state, lastError: message };
+  return replay || state.turn !== undefined
+    ? endTurnWith(told, "failed", message, replay)
+    : notice(endTurn(told), "error", message);
+}
+
+function endingOf(
+  state: SessionProjection,
+  outcome: TurnEnding,
+  error: string | undefined,
+  replay: boolean,
+): EndingEntry {
+  const prompt = state.entries.findLast(isUserEntry);
+  const recorded = prompt?.entryId === undefined ? undefined : state.outcomes[prompt.entryId];
+  const ended = recorded?.outcome === "shutdown" ? "shutdown" : outcome;
+  return {
+    kind: "ending",
+    outcome: ended,
+    text:
+      ended === "failed" ? (recorded?.error ?? error ?? endingLines.failed) : endingLines[ended],
+    prompt: resendablePrompt(state, prompt),
+    replay,
+  };
+}
+
+export const endingLines: Readonly<Record<TurnEnding, string>> = {
+  interrupted: "interrupted",
+  failed: "the turn failed",
+  shutdown: "the server stopped while this turn ran",
+};
+
+function resendablePrompt(
+  state: SessionProjection,
+  prompt: UserEntry | undefined,
+): string | undefined {
+  const asked = state.turn ?? prompt;
+  if (asked === undefined || asked.origin?.kind === "creature") return undefined;
+  return "userText" in asked ? asked.userText : asked.text;
+}
+
+function isUserEntry(entry: TranscriptEntry): entry is UserEntry {
+  return entry.kind === "user";
+}
+
+function noteEmptyReply(state: SessionProjection, message: Message): SessionProjection {
+  const said = message.parts.some(
+    (part) => (part.type === "text" && part.text.trim() !== "") || part.type === "tool-call",
+  );
+  return said || state.entries.at(-1)?.kind !== "user"
+    ? state
+    : notice(state, "info", emptyReplyLine);
 }
 
 function settleFlush(state: SessionProjection): SessionProjection {
@@ -306,7 +399,7 @@ function tailTool(
 ): SessionProjection {
   const index = liveRunIndex(state, callId);
   if (index === undefined) return state;
-  return updateRun(state, index, (run) => ({ ...run, live: lastLine(run.live, chunk) }));
+  return updateRun(state, index, (run) => streamedInto(run, chunk));
 }
 
 function settleTool(
@@ -323,13 +416,20 @@ function settleTool(
 
 function settledRun(run: ToolRun, payload: EnginePayloads["tool.finished"], ts: string): ToolRun {
   const provenance = run.child === undefined ? undefined : childProvenanceOf(payload.output);
-  const shown = provenance === undefined ? payload.output : childAnswerOf(payload.output);
-  const unexplained = run.phase !== "refused" && payload.isError && provenance === undefined;
+  const stopped = run.phase !== "refused" && payload.isError && isStop(payload.output);
+  const answer = provenance === undefined ? payload.output : childAnswerOf(payload.output);
+  const shown = stopped ? (run.streamed ?? "") : answer;
+  const unexplained =
+    run.phase !== "refused" && payload.isError && !stopped && provenance === undefined;
+  const { streamed: _, ...settling } = run;
+  const exitNote = payload.isError ? undefined : exitNoteOf(run.name, payload);
   return {
-    ...run,
+    ...settling,
     phase: run.phase === "refused" ? "refused" : payload.isError ? "failed" : "done",
+    ...(stopped && { stopped }),
+    ...(exitNote !== undefined && { exitNote }),
     live: undefined,
-    reason: unexplained ? firstLine(payload.output) : run.reason,
+    reason: unexplained ? plainFailure(firstLine(payload.output), run.subject) : run.reason,
     durationMs:
       run.replay || run.phase === "refused" || run.startedAt === undefined
         ? undefined
@@ -340,6 +440,45 @@ function settledRun(run: ToolRun, payload: EnginePayloads["tool.finished"], ts: 
     child: childSettledBy(run.child, provenance),
   };
 }
+
+function streamedInto(run: ToolRun, chunk: string): ToolRun {
+  const joined = (run.streamed ?? "") + chunk;
+  const streamed = joined.length > streamedLimit ? joined.slice(-streamedLimit) : joined;
+  return { ...run, streamed, live: lastLineOf(streamed) };
+}
+
+const streamedLimit = 64_000;
+
+function isStop(output: string): boolean {
+  return firstLine(output) === abortedCommand;
+}
+
+const abortedCommand = "Command aborted";
+
+function exitNoteOf(
+  tool: string,
+  { output, exitCode }: EnginePayloads["tool.finished"],
+): string | undefined {
+  if (exitCode !== undefined) return exitCode === 0 ? undefined : `exit ${exitCode}`;
+  const diedWithItsShell = tool === "bash" && lastLineOf(output).startsWith(shellExitedTrailer);
+  return diedWithItsShell ? "shell exited" : undefined;
+}
+
+const shellExitedTrailer = "(shell exited;";
+
+function plainFailure(line: string, subject: string): string {
+  const named = subject === "" ? "that path" : subject;
+  const plain = systemErrors.find(([code]) => line.startsWith(`${code}:`));
+  return plain === undefined ? line : plain[1](named);
+}
+
+const systemErrors: readonly (readonly [string, (named: string) => string])[] = [
+  ["ENOENT", (named) => `${named} not found`],
+  ["EACCES", (named) => `no permission to open ${named}`],
+  ["EPERM", (named) => `the system refused ${named}`],
+  ["EISDIR", (named) => `${named} is a folder, not a file`],
+  ["ENOTDIR", (named) => `part of ${named} is not a folder`],
+];
 
 function markChild(
   state: SessionProjection,
@@ -473,11 +612,42 @@ function isCreatureReport(payload: ExtensionNotice): boolean {
   return payload.extension === "creature";
 }
 
+function isFrame(payload: ExtensionNotice): boolean {
+  const detail = payload.detail as { kind?: unknown } | null | undefined;
+  return isCreatureReport(payload) && detail?.kind === "frame";
+}
+
 function bareLine(payload: ExtensionNotice): boolean {
   return isCreatureReport(payload) || isReviewNotice(payload);
 }
 
 export const crateDeliveredLine = "delivered · the crate is on the porch";
+
+function journaledNotice(
+  state: SessionProjection,
+  payload: ExtensionNotice,
+  sessionId: string,
+): SessionProjection {
+  const entryId = journalEntryOf(payload);
+  if (entryId !== undefined && drawsNotice(state, entryId)) return state;
+  const text = noticeLine(payload, sessionId);
+  const entry: NoticeEntry = {
+    kind: "notice",
+    level: "info",
+    text,
+    ...(entryId !== undefined && { entryId }),
+  };
+  return { ...state, entries: [...state.entries, entry] };
+}
+
+function journalEntryOf(payload: ExtensionNotice): string | undefined {
+  const detail = payload.detail as { entryId?: unknown } | null | undefined;
+  return typeof detail?.entryId === "string" ? detail.entryId : undefined;
+}
+
+function drawsNotice(state: SessionProjection, entryId: string): boolean {
+  return state.entries.some((entry) => entry.kind === "notice" && entry.entryId === entryId);
+}
 
 function noticeLine(payload: ExtensionNotice, sessionId: string): string {
   return labelsOwnTurn(payload, sessionId) ? crateDeliveredLine : extensionLine(payload);
@@ -671,18 +841,19 @@ function elapsed(from: string, to: string): number {
   return Math.max(0, Date.parse(to) - Date.parse(from));
 }
 
-function lastLine(previous: string | undefined, chunk: string): string {
-  const joined = (previous ?? "") + chunk;
-  const lines = joined.split("\n");
-  const tail = lines.at(-1) === "" ? lines.at(-2) : lines.at(-1);
-  return tail ?? "";
+function lastLineOf(text: string): string {
+  return (
+    text
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .findLast((line) => line !== "") ?? ""
+  );
 }
 
 function detailLines(output: string): string[] {
   const lines = output.split("\n").map((line) => line.replace(/\s+$/, ""));
   while (lines.length > 0 && lines.at(-1) === "") lines.pop();
-  if (lines.length <= detailLineLimit) return lines;
-  return [...lines.slice(0, detailLineLimit), `… ${lines.length - detailLineLimit} more lines`];
+  return lines;
 }
 
 function firstLine(output: string): string {

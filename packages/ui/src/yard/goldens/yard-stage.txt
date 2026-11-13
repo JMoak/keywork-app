@@ -1,12 +1,12 @@
 yard yard
 hub 16,16 272×96
 stage working back 300,16 1124×868
-  the parser fix · Wren set out a note
+  the parser fix · Wren showed a note
 rail 16,124 272×192
-  head 0,0 272×40 1 of 6 unfolds · the next is free
+  head 0,0 272×40 1 of 6 panels opened in 10 min
   card 0,52 272×64
     the nightly chore found two stale branches
-    Wren set out a note
+    Wren showed a note
     set out because you asked about it this morning
   card 0,128 272×64
     https://example.com/parser-spec

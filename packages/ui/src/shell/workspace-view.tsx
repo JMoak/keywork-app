@@ -35,18 +35,24 @@ import { followActivations } from "../host/activation.ts";
 import { openInEditorWith } from "../host/editor.ts";
 import { describeFailure, type HostPort } from "../host/port.ts";
 import { hostFetch } from "../host/transport.ts";
+import { holdsModifiersOf } from "../keys/held.ts";
 import {
   type ActionTarget,
   actionScopes,
   appActions,
   bindingHelp,
+  type Chord,
   chordsOfKey,
+  formatChord,
   type Keymap,
+  type KeymapResult,
   keymapFromConfig,
 } from "../keys/index.ts";
 import { createLiveKeymap, followKeybindings, foreignActionsLine } from "../keys/live.ts";
-import { keyFocusOf } from "../keys/typing.ts";
+import { isTextField, keyFocusOf } from "../keys/typing.ts";
 import {
+  type Direction,
+  type DockSide,
   type DropZone,
   dropZoneRects,
   type PaneId,
@@ -58,6 +64,7 @@ import {
   seamZoneRect,
   type Verdict,
 } from "../layout/index.ts";
+import { OrdinalBadge, ZoomBadge } from "../layout/pane-badges.tsx";
 import { createOnboardingController } from "../onboarding/controller.ts";
 import type { AskPick } from "../page/ask-card.tsx";
 import { actionCommand } from "../palette/action-commands.ts";
@@ -71,6 +78,7 @@ import {
   surfaceCommands,
 } from "../palette/surface-commands.ts";
 import { choresOverFetch } from "../panes/chores/port.ts";
+import { inferenceWords } from "../panes/conversation/controls.ts";
 import { createCreatureNames } from "../panes/creature/names.ts";
 import {
   definitionOf,
@@ -80,16 +88,19 @@ import {
   parsePaneSpec,
   type ShellSeams,
 } from "../panes/index.ts";
+import { holdKeysWherePressed, sendStrayKeysHome } from "../panes/keyboard-home.ts";
 import { workingSession } from "../panes/overview/working-session.ts";
-import type { PaneActionHandler } from "../panes/registry.ts";
+import { createCloseGate, type PaneActionHandler } from "../panes/registry.ts";
 import { type SteadHomeScope, shellForStead } from "../panes/stead/home-scope.ts";
 import { steadPane } from "../panes/stead/index.tsx";
 import { postureStorageKey } from "../posture/record.ts";
 import { createTrustSetup, followTrustArrival } from "../posture/trust-setup.ts";
 import { attireStorageKey, createAttire, type Outfit } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
+import { yardToggleActionId } from "../yard/actions.ts";
 import { createYardSurface, Yard } from "../yard/index.ts";
-import { answerHeldAsk } from "./answer-ask.ts";
+import { panelIdAt } from "../yard/panels.ts";
+import { answerHeldAsk, askingRun } from "./answer-ask.ts";
 import { conversationHub, hubTabsHeight, tabbedOut } from "./conversation-hub.ts";
 import { createDraftLedger } from "./drafts.ts";
 import {
@@ -123,7 +134,7 @@ import {
 } from "./server-standing.ts";
 import { createSessionReads } from "./session-reads.ts";
 import type { SessionStore } from "./session-store.ts";
-import { createTiler, type PaneSlot, parseTilerState } from "./tiler.ts";
+import { createTiler, type PaneSlot, parseTilerState, refusalNotices } from "./tiler.ts";
 import { createTrustFlow, type TrustFlow } from "./trust.ts";
 import { TrustCard } from "./trust-card.tsx";
 
@@ -143,7 +154,7 @@ export interface WorkspaceViewProps {
   attached?: boolean | undefined;
   standing?: ServerStanding | undefined;
   keymap?: Keymap | undefined;
-  storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
+  storage?: Pick<Storage, "getItem" | "setItem" | "removeItem"> | undefined;
 }
 
 type Overlay =
@@ -202,7 +213,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   });
   const marks = createPaneMarks((paneId) => tiler.spec(paneId) !== undefined);
   const quiet = props.store.quiet;
-  const drafts = createDraftLedger();
+  const drafts = createDraftLedger({ storage, key: `${profile.id}.drafts:${props.workspace}` });
   const strip = createStripPreference(storage);
   const [screen, setScreen] = createSignal<Screen>({ width: 1280, height: 800 });
   const [overlay, setOverlay] = createSignal<Overlay>();
@@ -218,20 +229,23 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       overlayLeftPanel = undefined;
       if (panel !== undefined && yard.panels.focus(panel)) return;
       if (!keyboard.restore()) keyboard.returnHome();
+      settleKeyboardSoon();
     }),
   );
   const [leaderArmed, setLeaderArmed] = createSignal(false);
+  const [ordinalsShown, setOrdinalsShown] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [seen, setSeen] = createSignal<Record<PaneId, number>>({});
   const [changingLayer, setChangingLayer] = createSignal<PaneId>();
-  const floatFocused = (): void => {
+  const floatFocused = (): Verdict => {
     const pane = tiler.focused();
     setChangingLayer(pane);
     setTimeout(() => setChangingLayer((held) => (held === pane ? undefined : held)), layerChangeMs);
-    act(tiler.float(screen()));
+    return tiler.float(screen());
   };
   const localHandlers = new Map<PaneId, PaneActionHandler>();
   const awaitingHandlers = new Map<PaneId, () => void>();
+  const closeGate = createCloseGate();
   const [gestures, setGestures] = createSignal<PointerGestures>();
   let disposed = false;
   onCleanup(() => {
@@ -251,8 +265,50 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     const answer = await props.client.setArcTheme(slug, theme);
     if (isSurfaceRefusal(answer)) say(`${answer.detail} · worn in this window only`);
   };
-  const act = (verdict: Verdict): void => {
-    if (verdict.notice !== undefined) say(verdict.notice);
+  const act = (verdict: Verdict, otherwise?: string): void => {
+    const line = verdict.ok ? verdict.notice : (verdict.notice ?? otherwise);
+    if (line !== undefined) say(line);
+  };
+
+  const slotElement = (pane: PaneId | undefined): HTMLElement | undefined =>
+    pane === undefined
+      ? undefined
+      : (stage?.querySelector<HTMLElement>(`.kw-slot[data-pane-id="${CSS.escape(pane)}"]`) ??
+        undefined);
+  const focusStrayedFrom = (slot: HTMLElement): boolean => {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return true;
+    return stage?.contains(active) === true && !slot.contains(active);
+  };
+  const settleKeyboard = (): void => {
+    if (disposed || overlay() !== undefined || keyboard.restore()) return;
+    const slot = slotElement(tiler.focused());
+    if (slot === undefined || !focusStrayedFrom(slot)) return;
+    keyboard.returnHome();
+    if (!slot.contains(document.activeElement)) slot.focus({ preventScroll: true });
+  };
+  const settleKeyboardSoon = (): void => queueMicrotask(settleKeyboard);
+  const catchFallingFocus = (event: FocusEvent): void => {
+    if (event.relatedTarget !== null) return;
+    const panel = panelIdAt(event.target);
+    queueMicrotask(() => {
+      if (document.activeElement !== null && document.activeElement !== document.body) return;
+      if (panel === undefined || !yard.panels.focus(panel)) settleKeyboard();
+    });
+  };
+  const takeStrayKeyHome = (target: Element): HTMLElement | undefined => {
+    const pane = tiler.focused();
+    const slot = slotElement(pane);
+    if (pane === undefined || slot === undefined || overlay() !== undefined) return undefined;
+    if (target !== document.body && !slot.contains(target)) return undefined;
+    const home = keyboard.homeOf(pane);
+    if (home?.contains(target)) return undefined;
+    if (home !== undefined) home.focus({ preventScroll: true });
+    else keyboard.returnHome();
+    const landed = document.activeElement;
+    return landed instanceof HTMLElement && landed !== target && slot.contains(landed)
+      ? landed
+      : undefined;
   };
   const focusedSession = (): string | undefined => {
     const spec = tiler.focusedSpec();
@@ -302,6 +358,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   const paneShowing = (sessionId: string): PaneId | undefined => {
     tiler.version();
     return tiler.findPane((spec) => spec.kind === "conversation" && spec.sessionId === sessionId);
+  };
+  const focusedFreshConversation = (): PaneId | undefined => {
+    const spec = tiler.focusedSpec();
+    return spec?.kind === "conversation" && spec.sessionId === undefined
+      ? tiler.focused()
+      : undefined;
   };
   const showPlace = (place: NeedsYouPlace): void => {
     if (place.workspace !== props.workspace) {
@@ -437,20 +499,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     },
     sessions: {
       openSession: (sessionId) => {
-        const focused = tiler.focused();
-        const spec = tiler.focusedSpec();
-        if (
-          focused !== undefined &&
-          spec?.kind === "conversation" &&
-          spec.sessionId === undefined
-        ) {
-          tiler.bind(focused, { kind: "conversation", sessionId });
-        } else {
-          act(tiler.open({ kind: "conversation", sessionId }, screen()));
-        }
-        void props.store.open(sessionId);
+        const fresh = focusedFreshConversation();
+        const spec = { kind: "conversation", sessionId } as const;
+        if (fresh !== undefined && paneShowing(sessionId) === undefined) tiler.bind(fresh, spec);
+        else show(spec);
       },
-      newSession: async () => shell.sessions.openSession(await props.store.create()),
+      newSession: () => summon(definitionOf("conversation")),
       startSession: async (paneId, text) => {
         const sessionId = await props.store.create();
         tiler.bind(paneId, { kind: "conversation", sessionId });
@@ -464,8 +518,23 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (definition.summon === undefined) return;
     const spec = await definition.summon.spec(shell, variant);
     if (yard.openFromPanel(spec)) return;
-    act(tiler.summon(spec, screen(), variant));
+    show(spec, variant);
     if (!keyboard.restore()) keyboard.returnHome();
+  };
+  const show = (spec: PaneSpec, variant?: string): void => {
+    const full = spec.kind === "conversation" && tiler.crowds(spec, screen(), variant);
+    const lastUsed = full ? tiler.lastFocusedOf("conversation") : undefined;
+    if (lastUsed === undefined) act(tiler.summon(spec, screen(), variant));
+    else showInPlaceOf(lastUsed, spec);
+  };
+  const showInPlaceOf = (pane: PaneId, spec: PaneSpec): void => {
+    const left = tiler.spec(pane);
+    tiler.bind(pane, spec);
+    act(tiler.focus(pane));
+    if (left?.kind === "conversation" && left.sessionId !== undefined)
+      say(
+        refusalNotices.shownInstead(paneTitle(spec), paneTitle(left), keys.describe("tree.summon")),
+      );
   };
   followTrustArrival(trust.state, {
     granted: () => void summon(definitionOf("posture")),
@@ -478,15 +547,22 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (tiler.focusedSpec()?.kind !== "stead") return undefined;
     return parsePaneSpec(steadHome()?.presentedPane?.());
   };
-  const answerFocusedAsk = (pick: AskPick): void => {
+  const askHolder = () => {
     const presented = presentedHome();
     const home = presented?.kind === "conversation" ? steadHome()?.shell : undefined;
-    const sessionId = presented?.kind === "conversation" ? presented.sessionId : focusedSession();
-    const answering = {
+    return {
       store: home?.store ?? props.store,
-      approveKey: shell.keys.chord("ask.approve"),
+      sessionId: presented?.kind === "conversation" ? presented.sessionId : focusedSession(),
     };
-    void answerHeldAsk(answering, { sessionId }, pick).then((line) => {
+  };
+  const askWaitsInReach = (): boolean => {
+    const holder = askHolder();
+    return askingRun(holder.store.projection(holder.sessionId)) !== undefined;
+  };
+  const answerFocusedAsk = (pick: AskPick): void => {
+    const holder = askHolder();
+    const answering = { store: holder.store, approveKey: shell.keys.chord("ask.approve") };
+    void answerHeldAsk(answering, { sessionId: holder.sessionId }, pick).then((line) => {
       if (line !== undefined) say(line);
     });
   };
@@ -560,26 +636,66 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     },
   });
   const focusedPaneHub = (): boolean => yard.control.on() && profile.startup !== "creature";
+  const reshape = (verb: () => Verdict, otherwise?: string): void => {
+    if (focusedPaneHub()) say(refusalNotices.yardArranges(keys.describe(yardToggleActionId)));
+    else act(verb(), otherwise);
+  };
+  const focusToward = (direction: Direction): void => {
+    const verdict = focusedPaneHub()
+      ? tiler.focusShownToward(direction, screen(), shownRects())
+      : tiler.focusToward(direction, screen());
+    act(verdict, refusalNotices.nothingToward(direction));
+  };
+  const focusedDockSide = (): DockSide | undefined => {
+    const pane = tiler.focused();
+    return pane === undefined ? undefined : tiler.layout.dockSideOf(pane);
+  };
+  const resizeRefusal = (delta: number): string => {
+    if (focusedDockSide() !== undefined)
+      return refusalNotices.resizesWithItsDock(keys.describe("dock.grow"));
+    return tiler.layout.mainCount() > 1
+      ? refusalNotices.atItsLimit(delta)
+      : refusalNotices.fillsTheMain;
+  };
+  const closeAgainLine = (reason: string): string =>
+    refusalNotices.closeAgain(reason, keys.describe("pane.close"));
+  const closeGuardedPane = async (pane: PaneId): Promise<void> => {
+    const held = await closeGate.holdBack(pane, (reason) => readingMs(closeAgainLine(reason)));
+    if (held === undefined) act(tiler.close(pane));
+    else say(closeAgainLine(held));
+  };
+  const closeFocusedPane = (): void => {
+    const pane = tiler.focused();
+    if (pane !== undefined && closeGate.guards(pane)) void closeGuardedPane(pane);
+    else act(tiler.closeFocused());
+  };
 
   const target: ActionTarget = {
     requestOnboarding: () => (steadHome()?.shell.onboarding ?? onboarding).request(),
     toggleCompanion: () => void companion.toggle()?.toggle(),
     switchCompanion: companion.switchTo,
-    closePane: () => act(tiler.closeFocused()),
-    zoomPane: () => act(tiler.zoom()),
-    floatPane: floatFocused,
-    shelvePane: () => act(tiler.shelve()),
-    returnFromShelf: () => act(tiler.returnFromShelf(screen())),
-    pinPane: () => act(tiler.pin()),
-    focusAcrossLayers: () => act(tiler.focusAcrossLayers(screen())),
-    rotatePane: () => act(tiler.rotate(screen())),
-    focusToward: (direction) => act(tiler.focusToward(direction, screen())),
-    focusOrdinal: (ordinal) => act(tiler.focusOrdinal(ordinal)),
-    movePane: (direction) => act(tiler.move(direction, screen())),
-    cyclePane: () => act(tiler.cycle(screen())),
-    dockPane: (side) => act(tiler.dock(side, screen())),
-    resizeDock: (delta) => act(tiler.resizeDock(delta, screen())),
-    resizePane: (delta) => act(tiler.resizePane(delta, screen())),
+    closePane: closeFocusedPane,
+    zoomPane: () => reshape(() => tiler.zoom(), refusalNotices.nothingFocused),
+    floatPane: () => reshape(floatFocused, refusalNotices.nothingFocused),
+    shelvePane: () => reshape(() => tiler.shelve(), refusalNotices.nothingFocused),
+    returnFromShelf: () => reshape(() => tiler.returnFromShelf(screen())),
+    pinPane: () => reshape(() => tiler.pin(), refusalNotices.nothingFocused),
+    focusAcrossLayers: () => reshape(() => tiler.focusAcrossLayers(screen())),
+    rotatePane: () => reshape(() => tiler.rotate(screen()), refusalNotices.nothingToRotate),
+    focusToward,
+    focusOrdinal: (ordinal) =>
+      act(tiler.focusOrdinal(ordinal), refusalNotices.noPaneNumbered(ordinal)),
+    movePane: (direction) =>
+      reshape(() => tiler.move(direction, screen()), refusalNotices.cannotMove(direction)),
+    cyclePane: () => reshape(() => tiler.cycle(screen())),
+    dockPane: (side) =>
+      reshape(() => tiler.dock(side, screen()), refusalNotices.alreadyDocked(side)),
+    resizeDock: (delta) =>
+      reshape(
+        () => tiler.resizeDock(delta, screen()),
+        refusalNotices.notDocked(keys.describe(delta > 0 ? "pane.grow" : "pane.shrink")),
+      ),
+    resizePane: (delta) => reshape(() => tiler.resizePane(delta, screen()), resizeRefusal(delta)),
     summon: (kind, argument) => void summon(definitionOf(kind), argument),
     paneAction: (action, argument) => {
       if (yard.panels.deliver(action, argument)) return;
@@ -587,7 +703,6 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       if (id !== undefined) deliverToPane(id, action, argument);
     },
     openPaneCommands,
-    cycleMode: () => say("modes arrive with the server's mode route"),
     answerAsk: answerFocusedAsk,
     toggleQuiet: () => void toggleFocusedQuiet(),
     toggleHelp: () =>
@@ -741,17 +856,48 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (eventTarget instanceof Element && eventTarget.closest("[data-keys-owned]") !== null) return;
     const chords = chordsOfKey(event);
     if (chords.length === 0) return;
+    const panel = yard.panels.kindAt(eventTarget);
+    const presented = presentedHome()?.kind;
     const focus = keyFocusOf(
-      yard.panels.kindAt(eventTarget) ?? presentedHome()?.kind ?? tiler.focusedSpec()?.kind,
+      panel ?? presented ?? tiler.focusedSpec()?.kind,
       event.target,
       keymap,
+      panel !== undefined || presented !== undefined || focusedSlotHolds(eventTarget),
     );
     const result = keymap.press(chords, performance.now(), focus.scope, focus.typing);
-    setLeaderArmed(result.type === "leader-pending");
-    if (result.type === "pass") return;
+    showLeader(result.type === "leader-pending");
+    if (result.type === "pass" || leftToThePlatform(result, event.target)) return;
     event.preventDefault();
     event.stopPropagation();
     if (result.type === "action") appActions[result.action]?.invoke(target);
+    else if (result.type === "cancelled") sayLeaderMissed(chords[0]);
+  };
+  const focusedSlotHolds = (element: EventTarget | null): boolean =>
+    element instanceof Node && slotElement(tiler.focused())?.contains(element) === true;
+  const leftToThePlatform = (result: KeymapResult, typedInto: EventTarget | null): boolean =>
+    result.type === "action" &&
+    result.action === "ask.approve" &&
+    isTextField(typedInto) &&
+    !askWaitsInReach();
+  let leaderLapse: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(leaderLapse));
+  const showLeader = (armed: boolean): void => {
+    clearTimeout(leaderLapse);
+    setLeaderArmed(armed);
+    if (!armed) return;
+    leaderLapse = setTimeout(
+      () => setLeaderArmed(keymap.armed(performance.now())),
+      keymap.timeoutMs + 1,
+    );
+  };
+  const sayLeaderMissed = (pressed: Chord | undefined): void => {
+    if (pressed === undefined || pressed.name === "escape") return;
+    const help = keys.describe("help.toggle");
+    const missed = `${keys.leader()} ${formatChord(pressed)} does nothing here`;
+    say(help === undefined ? missed : `${missed} · ${help} lists every key`);
+  };
+  const showOrdinalsWhileHeld = (event: KeyboardEvent): void => {
+    setOrdinalsShown(holdsModifiersOf(event, keys.describeAll("focus.pane1")));
   };
 
   const focusPaneHolding = (element: Element): void => {
@@ -773,6 +919,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   onMount(() => {
     document.addEventListener("keydown", onKeyDown, true);
     onCleanup(() => document.removeEventListener("keydown", onKeyDown, true));
+    onCleanup(listen(document, "keydown", showOrdinalsWhileHeld));
+    onCleanup(listen(document, "keyup", showOrdinalsWhileHeld));
+    onCleanup(listen(window, "blur", () => setOrdinalsShown(false)));
+    onCleanup(listen(document, "focusout", catchFallingFocus));
+    onCleanup(sendStrayKeysHome({ takeHome: takeStrayKeyHome }));
+    if (workspaceRoot !== undefined) onCleanup(holdKeysWherePressed(workspaceRoot));
     onCleanup(keyboard.routeToPanes(focusPaneHolding));
     if (stage === undefined) return;
     const keyboardStage = stage;
@@ -803,7 +955,6 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     tiler.summon({ kind: "tree" }, screen());
     const sessionId = props.store.state.summaries[0]?.id;
     act(tiler.open({ kind: "conversation", sessionId }, screen()));
-    if (sessionId !== undefined) void props.store.open(sessionId);
   };
   const openFirstHomeConversation = async (): Promise<void> => {
     const creatures = await creaturesListed(props.client);
@@ -835,6 +986,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     tiler.version();
     storage?.setItem(storageKey, JSON.stringify(tiler.snapshot()));
   });
+  createEffect(on(tiler.version, settleKeyboardSoon, { defer: true }));
 
   const titleOf = (slot: Pick<PaneSlot, "spec">): string => paneTitle(slot.spec);
   const titleOfPane = (id: PaneId): string => {
@@ -910,7 +1062,20 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           };
         }),
   );
-  const paneIds = createMemo(() => [...slots(), ...benched()].map((slot) => slot.id));
+  const paneIds = createMemo<readonly PaneId[]>(
+    (shown) =>
+      keptInPlace(
+        shown,
+        [...slots(), ...benched()].map((slot) => slot.id),
+      ),
+    [],
+  );
+  const shownRects = (): Map<PaneId, Rect> =>
+    new Map(slots().flatMap((slot) => (tabbedAway(slot.id) ? [] : [[slot.id, slot.rect]])));
+  const ordinalChord = (slot: PaneSlot): string | undefined =>
+    slot.spawnRank < 9 ? keys.describe(`focus.pane${slot.spawnRank + 1}`) : undefined;
+  const hiddenByZoom = (): number =>
+    tiler.zoomed() === undefined ? 0 : tiler.panes().length - slots().length - benched().length;
   const slotOf = (id: PaneId): PaneSlot | undefined =>
     slots().find((slot) => slot.id === id) ?? benched().find((slot) => slot.id === id);
   const needsYouPaneOpen = () => slots().some((slot) => slot.spec.kind === "needs-you");
@@ -944,8 +1109,16 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         data-floating={slot().floating === undefined ? undefined : ""}
         data-changing-layer={changingLayer() === slot().id ? "" : undefined}
         hidden={tabbedAway(slot().id) || onShelf(slot().id) ? true : undefined}
-        style={{ ...rectStyle(slot().rect), "--kw-float-z": slot().floating?.z }}
+        tabIndex={-1}
+        style={{
+          ...rectStyle(slot().rect),
+          outline: "none",
+          "--kw-float-z": slot().floating?.z,
+        }}
       >
+        <Show when={ordinalsShown()}>
+          <OrdinalBadge chord={ordinalChord(slot())} />
+        </Show>
         <PaneFrame
           name={titleOf(slot())}
           state={lifecycleOf(slot())}
@@ -978,6 +1151,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
               awaitingHandlers.delete(id);
               onCleanup(() => localHandlers.delete(id));
             }}
+            guardClose={(guard) => onCleanup(closeGate.guard(slot().id, guard))}
           />
           <Show when={trayIn(slot().id)}>
             {(tray) => (
@@ -1030,7 +1204,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           </For>
         </div>
       </Show>
-      <Show when={tiler.emptyMain(screen())}>
+      <Show when={hiddenByZoom() > 0 && !focusedPaneHub()}>
+        <ZoomBadge hidden={hiddenByZoom()} restore={keys.describe("pane.zoom")} />
+      </Show>
+      <Show when={focusedPaneHub() ? undefined : tiler.emptyMain(screen())}>
         {(rect) => (
           <div class="kw-slot kw-empty-main" style={rectStyle(rect())}>
             <p class="kw-empty">{keys.describe("pane.split")} opens a session here</p>
@@ -1120,6 +1297,8 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       <StatusLine
         serverLabel={standingLine(props.standing, props.serverLabel)}
         serverLost={isLost(props.standing)}
+        folder={props.workspace}
+        model={inferenceWords(props.store.controlsOf(focusedSession()))}
         projection={focusedProjection()}
         usage={telemetry(focusedProjection(), props.store.controls.readings(focusedSession()).cost)}
         preset={props.store.controls.state.preset}
@@ -1170,6 +1349,16 @@ function paneCount(count: number): string {
   return `${count} ${count === 1 ? "pane" : "panes"}`;
 }
 
+function listen<Type extends keyof DocumentEventMap & keyof WindowEventMap>(
+  target: Document | Window,
+  type: Type,
+  listener: (event: DocumentEventMap[Type]) => void,
+): () => void {
+  const handler = listener as EventListener;
+  target.addEventListener(type, handler, true);
+  return () => target.removeEventListener(type, handler, true);
+}
+
 function workspaceOwnsKey(workspace: HTMLElement | undefined, target: Element): boolean {
   const owner = target.closest(".kw-workspace");
   return owner === null || owner === workspace;
@@ -1184,6 +1373,12 @@ function trustStatusItem(trust: TrustFlow, chord: string): string | undefined {
   }
   if (state.kind === "stale") return "trust recorded · the attached server needs a restart";
   return trust.untrusted() ? `untrusted · ${chord} trusts` : undefined;
+}
+
+function keptInPlace(shown: readonly PaneId[], now: readonly PaneId[]): readonly PaneId[] {
+  const kept = shown.filter((id) => now.includes(id));
+  const added = now.filter((id) => !kept.includes(id));
+  return added.length === 0 && kept.length === shown.length ? shown : [...kept, ...added];
 }
 
 function rectStyle(rect: { x: number; y: number; width: number; height: number }) {

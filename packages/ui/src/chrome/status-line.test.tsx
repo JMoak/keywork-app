@@ -1,6 +1,6 @@
 import { emptyProjection } from "@keywork-app/client";
 import { keyworkProfile, steadProfile } from "@keywork-app/product";
-import { cleanup, render } from "@solidjs/testing-library";
+import { cleanup, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { StatusLine, type StatusLineProps, statusItems } from "./status-line.tsx";
 
@@ -35,6 +35,35 @@ describe("statusItems", () => {
     expect(items[2]).toEqual({ tone: "warn", text: "untrusted · ctrl+k u trusts" });
   });
 
+  it("names the folder and the model, keeping the server's address for the hover", () => {
+    const items = statusItems({
+      ...quiet,
+      folder: "C:\\work\\pricing-site\\",
+      model: "anthropic/claude-sonnet",
+    });
+    expect(items.map((item) => item.text)).toEqual([
+      keyworkProfile.name,
+      "pricing-site",
+      "anthropic/claude-sonnet",
+      "careful",
+    ]);
+    expect(items[1]?.detail).toBe("C:\\work\\pricing-site\\ · served at 127.0.0.1:4770");
+  });
+
+  it("says a lost server in the folder's place and keeps the folder for the hover", () => {
+    const items = statusItems({
+      ...quiet,
+      folder: "/srv/pricing-site",
+      serverLost: true,
+      serverLabel: "server lost · reattaching",
+    });
+    expect(items[1]).toEqual({
+      tone: "warn",
+      text: "server lost · reattaching",
+      detail: "/srv/pricing-site",
+    });
+  });
+
   it("says the same usage words the focused frame's title row says", () => {
     const items = statusItems({ ...quiet, usage: "734k tokens · $0.1722" });
     expect(items.at(-1)).toEqual({ tone: "quiet", text: "734k tokens · $0.1722" });
@@ -49,6 +78,14 @@ describe("StatusLine", () => {
     );
     expect(tones).toEqual(["mark", "where", "word"]);
     expect(container.querySelector(".kw-status-moment")?.textContent).toBe("");
+  });
+
+  it("keeps the moment zone a live status region, empty or not", () => {
+    render(() => <StatusLine {...quiet} folder="/srv/pricing-site" />);
+    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.getByText("pricing-site").getAttribute("title")).toBe(
+      "/srv/pricing-site · served at 127.0.0.1:4770",
+    );
   });
 
   it("shows a manual compatibility notice without an install button", () => {

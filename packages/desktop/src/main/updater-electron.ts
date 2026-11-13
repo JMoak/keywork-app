@@ -1,7 +1,8 @@
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
 import { hostChannels } from "../shared/channels.ts";
+import { trustedIpc } from "./app-page.ts";
 import { runUpdater, type UpdateReady, type Updater } from "./updater.ts";
 
 export function startUpdater(profile: ProductProfile = keyworkProfile): Updater | undefined {
@@ -26,7 +27,7 @@ export function startUpdater(profile: ProductProfile = keyworkProfile): Updater 
       onError: (listener) => autoUpdater.on("error", listener),
     },
     announce: announceToEveryWindow(),
-    onAccept: (listener) => ipcMain.handle(hostChannels.acceptUpdate, () => listener()),
+    onAccept: (listener) => trustedIpc().handle(hostChannels.acceptUpdate, () => listener()),
     schedule: (run, delayMs) => {
       const timer = setTimeout(run, delayMs);
       return () => clearTimeout(timer);

@@ -227,11 +227,10 @@ export function settingsLine(settings: NotificationSettings): string {
   return `digest at ${settings.digest.join(", ")} · ${quiet}${zone}`;
 }
 
-export const settingsUnservedLine =
-  "Digest times and quiet hours: this node does not serve them yet.";
+export const settingsUnservedLine = "Digest times and quiet hours are not available here yet.";
 
 export const settingsPointer =
-  "Node settings, read-only here: change them in the node's config. A run that needs you rings at once, after quiet hours.";
+  "Scheduled chores run only while their engine runs: with background work off, quitting the app pauses them until you open it again. A run that needs you notifies you at once, or after quiet hours. Digest times and quiet hours are set in the engine's config.";
 
 export function acceptHeading(title: string, posture: ToolPosture, count: number): string {
   return `${title} asks for ${posture} with ${countOf(count, "grant", "grants")}:`;
@@ -244,6 +243,8 @@ export function acceptTerms(digest: string): string {
 }
 
 export function acceptQuestion(count: number): string {
+  if (count === 0)
+    return "accept it with no standing grants, so each write asks you as it happens?";
   return `accept ${count === 1 ? "this grant" : `these ${count} grants`}?`;
 }
 
@@ -335,7 +336,7 @@ export const formWords = {
   save: "save",
   cancel: "cancel",
   keys: "enter or ctrl+enter saves · escape cancels",
-  grantsHint: "one per line: an action, a space, then what it covers",
+  grantsHint: "one per line: an action, a space, then what it covers (for example: write notes/**)",
   untilHint: "optional: YYYY-MM-DD",
 } as const;
 

@@ -9,6 +9,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { tabStopsIn } from "../chrome/tab-trap.ts";
 import type { HostPort } from "../host/port.ts";
 import { hostFetch } from "../host/transport.ts";
 import type { PtyEvent } from "../panes/terminal/session.ts";
@@ -34,6 +35,7 @@ export interface ModelSetupProps {
   readonly continueLabel: string;
   readonly scope?: ModelSetupScope;
   readonly current?: SelectedModel | undefined;
+  readonly exploreLabel?: string;
   onContinue(selected: SelectedModel): Promise<void> | void;
   onExplore(): void;
 }
@@ -191,7 +193,7 @@ export function ModelSetup(props: ModelSetupProps) {
     <section class="kw-model-setup" aria-labelledby={title} data-native-activation>
       <div class="kw-model-heading">
         <span class="kw-model-kicker">Model setup</span>
-        <h2 id={title} tabIndex={-1} ref={heading}>
+        <h2 id={title} tabIndex={-1} ref={heading} onKeyDown={tabOnFromHeading}>
           {props.heading}
         </h2>
       </div>
@@ -334,7 +336,7 @@ export function ModelSetup(props: ModelSetupProps) {
                 disabled={busy()}
                 onClick={() => props.onExplore()}
               >
-                Explore first
+                {props.exploreLabel ?? "Explore first"}
               </button>
               <Show when={refreshFailed() || terminalReceipt() !== undefined}>
                 <button
@@ -419,6 +421,16 @@ export function ModelSetup(props: ModelSetupProps) {
       </Show>
     </section>
   );
+}
+
+function tabOnFromHeading(event: KeyboardEvent & { currentTarget: HTMLElement }): void {
+  if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey)
+    return;
+  const section = event.currentTarget.closest("section");
+  const next = section === null ? undefined : tabStopsIn(section)[0];
+  if (next === undefined) return;
+  event.preventDefault();
+  next.focus();
 }
 
 const projectCheckFailed =

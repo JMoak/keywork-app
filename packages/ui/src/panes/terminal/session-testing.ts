@@ -4,6 +4,7 @@ export interface FakeSurface extends TerminalSurface {
   text(): string;
   resets: number;
   clears: number;
+  selected: string;
   focused: boolean | undefined;
   type(data: string): void;
   grow(size: TerminalSize): void;
@@ -18,6 +19,7 @@ export function fakeSurface(size: TerminalSize = { cols: 80, rows: 24 }): FakeSu
   const surface: FakeSurface = {
     resets: 0,
     clears: 0,
+    selected: "selected text",
     focused: undefined,
     text: () => written,
     write: (data) => {
@@ -31,7 +33,7 @@ export function fakeSurface(size: TerminalSize = { cols: 80, rows: 24 }): FakeSu
       written = "";
     },
     size: () => current,
-    selection: () => "selected text",
+    selection: () => surface.selected,
     focus: () => {
       surface.focused = true;
     },

@@ -16,7 +16,7 @@ export function transcriptWalk(seams: WalkSeams): (event: KeyboardEvent) => void
     if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return;
     const rows = walkRowsIn(seams.page());
     const at = rows.indexOf(event.target as HTMLElement);
-    const step = stepOf(event, at !== -1, event.target === seams.composer());
+    const step = stepOf(event, at !== -1, event.target === seams.composer() && rows.length > 0);
     if (step === undefined) return;
     event.preventDefault();
     event.stopPropagation();
@@ -27,10 +27,8 @@ export function transcriptWalk(seams: WalkSeams): (event: KeyboardEvent) => void
 
 type Step = -1 | 1 | "enter" | "home";
 
-function stepOf(event: KeyboardEvent, onRow: boolean, inComposer: boolean): Step | undefined {
-  if (event.key === "Tab" && !event.shiftKey && (onRow || inComposer)) {
-    return onRow ? "home" : "enter";
-  }
+function stepOf(event: KeyboardEvent, onRow: boolean, belowRows: boolean): Step | undefined {
+  if (event.key === "Tab" && event.shiftKey && belowRows) return "enter";
   if (!onRow) return undefined;
   switch (event.key) {
     case "ArrowUp":

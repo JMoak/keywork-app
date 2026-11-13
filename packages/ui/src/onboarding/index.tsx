@@ -22,6 +22,7 @@ import {
   acceptRestKey,
   backKey,
   connectKey,
+  homeTitle,
   madeKeys,
   makingLine,
   modelsAsk,
@@ -112,7 +113,7 @@ const keyVerbs: Readonly<Record<string, Verb>> = {
   k: "up",
   ArrowUp: "up",
   Enter: "keep",
-  Escape: "skip",
+  Escape: "dismiss",
   a: "rest",
   Backspace: "back",
   x: "dismiss",
@@ -168,25 +169,28 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
     ...props.seams,
   });
   const listed = props.automatic ? createCreatureListing(props.shell) : () => undefined;
+  const trusted = (): boolean => props.shell.trust.state().kind === "trusted";
   const wanted = (): boolean =>
     props.automatic === true &&
     firstRunWanted({
-      trusted: props.shell.trust.state().kind === "trusted",
+      trusted: trusted(),
       creatures: listed(),
       remembered: rememberedOnboarding(storage, onboardingStorageKey(props.shell.workspace)),
     });
+  const homeIsEmpty = (): boolean =>
+    props.automatic === true && trusted() && listed()?.length === 0;
   const underway = (): boolean => {
     const kind = onboarding.phase().kind;
     return kind === "making" || kind === "made" || kind === "failed";
   };
   const showing = (): boolean =>
     controller.requested() ||
-    (props.simple !== true && onboarding.phase().kind !== "closed" && (underway() || wanted()));
+    (onboarding.phase().kind !== "closed" && (underway() || (props.simple !== true && wanted())));
   createEffect(
     on(
       () => onboarding.phase().kind,
       (kind) => {
-        if (kind === "closed") controller.clearRequest();
+        if (kind === "making" || kind === "closed") controller.clearRequest();
       },
     ),
   );
@@ -199,7 +203,7 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
         <MeetCreature
           shell={props.shell}
           creatures={listed()}
-          first={wanted()}
+          first={homeIsEmpty()}
           onCustomize={() => controller.request()}
         />
       </Show>
@@ -280,9 +284,7 @@ export function OnboardingCard(props: OnboardingCardProps) {
       onKeyDown={onKeyDown}
     >
       <div class="kw-onboard-head">
-        <span class="kw-onboard-title">
-          {props.home ? "a creature for your home" : titleLine(props.workspace)}
-        </span>
+        <span class="kw-onboard-title">{props.home ? homeTitle : titleLine(props.workspace)}</span>
         <ol class="kw-onboard-steps" aria-label="steps">
           <For each={steps}>
             {(each) => (
@@ -304,7 +306,7 @@ export function OnboardingCard(props: OnboardingCardProps) {
               proposals={proposals()?.names ?? []}
               notice={notice()}
               onKeep={keepName}
-              onSkip={() => props.onboarding.act("skip")}
+              onNotNow={() => props.onboarding.act("dismiss")}
             />
           </Match>
           <Match when={step() !== undefined && step() !== "name"}>
@@ -365,7 +367,7 @@ interface NameStepProps {
   proposals: readonly string[];
   notice: string | undefined;
   onKeep(text: string): void;
-  onSkip(): void;
+  onNotNow(): void;
 }
 
 function NameStep(props: NameStepProps) {
@@ -397,7 +399,7 @@ function NameStep(props: NameStepProps) {
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
-              props.onSkip();
+              props.onNotNow();
               return;
             }
             const proposal = text() === "" ? proposalAt(event.key) : undefined;

@@ -53,6 +53,7 @@ export const serverEventTypes = [
   "surface.changed",
   "session.tree",
   "changes.updated",
+  "workspace.changed",
   "session.removed",
   "session.restored",
   "session.settled",
@@ -104,6 +105,7 @@ export interface ServerPayloads {
   "surface.changed": { kind: SurfaceKind };
   "session.tree": TreeChange;
   "changes.updated": ChangesUpdate;
+  "workspace.changed": WorkspaceChanged;
   "session.removed": SessionRemoval;
   "session.restored": SessionRemoval;
   "session.settled": SessionSettlement;
@@ -122,6 +124,11 @@ export interface ServerPayloads {
   "mesh.peers": MeshPeersChange;
   "show.proposed": ShowProposed;
   "show.settled": ShowSettled;
+}
+
+export interface WorkspaceChanged {
+  paths: string[];
+  truncated: boolean;
 }
 
 export interface InboxTally {
@@ -188,7 +195,13 @@ export interface EnginePayloads {
   "queue.changed": { queued: QueuedPrompt[] };
   "tool.started": { call: ToolCallPart };
   "tool.output": { chunk: string; callId?: string };
-  "tool.finished": { callId: string; output: string; isError: boolean; spill?: SpillReference };
+  "tool.finished": {
+    callId: string;
+    output: string;
+    isError: boolean;
+    spill?: SpillReference;
+    exitCode?: number;
+  };
   "gate.ask": { ask: PermissionAsk };
   "gate.permission": { decision: PermissionDecision };
   "gate.preset": { from: string; to: string };
@@ -269,6 +282,7 @@ export type MessagePart =
       output: string;
       isError: boolean;
       spill?: SpillReference;
+      exitCode?: number;
     };
 
 export interface Usage {

@@ -53,8 +53,20 @@ export interface SessionDetail extends SessionSummary {
   edits?: readonly ContextEditMark[];
   reports?: readonly ReportMark[];
   verdicts?: readonly VerdictMark[];
+  outcomes?: readonly OutcomeMark[];
   parentSession?: string;
   forkedFrom?: ForkOrigin;
+}
+
+export const turnOutcomes = ["completed", "interrupted", "failed", "shutdown"] as const;
+
+export type TurnOutcome = (typeof turnOutcomes)[number];
+
+export interface OutcomeMark {
+  index: number;
+  entryId: string;
+  outcome: TurnOutcome;
+  error?: string;
 }
 
 export type SummaryKind = "compaction" | "branch_summary";
@@ -277,6 +289,28 @@ export interface ChangedPath {
   added: number;
   deleted: number;
   turn?: number;
+}
+
+export const turnFactsEntryType = "turn_facts";
+
+export interface TurnFacts {
+  prompt: string;
+  checkpoint?: string;
+  settled?: string;
+  files: readonly ChangedPath[];
+  session?: ChangesSummary;
+  outcome?: TurnOutcome;
+  error?: string;
+}
+
+export const restoreEntryTypes = { restore: "restore", undone: "restore-undone" } as const;
+
+export interface RestoreFacts {
+  turn?: number;
+  from: string | null;
+  files: string | null;
+  redo: string | null;
+  paths?: readonly string[];
 }
 
 export interface SessionChanges {

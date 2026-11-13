@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { hostChannels } from "../shared/channels.ts";
+import { appPage, loadedOn } from "./page-testing.ts";
 
 const exposed = new Map<string, unknown>();
 const invoked: Array<[string, unknown[]]> = [];
@@ -20,7 +21,7 @@ vi.mock("electron", () => ({
 }));
 
 beforeAll(async () => {
-  await import("./index.ts");
+  await loadedOn(appPage, () => import("./index.ts"));
 });
 
 describe("the preload bridge", () => {

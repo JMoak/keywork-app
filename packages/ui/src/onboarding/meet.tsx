@@ -4,9 +4,14 @@ import { ModelSetup } from "../model-setup/index.tsx";
 import type { SelectedModel } from "../model-setup/inventory.ts";
 import type { ShellSeams } from "../panes/registry.ts";
 import { creaturesListed } from "../shell/first-frame.ts";
+import { proposeNames } from "./names.ts";
 import { Portrait } from "./portrait.tsx";
 import { fallbackName } from "./sequence.ts";
 import { offeredSkins } from "./skins.ts";
+
+export function meetingName(workspace: string): string {
+  return proposeNames(workspace)[0] ?? fallbackName;
+}
 
 export function MeetCreature(props: {
   readonly shell: ShellSeams;
@@ -16,14 +21,13 @@ export function MeetCreature(props: {
 }) {
   const [created, setCreated] = createSignal<CreatureSummary>();
   const [settingUp, setSettingUp] = createSignal<CreatureSummary>();
+  const [met, setMet] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
-  const creature = () => props.creatures?.[0] ?? created();
-  const returningThread = () => {
-    const resident = creature();
-    return resident?.slug !== created()?.slug ? resident?.conversation : undefined;
-  };
+  const name = meetingName(props.shell.workspace);
   const skin = offeredSkins()[0] ?? "kid";
+  const homeIsEmpty = () => props.first && (props.creatures?.length ?? 0) === 0;
+  const introducing = () => !met() && (created() !== undefined || homeIsEmpty());
   let disposed = false;
   onCleanup(() => {
     disposed = true;
@@ -35,7 +39,7 @@ export function MeetCreature(props: {
       throw new Error("Could not read the creatures in your home.");
     const existing = listed[0] ?? created();
     if (existing !== undefined) return existing;
-    const answer = await props.shell.client.createCreature({ name: fallbackName, skin });
+    const answer = await props.shell.client.createCreature({ name, skin });
     if (!("slug" in answer)) throw new Error("Could not save your creature. Try again.");
     if (!disposed) {
       setCreated(answer);
@@ -45,10 +49,11 @@ export function MeetCreature(props: {
   };
 
   const meet = async (talk: boolean): Promise<void> => {
+    if (busy()) return;
     setBusy(true);
     setNotice(undefined);
     try {
-      const resident = creature() ?? (await make());
+      const resident = created() ?? (await make());
       if (!disposed && talk) setSettingUp(resident);
     } catch {
       if (!disposed) setNotice("We could not save your creature. Try again.");
@@ -78,6 +83,7 @@ export function MeetCreature(props: {
     if (disposed) return;
     props.shell.sessions.openSession(current.conversation);
     setSettingUp(undefined);
+    setMet(true);
   };
 
   return (
@@ -85,57 +91,50 @@ export function MeetCreature(props: {
       when={settingUp()}
       keyed
       fallback={
-        <Show when={creature() !== undefined || props.first}>
-          <section class="kw-meet-creature" aria-label="Meet your creature" data-native-activation>
-            <div class="kw-meet-creature-intro">
-              <Show when={creature() === undefined}>
-                <Portrait skin={skin} hueStop={1} />
-              </Show>
-              <div class="kw-meet-creature-copy">
-                <span class="kw-model-kicker">Your creature</span>
-                <h2>{creature() === undefined ? `Meet ${fallbackName}` : creature()?.name}</h2>
-                <p>
-                  {creature() === undefined
-                    ? "You can meet your creature now and choose a model when you want to talk."
-                    : "Choose how your creature replies."}
-                </p>
-              </div>
-            </div>
+        <Show when={introducing()}>
+          <section
+            class="kw-meet-creature"
+            aria-label="Meet your creature"
+            aria-busy={busy()}
+            data-native-activation
+          >
+            <Show
+              when={created()}
+              fallback={
+                <div class="kw-meet-creature-intro">
+                  <Portrait skin={skin} hueStop={1} />
+                  <div class="kw-meet-creature-copy">
+                    <span class="kw-model-kicker">Your creature</span>
+                    <h2>{`Meet ${name}`}</h2>
+                    <p>{meetLine(name)}</p>
+                  </div>
+                </div>
+              }
+            >
+              {(resident) => (
+                <div class="kw-meet-creature-intro">
+                  <div class="kw-meet-creature-copy">
+                    <span class="kw-model-kicker">Your creature</span>
+                    <h2>{resident().name}</h2>
+                    <p>{madeHereLine(resident().name)}</p>
+                  </div>
+                </div>
+              )}
+            </Show>
             <div class="kw-model-actions">
-              <Show when={returningThread()}>
-                {(thread) => (
-                  <button
-                    type="button"
-                    class="kw-model-primary"
-                    disabled={busy()}
-                    onClick={() => props.shell.sessions.openSession(thread())}
-                  >
-                    Open current conversation
-                  </button>
-                )}
-              </Show>
-              <button
-                type="button"
-                class={returningThread() ? "kw-model-link" : "kw-model-primary"}
-                disabled={busy()}
-                onClick={() => void meet(true)}
-              >
-                {returningThread() ? "Set up a model" : "Start a conversation"}
+              <button type="button" class="kw-model-primary" onClick={() => void meet(true)}>
+                Start a conversation
               </button>
-              <Show when={creature() === undefined}>
-                <button
-                  type="button"
-                  class="kw-model-link"
-                  disabled={busy()}
-                  onClick={() => void meet(false)}
-                >
+              <Show when={created() === undefined}>
+                <button type="button" class="kw-model-link" onClick={() => void meet(false)}>
                   Explore first
                 </button>
                 <button
                   type="button"
                   class="kw-model-link"
-                  disabled={busy()}
-                  onClick={() => props.onCustomize()}
+                  onClick={() => {
+                    if (!busy()) props.onCustomize();
+                  }}
                 >
                   Customize first
                 </button>
@@ -160,4 +159,12 @@ export function MeetCreature(props: {
       )}
     </Show>
   );
+}
+
+function meetLine(name: string): string {
+  return `${name} lives on this computer and can take on work for you. Start a conversation to choose the model it talks with, or look around first.`;
+}
+
+function madeHereLine(name: string): string {
+  return `${name} is on the stead. Start a conversation when you are ready; you will choose the model it talks with.`;
 }

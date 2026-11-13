@@ -2053,6 +2053,12 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
   gestures, and a seeded all-verbs run over four screen sizes that holds the tiling gapless
   under the floats and the focused pane on the stage), `shell/tiler.test.ts`,
   `chrome/pane-shelf.test.tsx` and the keyboard workflows in `shell/workflows.test.tsx`.
+- **Met the UX sweep (2026-11-12).** The sweep's rule for a full layout stands for
+  sessions: `tiler.crowds` asks, without seating anything, whether a summon would send a
+  pane to the shelf (`Layout.hasRoomBeside`, `hasRoomInMain`, `hasRoomInDock`), and the
+  workspace then shows the session in place of the conversation last used. Every other
+  pane, and a shrinking window, use the shelf. Ordinals follow the sweep's opening order,
+  so a shelved pane keeps its number.
 - **Motion.** Lifting and settling travel in `--kw-tempo-quick` (three steps, 120 ms) on the
   one slot that changes layer; measured in Chromium as 960, 853, 747, 640 px wide, and as
   960 then 640 under reduced motion.

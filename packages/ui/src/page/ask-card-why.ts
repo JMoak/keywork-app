@@ -15,9 +15,12 @@ export const reasonOffers: readonly ReasonOffer[] = [
   { reason: "other", key: "o", label: "other" },
 ];
 
+export const takeBackOffer = { key: "esc", label: "back" } as const;
+
 export const whyLine = [
   whyPrompt,
   ...reasonOffers.map((offer) => `${offer.key} ${offer.label}`),
+  `${takeBackOffer.key} ${takeBackOffer.label}`,
 ].join(" · ");
 
 export function askWhy(callId: string): void {
@@ -33,8 +36,7 @@ export function stopAskingWhy(callId: string): void {
 }
 
 export function denyReasonOf(event: KeyboardEvent): DenyReason | undefined {
-  if (event.ctrlKey || event.altKey || event.metaKey) return undefined;
-  if (event.key === "Escape") return "other";
+  if (isModified(event)) return undefined;
   if (event.key === "Enter") return pressesAButton(event) ? undefined : "other";
   return reasonOffers.find((offer) => offer.key === event.key.toLowerCase())?.reason;
 }
@@ -54,10 +56,8 @@ export function readWhyKeys(
     const onKey = (event: KeyboardEvent): void => {
       if (!within(scope(), event.target)) return;
       const reason = denyReasonOf(event);
-      if (reason === undefined) return;
-      event.preventDefault();
-      event.stopPropagation();
-      answer(reason, asksForWords(event));
+      if (reason !== undefined) claim(event, () => answer(reason, asksForWords(event)));
+      else if (takesItBack(event)) claim(event, () => stopAskingWhy(id));
     };
     onCleanup(listenAheadOfTheKeymap(onKey));
   });
@@ -70,6 +70,20 @@ const wordsKey = reasonOffers.find((offer) => offer.reason === "other")?.key;
 function listenAheadOfTheKeymap(onKey: (event: KeyboardEvent) => void): () => void {
   window.addEventListener("keydown", onKey, true);
   return () => window.removeEventListener("keydown", onKey, true);
+}
+
+function claim(event: KeyboardEvent, act: () => void): void {
+  event.preventDefault();
+  event.stopPropagation();
+  act();
+}
+
+function takesItBack(event: KeyboardEvent): boolean {
+  return event.key === "Escape" && !isModified(event);
+}
+
+function isModified(event: KeyboardEvent): boolean {
+  return event.ctrlKey || event.altKey || event.metaKey;
 }
 
 function pressesAButton(event: KeyboardEvent): boolean {

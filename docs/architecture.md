@@ -179,6 +179,9 @@ Three things take a pane off the tiling without touching its seat:
   that is missing. An open, a dock, a cycle or a move is therefore never refused for room;
   the status line says how many panes now wait. A resize that would squeeze a shown pane
   under its minimum is still refused, because resizing is not a reason to hide anything.
+  One open is handled before it reaches the fit: a session opened into a stage with no room
+  takes the place of the conversation last used, and the status line names both, so
+  sessions (which the tree already lists) do not pile up on the shelf.
 
 The arrows walk the tiling and never land on a float; one verb steps from the tiling through
 each float and back. Floats, the shelf and pins persist with the layout per workspace.

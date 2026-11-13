@@ -38,30 +38,27 @@ export interface NeedsYouStripProps {
 
 export function NeedsYouStrip(props: NeedsYouStripProps) {
   return (
-    <Show when={props.line}>
-      {(line) => (
-        <aside
-          class="kw-needs-you"
-          role="status"
-          aria-label="needs you"
-          data-detail={line().next === undefined ? "count" : "next"}
-        >
-          <span class="kw-needs-you-stamp" aria-hidden="true">
-            {needsYouGlyph}
-          </span>
-          <span class="kw-needs-you-count">{line().count}</span>
-          <Show when={line().next}>
-            {(next) => (
-              <>
-                <span class="kw-needs-you-gloss">{next().gloss}</span>
-                <span class="kw-needs-you-where">({next().where})</span>
-                <kbd class="kw-needs-you-hint">{next().hint}</kbd>
-              </>
-            )}
-          </Show>
-        </aside>
-      )}
-    </Show>
+    <div class="kw-needs-you-live" role="status" aria-label="needs you">
+      <Show when={props.line}>
+        {(line) => (
+          <div class="kw-needs-you" data-detail={line().next === undefined ? "count" : "next"}>
+            <span class="kw-needs-you-stamp" aria-hidden="true">
+              {needsYouGlyph}
+            </span>
+            <span class="kw-needs-you-count">{line().count}</span>
+            <Show when={line().next}>
+              {(next) => (
+                <>
+                  <span class="kw-needs-you-gloss">{next().gloss}</span>
+                  <span class="kw-needs-you-where">({next().where})</span>
+                  <kbd class="kw-needs-you-hint">{next().hint}</kbd>
+                </>
+              )}
+            </Show>
+          </div>
+        )}
+      </Show>
+    </div>
   );
 }
 

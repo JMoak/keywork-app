@@ -1,5 +1,6 @@
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
 import { For } from "solid-js";
+import { chordLabel } from "../keys/chord.ts";
 import { useProductProfile } from "./product.ts";
 import "./first-run.css";
 
@@ -50,8 +51,10 @@ function firstLessonOf(keys: KeyChords, profile: ProductProfile): Lesson[] {
     ];
   }
   return [
-    { chord: "enter", does: "sends what you type" },
+    { chord: chordLabel(composerSendKey), does: "sends what you type" },
     { chord: keys.chord("pane.split"), does: "opens a session beside this one" },
     { chord: keys.chord("tree.summon"), does: "lists your sessions and their trees" },
   ];
 }
+
+const composerSendKey = "enter";

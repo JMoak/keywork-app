@@ -15,6 +15,7 @@ import {
   type PaneProps,
   type ShellSeams,
 } from "../registry.ts";
+import { InCreatureHome } from "../stead/creature-home.tsx";
 import {
   acceptedLine,
   alreadyAcceptedLine,
@@ -176,7 +177,11 @@ export function choresPaneWith(seams: ChoresSeams): PaneDefinition<ChoresSpec> {
     attire: "house",
     title: (spec) => choresTitle(spec.creature),
     emptyState: (keys) => noChoresLine(keys.chord("chores.new")),
-    component: (props) => <Chores pane={props} seams={seams} />,
+    component: (props) => (
+      <InCreatureHome shell={props.shell} class="kw-ov kw-chores">
+        {(home) => <Chores pane={props} shell={home} seams={seams} />}
+      </InCreatureHome>
+    ),
     summon: {
       action: "chores.summon",
       chords: "leader shift+b",
@@ -204,11 +209,12 @@ type Prompt =
 
 interface ChoresProps {
   readonly pane: PaneProps<ChoresSpec>;
+  readonly shell: ShellSeams;
   readonly seams: ChoresSeams;
 }
 
 function Chores(props: ChoresProps) {
-  const shell = props.pane.shell;
+  const shell = props.shell;
   const keys = shell.keys;
   const port = props.seams.port(shell);
   const store = createChoresStore(port, shell.feed);

@@ -13,6 +13,7 @@ import {
   noDecisions,
   railHint,
   railLabel,
+  readingHead,
   trailHint,
 } from "./copy.ts";
 import "./yard.css";
@@ -40,15 +41,22 @@ export interface YardCardView {
   readonly log: readonly string[];
 }
 
+export interface RailReading {
+  readonly title: string;
+  readonly text: string;
+}
+
 export interface RailProps {
   entries: readonly RailEntry[];
   cards: readonly RailCardSpot[];
   head: Rect;
   fold: Rect | undefined;
   folded: number;
+  above?: number | undefined;
   heldBack: number;
   foldedAway?: readonly string[] | undefined;
   card?: YardCardView | undefined;
+  reading?: RailReading | undefined;
   log?: Rect | undefined;
   active: boolean;
   view?: RailView | undefined;
@@ -56,6 +64,7 @@ export interface RailProps {
   onCursor(id: string): void;
   onEnter(entry: RailEntry): void;
   onAnswer(entry: RailEntry, outcome: KeeperShowOutcome): void;
+  onCloseReading?: (() => void) | undefined;
   onToggleView?: (() => void) | undefined;
   onWalk?: ((entry: RailEntry, step: TrailStep) => void) | undefined;
   onLeave?: ((next: EventTarget | null) => void) | undefined;
@@ -65,6 +74,7 @@ export interface RailProps {
 export function Rail(props: RailProps) {
   let list: HTMLDivElement | undefined;
   const [logOpen, setLogOpen] = createSignal(false);
+  const covered = (): boolean => logOpen() || props.reading !== undefined;
   const onHead = (): boolean => props.card !== undefined && props.cursor === yardIds.card;
   const current = (): RailEntry | undefined =>
     onHead()
@@ -107,9 +117,13 @@ export function Rail(props: RailProps) {
     "}": walk("leafward"),
     Escape: () => props.onReturn(),
   };
+  const whileReading: Readonly<Record<string, () => void>> = {
+    Enter: () => props.onCloseReading?.(),
+    Escape: () => props.onCloseReading?.(),
+  };
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
-    const act = keyed[event.key];
+    const act = (props.reading === undefined ? keyed : whileReading)[event.key];
     if (act === undefined) return;
     event.preventDefault();
     event.stopPropagation();
@@ -136,7 +150,7 @@ export function Rail(props: RailProps) {
       aria-label={railLabel}
       data-view={props.view ?? "now"}
       aria-activedescendant={
-        props.active && (onHead() || current() !== undefined)
+        props.active && props.reading === undefined && (onHead() || current() !== undefined)
           ? railEntryId(onHead() ? yardIds.card : current()?.id)
           : undefined
       }
@@ -177,7 +191,19 @@ export function Rail(props: RailProps) {
           </ol>
         )}
       </Show>
-      <For each={logOpen() ? [] : props.cards}>
+      <Show when={props.reading}>
+        {(shown) => (
+          <article
+            class="kw-yard-reading"
+            aria-label={shown().title}
+            aria-live="polite"
+            style={rectStyle(props.log)}
+          >
+            <p class="kw-yard-note">{shown().text}</p>
+          </article>
+        )}
+      </Show>
+      <For each={covered() ? [] : props.cards}>
         {(spot) => (
           <Show when={entryOf(spot.id)}>
             {(entry) => (
@@ -194,9 +220,9 @@ export function Rail(props: RailProps) {
           </Show>
         )}
       </For>
-      <Show when={props.fold !== undefined && props.folded > 0}>
+      <Show when={!covered() && props.fold !== undefined && props.folded + (props.above ?? 0) > 0}>
         <p class="kw-yard-folded" style={rectStyle(props.fold)}>
-          {foldedLine(props.folded)}
+          {foldedLine(props.folded, props.above)}
         </p>
       </Show>
     </div>
@@ -204,6 +230,7 @@ export function Rail(props: RailProps) {
 }
 
 function headLine(props: RailProps, onHead: boolean, logOpen: boolean): string {
+  if (props.reading !== undefined) return readingHead(props.reading.title);
   if (logOpen) return decisionsHead;
   if (props.active && !onHead) return props.view === "trail" ? trailHint : railHint;
   const folded = props.foldedAway ?? [];

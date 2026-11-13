@@ -12,6 +12,10 @@ export type KeyEvent = Pick<
 
 export type PhysicalKeyEvent = KeyEvent & Partial<Pick<KeyboardEvent, "code">>;
 
+export type ModifierKeys = Pick<KeyboardEvent, "ctrlKey" | "shiftKey" | "altKey" | "metaKey">;
+
+export type Modifiers = Pick<Chord, "ctrl" | "shift" | "alt">;
+
 export class ChordError extends Error {
   override readonly name = "ChordError";
 }
@@ -62,11 +66,15 @@ export function chordsEqual(left: Chord, right: Chord): boolean {
   );
 }
 
+export function modifiersHeld(event: ModifierKeys): Modifiers {
+  return { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey, alt: event.altKey };
+}
+
 export function chordOfKey(event: KeyEvent): Chord | undefined {
   if (event.isComposing) return undefined;
   const name = keyName(event.key);
   if (name === undefined) return undefined;
-  const ctrl = event.ctrlKey || event.metaKey;
+  const { ctrl } = modifiersHeld(event);
   const unshifted = event.shiftKey ? usShiftedPunctuation[name] : undefined;
   if (unshifted !== undefined) return { name: unshifted, ctrl, shift: true, alt: event.altKey };
   return {
@@ -150,7 +158,7 @@ function keyName(key: string): string | undefined {
 function physicalChordOf(event: PhysicalKeyEvent): Chord | undefined {
   const name = event.code === undefined ? undefined : nameOfCode(event.code);
   if (name === undefined) return undefined;
-  return { name, ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey, alt: event.altKey };
+  return { name, ...modifiersHeld(event) };
 }
 
 function nameOfCode(code: string): string | undefined {

@@ -1,6 +1,6 @@
 import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { createYardPanels, panelIdAt, type YardPanels } from "./panels.ts";
+import { createYardPanels, followFocusOut, panelIdAt, type YardPanels } from "./panels.ts";
 import { aYardSetting } from "./testing.ts";
 
 afterEach(() => {
@@ -79,6 +79,51 @@ describe("the yard's panels", () => {
     });
   });
 });
+
+describe("focus falling out of a panel", () => {
+  it("brings the keyboard back when what held it was replaced under the click", async () => {
+    const { root, body } = panel("diff");
+    const pressed = document.createElement("button");
+    body.append(pressed);
+    pressed.focus();
+    const seen = leavings(true);
+    pressed.remove();
+    followFocusOut(root, focusOutOf(pressed, null), seen);
+    await Promise.resolve();
+    expect(seen.calls).toEqual(["refocus"]);
+  });
+
+  it("lets go when the keeper's focus goes somewhere else, at once or by clicking away", async () => {
+    const { root, body } = panel("diff");
+    const composer = document.createElement("textarea");
+    document.body.append(composer);
+    const elsewhere = leavings(true);
+    followFocusOut(root, focusOutOf(body, composer), elsewhere);
+    expect(elsewhere.calls).toEqual(["leave"]);
+    const away = leavings(true);
+    followFocusOut(root, focusOutOf(body, null), away);
+    await Promise.resolve();
+    expect(away.calls).toEqual(["leave"]);
+  });
+});
+
+function leavings(refocused: boolean) {
+  const calls: string[] = [];
+  return {
+    calls,
+    refocus: () => {
+      calls.push("refocus");
+      return refocused;
+    },
+    leave: () => {
+      calls.push("leave");
+    },
+  };
+}
+
+function focusOutOf(target: EventTarget, relatedTarget: EventTarget | null): FocusEvent {
+  return { target, relatedTarget } as unknown as FocusEvent;
+}
 
 function withPanels(check: (panels: YardPanels) => void): void {
   createRoot((dispose) => {

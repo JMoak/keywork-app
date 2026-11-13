@@ -21,17 +21,23 @@ export interface Dresser {
 
 export const rememberedNotice = "remembered for the next launch";
 export const targetRememberedNotice = "remembered";
-export const windowAlwaysDressedNotice = "the window always wears something · s follows the OS";
 export const onlyWindowFollowsNotice = "only the window follows the OS";
+
+export type ChordOf = (action: string) => string;
+
+export function windowAlwaysDressedNotice(chord: ChordOf): string {
+  return `the window always wears something · ${chord("themes.system")} follows the OS`;
+}
 
 export function dresserFor(
   target: AttireTarget,
   wardrobe: Wardrobe,
   attire: Attire | undefined,
+  chord: ChordOf,
 ): Dresser {
   return attire === undefined || target.kind === "window"
-    ? windowDresser(wardrobe)
-    : targetDresser(target, wardrobe, attire);
+    ? windowDresser(wardrobe, chord)
+    : targetDresser(target, wardrobe, attire, chord);
 }
 
 export function themeOnShow(wardrobe: Wardrobe): string {
@@ -39,7 +45,7 @@ export function themeOnShow(wardrobe: Wardrobe): string {
   return worn === systemThemeName ? (wardrobe.wearing()?.name ?? worn) : worn;
 }
 
-function windowDresser(wardrobe: Wardrobe): Dresser {
+function windowDresser(wardrobe: Wardrobe, chord: ChordOf): Dresser {
   return {
     target: windowTarget,
     lists: () => true,
@@ -48,16 +54,21 @@ function windowDresser(wardrobe: Wardrobe): Dresser {
     echoes: () => [],
     landing: () => themeOnShow(wardrobe),
     head: () => `${wardrobe.worn()} · the window`,
-    hints: () => "enter wears · esc keeps · s system · t target",
+    hints: () => hintLine(chord, ["themes.system", "system"]),
     preview: (name) => wardrobe.preview(name),
     wear: (name) => wardrobe.wear(name) ?? rememberedNotice,
-    undress: () => windowAlwaysDressedNotice,
+    undress: () => windowAlwaysDressedNotice(chord),
     followSystem: () => wardrobe.toggleSystem() ?? rememberedNotice,
     kept: () => `kept ${wardrobe.worn()}`,
   };
 }
 
-function targetDresser(target: AttireTarget, wardrobe: Wardrobe, attire: Attire): Dresser {
+function targetDresser(
+  target: AttireTarget,
+  wardrobe: Wardrobe,
+  attire: Attire,
+  chord: ChordOf,
+): Dresser {
   const own = (): string | undefined => attire.worn(target);
   const inherited = (): string | undefined => inheritedTheme(attire, target, themeOnShow(wardrobe));
   const landing = (): string | undefined => own() ?? inherited();
@@ -69,7 +80,7 @@ function targetDresser(target: AttireTarget, wardrobe: Wardrobe, attire: Attire)
     echoes: () => echoedThemes(attire, target, themeOnShow(wardrobe)),
     landing,
     head: () => targetHead(attire, target, themeOnShow(wardrobe)),
-    hints: () => "enter wears · esc keeps · x inherits · t target",
+    hints: () => hintLine(chord, ["themes.undress", "inherits"]),
     preview: (name) => attire.preview(target, name),
     wear: (name) => attire.wear(target, name) ?? targetRememberedNotice,
     undress: () => {
@@ -79,4 +90,16 @@ function targetDresser(target: AttireTarget, wardrobe: Wardrobe, attire: Attire)
     followSystem: () => onlyWindowFollowsNotice,
     kept: () => `kept ${landing() ?? "what each pane wears"}`,
   };
+}
+
+type Hint = readonly [action: string, does: string];
+
+function hintLine(chord: ChordOf, ownHint: Hint): string {
+  const hints: readonly Hint[] = [
+    ["themes.wear", "wears"],
+    ["themes.restore", "keeps"],
+    ownHint,
+    ["themes.target", "target"],
+  ];
+  return hints.map(([action, does]) => `${chord(action)} ${does}`).join(" · ");
 }

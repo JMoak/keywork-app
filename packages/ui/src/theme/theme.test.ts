@@ -17,6 +17,7 @@ import {
   applyTheme,
   dressElement,
   fontVariables,
+  swappingAttribute,
   themeAttributes,
   themeStylesheet,
   themeVariables,
@@ -194,8 +195,10 @@ describe("the faint rung", () => {
   it.each(gallery.map((theme) => [theme.name, theme] as const))(
     "%s resolves textFaint one step quieter than textDim and still above the floor",
     (_, theme) => {
-      const { background, textDim } = theme.tokens;
-      const faint = themeVariables(theme)["--kw-text-faint"] ?? "";
+      const { background } = theme.tokens;
+      const variables = themeVariables(theme);
+      const faint = variables["--kw-text-faint"] ?? "";
+      const textDim = variables["--kw-text-dim"] ?? "";
       expect(faint).toMatch(/^#[0-9a-f]{6}$/);
       expect(apcaLc(faint, background)).toBeGreaterThanOrEqual(faintFloor);
       expect(apcaLc(faint, background)).toBeLessThan(apcaLc(textDim, background));
@@ -299,6 +302,44 @@ describe("themeVariables", () => {
     );
     expect(variablesOfStylesheet(css)).toEqual(themeVariables(keyworkNight));
     expect(css).toBe(themeStylesheet(keyworkNight));
+  });
+});
+
+describe("swapping a theme", () => {
+  const appCss = readFileSync(join(process.cwd(), "packages/ui/src/app.css"), "utf8");
+
+  it.each([
+    ["the window", (element: HTMLElement) => applyTheme(keyworkDay, element)],
+    ["a dressed pane", (element: HTMLElement) => dressElement(element, keyworkDay)],
+    ["an undressed pane", (element: HTMLElement) => undressElement(element)],
+  ])("holds every transition while %s changes ink, then lets go", (_, swap) => {
+    const element = document.createElement("div");
+    const heldDuringSwap: boolean[] = [];
+    const setProperty = element.style.setProperty.bind(element.style);
+    const removeProperty = element.style.removeProperty.bind(element.style);
+    element.style.setProperty = (name, value) => {
+      heldDuringSwap.push(element.hasAttribute(swappingAttribute));
+      setProperty(name, value);
+    };
+    element.style.removeProperty = (name) => {
+      heldDuringSwap.push(element.hasAttribute(swappingAttribute));
+      return removeProperty(name);
+    };
+    swap(element);
+    expect(heldDuringSwap.length).toBeGreaterThan(0);
+    expect(heldDuringSwap.every(Boolean)).toBe(true);
+    expect(element.hasAttribute(swappingAttribute)).toBe(false);
+  });
+
+  it("stops the tempo for whatever is swapping, so no ground lags behind its ink", () => {
+    const rule = appCss.match(/\[data-theme-swap\]\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain("--kw-tempo-quick: 0s");
+    expect(rule).toContain("--kw-tempo-settle: 0s");
+  });
+
+  it("paints every scrollbar from the theme, on the window and on each dressed pane", () => {
+    expect(appCss).toMatch(/:root,\s*\[data-theme\]\s*\{\s*scrollbar-color: var\(--kw-scrollbar\)/);
+    expect(appCss).not.toContain("::-webkit-scrollbar");
   });
 });
 

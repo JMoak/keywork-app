@@ -4,11 +4,12 @@
     "body": {
       "turn": 1,
       "prompt": {
-        "entryId": "q1",
+        "entryId": "q2",
         "text": "write two lines to notes.txt"
       },
-      "leafId": "q5",
+      "leafId": "q6",
       "undoneTurns": 2,
+      "scope": "session",
       "files": [
         {
           "path": "notes.txt",
@@ -30,7 +31,7 @@
   "restoreMalformed": {
     "status": 400,
     "body": {
-      "error": "the body must be { turn: a positive integer }"
+      "error": "the body must be { turn: a positive integer, scope?: \"session\" | \"everything\" }"
     }
   },
   "redo": {
@@ -45,8 +46,16 @@
     "status": 200,
     "body": {
       "sessionId": "s1",
-      "leafId": "q6",
+      "leafId": "q7",
       "entries": [
+        {
+          "type": "model_change",
+          "provider": "mock",
+          "modelId": "mock-model",
+          "id": "q1",
+          "parentId": null,
+          "timestamp": "2026-09-07T12:00:00.000Z"
+        },
         {
           "type": "message",
           "message": {
@@ -58,8 +67,8 @@
               }
             ]
           },
-          "id": "q1",
-          "parentId": null,
+          "id": "q2",
+          "parentId": "q1",
           "timestamp": "2026-09-07T12:00:00.000Z",
           "checkpoint": "<sha>"
         },
@@ -75,8 +84,8 @@
               "asked": false
             }
           },
-          "id": "q7",
-          "parentId": "q1",
+          "id": "q8",
+          "parentId": "q2",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -99,8 +108,8 @@
             "inputTokens": 0,
             "outputTokens": 0
           },
-          "id": "q8",
-          "parentId": "q7",
+          "id": "q9",
+          "parentId": "q8",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -116,8 +125,8 @@
               }
             ]
           },
-          "id": "q9",
-          "parentId": "q8",
+          "id": "q10",
+          "parentId": "q9",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -135,15 +144,15 @@
             "inputTokens": 12,
             "outputTokens": 5
           },
-          "id": "q10",
-          "parentId": "q9",
+          "id": "q11",
+          "parentId": "q10",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
           "type": "custom",
           "customType": "turn_facts",
           "data": {
-            "prompt": "q1",
+            "prompt": "q2",
             "checkpoint": "<sha>",
             "settled": "b8aec9de5833d1454488f7d3616a6408879f522b",
             "files": [
@@ -157,10 +166,11 @@
               "files": 1,
               "added": 2,
               "deleted": 0
-            }
+            },
+            "outcome": "completed"
           },
-          "id": "q2",
-          "parentId": "q10",
+          "id": "q3",
+          "parentId": "q11",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -174,8 +184,8 @@
               }
             ]
           },
-          "id": "q3",
-          "parentId": "q2",
+          "id": "q4",
+          "parentId": "q3",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -193,19 +203,20 @@
             "inputTokens": 12,
             "outputTokens": 5
           },
-          "id": "q11",
-          "parentId": "q3",
+          "id": "q12",
+          "parentId": "q4",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
           "type": "custom",
           "customType": "turn_facts",
           "data": {
-            "prompt": "q3",
-            "files": []
+            "prompt": "q4",
+            "files": [],
+            "outcome": "completed"
           },
-          "id": "q4",
-          "parentId": "q11",
+          "id": "q5",
+          "parentId": "q12",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
@@ -213,42 +224,46 @@
           "customType": "restore",
           "data": {
             "turn": 1,
-            "from": "q4",
+            "from": "q5",
             "files": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-            "redo": "b8aec9de5833d1454488f7d3616a6408879f522b"
+            "redo": "b8aec9de5833d1454488f7d3616a6408879f522b",
+            "paths": [
+              "notes.txt"
+            ]
           },
-          "id": "q5",
-          "parentId": null,
+          "id": "q6",
+          "parentId": "q1",
           "timestamp": "2026-09-07T12:00:00.000Z"
         },
         {
           "type": "custom",
           "customType": "restore-undone",
           "data": {
-            "restore": "q5"
+            "restore": "q6"
           },
-          "id": "q6",
-          "parentId": "q4",
+          "id": "q7",
+          "parentId": "q5",
           "timestamp": "2026-09-07T12:00:00.000Z"
         }
       ],
       "labels": {},
       "activePath": [
         "q1",
-        "q7",
+        "q2",
         "q8",
         "q9",
         "q10",
-        "q2",
-        "q3",
         "q11",
+        "q3",
         "q4",
-        "q6"
+        "q12",
+        "q5",
+        "q7"
       ],
       "journal": [
-        "q7",
-        "q2",
-        "q4"
+        "q8",
+        "q3",
+        "q5"
       ]
     }
   }

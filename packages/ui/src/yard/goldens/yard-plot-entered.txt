@@ -1,14 +1,14 @@
 yard yard
 hub 156,16 432×868
 unfold readable mid 600,524 540×360
-  the sum and its test · Wren set out a note
+  the sum and its test · Wren showed a note
 unfold readable mid 884,92 540×284
   src/sum.test.ts · you opened it from src/sum.ts
 unfold card mid 884,16 272×64
   src/sum.ts · you opened it from the sum and its test
 rail 600,16 272×116
-  head 0,0 272×40 1 of 6 unfolds · the next is free
+  head 0,0 272×40 1 of 6 panels opened in 10 min
   card 0,52 272×64
     the nightly chore found two stale branches
-    Wren set out a note
+    Wren showed a note
     set out because you asked about it this morning

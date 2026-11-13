@@ -36,9 +36,17 @@ import {
   looseningQuestion,
   nextEffort,
   presetStep,
+  sessionGoneNotice,
   unsteppableNotice,
 } from "./controls.ts";
-import { type ConversationSpec, conversationPane } from "./index.tsx";
+import {
+  type ConversationSpec,
+  childStartingLine,
+  conversationPane,
+  emptySessionLine,
+  loadingSessionLine,
+  nothingToRetryNotice,
+} from "./index.tsx";
 
 const recordedCost = recordedAnswers.cost.body as CostReport;
 const recordedContext = recordedAnswers.context.body as ContextReport;
@@ -53,6 +61,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 interface Sent {
   prompts: Array<[string, string, PromptBehavior]>;
   verbs: string[];
+  followed: string[];
 }
 
 interface Fakes {
@@ -63,11 +72,14 @@ interface Fakes {
   seed?: { text: string };
   models?: string[];
   saved?: SaveOutcome;
+  saveFails?: string;
   promptOutcome?: PromptOutcome;
   title?: string;
   trashed?: boolean;
+  gone?: boolean;
   live?: LiveSession;
   child?: ChildLineage;
+  loading?: boolean;
 }
 
 interface LiveSession {
@@ -91,8 +103,11 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
       sent.prompts.push([id, text, behavior]);
       return fakes.promptOutcome ?? "started";
     },
-    state: { summaries: [{ id: "s1" }] },
-    gone: () => false,
+    state: { summaries: [{ id: "s1" }], loading: { s1: fakes.loading === true } },
+    open: async (id: string) => {
+      sent.followed.push(id);
+    },
+    gone: () => fakes.gone === true,
     trashed: () => fakes.live?.trashed() ?? fakes.trashed === true,
     restore: async (id: string) => {
       sent.verbs.push(`restore ${id}`);
@@ -161,6 +176,7 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
       ...browserHost(),
       saveAs: async (name: string, text: string) => {
         sent.verbs.push(`save ${name} ${text.length}`);
+        if (fakes.saveFails !== undefined) throw new Error(fakes.saveFails);
         return fakes.saved ?? { saved: false, refused: "cancelled" };
       },
     },
@@ -175,7 +191,7 @@ function mount(
   fakes: Fakes = {},
   spec: ConversationSpec = { kind: "conversation", sessionId: "s1" },
 ) {
-  const sent: Sent = { prompts: [], verbs: [] };
+  const sent: Sent = { prompts: [], verbs: [], followed: [] };
   let handle: (action: string) => void = () => {};
   const shell = shellOver(sent, fakes);
   render(() => (
@@ -283,6 +299,15 @@ describe("the conversation pane's controls", () => {
     expect(sent.prompts).toEqual([]);
     expect(input.value).toBe("also check the callers");
     expect(document.querySelector(".kw-composer-hold")?.textContent).toBe(childAtWorkNotice);
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(childStartingLine);
+  });
+
+  it("says a session with nothing in it is empty, and an unread one is still being read", () => {
+    mount();
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(emptySessionLine);
+    cleanup();
+    mount({ loading: true });
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(loadingSessionLine);
   });
 
   it("opens a delegated child from its transcript row by the session-opening path", () => {
@@ -294,6 +319,33 @@ describe("the conversation pane's controls", () => {
     expect(row.textContent).toContain('child "audit the trust rules" · ◇ researcher');
     fireEvent.keyDown(row, { key: "Enter" });
     expect(sent.verbs).toEqual(["open q2"]);
+  });
+
+  it("sends a failed prompt again from its ending row or the retry command, and says when none waits", async () => {
+    const at = "2026-11-12T12:00:00.000Z";
+    const failed = projectAll(emptyProjection, [
+      { id: 1, ts: at, sessionId: "s1", type: "turn.started", payload: { userText: "failnow" } },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "engine.error",
+        payload: { error: { name: "Error", message: "upstream 529 overloaded" } },
+      },
+    ]);
+    const { sent, act } = mount({
+      live: { summary: () => undefined, projection: () => failed, trashed: () => false },
+    });
+    fireEvent.keyDown(document.querySelector(".kw-ending") as HTMLElement, { key: "Enter" });
+    await act("conversation.retry");
+    expect(sent.prompts).toEqual([
+      ["s1", "failnow", "steer"],
+      ["s1", "failnow", "steer"],
+    ]);
+    cleanup();
+    const quiet = mount();
+    await quiet.act("conversation.retry");
+    expect(lines()).toEqual([nothingToRetryNotice]);
   });
 
   it("seeds the composer with an undone prompt", () => {
@@ -407,6 +459,17 @@ describe("the conversation pane's controls", () => {
     expect(lines()).toEqual(["export cancelled · nothing was written"]);
   });
 
+  it("says why a save dialog that fails wrote nothing, instead of failing silently", async () => {
+    const { act } = mount({
+      saveFails:
+        "Error invoking remote method 'host:save-as': Error: Failed to get 'downloads' path",
+    });
+    await act("conversation.export");
+    expect(lines()).toEqual([
+      "the save dialog failed · Failed to get 'downloads' path · export-file writes the page into the workspace instead",
+    ]);
+  });
+
   it("points at export-file when the host has no save dialog", async () => {
     const { act } = mount({
       saved: {
@@ -512,6 +575,56 @@ describe("a session the server no longer knows", () => {
   });
 });
 
+describe("a pane whose session is gone", () => {
+  it("says so as its one empty line, not beside a second one", async () => {
+    const sent: Sent = { prompts: [], verbs: [], followed: [] };
+    const [spec, setSpec] = createSignal<ConversationSpec>({
+      kind: "conversation",
+      sessionId: "s1",
+    });
+    const shell = {
+      ...shellOver(sent, { gone: true }),
+      rebind: (_pane: string, next: ConversationSpec) => setSpec(next),
+    } as ShellSeams;
+    render(() => (
+      <conversationPane.component
+        id="conversation-1"
+        spec={spec()}
+        focused={true}
+        shell={shell}
+        onAction={() => undefined}
+      />
+    ));
+    await settle();
+    const empties = [...document.querySelectorAll(".kw-empty")].map((line) => line.textContent);
+    expect(empties).toEqual([sessionGoneNotice]);
+    expect(lines()).toEqual([]);
+  });
+});
+
+describe("the session a pane shows", () => {
+  it("is followed however the pane came to show it: mounted, rebound or bound after a first prompt", async () => {
+    const sent: Sent = { prompts: [], verbs: [], followed: [] };
+    const shell = shellOver(sent);
+    const [spec, setSpec] = createSignal<ConversationSpec>({ kind: "conversation" });
+    render(() => (
+      <conversationPane.component
+        id="conversation-1"
+        spec={spec()}
+        focused={true}
+        shell={shell}
+        onAction={() => undefined}
+      />
+    ));
+    await settle();
+    expect(sent.followed).toEqual([]);
+    setSpec({ kind: "conversation", sessionId: "s1" });
+    setSpec({ kind: "conversation", sessionId: "s2" });
+    await settle();
+    expect(sent.followed).toEqual(["s1", "s2"]);
+  });
+});
+
 describe("the conversation pane's keyboard home", () => {
   it("puts the keys in the composer when the pane is focused, so typing is never dropped", () => {
     mount();
@@ -531,7 +644,7 @@ describe("the conversation pane's keyboard home", () => {
 describe("the conversation pane's title row", () => {
   it("shows the inference words, the reported context basis and the server's usage", () => {
     const shell = shellOver(
-      { prompts: [], verbs: [] },
+      { prompts: [], verbs: [], followed: [] },
       {
         controls: { model: "mock/beta", thinking: true, effort: "high" },
         readings: { context: { ...recordedContext, used: 4000 }, cost: recordedCost },
@@ -562,7 +675,7 @@ describe("the conversation pane's title row", () => {
       bot: "reviewer",
     };
     const shell = shellOver(
-      { prompts: [], verbs: [] },
+      { prompts: [], verbs: [], followed: [] },
       { live: { summary: () => bound, projection: () => emptyProjection, trashed: () => false } },
     );
     const adornments = conversationPane.adornments?.(
@@ -574,7 +687,7 @@ describe("the conversation pane's title row", () => {
   });
 
   it("keeps the assumed basis until the first reading arrives", () => {
-    const shell = shellOver({ prompts: [], verbs: [] });
+    const shell = shellOver({ prompts: [], verbs: [], followed: [] });
     const adornments = conversationPane.adornments?.(
       { kind: "conversation", sessionId: "s1" },
       shell,
@@ -594,6 +707,7 @@ describe("the conversation pane's title row", () => {
       "leader shift+c",
       "leader shift+r",
       "leader shift+e",
+      "leader end",
       "leader shift+x",
       "leader [",
       "leader ]",
@@ -737,7 +851,7 @@ describe("a creature's report on its own turn", () => {
       });
       const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
       expect(notices, `replay ${replay}`).toEqual([crateDeliveredLine]);
-      const drawn = document.body.textContent ?? "";
+      const drawn = document.querySelector(".kw-transcript")?.textContent ?? "";
       expect(drawn.split(sentence).length - 1, `replay ${replay}`).toBe(1);
       cleanup();
     }

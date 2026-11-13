@@ -1,11 +1,17 @@
-import { app, ipcMain, type WebContents } from "electron";
+import { execFile } from "node:child_process";
+import { app, type WebContents } from "electron";
 import { z } from "zod";
 import { ptyChannels } from "../shared/channels.ts";
-import { type PtyHost, ptyHost } from "./pty.ts";
+import type { AppIpc } from "./app-page.ts";
+import { type PtyHost, processListing, ptyHost } from "./pty.ts";
 import { type NativePtyOptions, nativePtySeams } from "./pty-native.ts";
 
-export function registerPtyHandlers(options: NativePtyOptions): PtyHost {
-  const ptys = ptyHost(nativePtySeams(options));
+export function registerPtyHandlers(
+  ipc: AppIpc,
+  serves: (sender: WebContents, workspace: string) => boolean,
+  options: NativePtyOptions,
+): PtyHost {
+  const ptys = ptyHost({ ...nativePtySeams(options), listProcesses });
   const watched = new Set<number>();
   const watch = (sender: WebContents): void => {
     if (watched.has(sender.id)) return;
@@ -15,10 +21,14 @@ export function registerPtyHandlers(options: NativePtyOptions): PtyHost {
       ptys.closeOwned(sender.id);
     });
   };
-  ipcMain.handle(ptyChannels.open, (event, request: unknown) => {
+  ipc.handle(ptyChannels.open, (event, request: unknown) => {
     const sender = event.sender;
+    const opening = openRequest.parse(request);
+    if (!serves(sender, opening.workspace)) {
+      throw new Error(`a terminal opens only in this window's workspace, not ${opening.workspace}`);
+    }
     watch(sender);
-    return ptys.open(openRequest.parse(request), sender.id, {
+    return ptys.open(opening, sender.id, {
       data: (id, bytes) => {
         if (!sender.isDestroyed()) sender.send(ptyChannels.data, id, bytes);
       },
@@ -27,14 +37,32 @@ export function registerPtyHandlers(options: NativePtyOptions): PtyHost {
       },
     });
   });
-  ipcMain.on(ptyChannels.write, (_event, id: number, data: string) => ptys.write(id, data));
-  ipcMain.on(ptyChannels.resize, (_event, id: number, cols: number, rows: number) =>
-    ptys.resize(id, cols, rows),
+  ipc.on(ptyChannels.write, (event, id: number, data: string) =>
+    ptys.write(event.sender.id, id, data),
   );
-  ipcMain.on(ptyChannels.close, (_event, id: number) => ptys.close(id));
+  ipc.on(ptyChannels.resize, (event, id: number, cols: number, rows: number) =>
+    ptys.resize(event.sender.id, id, cols, rows),
+  );
+  ipc.on(ptyChannels.close, (event, id: number) => ptys.close(event.sender.id, id));
+  ipc.handle(ptyRunningChannel, (event, id: unknown) =>
+    ptys.running(event.sender.id, z.number().int().parse(id)),
+  );
   app.on("will-quit", () => ptys.closeAll());
   return ptys;
 }
+
+export const ptyRunningChannel = "pty:running";
+
+function listProcesses(): Promise<string> {
+  const { command, args } = processListing(process.platform);
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { timeout: listingTimeoutMs, windowsHide: true }, (error, stdout) =>
+      error === null ? resolve(stdout) : reject(error),
+    );
+  });
+}
+
+const listingTimeoutMs = 4000;
 
 const openRequest = z.object({
   workspace: z.string().min(1),

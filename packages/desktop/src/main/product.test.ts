@@ -16,6 +16,12 @@ describe("the product name", () => {
     expect(windowTitle(3)).toBe("(3) keywork");
   });
 
+  it("names the workspace folder a window shows ahead of the product", () => {
+    expect(windowTitle(0, keyworkProfile, "C:\\work\\rig-sample")).toBe("rig-sample · keywork");
+    expect(windowTitle(2, steadProfile, "/home/me/garden/")).toBe("(2) garden · stead");
+    expect(windowTitle(0, keyworkProfile, "C:\\")).toBe("C: · keywork");
+  });
+
   it("says keywork in the about box and names the keywork engine inside", () => {
     const box = aboutBox({ shell: "electron", platform: "win32", version: "0.1.0" });
     expect(box.title).toBe("About keywork");

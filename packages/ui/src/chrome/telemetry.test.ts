@@ -2,7 +2,7 @@ import { emptyProjection, projectAll } from "@keywork-app/client";
 import type { BusEnvelope, CostReport } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import recordedAnswers from "../../../client/src/fixtures/controls.json";
-import { liveTurnsOnly, telemetry } from "./telemetry.ts";
+import { compactTelemetry, liveTurnsOnly, telemetry } from "./telemetry.ts";
 
 const recordedCost = recordedAnswers.cost.body as CostReport;
 
@@ -31,5 +31,13 @@ describe("telemetry", () => {
 
   it("says nothing before a turn has been seen or reported", () => {
     expect(telemetry(emptyProjection)).toBe("");
+  });
+});
+
+describe("compactTelemetry", () => {
+  it("keeps only the spend beside the context gauge when the title runs short", () => {
+    expect(compactTelemetry(`9.7k tokens · $0.0147 · ${liveTurnsOnly}`)).toBe("$0.0147");
+    expect(compactTelemetry("210k tokens · $0.05 + 2 unpriced")).toBe("$0.05 + 2 unpriced");
+    expect(compactTelemetry("12 tokens")).toBe("");
   });
 });

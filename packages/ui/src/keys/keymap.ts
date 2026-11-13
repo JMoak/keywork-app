@@ -25,6 +25,7 @@ export interface KeymapOptions {
   bindings: Record<string, BindingSpec>;
   scopes?: Record<string, string> | undefined;
   exclusiveScopes?: readonly string[] | undefined;
+  reserved?: readonly string[] | undefined;
 }
 
 export class KeymapError extends Error {
@@ -34,6 +35,13 @@ export class KeymapError extends Error {
 export const defaultLeader = "ctrl+k";
 export const defaultLeaderTimeoutMs = 2000;
 export const everyPane = "*";
+export const leaderTwice = "leader";
+
+export const defaultReserved: readonly string[] = [
+  ...["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => `alt+${digit}`),
+  "alt+z",
+  "ctrl+shift+p",
+];
 
 export class Keymap {
   private table: BindingTable;
@@ -66,17 +74,16 @@ export class Keymap {
     const chords = isChordList(pressed) ? pressed : [pressed];
     const isLeader = chords.some((chord) => chordsEqual(chord, this.table.leader));
     if (this.isPending(nowMs)) {
-      if (!isLeader) return this.resolveLeaderKey(chords, activeScope);
-      this.disarm();
-      return cancelled;
+      return isLeader
+        ? this.resolveLeaderTwice(activeScope)
+        : this.resolveLeaderKey(chords, activeScope);
     }
     if (isLeader) {
       this.pendingSince = nowMs;
       return { type: "leader-pending" };
     }
     const chordScope = typing ? undefined : activeScope;
-    const scopedOnly = this.ownsKeyboard(chordScope);
-    const action = firstOf(chords, (chord) => this.findByChord(chord, chordScope, scopedOnly));
+    const action = firstOf(chords, (chord) => this.findByChord(chord, chordScope));
     return action === undefined ? { type: "pass" } : { type: "action", action };
   }
 
@@ -97,9 +104,7 @@ export class Keymap {
   }
 
   describeAll(action: string): string[] {
-    return (this.table.bindings.get(action) ?? []).map((binding) =>
-      binding.kind === "chord" ? binding.label : `${this.leader} ${binding.label}`,
-    );
+    return (this.table.bindings.get(action) ?? []).map((binding) => this.labelOf(binding));
   }
 
   isLeaderless(action: string): boolean {
@@ -128,15 +133,20 @@ export class Keymap {
     this.disarm();
     const [typed] = chords;
     if (typed === undefined || typed.name === "escape" || typed.ctrl || typed.alt) return cancelled;
-    const action = firstOf(chords, (chord) => this.findByLeaderKey(chord, activeScope));
+    const action = firstOf(chords, (chord) =>
+      this.findByLeaderKey(leaderKeyOf(chord), activeScope),
+    );
     return action === undefined ? cancelled : { type: "action", action };
   }
 
-  private findByChord(
-    chord: Chord,
-    activeScope: string | undefined,
-    scopedOnly = false,
-  ): string | undefined {
+  private resolveLeaderTwice(activeScope: string | undefined): KeymapResult {
+    this.disarm();
+    const action = this.findByLeaderKey(leaderTwice, activeScope);
+    return action === undefined ? cancelled : { type: "action", action };
+  }
+
+  private findByChord(chord: Chord, activeScope: string | undefined): string | undefined {
+    const scopedOnly = this.ownsKeyboard(activeScope) && !this.reserves(chord);
     return this.find(
       (binding) => binding.kind === "chord" && chordsEqual(binding.chord, chord),
       activeScope,
@@ -144,12 +154,17 @@ export class Keymap {
     );
   }
 
-  private findByLeaderKey(chord: Chord, activeScope: string | undefined): string | undefined {
-    const pressed = leaderKeyOf(chord);
-    return this.find(
-      (binding) => binding.kind === "leader" && binding.key === pressed,
-      activeScope,
-    );
+  private reserves(chord: Chord): boolean {
+    return this.table.reserved.some((kept) => chordsEqual(kept, chord));
+  }
+
+  private findByLeaderKey(key: string, activeScope: string | undefined): string | undefined {
+    return this.find((binding) => binding.kind === "leader" && binding.key === key, activeScope);
+  }
+
+  private labelOf(binding: Binding): string {
+    if (binding.kind === "chord") return binding.label;
+    return `${this.leader} ${binding.key === leaderTwice ? this.leader : binding.label}`;
   }
 
   private find(
@@ -179,6 +194,7 @@ interface BindingTable {
   readonly bindings: ReadonlyMap<string, readonly Binding[]>;
   readonly scopes: ReadonlyMap<string, string>;
   readonly exclusiveScopes: ReadonlySet<string>;
+  readonly reserved: readonly Chord[];
 }
 
 interface Claim {
@@ -205,6 +221,7 @@ function compile(options: KeymapOptions): BindingTable {
     bindings,
     scopes,
     exclusiveScopes: new Set(options.exclusiveScopes ?? []),
+    reserved: (options.reserved ?? defaultReserved).map(parseChord),
   };
 }
 
@@ -246,6 +263,9 @@ function parseBinding(spec: string): Binding {
     }
   }
   const keySpec = leaderMatch[1] as string;
+  if (keySpec.toLowerCase() === leaderTwice) {
+    return { kind: "leader", key: leaderTwice, label: leaderTwice };
+  }
   const key = parseChord(keySpec);
   if (key.ctrl || key.alt) {
     throw new KeymapError(

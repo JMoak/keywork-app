@@ -1,18 +1,34 @@
 import type { PlotCard, YardCard, YardSetting } from "@keywork-app/habitat";
-import type { KeeperShowOutcome, SettingSubject } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  KeeperShowOutcome,
+  Setting,
+  SettingSubject,
+} from "@keywork-app/protocol";
 import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { HostPort } from "../host/port.ts";
 import type { PaneSpec, ShellSeams } from "../panes/index.ts";
 import { reducedMotionActive, reducedMotionQuery, watchMedia } from "../panes/stead/painter.ts";
 import { windowFocus } from "../shell/window-focus.ts";
-import type { TrailStep } from "./actions.ts";
+import { type TrailStep, yardRailActionId } from "./actions.ts";
 import { createAttentionReports } from "./attention.ts";
 import { createYardControl, type YardControl } from "./control.ts";
-import { chainEndLine, chainRootLine, restoredLine, walkedLine, withdrawnLine } from "./copy.ts";
+import {
+  arrivedLine,
+  chainEndLine,
+  chainRootLine,
+  openedAsCardLine,
+  openedBesideLine,
+  restoredLine,
+  setOutLine,
+  walkedLine,
+  withdrawnLine,
+} from "./copy.ts";
+import type { PanelWay } from "./entering.ts";
 import { reaches } from "./layout.ts";
 import { createYardModel } from "./model.ts";
 import { openFrom, subjectOfPane } from "./openings.ts";
-import { createYardPanels, type YardPanels } from "./panels.ts";
+import { createYardPanels, type DrawnAs, type YardPanels } from "./panels.ts";
 import { createYardRuleBook, type RuleStorage } from "./rules.ts";
 import { satelliteOf, showsSubject, titleOfSetting } from "./satellites.ts";
 import { createKeeperSignals } from "./signals.ts";
@@ -43,7 +59,7 @@ export interface YardSurface {
   card(): YardCard;
   withdrawn(id: string): boolean;
   ownerOf(setting: YardSetting): string;
-  enter(setting: YardSetting): void;
+  enter(setting: YardSetting, way: PanelWay): void;
   answer(setting: YardSetting, outcome: KeeperShowOutcome): void;
   open(from: YardSetting, what: SettingSubject): void;
   restore(plot: PlotCard): void;
@@ -94,11 +110,33 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
   };
   const settingOf = (id: string | undefined): YardSetting | undefined =>
     model.settings().find((setting) => setting.id === id);
+  const railChord = (): string => options.chord(yardRailActionId);
+  const landed = (opened: Setting, from: YardSetting, as: DrawnAs): void => {
+    const title = titleOfSetting(opened);
+    if (as === "card") {
+      options.say(openedAsCardLine(title, railChord()));
+      return;
+    }
+    panels.focusWhenMounted(opened.id);
+    options.say(openedBesideLine(title, titleOfSetting(from)));
+  };
   const open = (from: YardSetting, what: SettingSubject): void => {
     const still = settingOf(from.id) !== undefined && !model.withdrawn(from.id);
     const parent = still ? from.id : from.sessionId;
-    void openFrom(model.shellOf(from).client, what, parent).then(options.say);
+    void openFrom(model.shellOf(from).client, what, parent).then((opening) => {
+      if ("unopened" in opening) options.say(opening.unopened);
+      else panels.whenDrawn(opening.opened.id, (as) => landed(opening.opened, from, as));
+    });
   };
+  const announceWhatArrivesInTiles = (batch: readonly BusEnvelope[]): void => {
+    if (control.on()) return;
+    const arrived = proposedByTheModel(batch).flatMap((id) => {
+      const setting = settingOf(id);
+      return setting === undefined ? [] : [setOutLine(setting, model.ownerOf(setting))];
+    });
+    if (arrived.length > 0) options.say(arrivedLine(arrived, railChord()));
+  };
+  onCleanup(options.shell.feed.subscribe(announceWhatArrivesInTiles));
   const go = (id: string): void => {
     const setting = settingOf(id);
     if (setting === undefined) {
@@ -109,17 +147,8 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     if (control.railActive() || !panels.focus(id)) control.focusRail(id);
     options.say(walkedLine(model.lineage.chainOf(id), titleOfSetting(setting)));
   };
-  const waitsBesidePanel = (id: string): boolean => {
-    if (panels.settingOf(id) !== undefined) return false;
-    for (let above = model.lineage.parentOf(id); above !== undefined; ) {
-      if (panels.settingOf(above) !== undefined) return true;
-      above = model.lineage.parentOf(above);
-    }
-    return false;
-  };
-  const enterInPlace = (setting: YardSetting): void => {
+  const unfoldBeside = (setting: YardSetting): void => {
     if (!reaches(setting.shown, "unfold")) model.raiseByHand(setting);
-    control.leaveRail();
     panels.focusWhenMounted(setting.id);
     model.attend({
       type: "keeper.attend",
@@ -127,6 +156,16 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
       id: setting.id,
       kind: "enter",
     });
+  };
+  const openAsTile = (setting: YardSetting): void => {
+    const shell = model.shellOf(setting);
+    const before = shell.focusedPane();
+    const opened = takeIntoHub(setting, shell, options.host);
+    options.returnHome();
+    const reached = opened === "pane" ? shell.focusedPane() !== before : opened !== undefined;
+    if (reached && setting.state !== "pinned" && !model.withdrawn(setting.id)) {
+      answer(setting, "seen");
+    }
   };
   const cameFrom = new Map<string, string>();
   const walkFrom = (at: string | undefined, step: TrailStep): void => {
@@ -152,13 +191,10 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     card: model.card,
     withdrawn: model.withdrawn,
     ownerOf: model.ownerOf,
-    enter: (setting) => {
-      const withdrawn = model.withdrawn(setting.id);
-      if (!withdrawn && waitsBesidePanel(setting.id)) return enterInPlace(setting);
-      if (!withdrawn && !reaches(setting.shown, "unfold")) return model.raiseByHand(setting);
-      control.leaveRail();
-      takeIntoHub(setting, model.shellOf(setting), options.host);
-      if (setting.state !== "pinned" && !withdrawn) answer(setting, "seen");
+    enter: (setting, way) => {
+      if (way === "focus" && panels.focus(setting.id)) return;
+      if (way === "tile") openAsTile(setting);
+      else unfoldBeside(setting);
     },
     answer,
     open,
@@ -177,27 +213,42 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     walk: (step) => walkFrom(panels.inside() ?? options.focusedThread(), step),
     walkFrom,
     lanternOn: (spec) =>
-      control.on() &&
       model
         .settings()
         .some((setting) => setting.shown === "lantern" && showsSubject(setting, spec)),
   };
 }
 
+export function proposedByTheModel(batch: readonly BusEnvelope[]): string[] {
+  return batch.flatMap((envelope) =>
+    envelope.type === "show.proposed" &&
+    envelope.payload.replay !== true &&
+    envelope.payload.setting.origin !== "keeper"
+      ? [envelope.payload.setting.id]
+      : [],
+  );
+}
+
+export type TakenInto = "pane" | "session" | "elsewhere";
+
 export function takeIntoHub(
   setting: YardSetting,
   shell: ShellSeams,
   host: Pick<HostPort, "openExternal">,
-): void {
+): TakenInto | undefined {
   const satellite = satelliteOf(setting);
-  if (satellite.kind === "link") void host.openExternal(satellite.url);
-  if (satellite.kind !== "pane") return;
+  if (satellite.kind === "link") {
+    void host.openExternal(satellite.url);
+    return "elsewhere";
+  }
+  if (satellite.kind !== "pane") return undefined;
   const spec = satellite.spec;
   if (spec.kind === "conversation" && spec.sessionId !== undefined) {
     shell.sessions.openSession(spec.sessionId);
-  } else {
-    shell.openPane(spec);
+    return "session";
   }
+  shell.openPane(spec);
+  return "pane";
 }
 
 function createReducedMotion(): Accessor<boolean> {

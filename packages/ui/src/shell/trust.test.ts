@@ -195,9 +195,7 @@ describe("the trust flow", () => {
   });
 
   it("speaks in the product's words: the server, never the engine's name", () => {
-    expect(trustPrompt("C:/work")).toBe(
-      "trust C:/work? the server keeps workspace files and memory in .keywork",
-    );
+    expect(trustPrompt("C:\\Users\\keeper\\src\\site")).toBe("trust site?");
     expect(untrustedNotice("C:/work", "ctrl+k u")).toContain("ctrl+k u trusts it");
     expect(trustStateOf({ ...undecidedWorkspace, trust: "untrusted" })).toMatchObject({
       kind: "refused",

@@ -28,10 +28,13 @@ export function standingLine(standing: ServerStanding | undefined, serverLabel: 
 
 export function composerHold(standing: ServerStanding | undefined): string | undefined {
   if (standing?.kind !== "lost") return undefined;
-  return standing.reattaching
-    ? "server lost · reattaching · this prompt waits here until it's back"
-    : `server lost · /${reconnectCommand} tries again · this prompt waits here`;
+  const lost = standing.reattaching
+    ? "server lost · reattaching"
+    : `server lost · /${reconnectCommand} tries again`;
+  return `${lost} · ${heldDraftLine}`;
 }
+
+export const heldDraftLine = "nothing is sent · the draft stays here for enter once it's back";
 
 export function backNotice(serverLabel: string): string {
   return `the server is back · ${serverLabel}`;

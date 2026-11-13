@@ -19,18 +19,23 @@ import { EmptyState } from "../empty-state.tsx";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { bareFolderLine, folderOpening, pathTitle } from "./folder.ts";
+import { landed, landingFor } from "./landing.ts";
 import {
   fileUrlOf,
   lineLabel,
   openingRange,
   rangeAfter,
   rangeBefore,
+  rereadRange,
+  sameSlice,
   sliceFacts,
   tailRange,
 } from "./range.ts";
 import { pathToOpen } from "./recent.ts";
+import { rereadOnReturn, rereadWhenFilesMove } from "./rereading.ts";
 import { type SpillSource, spillEditorRefusal, spillRefusal, spillTitle } from "./spill.ts";
 import { type FindReading, type FindStep, mountTextView, type TextMount } from "./text-view.ts";
+import { workspaceFileChoices } from "./workspace-files.ts";
 import "./file.css";
 
 const fileSpec = z.object({
@@ -62,6 +67,7 @@ export const filePane = definePane<FileSpec>({
   home: "main",
   attire: "work",
   title: (spec) => (spec.spill === undefined ? pathTitle(spec.path) : spillTitle(spec.path)),
+  subject: (spec) => [spec.path, spec.spill],
   emptyState: (keys) => `an empty file · ${keys.chord("browser.summon")} picks another`,
   component: FileSlot,
   summon: {
@@ -72,18 +78,18 @@ export const filePane = definePane<FileSpec>({
       name: "open",
       aliases: ["view"],
       description: "open a file, else the one the agent touched last, else the README",
-      argument: { hint: "[path]" },
+      argument: { hint: "[path]", choices: (shell) => workspaceFileChoices(shell.client) },
     },
     spec: (_shell, path) => ({ kind: "file", path: path ?? pathToOpen() }),
   },
   localActions: {
     "file.top": {
-      chords: "g",
+      chords: ["g", "home"],
       help: "the top of the file",
       command: { name: "file-top", description: "read from the start of this file" },
     },
     "file.end": {
-      chords: "shift+g",
+      chords: ["shift+g", "end"],
       help: "the end of the file",
       command: { name: "file-end", description: "read the tail of this file" },
     },
@@ -106,6 +112,31 @@ export const filePane = definePane<FileSpec>({
       chords: ["k", "up"],
       help: "scroll up",
       command: { name: "file-up", description: "scroll this file up a line" },
+    },
+    "file.page-down": {
+      chords: ["pagedown", "space"],
+      help: "down a page",
+      command: { name: "file-page-down", description: "scroll this file down a page" },
+    },
+    "file.page-up": {
+      chords: "pageup",
+      help: "up a page",
+      command: { name: "file-page-up", description: "scroll this file up a page" },
+    },
+    "file.line": {
+      chords: "ctrl+g",
+      help: "go to a line",
+      command: {
+        name: "line",
+        aliases: ["goto"],
+        description: "go to a line of this file and mark it",
+        argument: { hint: "[line]" },
+      },
+    },
+    "file.refresh": {
+      chords: "r",
+      help: "read it again",
+      command: { name: "file-refresh", description: "read this file again from disk" },
     },
     "file.editor": {
       chords: "o",
@@ -155,6 +186,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
   const [finding, setFinding] = createSignal(false);
   const [query, setQuery] = createSignal("");
   const [found, setFound] = createSignal<FindReading>();
+  const [goingTo, setGoingTo] = createSignal<LineAsk>();
   let holder: HTMLDivElement | undefined;
   let findInput: HTMLInputElement | undefined;
 
@@ -163,7 +195,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
     return current.kind === "loaded" ? current.slice : undefined;
   };
 
-  let landing: Edge = "top";
+  let landing: Arrival = "top";
 
   const read = async (
     range: FileRange | "tail",
@@ -207,6 +239,26 @@ function FileSlot(props: PaneProps<FileSpec>) {
     void read(openingRange(props.spec));
   });
 
+  const reread = async (): Promise<void> => {
+    const shown = slice();
+    if (shown === undefined || props.spec.spill !== undefined) return;
+    const reading = await readSlice(props.shell, props.spec, rereadRange(shown)).catch(
+      () => undefined,
+    );
+    const current = slice();
+    if (reading === undefined || current === undefined) return;
+    if (typeof reading !== "string" && sameSlice(reading, current)) return;
+    landing = "kept";
+    setState(
+      typeof reading === "string"
+        ? { kind: "refused", reading, spec: props.spec }
+        : { kind: "loaded", slice: reading },
+    );
+  };
+  const rereadQuietly = (): void => void reread();
+  rereadWhenFilesMove(props.shell.feed, rereadQuietly);
+  rereadOnReturn(() => props.focused, rereadQuietly);
+
   createEffect(() => {
     const current = state();
     if (current.kind === "loading") return;
@@ -219,13 +271,43 @@ function FileSlot(props: PaneProps<FileSpec>) {
     }
     const numbering = { label: (index: number) => lineLabel(loaded, index) };
     const existing = untrack(mount);
+    const kept = existing?.scrollOffset() ?? 0;
     const shown = existing ?? mountTextView(holder, loaded.text, numbering, props.spec.path);
     if (existing === undefined) setMount(shown);
     else existing.replace(loaded.text, numbering, props.spec.path);
     if (landing === "end") shown.scrollTo("end");
     if (untrack(query) !== "") setFound(shown.find(untrack(query)));
+    if (landing === "kept") shown.scrollToOffset(kept);
   });
   onCleanup(() => mount()?.destroy());
+
+  createEffect(() => {
+    const request = landingFor(props.spec.path);
+    const shown = mount();
+    const loaded = slice();
+    if (request === undefined || shown === undefined || loaded === undefined) return;
+    if (loaded.from === 0) shown.land(request.line, request.lines);
+    landed(request);
+  });
+
+  const goToLine = (typed: string): void => {
+    const shown = mount();
+    const loaded = slice();
+    const refusal =
+      shown === undefined || loaded === undefined
+        ? "nothing is shown to go to"
+        : lineRefusal(typed, loaded, shown.lineCount());
+    if (refusal !== undefined) {
+      setGoingTo({ refusal });
+      return;
+    }
+    shown?.land(Number(typed), 1);
+    closeGoTo();
+  };
+  const closeGoTo = (): void => {
+    setGoingTo(undefined);
+    root?.focus({ preventScroll: true });
+  };
 
   const openFind = (): void => {
     setFinding(true);
@@ -259,7 +341,7 @@ function FileSlot(props: PaneProps<FileSpec>) {
     opening.catch((cause: unknown) => setEditorRefusal(editorRefusalText(cause)));
   };
 
-  props.onAction((action) => {
+  props.onAction((action, argument) => {
     const loaded = slice();
     switch (action) {
       case "file.top":
@@ -280,6 +362,14 @@ function FileSlot(props: PaneProps<FileSpec>) {
         return mount()?.scrollBy(1);
       case "file.up":
         return mount()?.scrollBy(-1);
+      case "file.page-down":
+        return mount()?.scrollPage(1);
+      case "file.page-up":
+        return mount()?.scrollPage(-1);
+      case "file.line":
+        return argument === undefined ? setGoingTo({}) : goToLine(argument.trim());
+      case "file.refresh":
+        return loaded === undefined ? void read(openingRange(props.spec)) : void reread();
       case "file.editor":
         return openInEditor();
       case "file.find":
@@ -325,6 +415,16 @@ function FileSlot(props: PaneProps<FileSpec>) {
             })}
           </span>
         </div>
+      </Show>
+      <Show when={goingTo()}>
+        {(ask) => (
+          <div class="kw-file-find">
+            <LineInput onGo={goToLine} onClose={closeGoTo} />
+            <span class="kw-file-find-count" data-level={ask().refusal ? "error" : undefined}>
+              {ask().refusal ?? "enter goes · esc closes"}
+            </span>
+          </div>
+        )}
       </Show>
       <Show when={editorRefusal()}>
         {(refusal) => (
@@ -402,6 +502,47 @@ function FindInput(props: FindInputProps) {
   );
 }
 
+interface LineAsk {
+  readonly refusal?: string;
+}
+
+function LineInput(props: { onGo: (typed: string) => void; onClose: () => void }) {
+  let input: HTMLInputElement | undefined;
+  onMount(() => input?.focus());
+  const onKeyDown = (event: KeyboardEvent & { currentTarget: HTMLInputElement }): void => {
+    if (event.key === "Enter") props.onGo(event.currentTarget.value.trim());
+    else if (event.key === "Escape") props.onClose();
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  return (
+    <input
+      ref={input}
+      class="kw-file-find-input"
+      type="text"
+      inputMode="numeric"
+      aria-label="go to line"
+      placeholder="line"
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
+export function lineRefusal(
+  typed: string,
+  slice: Pick<TextSlice, "from" | "to" | "bytes">,
+  lines: number,
+): string | undefined {
+  const line = Number(typed);
+  if (!/^\d+$/.test(typed) || line < 1) return `${typed || "nothing"} is not a line number`;
+  if (slice.from > 0) return "this slice starts partway in · g reads from the top";
+  if (line <= lines) return undefined;
+  return sliceReachesEnd(slice)
+    ? `the file has ${lines} lines`
+    : `line ${line} is past this slice · ] loads more`;
+}
+
 export interface FindKeys {
   readonly next: string;
   readonly previous: string;
@@ -459,6 +600,8 @@ function bareFolderOf(state: FileState): Extract<FileState, { kind: "bare-folder
 }
 
 type Edge = "top" | "end";
+
+type Arrival = Edge | "kept";
 
 function landingOf(range: FileRange | "tail"): Edge {
   return range === "tail" ? "end" : "top";

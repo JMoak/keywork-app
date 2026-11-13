@@ -77,6 +77,7 @@ import {
   steadTitle,
   whatAreYouDoing,
 } from "./copy.ts";
+import { HomeOpening } from "./creature-home.tsx";
 import { type PlacedMember, steadDrawer } from "./draw.ts";
 import { browserFieldHost, type FieldPicture, steadField } from "./field.ts";
 import { createHabitatState, houseOffsetMinutes } from "./habitat.ts";
@@ -306,21 +307,7 @@ function SteadPane(props: PaneProps<SteadSpec>) {
       keyed
       fallback={
         <Show when={props.shell.prepareSteadHome !== undefined} fallback={<Stead {...props} />}>
-          <section class="kw-ov kw-stead" data-native-activation>
-            <Show
-              when={props.shell.steadHomeFailure}
-              fallback={<p role="status">Opening your creature’s home…</p>}
-            >
-              {(failure) => (
-                <>
-                  <p role="status">{failure()}</p>
-                  <button type="button" onClick={() => props.shell.prepareSteadHome?.(true)}>
-                    Retry home
-                  </button>
-                </>
-              )}
-            </Show>
-          </section>
+          <HomeOpening shell={props.shell} class="kw-ov kw-stead" />
         </Show>
       }
     >
@@ -336,8 +323,8 @@ function ConnectedStead(props: PaneProps<SteadSpec> & { readonly scope: SteadHom
     <Show when={pane()} keyed fallback={<Stead {...props} shell={shell} />}>
       {(spec) => (
         <div class="kw-stead-presented" data-keywork-pane-kind={spec.kind} data-native-activation>
-          <button type="button" onClick={() => props.scope.dismissPane?.()}>
-            Back to creatures
+          <button type="button" class="kw-stead-back" onClick={() => props.scope.dismissPane?.()}>
+            <span aria-hidden="true">‹ </span>Back to creatures
           </button>
           <Dynamic
             component={definitionOf(spec.kind).component}
@@ -392,6 +379,8 @@ function Stead(props: PaneProps<SteadSpec>) {
   const drawer = steadDrawer();
 
   const members = (): readonly Member[] => herd().members;
+  const meetsItsCreature = (): boolean =>
+    profile.id === "stead" && props.shell.steadHome !== undefined;
   const cursor = createCursor(() => members().length);
   const keys = createMemo(() => steadKeys(props.shell.keys));
   const current = (): Member | undefined => members()[cursor.index()];
@@ -789,11 +778,15 @@ function Stead(props: PaneProps<SteadSpec>) {
         shell={props.shell}
         controller={onboarding}
         automatic={profile.startup === "creature"}
-        simple={profile.id === "stead" && props.shell.steadHome !== undefined}
+        simple={meetsItsCreature()}
       />
       <Show
         when={members().length > 0}
-        fallback={<EmptyState line={steadPane.emptyState(props.shell.keys)} />}
+        fallback={
+          <Show when={!meetsItsCreature() && onboarding.active() === undefined}>
+            <EmptyState line={steadPane.emptyState(props.shell.keys)} />
+          </Show>
+        }
       >
         <p
           class="kw-stead-board"

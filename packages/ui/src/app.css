@@ -27,6 +27,31 @@
   }
 }
 
+[data-theme-swap] {
+  --kw-tempo-quick: 0s;
+  --kw-tempo-settle: 0s;
+}
+
+:root,
+[data-theme] {
+  scrollbar-color: var(--kw-scrollbar) transparent;
+}
+
+:where(:focus-visible) {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+:where(.kw-frame-body [tabindex="-1"]:focus-visible) {
+  outline: none;
+}
+
+@media (forced-colors: active) {
+  :where(:focus-visible) {
+    outline-color: Highlight;
+  }
+}
+
 ::selection {
   color: var(--kw-selection-text, var(--kw-background));
   background: var(--kw-selection, var(--kw-accent));

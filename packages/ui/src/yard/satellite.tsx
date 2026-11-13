@@ -7,9 +7,9 @@ import type { Rect } from "../layout/index.ts";
 import { definitionOf, type PaneSpec, type ShellSeams } from "../panes/index.ts";
 import { watchInteractions } from "./attention.ts";
 import { linkOpened, panelShell } from "./openings.ts";
-import { keptByThePanel, type YardPanels } from "./panels.ts";
+import { followFocusOut, type YardPanels } from "./panels.ts";
 import { railEntryId, rectStyle } from "./rail.tsx";
-import { satelliteOf, satellitePaneId, titleOfSetting } from "./satellites.ts";
+import { panelTitleOf, satelliteOf, satellitePaneId } from "./satellites.ts";
 
 export interface SatelliteSlotProps {
   placement: Placement;
@@ -30,6 +30,7 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
   const [navigated, setNavigated] = createSignal<PaneSpec>();
   const satellite = createMemo(() => satelliteOf(props.setting), undefined, { equals: sameValue });
   const paneId = createMemo(() => satellitePaneId(props.setting));
+  const holdsFocus = (): boolean => props.panels.inside() === props.setting.id;
   const paneSpec = createMemo(
     (): PaneSpec | undefined => {
       const shown = satellite();
@@ -81,16 +82,17 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
       style={rectStyle(props.rect)}
       onClick={openLink}
       onFocusIn={(event) => props.panels.focusWithin(props.setting.id, true, event.target)}
-      onFocusOut={(event) => {
-        if (!keptByThePanel(event.currentTarget, event.relatedTarget)) {
-          props.panels.focusWithin(props.setting.id, false);
-        }
-      }}
+      onFocusOut={(event) =>
+        followFocusOut(event.currentTarget, event, {
+          refocus: () => props.panels.focus(props.setting.id),
+          leave: () => props.panels.focusWithin(props.setting.id, false),
+        })
+      }
     >
       <PaneFrame
-        name={titleOfSetting(props.setting)}
+        name={panelTitleOf(props.setting)}
         state="idle"
-        focused={props.cursor}
+        focused={props.cursor || holdsFocus()}
         spawnRank={0}
         ribbon={props.by}
       >
@@ -101,7 +103,7 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
                 component={definitionOf(spec().kind).component}
                 id={paneId()}
                 spec={spec()}
-                focused={false}
+                focused={holdsFocus()}
                 shell={shell()}
                 onAction={(handler) => onCleanup(props.panels.handle(props.setting.id, handler))}
               />

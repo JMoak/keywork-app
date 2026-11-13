@@ -3,6 +3,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  createUniqueId,
   For,
   on,
   onCleanup,
@@ -180,19 +181,23 @@ function ThemesList(props: PaneProps<ThemesSpec>) {
 }
 
 function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
-  let root: HTMLElement | undefined;
+  let root: HTMLDivElement | undefined;
   keepKeyboardHome(
     () => root,
     () => props.focused,
   );
   const [target, setTarget] = createSignal<AttireTarget>(props.spec.target ?? windowTarget);
-  const dresser = createMemo(() => dresserFor(target(), props.wardrobe, props.shell.attire));
+  const dresser = createMemo(() =>
+    dresserFor(target(), props.wardrobe, props.shell.attire, props.shell.keys.chord),
+  );
   const fittings = createMemo(() =>
     props.wardrobe.fittings().filter((fitting) => dresser().lists(fitting)),
   );
   const cursor = createCursor(() => fittings().length);
   const [notice, setNotice] = createSignal<string | undefined>(props.spec.notice);
   const atCursor = (): Fitting | undefined => fittings()[cursor.index()];
+  const listId = createUniqueId();
+  const rowId = (index: number): string => `${listId}-${index}`;
   const previews = framePreview(setNotice);
 
   const landOnWorn = (): void => {
@@ -291,15 +296,23 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
   });
 
   return (
-    <section class="kw-ov kw-themes" aria-label="themes" tabIndex={-1} ref={root}>
+    <section class="kw-ov kw-themes" aria-label="themes">
       <div class="kw-ov-head">
         <span class="kw-ov-head-lead">{dresser().head()}</span>
         <span class="kw-ov-head-detail">{dresser().hints()}</span>
       </div>
-      <ol class="kw-ov-list kw-themes-list">
+      <div
+        class="kw-ov-list kw-themes-list"
+        role="listbox"
+        aria-label="themes"
+        aria-activedescendant={atCursor() === undefined ? undefined : rowId(cursor.index())}
+        tabIndex={-1}
+        ref={root}
+      >
         <For each={fittings()}>
           {(fitting, index) => (
             <ThemeRow
+              id={rowId(index())}
               fitting={fitting}
               cursor={index() === cursor.index()}
               dressing={dressingOf(dresser(), fitting.name)}
@@ -311,8 +324,10 @@ function WardrobeList(props: PaneProps<ThemesSpec> & { wardrobe: Wardrobe }) {
             />
           )}
         </For>
-      </ol>
-      <NoticeLine text={notice()} />
+      </div>
+      <div class="kw-themes-notice" role="status">
+        <NoticeLine text={notice()} />
+      </div>
     </section>
   );
 }
@@ -323,6 +338,10 @@ export const onlyTheWindowNotice =
 type Dressing = "own" | "inherited" | undefined;
 
 const dressingMarks: Record<NonNullable<Dressing>, string> = { own: "█", inherited: "·" };
+const dressingWords: Record<NonNullable<Dressing>, string> = {
+  own: "worn",
+  inherited: "inherited",
+};
 
 function dressingOf(dresser: Dresser, name: string): Dressing {
   if (dresser.own() === name) return "own";
@@ -330,6 +349,7 @@ function dressingOf(dresser: Dresser, name: string): Dressing {
 }
 
 interface ThemeRowProps {
+  id: string;
   fitting: Fitting;
   cursor: boolean;
   dressing: Dressing;
@@ -345,19 +365,22 @@ function ThemeRow(props: ThemeRowProps) {
       ? props.fitting.refusal.split("\n").slice(0, 2).join(" ")
       : undefined;
   return (
-    <li
+    <div
       ref={(row) => keepInView(row, () => props.cursor)}
+      id={props.id}
       class="kw-themes-row"
+      role="option"
+      tabIndex={-1}
+      aria-selected={props.cursor}
+      aria-current={props.dressing === "own" ? "true" : undefined}
       data-theme-name={props.fitting.name}
       data-cursor={props.cursor ? "" : undefined}
       data-worn={props.dressing === "own" ? "" : undefined}
       data-inherited={props.dressing === "inherited" ? "" : undefined}
       data-refused={refusal() === undefined ? undefined : ""}
     >
-      <button type="button" class="kw-themes-button" onClick={() => props.onClick()}>
-        <span class="kw-themes-mark" aria-hidden="true">
-          {props.dressing === undefined ? " " : dressingMarks[props.dressing]}
-        </span>
+      <button type="button" class="kw-themes-button" tabIndex={-1} onClick={() => props.onClick()}>
+        <DressingMark dressing={props.dressing} />
         <span class="kw-themes-name">{props.fitting.name}</span>
         <span class="kw-themes-source">{props.fitting.source}</span>
         <Show when={props.fitting.name !== systemThemeName ? theme() : undefined}>
@@ -375,7 +398,26 @@ function ThemeRow(props: ThemeRowProps) {
         <Show when={props.pair}>{(line) => <span class="kw-themes-pair">{line()}</span>}</Show>
         <Show when={refusal()}>{(line) => <span class="kw-themes-refusal">{line()}</span>}</Show>
       </button>
-    </li>
+    </div>
+  );
+}
+
+function DressingMark(props: { dressing: Dressing }) {
+  return (
+    <Show
+      when={props.dressing}
+      fallback={
+        <span class="kw-themes-mark" aria-hidden="true">
+          {" "}
+        </span>
+      }
+    >
+      {(dressing) => (
+        <span class="kw-themes-mark" role="img" aria-label={dressingWords[dressing()]}>
+          {dressingMarks[dressing()]}
+        </span>
+      )}
+    </Show>
   );
 }
 

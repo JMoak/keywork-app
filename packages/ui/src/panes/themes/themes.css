@@ -1,3 +1,8 @@
+.kw-themes-list:focus,
+.kw-themes-row:focus {
+  outline: none;
+}
+
 .kw-themes-button {
   display: grid;
   grid-template-columns: 1.25rem minmax(0, 1fr) auto;

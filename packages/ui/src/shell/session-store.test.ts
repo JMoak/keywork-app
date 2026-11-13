@@ -62,18 +62,73 @@ describe("the session store's lineage", () => {
     expect(store.controlsOf("q2").title).toBe("audit the trust rules");
   });
 
-  it("rereads an open child on its parent's activity lines and when it finishes", async () => {
-    const { store, emit, reads } = mounted();
+  it("streams an open running child under its own id and rereads it once, when it finishes", async () => {
     const started = stream.findIndex((envelope) => envelope.type === "child.started");
+    const finished = stream.findIndex((envelope) => envelope.type === "child.finished");
+    const running = { ...child, live: true, messages: child.messages.slice(0, 1) };
+    const { store, emit, reads } = mounted([], { q2: running });
     emit(stream.slice(0, started + 1));
     await store.open("q2");
-    emit([activity("read src/trust.ts")]);
+    emit([activity("read src/trust.ts"), ...childTurn("q2", child)]);
+    expect(store.projection("q2").entries.map((entry) => entry.kind)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(store.projection("q2").entries.at(-1)).toMatchObject({
+      text: "Two rules allow more than they say.",
+    });
+    expect(reads("q2")).toBe(1);
+    emit(stream.slice(finished));
     await vi.waitFor(() => expect(reads("q2")).toBe(2));
-    emit(stream.slice(started + 1));
-    await vi.waitFor(() => expect(reads("q2")).toBe(3));
-    emit([activity("too late")]);
-    await Promise.resolve();
-    expect(reads("q2")).toBe(3);
+  });
+});
+
+describe("a child's asks", () => {
+  const childAsk: PendingAsk = {
+    sessionId: "s1",
+    callId: "cw1",
+    tool: "write",
+    arguments: { path: "notes/audit.md", content: "two loose rules\n" },
+    askedAt: "2026-09-07T12:00:01.900Z",
+    rules: [],
+  };
+  const raised: BusEnvelope = {
+    id: 120,
+    ts: childAsk.askedAt,
+    sessionId: "q2",
+    type: "gate.ask",
+    payload: {
+      ask: {
+        tool: childAsk.tool,
+        callId: childAsk.callId,
+        arguments: childAsk.arguments,
+        rule: "default",
+        rules: [],
+      },
+    },
+  };
+  const asking = (store: SessionStore, id: string): string[] =>
+    store
+      .projection(id)
+      .entries.flatMap((entry) =>
+        entry.kind === "tool" && entry.run.phase === "asking" ? [entry.run.callId] : [],
+      );
+
+  it("are answered in the child's pane, never a second time in the parent's", async () => {
+    const started = stream.findIndex((envelope) => envelope.type === "child.started");
+    const running = { ...child, live: true, messages: child.messages.slice(0, 1) };
+    const { store, emit } = mounted([childAsk], { q2: running });
+    emit([...stream.slice(0, started + 1), raised]);
+    await store.open("s1");
+    await store.open("q2");
+    expect(asking(store, "q2")).toEqual(["cw1"]);
+    expect(asking(store, "s1")).toEqual([]);
+  });
+
+  it("fall back to the parent's pane when the app never heard which child raised them", async () => {
+    const { store } = mounted([childAsk]);
+    await store.open("s1");
+    expect(asking(store, "s1")).toEqual(["cw1"]);
   });
 });
 
@@ -96,6 +151,69 @@ describe("the session store's pending asks", () => {
       .projection("s1")
       .entries.find((entry) => entry.kind === "tool" && entry.run.callId === "w1");
     expect(asking?.kind === "tool" ? asking.run.ask?.preview : undefined).toEqual(preview);
+  });
+});
+
+describe("the session store's seam between a snapshot and the live stream", () => {
+  const at = "2026-11-12T12:00:00.000Z";
+  const wren = { kind: "creature", creature: "wren", thread: "w1" } as const;
+  const frame = "You are Wren.";
+  const told = (id: number, type: BusEnvelope["type"], payload: unknown): BusEnvelope =>
+    ({ id, ts: at, sessionId: "w1", type, payload }) as BusEnvelope;
+  const introduction = [
+    told(1, "extension.notice", {
+      extension: "creature",
+      level: "info",
+      message: frame,
+      detail: { origin: wren, entryId: "f1", kind: "frame" },
+    }),
+    told(2, "turn.started", { userText: frame, origin: wren }),
+    told(3, "turn.delta", { delta: { type: "text", text: "I" } }),
+    told(4, "turn.delta", { delta: { type: "text", text: " am Wren." } }),
+  ];
+  const snapshot: SessionDetail = {
+    id: "w1",
+    title: "wren",
+    createdAt: at,
+    lastActivityAt: at,
+    messageCount: 1,
+    cwd: "/home",
+    live: true,
+    asOf: 3,
+    messages: [{ role: "user", parts: [{ type: "text", text: frame }] }],
+    reports: [{ index: 0, entryId: "f1", at, text: frame, origin: wren, kind: "frame" }],
+  };
+
+  it("keeps a thread's first words that streamed before it was opened, and keeps its frame out of the transcript", async () => {
+    const listeners: Array<(envelopes: readonly BusEnvelope[]) => void> = [];
+    const emit = (envelopes: readonly BusEnvelope[]) => {
+      for (const listener of listeners) listener(envelopes);
+    };
+    const client = {
+      session: async () => {
+        emit(introduction.slice(3));
+        return snapshot;
+      },
+      asks: async () => [],
+      entries: async () => undefined,
+      sessions: async () => [],
+    } as unknown as KeyworkClient;
+    const feed = {
+      subscribe: (listener: (envelopes: readonly BusEnvelope[]) => void) => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+      onNotice: () => () => undefined,
+      whenLost: () => () => undefined,
+    } as unknown as ServerFeed;
+    const store = createRoot(() => createSessionStore(client, feed));
+    emit(introduction.slice(0, 3));
+    await store.open("w1");
+    const drawn = store
+      .projection("w1")
+      .entries.map((entry) => ("text" in entry ? entry.text : ""));
+    expect(drawn).toEqual(["I am Wren."]);
+    expect(store.projection("w1").turn).toMatchObject({ userText: frame });
   });
 });
 
@@ -130,6 +248,21 @@ describe("the session store's trees and changes", () => {
   });
 });
 
+function childTurn(sessionId: string, detail: SessionDetail): BusEnvelope[] {
+  const [prompt, reply] = detail.messages;
+  const text = (message: typeof prompt): string =>
+    message?.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("") ?? "";
+  const usage = { inputTokens: 12, outputTokens: 5 };
+  const told = (id: number, type: BusEnvelope["type"], payload: unknown): BusEnvelope =>
+    ({ id, ts: "2026-09-07T12:00:01.950Z", sessionId, type, payload }) as BusEnvelope;
+  return [
+    told(100, "turn.started", { userText: text(prompt) }),
+    told(101, "turn.delta", { delta: { type: "text", text: text(reply) } }),
+    told(102, "turn.delta", { delta: { type: "done", usage } }),
+    told(103, "turn.completed", { message: reply, usage }),
+  ];
+}
+
 function activity(chunk: string): BusEnvelope {
   return {
     id: 99,
@@ -146,10 +279,13 @@ interface Mounted {
   reads(id: string): number;
 }
 
-function mounted(pending: readonly PendingAsk[] = []): Mounted {
+function mounted(
+  pending: readonly PendingAsk[] = [],
+  reading: Readonly<Record<string, SessionDetail>> = {},
+): Mounted {
   const listeners: Array<(envelopes: readonly BusEnvelope[]) => void> = [];
   const sessionReads: string[] = [];
-  const details: Record<string, SessionDetail> = { s1: parent, q2: child };
+  const details: Record<string, SessionDetail> = { s1: parent, q2: child, ...reading };
   const listed: SessionSummary[] = [summaryOf(parent)];
   const client = {
     sessions: async () => listed,
@@ -158,6 +294,7 @@ function mounted(pending: readonly PendingAsk[] = []): Mounted {
       return details[id];
     },
     asks: async () => pending,
+    entries: async () => undefined,
   } as unknown as KeyworkClient;
   const feed = {
     subscribe: (listener: (envelopes: readonly BusEnvelope[]) => void) => {

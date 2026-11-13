@@ -15,7 +15,7 @@ export const yardRailAction: AppAction = {
   command: {
     name: "yard-rail",
     label: "the yard's rail",
-    description: "select what the creature set out for you, in depth order",
+    description: "pick from what the model showed you, most relevant first",
     aliases: ["rail"],
   },
   invoke: (target) => target.focusYardRail(),
@@ -27,7 +27,7 @@ export const yardToggleAction: AppAction = {
   command: {
     name: "yard",
     label: "the yard or tiles",
-    description: "lay the workspace out as the yard around the creature, or as tiles",
+    description: "lay the workspace out as the yard around the conversation, or as tiles",
     aliases: ["tiles"],
   },
   invoke: (target) => target.toggleYard(),
@@ -40,7 +40,7 @@ export const yardTrailAction: AppAction = {
     name: "trail",
     label: "the rail now or as the trail",
     description:
-      "order the yard's rail by depth, or by the trail each panel grew from (leader y then t does the same)",
+      "order the yard's rail by relevance, or by the trail each panel grew from (t on the rail does the same)",
   },
   invoke: (target) => target.toggleYardTrail(),
 };

@@ -58,8 +58,12 @@ export {
   type Renamed,
   type RenameReading,
   type ResolutionFailure,
+  type RestoreCandidate,
   type RestorePreview,
   type RestorePreviewReading,
+  type RestoreScope,
+  restoreScopes,
+  restoreTurnBody,
   type SendBehavior,
   type SessionState,
   type SessionVerbReading,
@@ -183,6 +187,7 @@ export {
   type TurnWaiting,
   type Usage,
   type WaitReason,
+  type WorkspaceChanged,
 } from "./events.ts";
 export {
   type DiscardTrashedOutcome,
@@ -467,6 +472,7 @@ export {
   type LeafOutcome,
   type MessageEntry,
   type ModelChangeEntry,
+  type OutcomeMark,
   type PendingAsk,
   type PromptInjection,
   type PromptOutcome,
@@ -475,7 +481,9 @@ export {
   type QueueRefusal,
   type QueueReport,
   type ReportMark,
+  type RestoreFacts,
   type ReviewVerdict,
+  restoreEntryTypes,
   reviewExtension,
   type SessionChanges,
   type SessionDetail,
@@ -490,6 +498,10 @@ export {
   type SummaryKind,
   type SummaryMark,
   type ThinkingLevelChangeEntry,
+  type TurnFacts,
+  type TurnOutcome,
+  turnFactsEntryType,
+  turnOutcomes,
   type VerdictMark,
   type VerdictRecording,
   type VerdictsReading,
@@ -552,6 +564,13 @@ export {
   type WorkspaceChoice,
   type WorkspaceUse,
 } from "./surfaces.ts";
+export {
+  type SessionWork,
+  type StoppedSession,
+  type WorkInFlight,
+  type WoundDown,
+  workRoutes,
+} from "./work.ts";
 export {
   isWorkshopRefusal,
   type WorkshopChange,

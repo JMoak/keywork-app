@@ -6,7 +6,7 @@ function seams(chosen: string | undefined, write?: () => Promise<void>) {
   const offered: string[] = [];
   const written: Array<[string, string]> = [];
   const seams: SaveSeams = {
-    folder: join("work", "lights"),
+    folder: () => join("work", "lights"),
     choosePath: async (defaultPath) => {
       offered.push(defaultPath);
       return chosen;
@@ -52,6 +52,29 @@ describe("saving a page through the host", () => {
     const save = seams("never.html");
     expect(await saveAs({ suggestedName: 3 }, save.seams)).toMatchObject({ refused: "invalid" });
     expect(save.offered).toEqual([]);
+  });
+
+  it("still offers the bare name when the downloads folder cannot be found", async () => {
+    const save = seams("here.html");
+    save.seams.folder = () => {
+      throw new Error("Failed to get 'downloads' path");
+    };
+    const outcome = await saveAs({ suggestedName: "lights.html", text: "x" }, save.seams);
+    expect(save.offered).toEqual(["lights.html"]);
+    expect(outcome).toEqual({ saved: true, path: "here.html" });
+  });
+
+  it("says why when the save dialog itself fails, instead of rejecting", async () => {
+    const save = seams("never.html");
+    save.seams.choosePath = async () => {
+      throw new Error("no window");
+    };
+    expect(await saveAs({ suggestedName: "a.html", text: "x" }, save.seams)).toEqual({
+      saved: false,
+      refused: "failed",
+      detail: "the save dialog failed: no window",
+    });
+    expect(save.written).toEqual([]);
   });
 
   it("keeps only the file name of a suggestion, so a renderer cannot steer the folder", () => {

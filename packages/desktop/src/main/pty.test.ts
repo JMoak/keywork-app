@@ -13,6 +13,8 @@ import {
   type PtyLaunch,
   type PtyProcess,
   type PtySeams,
+  processListing,
+  programsUnder,
   ptyHost,
   scrubEnv,
   windowsTreeKill,
@@ -252,14 +254,14 @@ describe("the pty host", () => {
     expect(data).toEqual([]);
     fake.frames[0]?.();
     expect(data).toEqual([[1, "PS C:\\work> dir\r\n"]]);
-    host.write(1, "dir\r");
-    host.resize(1, 120, 40);
-    host.resize(1, 0, 40);
+    host.write(7, 1, "dir\r");
+    host.resize(7, 1, 120, 40);
+    host.resize(7, 1, 0, 40);
     expect(process.written).toEqual(["dir\r"]);
     expect(process.sizes).toEqual([[120, 40]]);
     process.exit(0);
     expect(exits).toEqual([{ id: 1, exitCode: 0, signal: undefined }]);
-    host.write(1, "late");
+    host.write(7, 1, "late");
     expect(process.written).toEqual(["dir\r"]);
   });
 
@@ -296,7 +298,7 @@ describe("the pty host", () => {
     expect(fake.processes.map((process) => process.alive)).toEqual([false, true, false]);
     host.closeAll();
     expect(fake.killed).toEqual([101, 103, 102]);
-    host.close(2);
+    host.close(2, 2);
     expect(fake.killed).toHaveLength(3);
   });
 
@@ -304,9 +306,69 @@ describe("the pty host", () => {
     const fake = fakeSeams("linux");
     const host = ptyHost(fake.seams);
     await host.open({ workspace: "/w", program: "shell", args: [], cols: 1, rows: 1 }, 1, silent);
-    host.close(1);
+    host.close(1, 1);
     expect(fake.killed).toEqual([]);
     expect(fake.processes[0]?.alive).toBe(false);
+  });
+
+  it("lets only the window that opened a pty type into, resize or close it", async () => {
+    const fake = fakeSeams();
+    const host = ptyHost(fake.seams);
+    const request = {
+      workspace: "C:\\work",
+      program: "shell" as const,
+      args: [],
+      cols: 1,
+      rows: 1,
+    };
+    await host.open(request, 7, silent);
+    const process = fake.processes[0] as FakeProcess;
+    host.write(8, 1, "del /q *\r");
+    host.resize(8, 1, 10, 10);
+    host.close(8, 1);
+    expect(process.written).toEqual([]);
+    expect(process.sizes).toEqual([]);
+    expect(process.alive).toBe(true);
+    expect(fake.killed).toEqual([]);
+    host.close(7, 1);
+    expect(process.alive).toBe(false);
+  });
+
+  it("names the programs running under a window's own shell, and nothing for another window", async () => {
+    const fake = fakeSeams();
+    fake.seams.listProcesses = async () =>
+      [
+        "4 0 System",
+        "101 9000 pwsh.exe",
+        "777 101 PING.EXE",
+        "778 101 C:\\tools\\node.exe",
+        "900 102 vim",
+      ].join("\r\n");
+    const host = ptyHost(fake.seams);
+    const request = { workspace: "C:\\work", program: "shell" as const, cols: 1, rows: 1 };
+    await host.open({ ...request, args: [] }, 7, silent);
+    expect(await host.running(7, 1)).toEqual(["PING", "node"]);
+    expect(await host.running(8, 1)).toEqual([]);
+    expect(await host.running(7, 2)).toEqual([]);
+  });
+
+  it("calls a shell idle when the process list cannot be read", async () => {
+    const fake = fakeSeams("linux");
+    fake.seams.listProcesses = async () => {
+      throw new Error("ps is missing");
+    };
+    const host = ptyHost(fake.seams);
+    await host.open({ workspace: "/w", program: "shell", args: [], cols: 1, rows: 1 }, 1, silent);
+    expect(await host.running(1, 1)).toEqual([]);
+  });
+
+  it("lists processes with ps outside Windows and through CIM on Windows", () => {
+    expect(processListing("linux")).toEqual({
+      command: "ps",
+      args: ["-A", "-o", "pid=,ppid=,comm="],
+    });
+    expect(processListing("win32").command).toBe("powershell.exe");
+    expect(programsUnder(12, "  30   12 /usr/bin/python3\n  31   13 less\n")).toEqual(["python3"]);
   });
 
   it("names the launch after the shell binary", async () => {

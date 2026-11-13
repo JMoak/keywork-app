@@ -31,8 +31,14 @@ async function envelopes(name: string): Promise<BusEnvelope[]> {
 }
 
 async function projected(name: string): Promise<SessionProjection> {
-  return projectAll(emptyProjection, await envelopes(name));
+  const recorded = await envelopes(name);
+  return projectAll(
+    emptyProjection,
+    recorded.filter((envelope) => envelope.sessionId === recordedSession),
+  );
 }
+
+const recordedSession = "s1";
 
 function toolRun(state: SessionProjection, index: number): ToolRun {
   const entry = state.entries[index];
@@ -117,7 +123,8 @@ describe("fixtures recorded from keywork serve", () => {
   });
 
   it("delegated: the child rides the parent's delegate call and its result names the child first", async () => {
-    const stream = await envelopes("delegated");
+    const recorded = await envelopes("delegated");
+    const stream = recorded.filter((envelope) => envelope.sessionId === "s1");
     expect(stream.map((envelope) => envelope.type).slice(4, 9)).toEqual([
       "tool.started",
       "gate.permission",
@@ -125,7 +132,6 @@ describe("fixtures recorded from keywork serve", () => {
       "child.finished",
       "tool.finished",
     ]);
-    expect(stream.every((envelope) => envelope.sessionId === "s1")).toBe(true);
     const working = toolRun(projectAll(emptyProjection, stream.slice(0, 7)), 1);
     expect(working.child).toMatchObject({
       title: "audit the trust rules",
@@ -209,12 +215,18 @@ describe("fixtures recorded from keywork serve", () => {
     });
   });
 
-  it("interrupt: the partial answer stays and the turn ends with a notice", async () => {
+  it("interrupt: the partial answer stays and the turn ends marked interrupted, its prompt ready to send again", async () => {
     const state = await projected("interrupt");
     expect(state.entries).toEqual([
       { kind: "user", text: "wait forever", entryId: "q1", replay: false },
       { kind: "assistant", text: "Working on it", replay: false, settled: true },
-      { kind: "notice", level: "info", text: "· interrupted" },
+      {
+        kind: "ending",
+        outcome: "interrupted",
+        text: "interrupted",
+        prompt: "wait forever",
+        replay: false,
+      },
     ]);
     expect(state.turn).toBeUndefined();
     expect(state.usage.turns).toBe(0);
@@ -436,9 +448,10 @@ describe("a turn restore recorded from the server", () => {
       status: 200,
       body: {
         turn: 1,
-        prompt: { entryId: "q1", text: "write two lines to notes.txt" },
-        leafId: "q5",
+        prompt: { entryId: "q2", text: "write two lines to notes.txt" },
+        leafId: "q6",
         undoneTurns: 2,
+        scope: "session",
         files: [{ path: "notes.txt", added: 0, deleted: 2 }],
         filesNote: "files put back",
         undoable: true,
@@ -450,10 +463,10 @@ describe("a turn restore recorded from the server", () => {
   it("moves the leaf to the recorded entry, then reports nothing left differing once the files are put back", async () => {
     const stream = await envelopes("restored");
     const moved = stream.findIndex((envelope) => envelope.type === "session.tree");
-    expect(stream[moved]?.payload).toEqual({ reason: "leaf", entryId: "q5" });
+    expect(stream[moved]?.payload).toEqual({ reason: "leaf", entryId: "q6" });
     expect(stream[moved - 1]).toMatchObject({
       type: "session.state",
-      payload: { leafId: "q5", redoable: true },
+      payload: { leafId: "q6", redoable: true },
     });
     const restoreAnnounced = stream
       .slice(0, moved)
@@ -476,7 +489,9 @@ describe("a turn restore recorded from the server", () => {
     });
     expect(restoreMalformed).toEqual({
       status: 400,
-      body: { error: "the body must be { turn: a positive integer }" },
+      body: {
+        error: 'the body must be { turn: a positive integer, scope?: "session" | "everything" }',
+      },
     });
   });
 
@@ -493,13 +508,19 @@ describe("a turn restore recorded from the server", () => {
     );
     expect(restores).toEqual([
       [
-        "q5",
+        "q6",
         "restore",
-        { turn: 1, from: "q4", files: expect.any(String), redo: expect.any(String) },
+        {
+          turn: 1,
+          from: "q5",
+          files: expect.any(String),
+          redo: expect.any(String),
+          paths: ["notes.txt"],
+        },
       ],
-      ["q6", "restore-undone", { restore: "q5" }],
+      ["q7", "restore-undone", { restore: "q6" }],
     ]);
-    expect(entries.body.leafId).toBe("q6");
+    expect(entries.body.leafId).toBe("q7");
   });
 });
 

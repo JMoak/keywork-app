@@ -74,8 +74,10 @@ export function createChoresStore(port: ChoresPort, feed: ChoresFeed): ChoresSto
     setState("choreRefusals", creature, answer.ok ? undefined : answer.error);
   };
 
+  const runsRead = new Map<string, { creature: string; id: string }>();
   const loadRuns = async (creature: string, id: string): Promise<void> => {
     const key = runsKey(creature, id);
+    runsRead.set(key, { creature, id });
     const answer = await port.runs(creature, id);
     if (answer.ok) setState("runs", key, answer.value);
     setState("runRefusals", key, answer.ok ? undefined : answer.error);
@@ -98,7 +100,10 @@ export function createChoresStore(port: ChoresPort, feed: ChoresFeed): ChoresSto
       return;
     }
     setState({ refusal: undefined, creatures: creatures.value });
-    await Promise.all(creatures.value.map((creature) => reloadChores(creature.slug)));
+    await Promise.all([
+      ...creatures.value.map((creature) => reloadChores(creature.slug)),
+      ...[...runsRead.values()].map((chore) => loadRuns(chore.creature, chore.id)),
+    ]);
     setState("loaded", true);
   };
 
@@ -114,10 +119,6 @@ export function createChoresStore(port: ChoresPort, feed: ChoresFeed): ChoresSto
   };
 
   const follow = (events: readonly ChoreEvent[]): void => {
-    if (events.some((event) => event.kind === "creatures")) {
-      void load();
-      return;
-    }
     const stale = new Map<string, { creature: string; id: string }>();
     for (const event of events) {
       if (event.kind === "creatures") continue;
@@ -129,6 +130,10 @@ export function createChoresStore(port: ChoresPort, feed: ChoresFeed): ChoresSto
       if (event.run !== undefined) applyRun(event.creature, event.id, event.run);
       else stale.set(runsKey(event.creature, event.id), event);
       if (event.kind === "finished") stale.set(runsKey(event.creature, event.id), event);
+    }
+    if (events.some((event) => event.kind === "creatures")) {
+      void load();
+      return;
     }
     for (const creature of new Set([...stale.values()].map((event) => event.creature))) {
       void reloadChores(creature);

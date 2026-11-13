@@ -17,7 +17,10 @@ import {
   onceOnlyNotice,
 } from "./answer-ask.ts";
 
-afterEach(() => stopAskingWhy("c1"));
+afterEach(() => {
+  stopAskingWhy("c1");
+  Reflect.deleteProperty(document, "execCommand");
+});
 
 describe("one answer path for the card's chords and the desk's keys", () => {
   it("finds the asking run in a session, or the one with the call it holds", () => {
@@ -62,6 +65,33 @@ describe("one answer path for the card's chords and the desk's keys", () => {
     expect(held.sent).toEqual([]);
   });
 
+  it("lets the approve chord redo in a text field when nothing waits, and approve when an ask does", async () => {
+    const commands = recordEditCommands();
+    const field = document.body.appendChild(document.createElement("textarea"));
+    field.focus();
+    const idle = answering(emptyProjection);
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve")).toBeUndefined();
+    expect(commands).toEqual(["redo"]);
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "once")).toBe(nothingAsking);
+    const waiting = answering(asking(["c1"]));
+    expect(await answerHeldAsk(waiting, { sessionId: "s1" }, "approve")).toBeUndefined();
+    expect(waiting.sent).toEqual([["c1", "granted", undefined]]);
+    expect(commands).toEqual(["redo"]);
+    field.remove();
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve")).toBe(nothingAsking);
+    expect(commands).toEqual(["redo"]);
+  });
+
+  it("says nothing waits when the field had nothing to redo", async () => {
+    recordEditCommands(false);
+    const field = document.body.appendChild(document.createElement("textarea"));
+    field.focus();
+    expect(await answerHeldAsk(answering(emptyProjection), { sessionId: "s1" }, "approve")).toBe(
+      nothingAsking,
+    );
+    field.remove();
+  });
+
   it("passes the server's refusal and a failed request on in their own words", async () => {
     const refused = answering(asking(["c1"], [bunTest]), {
       refused: "nothing-to-remember",
@@ -78,6 +108,18 @@ describe("one answer path for the card's chords and the desk's keys", () => {
 });
 
 const bunTest: PermissionRule = { action: "bash", resource: "bun test *", effect: "allow" };
+
+function recordEditCommands(succeeds = true): string[] {
+  const commands: string[] = [];
+  Object.defineProperty(document, "execCommand", {
+    configurable: true,
+    value: (command: string): boolean => {
+      commands.push(command);
+      return succeeds;
+    },
+  });
+  return commands;
+}
 
 type Sent =
   | [string, AskVerdict, AskScope | undefined]
