@@ -82,7 +82,9 @@ export function DeskRowView(props: DeskRowProps) {
       <Show when={tail()}>
         {(line) => (
           <span class="kw-desk-tail">
-            <span class="kw-desk-line">{line()}</span>
+            <span class="kw-desk-line" title={line()}>
+              {line()}
+            </span>
             <Show when={!props.wording && asking()}>
               {(run) => (
                 <NeedsYouAnswers

@@ -4,6 +4,7 @@ import type {
   ChangesReading,
   Message,
   RestorePreviewReading,
+  RestoreScope,
   SessionDetail,
   SessionEntries,
   SessionSummary,
@@ -44,10 +45,10 @@ type Phase = "before" | "restored" | "redone";
 const logs: Readonly<Record<Phase, SessionEntries>> = {
   before: {
     ...recordedLog,
-    leafId: "q4",
-    activePath: recordedLog.activePath.filter((id) => id !== "q6"),
+    leafId: "q5",
+    activePath: recordedLog.activePath.filter((id) => id !== "q7"),
   },
-  restored: { ...recordedLog, leafId: "q5", activePath: ["q5"] },
+  restored: { ...recordedLog, leafId: "q6", activePath: ["q1", "q6"] },
   redone: recordedLog,
 };
 
@@ -55,6 +56,7 @@ interface ServerOptions {
   restore?: TurnRestoreReading;
   log?: SessionEntries | undefined;
   preview?: RestorePreviewReading;
+  everything?: RestorePreviewReading;
 }
 
 interface Server {
@@ -76,10 +78,11 @@ function scriptedServer(options: ServerOptions = {}): Server {
     changes: async (): Promise<ChangesReading> => recordedChanges,
     context: async () => "missing",
     cost: async () => "missing",
-    previewRestore: async () => options.preview ?? "missing",
-    restoreTurn: async (id: string, turn: number) => {
-      sent.push(`restore ${id} ${turn}`);
-      const answer = options.restore ?? restored;
+    previewRestore: async (_id: string, _turn: number, scope?: RestoreScope) =>
+      (scope === "everything" ? options.everything : options.preview) ?? "missing",
+    restoreTurn: async (id: string, turn: number, scope?: RestoreScope) => {
+      sent.push(scope === undefined ? `restore ${id} ${turn}` : `restore ${id} ${turn} ${scope}`);
+      const answer = options.restore ?? { ...restored, scope: scope ?? "session" };
       if (typeof answer !== "string" && !("refused" in answer)) phase = "restored";
       return answer;
     },
@@ -231,33 +234,92 @@ describe("the turn ledger in a live conversation", () => {
     expect(ledgerLines()).toEqual([]);
   });
 
-  it("lists every file going back, the ones no write of this session made first and flagged", async () => {
-    const preview: RestorePreviewReading = {
-      turn: 1,
-      prompt: { entryId: "q1", text: "write two lines to notes.txt" },
-      undoneTurns: 2,
-      files: [
-        { path: "notes.txt", added: 0, deleted: 2 },
-        { path: "docs/plan.md", added: 0, deleted: 4 },
-        { path: "README.md", added: 0, deleted: 1 },
-      ],
-      others: [{ sessionId: "s2", title: "plan the docs", paths: ["docs/plan.md"] }],
-    };
-    await mounted({ preview });
+  const sessionScoped: RestorePreviewReading = {
+    turn: 1,
+    prompt: { entryId: "q2", text: "write two lines to notes.txt" },
+    undoneTurns: 2,
+    scope: "session",
+    files: [
+      { path: "notes.txt", added: 0, deleted: 2, touched: true, goesBack: true },
+      { path: "docs/plan.md", added: 0, deleted: 4, touched: true, goesBack: true },
+      { path: "README.md", added: 0, deleted: 1, touched: false, goesBack: false },
+    ],
+    others: [{ sessionId: "s2", title: "plan the docs", paths: ["docs/plan.md"] }],
+  };
+  const everythingScoped: RestorePreviewReading = {
+    ...sessionScoped,
+    scope: "everything",
+    files: sessionScoped.files.map((file) => ({ ...file, goesBack: true })),
+    others: [{ sessionId: "s2", title: "plan the docs", paths: ["docs/plan.md", "README.md"] }],
+  };
+
+  function confirmItems(): [string | null, string][] {
+    return [...document.querySelectorAll(".kw-controls-item")].map((item) => [
+      item.textContent,
+      item.hasAttribute("data-flagged")
+        ? "flagged"
+        : item.hasAttribute("data-staying")
+          ? "stays"
+          : "",
+    ]);
+  }
+
+  it("by default puts back only this session's files and lists the others as staying", async () => {
+    const { server } = await mounted({ preview: sessionScoped, everything: everythingScoped });
     fireEvent.keyDown(ledgerOf(1), { key: "u" });
     await waitFor(() => expect(confirmLine()).toBeTruthy());
     expect(confirmLine()?.firstChild?.textContent).toBe(
-      'restore to before turn 1, "write two lines to notes.txt"? 2 turns and 3 files go back · it also undoes 1 file "plan the docs" changed · 1 of them this session never wrote · redo brings them back · y/n',
+      'restore to before turn 1, "write two lines to notes.txt"? 2 turns and 2 files go back · it also undoes 1 file "plan the docs" changed · 1 file this session never changed stays as it is · redo brings them back · y/n · e for everything',
     );
-    const items = [...document.querySelectorAll(".kw-controls-item")].map((item) => [
-      item.textContent,
-      item.hasAttribute("data-flagged"),
+    expect(confirmItems()).toEqual([
+      ["notes.txt+0 −2 · goes back", ""],
+      ['docs/plan.md+0 −4 · goes back · "plan the docs" changed it too', ""],
+      ["README.md+0 −1 · stays · this session never changed it", "stays"],
     ]);
-    expect(items).toEqual([
-      ["README.md+0 −1 · this session never wrote it · your own change?", true],
-      ["notes.txt+0 −2 · this session wrote it", false],
-      ['docs/plan.md+0 −4 · "plan the docs" changed it', false],
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "Enter" });
+    await waitFor(() => expect(server.sent).toEqual(["restore s1 1"]));
+  });
+
+  it("restores everything only through a second, explicit step that names what else goes back", async () => {
+    const { server } = await mounted({ preview: sessionScoped, everything: everythingScoped });
+    fireEvent.keyDown(ledgerOf(1), { key: "u" });
+    await waitFor(() => expect(confirmLine()).toBeTruthy());
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "e" });
+    expect(confirmLine()?.firstChild?.textContent).toBe(
+      'restore everything to before turn 1? 2 turns and 3 files go back, 1 of them never changed by this session · it also undoes 2 files "plan the docs" changed · redo brings them back · y restores everything · n steps back',
+    );
+    expect(confirmItems()[0]).toEqual([
+      "README.md+0 −1 · also goes back · this session never changed it",
+      "flagged",
     ]);
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "Enter" });
+    expect(server.sent).toEqual([]);
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "Escape" });
+    expect(confirmLine()?.firstChild?.textContent).toMatch(/^restore to before turn 1,/);
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "e" });
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "y" });
+    await waitFor(() => expect(server.sent).toEqual(["restore s1 1 everything"]));
+    await waitFor(() =>
+      expect(said()[0]).toMatch(/^restored everything to before turn 1 · 2 turns went back/),
+    );
+    const composer = document.querySelector(".kw-composer-input") as HTMLTextAreaElement;
+    await waitFor(() => expect(composer.value).toBe("write two lines to notes.txt"));
+  });
+
+  it("offers no everything step when every changed file is this session's own", async () => {
+    const own = {
+      ...sessionScoped,
+      files: sessionScoped.files.filter((file) => file.goesBack),
+    } as RestorePreviewReading;
+    const { server } = await mounted({ preview: own });
+    fireEvent.keyDown(ledgerOf(1), { key: "u" });
+    await waitFor(() => expect(confirmLine()).toBeTruthy());
+    expect(confirmLine()?.firstChild?.textContent).not.toContain("everything");
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "e" });
+    expect(confirmLine()?.firstChild?.textContent).toMatch(/^restore to before turn 1,/);
+    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "n" });
+    await waitFor(() => expect(said()).toEqual(["left unchanged"]));
+    expect(server.sent).toEqual([]);
   });
 
   it("shows the restore taken back once redo brings the turns home", async () => {
@@ -307,7 +369,7 @@ describe("the turn ledger in a live conversation", () => {
     const { server, opened } = await mounted();
     fireEvent.keyDown(ledgerOf(1), { key: "f" });
     await waitFor(() => expect(opened).toEqual(["s9"]));
-    expect(server.sent).toEqual(["fork s1 at q10"]);
+    expect(server.sent).toEqual(["fork s1 at q11"]);
     expect(said()).toEqual([forkedNotice(1)]);
   });
 
@@ -318,9 +380,9 @@ describe("the turn ledger in a live conversation", () => {
     fireEvent.keyDown(confirmLine() as HTMLElement, { key: "n" });
     fireEvent.focus(ledgerOf(1));
     act("conversation.fork-turn");
-    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q10"]));
+    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q11"]));
     act("conversation.fork-turn");
-    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q10", "fork s1 at q11"]));
+    await waitFor(() => expect(server.sent).toEqual(["fork s1 at q11", "fork s1 at q12"]));
   });
 });
 

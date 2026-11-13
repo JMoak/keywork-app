@@ -22,6 +22,7 @@ import {
   quietStillAsks,
   rememberableRules,
   ruleText,
+  untrustedAskReason,
 } from "./ask-card.tsx";
 import { stopAskingWhy } from "./ask-card-why.ts";
 import { ConversationPane } from "./pane.tsx";
@@ -595,6 +596,17 @@ describe("why the card asks", () => {
   it("never calls a read-only shell command a change", () => {
     const { container } = mountCard(askingRun("g1"));
     expect(container.querySelector(".kw-ask-why")?.textContent).not.toContain("changes");
+  });
+
+  it("says the folder isn't trusted when that is why it asks, but keeps a rule's own reason", () => {
+    expect(askReason({ tool: "bash", rule: "default" }, true)).toBe(untrustedAskReason);
+    expect(askReason({ tool: "bash", rule: "policy" }, true)).toBe(
+      "a rule asks before this tool runs",
+    );
+    const { container } = render(() => (
+      <AskCard run={askingRun("g1")} onAnswer={() => undefined} untrusted />
+    ));
+    expect(container.querySelector(".kw-ask-why")?.textContent).toBe(untrustedAskReason);
   });
 });
 

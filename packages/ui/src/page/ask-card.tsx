@@ -74,6 +74,7 @@ export interface AskCardProps {
   chords?: AskChords | undefined;
   quiet?: boolean | undefined;
   accepted?: RememberedScope | undefined;
+  untrusted?: boolean | undefined;
 }
 
 export function acceptedLine(scope: RememberedScope, chords: AskChords): string {
@@ -171,7 +172,7 @@ export function AskCard(props: AskCardProps) {
       data-quiet={quiet() ? "" : undefined}
       data-saying-why={sayingWhy() ? "" : undefined}
     >
-      <span class="kw-ask-why">{askReason(props.run.ask)}</span>
+      <span class="kw-ask-why">{askReason(props.run.ask, props.untrusted === true)}</span>
       <AskConsequence run={props.run} />
       <Show when={rules().length > 0 && !sayingWhy()}>
         <span class="kw-ask-rules">
@@ -299,16 +300,22 @@ export function blanketProgram(rule: PermissionRule): string | undefined {
   return codeRunners.has(program) && second?.startsWith("-") === true ? program : undefined;
 }
 
-export function askReason(ask: Pick<PermissionAsk, "tool" | "rule"> | undefined): string {
+export function askReason(
+  ask: Pick<PermissionAsk, "tool" | "rule"> | undefined,
+  untrusted = false,
+): string {
   switch (ask?.rule) {
     case "policy":
       return "a rule asks before this tool runs";
     case "trusted":
       return "trusted reads ask before this form runs";
     default:
-      return defaultAskReason(ask?.tool);
+      return untrusted ? untrustedAskReason : defaultAskReason(ask?.tool);
   }
 }
+
+export const untrustedAskReason =
+  "this folder isn't trusted yet, so every command and edit asks first · trusting it lets plain reads run";
 
 export interface AskOffer {
   readonly pick: AskPick;

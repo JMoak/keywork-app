@@ -1,4 +1,5 @@
 import { campaignRequestBodies, campaignRoutes } from "./campaigns.ts";
+import { restoreTurnBody } from "./controls.ts";
 import { creatureProjectRoutes, projectThreadBody } from "./creature-projects.ts";
 import {
   creatureDraftBody,
@@ -15,11 +16,12 @@ import { permissionRoutes } from "./permissions.ts";
 import { routineFileBody, routineRoutes } from "./routines.ts";
 import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
 import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
+import { workRoutes } from "./work.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.5.0";
 
-export const contractVersion = "1.31";
+export const contractVersion = "1.32";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -52,6 +54,7 @@ export const requestBodies: Readonly<Record<string, readonly string[]>> = {
   execInWorkshop: workshopTerminalBody,
   injectPrompt: promptInjectionBody,
   recordHunkVerdict: hunkVerdictBody,
+  restoreSessionTurn: restoreTurnBody,
   putRoutine: routineFileBody,
   previewMemoryForget: forgetSourceBody,
   applyMemoryForget: forgetApplyBody,
@@ -145,6 +148,7 @@ export const routes = [
   { method: "POST", path: "/workspaces/{slug}/unfocus", operationId: "unfocusWorkspaceDir" },
   { method: "GET", path: "/themes", operationId: "listThemes" },
   ...lifecycleRoutes,
+  ...workRoutes,
   ...permissionRoutes,
   ...creatureRoutes,
   ...routineRoutes,

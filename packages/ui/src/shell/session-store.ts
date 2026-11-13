@@ -3,8 +3,8 @@ import {
   type ChildLineage,
   changesSnapshot,
   changesState,
+  childrenFinishedIn,
   childrenOf,
-  childrenTouchedBy,
   closesTurn,
   emptyChangesState,
   emptyLineage,
@@ -38,6 +38,7 @@ import type {
   ForkOutcome,
   LabelOutcome,
   LeafOutcome,
+  PendingAsk,
   PromptOutcome,
   PurgedTrash,
   QueueCancelReading,
@@ -151,6 +152,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const arrivedWhileLoading = new Map<string, BusEnvelope[]>();
   const turnsHeard = new Map<string, BusEnvelope[]>();
   const reloadAfterLoading = new Set<string>();
+  const askOwners = new Map<string, string>();
   const treeFetches = new Map<string, Promise<void>>();
   const changeFetches = new Map<string, Promise<void>>();
   const memory = createMemoryStore(client, feed);
@@ -219,6 +221,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
 
   const absorb = (envelopes: readonly BusEnvelope[]): void => {
     hearTurns(envelopes);
+    learnAskOwners(askOwners, envelopes);
     const rewritten = sessionsRewrittenBy(envelopes, (id) => state.projections[id]?.standing);
     const batches = bySession(envelopes);
     for (const [sessionId, batch] of batches) {
@@ -241,7 +244,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
   const followLineage = (envelopes: readonly BusEnvelope[]): void => {
     const told = envelopes.filter(isChildEvent);
     if (told.length > 0) setState("lineage", (lineage) => told.reduce(lineageState, lineage));
-    for (const child of childrenTouchedBy(state.lineage, envelopes)) {
+    for (const child of childrenFinishedIn(envelopes)) {
       if (state.projections[child] !== undefined) void reload(child);
     }
   };
@@ -261,7 +264,7 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
         : joinSnapshot({
             detail,
             journal: state.trees[id]?.snapshot,
-            pending,
+            pending: pending.map((ask) => rehomed(ask, askOwners)),
             heard: turnsHeard.get(id) ?? [],
             arrived,
           });
@@ -439,6 +442,17 @@ export function createSessionStore(client: KeyworkClient, feed: ServerFeed): Ses
       for (const stop of stops) stop();
     },
   };
+}
+
+function learnAskOwners(owners: Map<string, string>, envelopes: readonly BusEnvelope[]): void {
+  for (const envelope of envelopes) {
+    if (envelope.type === "gate.ask") owners.set(envelope.payload.ask.callId, envelope.sessionId);
+  }
+}
+
+function rehomed(ask: PendingAsk, owners: ReadonlyMap<string, string>): PendingAsk {
+  const owner = owners.get(ask.callId);
+  return owner === undefined || owner === ask.sessionId ? ask : { ...ask, sessionId: owner };
 }
 
 function isChildEvent(envelope: BusEnvelope): boolean {

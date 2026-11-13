@@ -91,6 +91,40 @@
   color: var(--kw-error);
 }
 
+.kw-controls-item[data-staying] {
+  color: var(--kw-text-dim);
+}
+
+.kw-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.kw-ending {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--kw-font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kw-ending:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+.kw-ending-hint {
+  color: var(--kw-text-faint);
+}
+
 .kw-controls-lines {
   display: flex;
   flex-direction: column;

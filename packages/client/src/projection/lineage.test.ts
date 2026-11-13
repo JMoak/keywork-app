@@ -8,8 +8,8 @@ import type {
 import { describe, expect, it } from "vitest";
 import {
   type ChildLineage,
+  childrenFinishedIn,
   childrenOf,
-  childrenTouchedBy,
   childStateOf,
   emptyLineage,
   type LineageState,
@@ -121,19 +121,14 @@ describe("the lineage ledger", () => {
     });
   });
 
-  it("names the children whose open panes should reread: on finishing, and on activity while running", () => {
-    const ledger = fold([
+  it("names the children whose open panes should reread: only those that finished, since a running child streams under its own id", () => {
+    const finished = childrenFinishedIn([
       on("p", "child.started", { callId: "a", sessionId: "k1", title: "busy" }),
-      on("p", "child.started", { callId: "b", sessionId: "k2", title: "done" }),
-      on("p", "child.finished", { callId: "b", sessionId: "k2", outcome: "completed", usage }),
-    ]);
-    const touched = childrenTouchedBy(ledger, [
       on("p", "tool.output", { chunk: "read a.ts", callId: "a" }),
-      on("p", "tool.output", { chunk: "late line", callId: "b" }),
-      on("other", "tool.output", { chunk: "x", callId: "a" }),
+      on("k1", "turn.delta", { delta: { type: "text", text: "reading" } }),
       on("p", "child.finished", { callId: "c", sessionId: "k3", outcome: "failed", usage }),
     ]);
-    expect([...touched]).toEqual(["k1", "k3"]);
+    expect([...finished]).toEqual(["k3"]);
   });
 
   it("reads a run's state from its outcome first, then from its phase", () => {

@@ -10,8 +10,12 @@ import { parseJsonl } from "../dev/replay.ts";
 import { scenarios } from "../dev/scenarios.ts";
 import {
   ConversationPane,
+  callsQueuedBehind,
+  endingLine,
+  failureNextStep,
   headline,
   latestLine,
+  moreLinesLine,
   promptFold,
   wordCount,
   workingLine,
@@ -101,6 +105,72 @@ describe("ConversationPane over the recorded fixtures", () => {
     expect(container.querySelector(".kw-tool-detail")?.textContent).toBe("served");
     fireEvent.keyDown(tool, { key: "Enter" });
     expect(container.querySelector(".kw-tool-detail")).toBeNull();
+  });
+
+  it("unfolds a long output to its head and then, on request, to every line", () => {
+    const at = "2026-11-12T12:00:00.000Z";
+    const call = { type: "tool-call", callId: "c1", name: "bash", arguments: { command: "cat" } };
+    const output = Array.from({ length: 20 }, (_, line) => `line ${line + 1}`).join("\n");
+    const projection = projectAll(emptyProjection, [
+      { id: 1, ts: at, sessionId: "s1", type: "tool.started", payload: { call } },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "tool.finished",
+        payload: { callId: "c1", output, isError: false },
+      },
+    ] as BusEnvelope[]);
+    const { container } = render(() => <ConversationPane projection={projection} />);
+    fireEvent.keyDown(container.querySelector(".kw-tool") as HTMLElement, { key: "Enter" });
+    const detail = () => container.querySelector(".kw-tool-detail")?.textContent ?? "";
+    expect(detail().split("\n")).toHaveLength(12);
+    const more = container.querySelector(".kw-tool-more") as HTMLButtonElement;
+    expect(more.textContent).toBe(moreLinesLine(8));
+    expect(more.hasAttribute("data-walk")).toBe(true);
+    fireEvent.click(more);
+    expect(detail().split("\n")).toHaveLength(20);
+    expect(detail().endsWith("line 20")).toBe(true);
+    expect(container.querySelector(".kw-tool-more")).toBeNull();
+  });
+
+  it("counts the calls of a turn that wait behind the one asking", () => {
+    const at = "2026-11-12T12:00:00.000Z";
+    const write = (callId: string, path: string) => ({
+      type: "tool-call" as const,
+      callId,
+      name: "write",
+      arguments: { path, content: "x" },
+    });
+    const delta = (id: number, callId: string, path: string): BusEnvelope => ({
+      id,
+      ts: at,
+      sessionId: "s1",
+      type: "turn.delta",
+      payload: { delta: { type: "tool-call", call: write(callId, path) } },
+    });
+    const entries = projectAll(emptyProjection, [
+      { id: 1, ts: at, sessionId: "s1", type: "turn.started", payload: { userText: "parallel" } },
+      delta(2, "a", "a.txt"),
+      delta(3, "b", "b.txt"),
+      delta(4, "c", "c.txt"),
+      {
+        id: 5,
+        ts: at,
+        sessionId: "s1",
+        type: "gate.ask",
+        payload: {
+          ask: {
+            tool: "write",
+            callId: "a",
+            arguments: write("a", "a.txt").arguments,
+            rule: "default",
+          },
+        },
+      },
+    ]).entries;
+    expect(callsQueuedBehind(entries, 1)).toBe(2);
+    expect(callsQueuedBehind(entries, 2)).toBe(0);
   });
 
   it("colors a refusal with the error token and names the reason", async () => {
@@ -327,6 +397,53 @@ describe("a turn's signs of life", () => {
       ]),
     );
     expect(container.querySelector(".kw-working")).toBeNull();
+  });
+});
+
+describe("how a turn ended", () => {
+  const at = "2026-11-12T12:00:00.000Z";
+  const failed = projectAll(emptyProjection, [
+    { id: 1, ts: at, sessionId: "s1", type: "turn.started", payload: { userText: "failnow" } },
+    {
+      id: 2,
+      ts: at,
+      sessionId: "s1",
+      type: "engine.error",
+      payload: { error: { name: "Error", message: "upstream 529 overloaded" } },
+    },
+  ]);
+
+  it("says a failure with its next step and tries the prompt again on enter or a click", () => {
+    const resent: string[] = [];
+    const { container } = render(() => (
+      <ConversationPane projection={failed} onResend={(prompt) => resent.push(prompt)} />
+    ));
+    const ending = container.querySelector(".kw-ending") as HTMLElement;
+    expect(ending.textContent).toBe(
+      "failed · upstream 529 overloaded · the provider is busy · give it a moment · enter tries again",
+    );
+    expect(ending.hasAttribute("data-walk")).toBe(true);
+    expect(ending.getAttribute("data-level")).toBe("error");
+    fireEvent.keyDown(ending, { key: "Enter" });
+    fireEvent.click(ending);
+    expect(resent).toEqual(["failnow", "failnow"]);
+  });
+
+  it("marks a stop the server made apart from one the keeper made", () => {
+    expect(
+      endingLine({ outcome: "shutdown", text: "the server stopped while this turn ran" }),
+    ).toBe("· the server stopped while this turn ran");
+    expect(endingLine({ outcome: "interrupted", text: "interrupted" })).toBe("· interrupted");
+    expect(failureNextStep("ECONNREFUSED 127.0.0.1:443")).toBe("the provider could not be reached");
+    expect(failureNextStep("a listener threw")).toBeUndefined();
+  });
+
+  it("draws the ending as plain text where nothing can resend it", () => {
+    const { container } = render(() => <ConversationPane projection={failed} />);
+    expect(container.querySelector(".kw-ending")).toBeNull();
+    expect(container.querySelector("[data-ending='failed']")?.textContent).toBe(
+      "failed · upstream 529 overloaded · the provider is busy · give it a moment",
+    );
   });
 });
 

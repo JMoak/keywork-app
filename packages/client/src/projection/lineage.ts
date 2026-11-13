@@ -53,16 +53,14 @@ export function lineageOf(state: LineageState, childId: string): ChildLineage | 
   return undefined;
 }
 
-export function childrenTouchedBy(
-  state: LineageState,
-  envelopes: readonly BusEnvelope[],
-): Set<string> {
-  const touched = new Set<string>();
-  for (const envelope of envelopes) {
-    const id = touchedChild(state, envelope);
-    if (id !== undefined) touched.add(id);
-  }
-  return touched;
+export function childrenFinishedIn(envelopes: readonly BusEnvelope[]): Set<string> {
+  return new Set(
+    envelopes.flatMap((envelope) =>
+      envelope.type === "child.finished" && envelope.payload.sessionId !== undefined
+        ? [envelope.payload.sessionId]
+        : [],
+    ),
+  );
 }
 
 const stateOfPhase: Readonly<Record<ToolPhase, ChildState>> = {
@@ -125,13 +123,4 @@ function withChild(state: LineageState, child: ChildLineage): LineageState {
       ? [...siblings, child]
       : siblings.map((sibling, index) => (index === at ? child : sibling));
   return { ...state, [child.parentId]: next };
-}
-
-function touchedChild(state: LineageState, envelope: BusEnvelope): string | undefined {
-  if (envelope.type === "child.finished") return envelope.payload.sessionId;
-  if (envelope.type !== "tool.output") return undefined;
-  const callId = envelope.payload.callId;
-  return childrenOf(state, envelope.sessionId).find(
-    (child) => child.callId === callId && child.state === "running",
-  )?.sessionId;
 }

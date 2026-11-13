@@ -91,8 +91,8 @@ export {
 } from "./projection/ledger.ts";
 export {
   type ChildLineage,
+  childrenFinishedIn,
   childrenOf,
-  childrenTouchedBy,
   childStateOf,
   emptyLineage,
   type LineageState,
@@ -155,6 +155,7 @@ export {
   type AssistantEntry,
   type ChildMark,
   type ChildState,
+  type EndingEntry,
   emptyProjection,
   emptyUsage,
   type FlushEntry,
@@ -168,6 +169,7 @@ export {
   type ToolPhase,
   type ToolRun,
   type TranscriptEntry,
+  type TurnEnding,
   type UsageLedger,
   type UserEntry,
 } from "./projection/types.ts";

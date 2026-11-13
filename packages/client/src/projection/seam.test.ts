@@ -49,30 +49,27 @@ describe("joining a session snapshot to the live stream", () => {
     const moments = { asOf: 3, opened: 3, loaded: 4 };
     const joined = joinedAt(stream, timings[0] as Timing, moments, { reports: [frameReport] });
     const caught = projectAll(joined, between(stream, 4, 6));
-    expect(drawn(caught)).toEqual(["notice You are Wren.", "assistant I am Wren."]);
+    expect(drawn(caught)).toEqual(["assistant I am Wren."]);
   });
 
-  it("draws a creature's frame once when its report reached the snapshot before its notice fired", () => {
+  it("keeps a creature's frame out of the transcript when its report reached the snapshot before its notice fired", () => {
     const stream = framedIntroduction();
     const detail: SessionDetail = { ...snapshotOf([], 0), reports: [frameReport] };
     const joined = projectAll(
       replayBase(detail),
       joinSnapshot({ detail, pending: [], heard: [], arrived: stream }),
     );
-    expect(drawn(joined)).toEqual(["notice You are Wren.", "assistant I am Wren."]);
+    expect(drawn(joined)).toEqual(["assistant I am Wren."]);
   });
 
-  it("draws the frame once when its notice arrives only after a snapshot that held its report", () => {
+  it("keeps the frame out when its notice arrives only after a snapshot that held its report", () => {
     const stream = framedIntroduction();
     const detail: SessionDetail = { ...snapshotOf([], 0), reports: [frameReport] };
     const loaded = projectAll(
       replayBase(detail),
       joinSnapshot({ detail, pending: [], heard: [], arrived: [] }),
     );
-    expect(drawn(projectAll(loaded, stream))).toEqual([
-      "notice You are Wren.",
-      "assistant I am Wren.",
-    ]);
+    expect(drawn(projectAll(loaded, stream))).toEqual(["assistant I am Wren."]);
   });
 });
 

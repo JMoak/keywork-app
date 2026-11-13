@@ -41,6 +41,7 @@ import { spillOpening } from "../file/spill.ts";
 import { keepKeyboardHome } from "../keyboard-home.ts";
 import { definePane, type PaneProps, type ShellSeams } from "../registry.ts";
 import { restoreNotice } from "../tree/trash.ts";
+import { Announcements } from "./announcements.tsx";
 import {
   effortChoices,
   effortFrom,
@@ -197,6 +198,14 @@ export const conversationPane = definePane<ConversationSpec>({
       command: {
         name: "restore-turn",
         description: "put the session and its files back to before the focused turn, or the latest",
+      },
+    },
+    "conversation.retry": {
+      chords: "none",
+      help: "send a stopped or failed prompt again",
+      command: {
+        name: "retry",
+        description: "send the latest interrupted or failed prompt again",
       },
     },
     "conversation.fork-turn": {
@@ -384,12 +393,25 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
       props.shell.openPane(spillOpening(id, run, run.spill));
     }
   };
+  const resend = (text: string): void =>
+    void send(projection().turn === undefined ? "steer" : "queue")(text);
+  const retryLatest = (): void => {
+    const prompt = latestResendable(projection());
+    if (prompt === undefined) say(nothingToRetryNotice);
+    else resend(prompt);
+  };
   const interrupt = (): void => {
     const id = props.spec.sessionId;
     if (id !== undefined) void props.shell.store.abort(id);
   };
 
-  const turns = createTurnLedger(props.shell, () => props.spec.sessionId, say, setPending);
+  const turns = createTurnLedger(
+    props.shell,
+    () => props.spec.sessionId,
+    say,
+    setPending,
+    (text) => setReturned({ text }),
+  );
   const forgotten = createMemo(() =>
     forgottenPromptIds(props.shell.store.tree(props.spec.sessionId).snapshot),
   );
@@ -401,6 +423,7 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     ...turns.actions,
     ...copyVerbs(props.shell.host, shownProjection, say),
     "conversation.latest": () => tail?.resume(),
+    "conversation.retry": retryLatest,
   };
   props.onAction((action, argument) => controls[action]?.(argument));
 
@@ -426,6 +449,10 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
             </>
           }
         >
+          <Announcements projection={projection()} />
+          <Show when={blankSessionLine(props.shell, props.spec.sessionId)}>
+            {(line) => <EmptyState line={line()} />}
+          </Show>
           <ConversationPane
             projection={projection()}
             onAnswerAsk={(callId, verdict, scope, reason, note) =>
@@ -445,6 +472,8 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
             tailRef={(following) => {
               tail = following;
             }}
+            onResend={resend}
+            untrusted={props.shell.trust.untrusted()}
           />
         </Show>
       </div>
@@ -727,7 +756,30 @@ function settledState(projection: SessionProjection): LifecycleState | undefined
     return "needs-you";
   }
   const last = projection.entries.at(-1);
+  if (last?.kind === "ending") return last.outcome === "failed" ? "failed" : undefined;
   return last?.kind === "notice" && last.level === "error" ? "failed" : undefined;
+}
+
+export const nothingToRetryNotice = "no interrupted or failed prompt to send again here";
+
+export const loadingSessionLine = "reading this session from the server";
+
+export const childStartingLine = "this child has not said anything yet · its work streams here";
+
+export const emptySessionLine = "nothing in this session yet · type a prompt below to start it";
+
+function blankSessionLine(shell: ShellSeams, sessionId: string | undefined): string | undefined {
+  const projection = shell.store.projection(sessionId);
+  if (sessionId === undefined || projection.entries.length > 0 || projection.turn !== undefined) {
+    return undefined;
+  }
+  if (shell.store.state.loading[sessionId] === true) return loadingSessionLine;
+  return shell.store.childOf(sessionId)?.state === "running" ? childStartingLine : emptySessionLine;
+}
+
+function latestResendable(projection: SessionProjection): string | undefined {
+  const ending = projection.entries.findLast((entry) => entry.kind === "ending");
+  return ending?.kind === "ending" ? ending.prompt : undefined;
 }
 
 function restoreOffer(

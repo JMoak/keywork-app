@@ -23,11 +23,16 @@ export interface RowSpan {
   part: SpanPart;
 }
 
-export function toolRowSpans(run: ToolRun): RowSpan[] {
+export interface RowMoment {
+  readonly now?: number | undefined;
+  readonly queuedBehind?: number | undefined;
+}
+
+export function toolRowSpans(run: ToolRun, moment: RowMoment = {}): RowSpan[] {
   const head: RowSpan = { text: headText(run), tone: "body", part: "head" };
   if (run.phase === "proposed") return [head, span(" · proposed", "meta", "live")];
-  if (run.phase === "asking") return [head, span(" · waiting for your answer", "meta", "live")];
-  if (run.phase === "running") return [head, span(` · ${run.live ?? "running"}`, "meta", "live")];
+  if (run.phase === "asking") return [head, span(askingText(moment), "meta", "live")];
+  if (run.phase === "running") return [head, span(runningText(run, moment), "meta", "live")];
   const facts = [durationText(run), waitText(run), sizeText(run), elisionText(run)]
     .filter((part) => part !== undefined)
     .map((part) => ` · ${part}`)
@@ -36,7 +41,7 @@ export function toolRowSpans(run: ToolRun): RowSpan[] {
     head,
     ...(facts === "" ? [] : [span(facts, "meta", "facts")]),
     span(" · ", "meta", "separator"),
-    span(run.phase, run.phase === "done" ? "ok" : "bad", "outcome"),
+    outcomeSpan(run),
     ...grantSpans(run),
     ...recallSpans(run),
     ...(run.reason === undefined || run.reason === ""
@@ -68,12 +73,36 @@ export function compactJson(value: unknown): string {
 export function toolSubject(args: unknown): string {
   if (typeof args !== "object" || args === null) return "";
   const record = args as Record<string, unknown>;
+  const shown = shownSubject(record.what);
+  if (shown !== undefined) return clippedSubject(shown);
   const key =
     favoredSubjectKeys.find((candidate) => typeof record[candidate] === "string") ??
     Object.keys(record).find((candidate) => typeof record[candidate] === "string");
-  if (key === undefined) return "";
-  const flat = (record[key] as string).replace(/\s+/g, " ").trim();
-  return flat.length > 40 ? `${flat.slice(0, 39)}…` : flat;
+  return key === undefined ? "" : clippedSubject(lineMarked(record[key] as string));
+}
+
+export const lineBreakMark = "⏎";
+
+function lineMarked(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "")
+    .join(` ${lineBreakMark} `);
+}
+
+function clippedSubject(text: string): string {
+  return text.length > subjectLimit ? `${text.slice(0, subjectLimit - 1)}…` : text;
+}
+
+const subjectLimit = 60;
+
+function shownSubject(what: unknown): string | undefined {
+  if (typeof what !== "object" || what === null) return undefined;
+  const { kind, title, ref } = what as Record<string, unknown>;
+  if (typeof kind !== "string") return undefined;
+  const named = typeof title === "string" && title.trim() !== "" ? title : ref;
+  return typeof named === "string" ? `${kind} · ${lineMarked(named)}` : kind;
 }
 
 const favoredSubjectKeys = [
@@ -101,6 +130,32 @@ function answeredByYou(decision: PermissionDecision): boolean {
 function standingGrant(decision: PermissionDecision): string | undefined {
   const { scope } = decision;
   return scope === "session" || scope === "workspace" ? `${scope} grant` : undefined;
+}
+
+function askingText(moment: RowMoment): string {
+  const behind = moment.queuedBehind ?? 0;
+  if (behind === 0) return " · waiting for your answer";
+  return ` · waiting for your answer · ${behind} more ${behind === 1 ? "call waits" : "calls wait"} behind it`;
+}
+
+function runningText(run: ToolRun, moment: RowMoment): string {
+  const since = runningFor(run, moment.now);
+  const live = run.live === undefined || run.live === "" ? undefined : run.live;
+  if (live === undefined) return since === undefined ? " · running" : ` · running ${since}`;
+  return since === undefined ? ` · ${live}` : ` · ${since} · ${live}`;
+}
+
+function runningFor(run: ToolRun, now: number | undefined): string | undefined {
+  if (now === undefined || run.startedAt === undefined || run.replay) return undefined;
+  const ran = now - Date.parse(run.startedAt) - (run.waitedMs ?? 0);
+  return ran < 1000 ? undefined : elapsedText(Math.floor(ran / 1000) * 1000);
+}
+
+function outcomeSpan(run: ToolRun): RowSpan {
+  if (run.stopped === true) return span("stopped", "meta", "outcome");
+  if (run.phase === "done" && run.exitNote !== undefined)
+    return span(run.exitNote, "bad", "outcome");
+  return span(run.phase, run.phase === "done" ? "ok" : "bad", "outcome");
 }
 
 function headText(run: ToolRun): string {

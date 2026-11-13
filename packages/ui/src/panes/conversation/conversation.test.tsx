@@ -39,7 +39,14 @@ import {
   sessionGoneNotice,
   unsteppableNotice,
 } from "./controls.ts";
-import { type ConversationSpec, conversationPane } from "./index.tsx";
+import {
+  type ConversationSpec,
+  childStartingLine,
+  conversationPane,
+  emptySessionLine,
+  loadingSessionLine,
+  nothingToRetryNotice,
+} from "./index.tsx";
 
 const recordedCost = recordedAnswers.cost.body as CostReport;
 const recordedContext = recordedAnswers.context.body as ContextReport;
@@ -72,6 +79,7 @@ interface Fakes {
   gone?: boolean;
   live?: LiveSession;
   child?: ChildLineage;
+  loading?: boolean;
 }
 
 interface LiveSession {
@@ -95,7 +103,7 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
       sent.prompts.push([id, text, behavior]);
       return fakes.promptOutcome ?? "started";
     },
-    state: { summaries: [{ id: "s1" }] },
+    state: { summaries: [{ id: "s1" }], loading: { s1: fakes.loading === true } },
     open: async (id: string) => {
       sent.followed.push(id);
     },
@@ -291,6 +299,15 @@ describe("the conversation pane's controls", () => {
     expect(sent.prompts).toEqual([]);
     expect(input.value).toBe("also check the callers");
     expect(document.querySelector(".kw-composer-hold")?.textContent).toBe(childAtWorkNotice);
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(childStartingLine);
+  });
+
+  it("says a session with nothing in it is empty, and an unread one is still being read", () => {
+    mount();
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(emptySessionLine);
+    cleanup();
+    mount({ loading: true });
+    expect(document.querySelector(".kw-empty")?.textContent).toBe(loadingSessionLine);
   });
 
   it("opens a delegated child from its transcript row by the session-opening path", () => {
@@ -302,6 +319,33 @@ describe("the conversation pane's controls", () => {
     expect(row.textContent).toContain('child "audit the trust rules" · ◇ researcher');
     fireEvent.keyDown(row, { key: "Enter" });
     expect(sent.verbs).toEqual(["open q2"]);
+  });
+
+  it("sends a failed prompt again from its ending row or the retry command, and says when none waits", async () => {
+    const at = "2026-11-12T12:00:00.000Z";
+    const failed = projectAll(emptyProjection, [
+      { id: 1, ts: at, sessionId: "s1", type: "turn.started", payload: { userText: "failnow" } },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "engine.error",
+        payload: { error: { name: "Error", message: "upstream 529 overloaded" } },
+      },
+    ]);
+    const { sent, act } = mount({
+      live: { summary: () => undefined, projection: () => failed, trashed: () => false },
+    });
+    fireEvent.keyDown(document.querySelector(".kw-ending") as HTMLElement, { key: "Enter" });
+    await act("conversation.retry");
+    expect(sent.prompts).toEqual([
+      ["s1", "failnow", "steer"],
+      ["s1", "failnow", "steer"],
+    ]);
+    cleanup();
+    const quiet = mount();
+    await quiet.act("conversation.retry");
+    expect(lines()).toEqual([nothingToRetryNotice]);
   });
 
   it("seeds the composer with an undone prompt", () => {
@@ -807,7 +851,7 @@ describe("a creature's report on its own turn", () => {
       });
       const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
       expect(notices, `replay ${replay}`).toEqual([crateDeliveredLine]);
-      const drawn = document.body.textContent ?? "";
+      const drawn = document.querySelector(".kw-transcript")?.textContent ?? "";
       expect(drawn.split(sentence).length - 1, `replay ${replay}`).toBe(1);
       cleanup();
     }

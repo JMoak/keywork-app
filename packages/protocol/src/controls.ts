@@ -86,11 +86,18 @@ export interface Redone {
   redoable: boolean;
 }
 
+export const restoreScopes = ["session", "everything"] as const;
+
+export type RestoreScope = (typeof restoreScopes)[number];
+
+export const restoreTurnBody = ["turn", "scope"] as const;
+
 export interface TurnRestored {
   turn: number;
   prompt: UndonePrompt;
   leafId: string | null;
   undoneTurns: number;
+  scope: RestoreScope;
   files: readonly ChangedPath[];
   filesNote: string;
   undoable: boolean;
@@ -101,8 +108,14 @@ export interface RestorePreview {
   turn: number;
   prompt: UndonePrompt;
   undoneTurns: number;
-  files: readonly ChangedPath[];
+  scope: RestoreScope;
+  files: readonly RestoreCandidate[];
   others: readonly OtherSessionFiles[];
+}
+
+export interface RestoreCandidate extends ChangedPath {
+  touched: boolean;
+  goesBack: boolean;
 }
 
 export interface OtherSessionFiles {

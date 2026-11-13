@@ -2,6 +2,7 @@ import type {
   BusEnvelope,
   ContextEditMark,
   Message,
+  OutcomeMark,
   PermissionDecision,
   PromptOrigin,
   ReportMark,
@@ -36,18 +37,26 @@ export function historyEnvelopes(
   const reports = reportsAt(detail);
   const verdicts = verdictsAt(detail);
   const frames = framesAt(detail);
+  const outcomes = outcomesAt(detail);
+  let ending: OutcomeMark | undefined;
+  const closeTurn = (next: OutcomeMark | undefined): void => {
+    if (ending !== undefined) replayEnding(ending, emit);
+    ending = next;
+  };
   const replayForgottenAt = (index: number): void => {
     for (const edit of forgotten.get(index) ?? []) replayForgotten(edit, emit);
     for (const report of reports.get(index) ?? []) replayReport(report, emit);
     for (const verdict of verdicts.get(index) ?? []) replayVerdict(verdict, emit);
   };
   detail.messages.slice(0, until).forEach((message, index) => {
+    if (message.role === "user") closeTurn(outcomes.get(index));
     replayForgottenAt(index);
-    const entryId = marked.get(index) ?? placed.get(index);
+    const entryId = marked.get(index) ?? placed.get(index) ?? outcomes.get(index)?.entryId;
     if (message.role === "user") replayPrompt(message, entryId, emit, frames.get(index));
     else if (message.role === "assistant") replayAssistant(message, calls, emit);
     else replayToolResults(message, calls, decisions, emit);
   });
+  closeTurn(undefined);
   replayForgottenAt(until);
   return envelopes;
 }
@@ -58,6 +67,7 @@ export function replayBase(detail: SessionDetail | undefined): SessionProjection
     ...emptyProjection,
     summaries: summaryKindsOf(detail),
     flushes: Object.fromEntries((detail?.flushes ?? []).map((mark) => [mark.entryId, mark.facts])),
+    outcomes: Object.fromEntries((detail?.outcomes ?? []).map((mark) => [mark.entryId, mark])),
     ...(forkedFrom !== undefined && { forkedFrom }),
   };
 }
@@ -99,6 +109,24 @@ function verdictsAt(detail: SessionDetail): ReadonlyMap<number, VerdictMark[]> {
   }
   return slots;
 }
+
+function outcomesAt(detail: SessionDetail): ReadonlyMap<number, OutcomeMark> {
+  return new Map((detail.outcomes ?? []).map((mark) => [mark.index, mark]));
+}
+
+function replayEnding(mark: OutcomeMark, emit: Emit): void {
+  if (mark.outcome === "completed") return;
+  if (mark.outcome === "failed") {
+    const error = { name: "Error", message: mark.error ?? unexplainedFailure };
+    emit({ type: "engine.error", payload: { error, replay: true } });
+    return;
+  }
+  emit({ type: "turn.interrupted", payload: { message: noReply, replay: true } });
+}
+
+const unexplainedFailure = "the turn failed";
+
+const noReply: Message = { role: "assistant", parts: [] };
 
 function replayVerdict(verdict: VerdictMark, emit: Emit): void {
   emit({ type: "extension.notice", payload: { ...reviewNotice(verdict), replay: true } });
@@ -193,6 +221,7 @@ function replayToolResults(
         output: part.output,
         isError: part.isError,
         ...(part.spill !== undefined && { spill: part.spill }),
+        ...(part.exitCode !== undefined && { exitCode: part.exitCode }),
         replay: true,
       },
     });
