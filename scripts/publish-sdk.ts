@@ -67,13 +67,8 @@ export function publicationDistTag(version: string, latest?: string): string {
   return latest !== undefined && gt(latest, version) ? `release-${version}` : "latest";
 }
 
-export function sdkNotification(publication: SdkPublication): object {
-  return { event_type: "keywork-sdk-published", client_payload: publication };
-}
-
 async function run(): Promise<void> {
-  const command = process.argv[2];
-  if (command !== "publish" && command !== "notify") throw new Error("Expected publish or notify");
+  if (process.argv[2] !== "publish") throw new Error("Expected publish");
   const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -90,11 +85,6 @@ async function run(): Promise<void> {
     contract: contractVersion,
     electron: desktop.devDependencies.electron,
   };
-  if (command === "notify") {
-    await verifyPublishedSdk(expected);
-    await notifyStead(expected);
-    return;
-  }
   const directory = join(repoRoot, "dist", "sdk");
   const archives = (await readdir(directory)).filter((name) =>
     /^sdk-[a-f0-9]{12}\.tgz$/.test(name),
@@ -149,30 +139,6 @@ async function verifyPublishedSdk(expected: SdkPublication, integrity?: string):
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
-}
-
-async function notifyStead(publication: SdkPublication): Promise<void> {
-  const token = process.env.DEPENDENCY_TOKEN;
-  if (!token) {
-    await report(
-      "setup-needed",
-      "SDK is verified; Stead notification needs the dependency GitHub App credentials.",
-    );
-    return;
-  }
-  const response = await fetch("https://api.github.com/repos/JMoak/stead/dispatches", {
-    method: "POST",
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(sdkNotification(publication)),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (response.status !== 204)
-    throw new Error(`Stead notification failed: HTTP ${response.status}`);
-  await report("notified", `Notified Stead of verified SDK ${publication.version}.`);
 }
 
 function verifyArchive(contents: Buffer, expected: SdkPublication): void {

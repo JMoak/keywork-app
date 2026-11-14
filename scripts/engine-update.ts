@@ -21,10 +21,19 @@ import {
 } from "./fetch-sidecar.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 
-export const engineUpdateBranch = "automation/keywork-engine";
 export const enginePinPath = "packages/protocol/src/routes.ts";
+export const releaseWorkflow = "release.yml";
+export const automationCommitter: Identity = {
+  name: "github-actions[bot]",
+  email: "41898282+github-actions[bot]@users.noreply.github.com",
+};
 const upstream = "JMoak/keywork";
 const downstream = "JMoak/keywork-app";
+const focusedTests = [
+  "scripts/engine-update.test.ts",
+  "scripts/fetch-sidecar.test.ts",
+  "scripts/check-contract.test.ts",
+];
 type Request = (url: string, init?: RequestInit) => Promise<Response>;
 
 export interface EngineRelease {
@@ -34,13 +43,18 @@ export interface EngineRelease {
   assets: { name: string; digest: string | null }[];
 }
 
+export interface Identity {
+  name: string;
+  email: string;
+}
+
 export async function publishedEngine(request: Request = fetch): Promise<EngineRelease> {
   const release = await github<{
     tag_name: string;
     draft: boolean;
     prerelease: boolean;
     assets: { name: string; state: string; digest?: string | null }[];
-  }>(upstream, "releases/latest", request);
+  }>(`repos/${upstream}/releases/latest`, request);
   const version = release.tag_name?.slice(1);
   if (
     release.draft !== false ||
@@ -58,9 +72,9 @@ export async function publishedEngine(request: Request = fetch): Promise<EngineR
   };
 }
 
-export function shouldAdopt(candidate: string, current: string, pending?: string): boolean {
-  [candidate, current, ...(pending ? [pending] : [])].forEach(stableVersion);
-  return gt(candidate, current) && (pending === undefined || !gt(pending, candidate));
+export function shouldAdopt(candidate: string, current: string): boolean {
+  [candidate, current].forEach(stableVersion);
+  return gt(candidate, current);
 }
 
 export function updateEnginePin(source: string, version: string): string {
@@ -74,16 +88,12 @@ export function updateEnginePin(source: string, version: string): string {
   );
 }
 
-export function requireOwnedChanges(before: string, after: string, paths: readonly string[]): void {
-  if (
-    paths.length !== 1 ||
-    paths[0] !== enginePinPath ||
-    updateEnginePin(before, enginePinOf(after)) !== after
-  ) {
-    throw new Error(
-      "The automation branch contains changes beyond its engine pin; review it manually",
-    );
-  }
+export async function publishedContract(
+  release: EngineRelease,
+  request: Request = fetch,
+): Promise<string | undefined> {
+  const contract = await downloadText(`${sourceRoot(release)}/contract.ts`, request);
+  return contract.match(/^export const contractVersion = "(\d+\.\d+)";$/m)?.[1];
 }
 
 export async function verifyEngineContract(
@@ -91,13 +101,12 @@ export async function verifyEngineContract(
   pinned: EventShapes,
   request: Request = fetch,
 ): Promise<void> {
-  const root = `https://raw.githubusercontent.com/${upstream}/${release.sourceSha}/packages/server/src`;
-  const [contract, doc, shapes] = await Promise.all([
-    downloadText(`${root}/contract.ts`, request),
+  const root = sourceRoot(release);
+  const [servedContract, doc, shapes] = await Promise.all([
+    publishedContract(release, request),
     downloadText(`${root}/openapi-document.fixture.json`, request),
     downloadText(`${root}/event-shapes.fixture.json`, request),
   ]);
-  const servedContract = contract.match(/^export const contractVersion = "(\d+\.\d+)";$/m)?.[1];
   if (servedContract !== contractVersion) {
     throw new Error(
       `Engine contract ${servedContract ?? "missing"} differs from App ${contractVersion}; protocol adaptation requires review`,
@@ -135,6 +144,18 @@ export async function verifyEngineAssets(
   return digests;
 }
 
+export async function ownerIdentity(owner: string, request: Request = fetch): Promise<Identity> {
+  if (!/^[a-zA-Z0-9-]+$/.test(owner)) throw new Error(`Invalid repository owner: ${owner}`);
+  const user = await github<{ id: number; login: string; name?: string | null }>(
+    `users/${owner}`,
+    request,
+  );
+  if (!Number.isSafeInteger(user.id) || user.login !== owner)
+    throw new Error(`GitHub returned another account for ${owner}`);
+  const name = user.name?.replace(/\s+/g, " ").trim();
+  return { name: name || owner, email: `${user.id}+${owner}@users.noreply.github.com` };
+}
+
 async function run(): Promise<void> {
   if (
     process.env.GITHUB_REPOSITORY !== downstream ||
@@ -142,163 +163,72 @@ async function run(): Promise<void> {
   ) {
     throw new Error("Engine adoption runs only from JMoak/keywork-app main");
   }
-  const bot = process.env.DEPENDENCY_BOT_LOGIN ?? "";
-  const botId = process.env.DEPENDENCY_BOT_ID ?? "";
-  if (!/^[a-zA-Z0-9-]+\[bot\]$/.test(bot) || !/^\d+$/.test(botId) || !process.env.GH_TOKEN) {
-    throw new Error(
-      "Configure DEPENDENCY_APP_ID and DEPENDENCY_APP_PRIVATE_KEY with contents and pull requests write permissions",
-    );
-  }
+  if (!process.env.GH_TOKEN)
+    throw new Error("Engine adoption needs the workflow token as GH_TOKEN");
   if (git("status", "--porcelain")) throw new Error("Engine adoption requires a clean checkout");
   const mainSha = git("rev-parse", "HEAD");
-  const pending = await pendingUpdate(bot);
   const release = await publishedEngine();
-  if (!shouldAdopt(release.version, protocolVersion, pending?.version)) {
-    await summarize(
-      `No engine update: App pins ${protocolVersion}; published ${release.version}${pending ? `; pending ${pending.version}` : ""}.`,
+  if (!shouldAdopt(release.version, protocolVersion)) {
+    await summarize(`No engine update: App pins ${protocolVersion}; published ${release.version}.`);
+    return;
+  }
+  const served = await publishedContract(release);
+  if (served !== contractVersion) {
+    await hold(
+      `Holding keywork ${release.version}: it serves contract ${served ?? "unknown"} and the App speaks ${contractVersion}. Adopt that contract in the App; the pin follows on the next run.`,
     );
     return;
   }
   await verifyEngineContract(release, await pinnedEventShapes());
-  const digests = await verifyEngineAssets(release);
-  const temporary = await mkdtemp(join(tmpdir(), "keywork-engine-update-"));
-  const binary = join(temporary, process.platform === "win32" ? "keywork.exe" : "keywork");
-  await fetchSidecar(release.version, hostTarget(), binary);
-  const source = await readFile(join(repoRoot, enginePinPath), "utf8");
-  const updated = updateEnginePin(source, release.version);
-  const title = `fix(deps): adopt keywork ${release.version}`;
-  let head = pending?.sha;
-  const replaceBranch = pending?.version !== release.version || pending.base !== mainSha;
-  if (replaceBranch) {
-    git("checkout", "-B", engineUpdateBranch, mainSha);
-    await writeFile(join(repoRoot, enginePinPath), updated);
-    git("add", "--", enginePinPath);
-    git(
-      "-c",
-      `user.name=${bot}`,
-      "-c",
-      `user.email=${botId}+${bot}@users.noreply.github.com`,
-      "commit",
-      "-m",
-      title,
-    );
-    head = git("rev-parse", "HEAD");
-  } else git("checkout", "--detach", pending.sha);
-  if (!head) throw new Error("No verified update commit");
-  command("bun", [
-    "run",
-    "test",
-    "scripts/engine-update.test.ts",
-    "scripts/fetch-sidecar.test.ts",
-    "scripts/check-contract.test.ts",
-  ]);
+  await verifyEngineAssets(release);
+  await verifyHostBinary(release.version);
+  const author = await ownerIdentity(process.env.GITHUB_REPOSITORY_OWNER ?? "");
+  const head = await commitPin(release.version, author);
+  command("bun", ["run", "test", ...focusedTests]);
   if (git("rev-parse", "HEAD") !== head || git("status", "--porcelain"))
     throw new Error("Focused checks must leave the exact update commit unchanged");
   if ((await publishedTagSha(release.tag)) !== release.sourceSha)
     throw new Error("Published engine tag moved during verification");
   git("fetch", "origin", "main");
-  if (git("rev-parse", "origin/main") !== mainSha)
-    throw new Error("App main advanced; rerun adoption against its current contract");
-  if (replaceBranch)
-    git(
-      "push",
-      `--force-with-lease=refs/heads/${engineUpdateBranch}:${pending?.sha ?? ""}`,
-      "origin",
-      `HEAD:refs/heads/${engineUpdateBranch}`,
+  if (git("rev-parse", "origin/main") !== mainSha) {
+    await hold(
+      `App main advanced while keywork ${release.version} was verified; the next run adopts it against the new main.`,
     );
-  const body = join(temporary, "pull-request.md");
-  await writeFile(
-    body,
-    [
-      `Adopts [keywork ${release.tag}](https://github.com/${upstream}/releases/tag/${release.tag}) at ${release.sourceSha}.`,
-      ``,
-      `Only the bundled engine pin changes. Contract ${contractVersion}, routes, request bodies, events, and event shapes match the App. Every native artifact agrees with its published checksums; the Linux binary reports the expected version and contract. Focused adoption, sidecar, and contract tests pass.`,
-      ``,
-      ...Object.entries(digests).map(([name, digest]) => `- \`${name}\`: \`${digest}\``),
-      ``,
-      `This branch coalesces compatible public engine releases. The fix(deps) squash commit starts the App patch release after merge.`,
-    ].join("\n"),
-  );
-  const pr =
-    pending?.pr ??
-    gh(
-      "pr",
-      "create",
-      "--repo",
-      downstream,
-      "--base",
-      "main",
-      "--head",
-      engineUpdateBranch,
-      "--title",
-      title,
-      "--body-file",
-      body,
-    );
-  if (pending?.pr)
-    gh("pr", "edit", pr, "--repo", downstream, "--title", title, "--body-file", body);
-  gh(
-    "pr",
-    "merge",
-    pr,
-    "--repo",
-    downstream,
-    "--auto",
-    "--squash",
-    "--match-head-commit",
-    head,
-    "--subject",
-    title,
-  );
+    return;
+  }
+  git("push", "origin", `${head}:refs/heads/main`);
+  gh("workflow", "run", releaseWorkflow, "--repo", downstream, "--ref", "main");
   await summarize(
-    `Verified engine ${release.version} and enabled squash auto-merge for ${pr} at ${head}. Required repository checks still apply.`,
+    `Adopted keywork ${release.version} on main at ${head} and started ${releaseWorkflow}.`,
   );
 }
 
-async function pendingUpdate(
-  bot: string,
-): Promise<{ version: string; sha: string; base: string; pr?: string } | undefined> {
-  const refs = git("ls-remote", "--heads", "origin", `refs/heads/${engineUpdateBranch}`);
-  const pulls = await github<
-    {
-      html_url: string;
-      user: { login: string; type: string };
-      head: { sha: string };
-    }[]
-  >(
-    downstream,
-    `pulls?state=open&base=main&head=${encodeURIComponent(`JMoak:${engineUpdateBranch}`)}&per_page=100`,
-    fetch,
-  );
-  if (pulls.length > 1) throw new Error("Multiple engine adoption PRs require review");
-  const pr = pulls[0];
-  if (!refs) {
-    if (pr) throw new Error("Engine PR has no matching branch");
-    return undefined;
-  }
-  git(
-    "fetch",
-    "origin",
-    `refs/heads/${engineUpdateBranch}:refs/remotes/origin/${engineUpdateBranch}`,
-  );
-  const sha = git("rev-parse", `origin/${engineUpdateBranch}`);
-  if (pr && (pr.user.login !== bot || pr.user.type !== "Bot" || pr.head.sha !== sha))
-    throw new Error("Engine PR is not the dependency App's current branch");
-  const base = git("merge-base", "HEAD", sha);
-  if (base === sha) {
-    if (pr) throw new Error("Engine PR has already merged; refresh its state before retrying");
-    return { version: "0.0.0", sha, base };
-  }
-  if (git("log", "-1", "--format=%an", sha) !== bot)
-    throw new Error("Engine branch is not owned by the dependency App");
-  const before = git("show", `${base}:${enginePinPath}`);
-  const after = git("show", `${sha}:${enginePinPath}`);
-  requireOwnedChanges(before, after, git("diff", "--name-only", `${base}..${sha}`).split("\n"));
-  return { version: enginePinOf(after), sha, base, ...(pr ? { pr: pr.html_url } : {}) };
+async function verifyHostBinary(version: string): Promise<void> {
+  const temporary = await mkdtemp(join(tmpdir(), "keywork-engine-update-"));
+  const binary = join(temporary, process.platform === "win32" ? "keywork.exe" : "keywork");
+  await fetchSidecar(version, hostTarget(), binary);
 }
 
-function enginePinOf(source: string): string {
-  return stableVersion(source.match(/^export const protocolVersion = "([^"]+)";$/m)?.[1] ?? "");
+async function commitPin(version: string, author: Identity): Promise<string> {
+  const pin = join(repoRoot, enginePinPath);
+  await writeFile(pin, updateEnginePin(await readFile(pin, "utf8"), version));
+  git("add", "--", enginePinPath);
+  execFileSync("git", ["commit", "-m", `fix(deps): adopt keywork ${version}`], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: author.name,
+      GIT_AUTHOR_EMAIL: author.email,
+      GIT_COMMITTER_NAME: automationCommitter.name,
+      GIT_COMMITTER_EMAIL: automationCommitter.email,
+    },
+  });
+  return git("rev-parse", "HEAD");
+}
+
+function sourceRoot(release: EngineRelease): string {
+  return `https://raw.githubusercontent.com/${upstream}/${release.sourceSha}/packages/server/src`;
 }
 
 function stableVersion(version: string): string {
@@ -309,8 +239,7 @@ function stableVersion(version: string): string {
 
 async function publishedTagSha(tag: string, request: Request = fetch): Promise<string> {
   const ref = await github<{ object: { type: string; sha: string } }>(
-    upstream,
-    `git/ref/tags/${tag}`,
+    `repos/${upstream}/git/ref/tags/${tag}`,
     request,
   );
   if (ref.object?.type !== "commit" || !/^[a-f0-9]{40}$/.test(ref.object.sha))
@@ -324,8 +253,8 @@ function requireAsset(release: EngineRelease, name: string): EngineRelease["asse
   return assets[0];
 }
 
-async function github<T>(repository: string, path: string, request: Request): Promise<T> {
-  const response = await request(`https://api.github.com/repos/${repository}/${path}`, {
+async function github<T>(path: string, request: Request): Promise<T> {
+  const response = await request(`https://api.github.com/${path}`, {
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${process.env.GH_TOKEN ?? ""}`,
@@ -346,6 +275,12 @@ async function download(url: string, request: Request): Promise<Uint8Array> {
 
 async function downloadText(url: string, request: Request): Promise<string> {
   return new TextDecoder().decode(await download(url, request));
+}
+
+async function hold(message: string): Promise<void> {
+  console.log(`::notice::${message}`);
+  if (process.env.GITHUB_STEP_SUMMARY)
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
 }
 
 async function summarize(message: string): Promise<void> {

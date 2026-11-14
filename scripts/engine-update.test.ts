@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { docFixture, pinnedEventShapes } from "./check-contract.ts";
 import {
   type EngineRelease,
-  enginePinPath,
+  ownerIdentity,
+  publishedContract,
   publishedEngine,
-  requireOwnedChanges,
   shouldAdopt,
   updateEnginePin,
   verifyEngineAssets,
@@ -36,20 +36,17 @@ const source = 'export const protocolVersion = "0.4.0";\nexport const contractVe
 
 describe("compatible engine adoption", () => {
   it.each([
-    ["0.4.1", "0.4.0", undefined, true],
-    ["0.4.0", "0.4.0", undefined, false],
-    ["0.3.9", "0.4.0", undefined, false],
-    ["0.4.1", "0.4.0", "0.4.2", false],
-    ["0.4.2", "0.4.0", "0.4.1", true],
-    ["0.4.1", "0.4.0", "0.4.1", true],
-  ])("adoption %s from %s with pending %s is %s", (candidate, current, pending, expected) => {
-    expect(shouldAdopt(candidate, current, pending)).toBe(expected);
+    ["0.4.1", "0.4.0", true],
+    ["0.5.0", "0.4.9", true],
+    ["0.4.0", "0.4.0", false],
+    ["0.3.9", "0.4.0", false],
+  ])("adoption of %s over %s is %s", (candidate, current, expected) => {
+    expect(shouldAdopt(candidate, current)).toBe(expected);
   });
 
   it("changes the engine pin alone and never changes the wire contract", () => {
     const updated = updateEnginePin(source, "0.4.1");
     expect(updated).toBe(source.replace('protocolVersion = "0.4.0"', 'protocolVersion = "0.4.1"'));
-    expect(() => requireOwnedChanges(source, updated, [enginePinPath])).not.toThrow();
   });
 
   it.each(["0.4.1-beta.1", "v0.4.1", "0.4.1\nrun-command", "$(command)"])(
@@ -59,15 +56,38 @@ describe("compatible engine adoption", () => {
     },
   );
 
-  it("refuses to overwrite unrelated branch edits", () => {
-    const updated = updateEnginePin(source, "0.4.1");
-    expect(() =>
-      requireOwnedChanges(source, updated.replace("1.29", "1.30"), [enginePinPath]),
-    ).toThrow("beyond its engine pin");
-    expect(() => requireOwnedChanges(source, updated, [enginePinPath, "package.json"])).toThrow(
-      "beyond its engine pin",
-    );
+  it("refuses a source with more than one engine pin", () => {
     expect(() => updateEnginePin(`${source}${source}`, "0.4.1")).toThrow("exactly one");
+  });
+
+  it("reads the contract a release serves from its immutable source", async () => {
+    const request = await contractRequest("1.30");
+    expect(await publishedContract(release, request)).toBe("1.30");
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      `https://raw.githubusercontent.com/JMoak/keywork/${sourceSha}/packages/server/src/contract.ts`,
+    ]);
+  });
+
+  it("authors the pin as the repository owner through the account's no-reply address", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(Response.json({ id: 4242, login: "octo-owner", name: " Octo  Owner " }));
+    expect(await ownerIdentity("octo-owner", request)).toEqual({
+      name: "Octo Owner",
+      email: "4242+octo-owner@users.noreply.github.com",
+    });
+    expect(request.mock.calls[0]?.[0]).toBe("https://api.github.com/users/octo-owner");
+  });
+
+  it("falls back to the login when the owner publishes no name", async () => {
+    const request = vi.fn().mockResolvedValue(Response.json({ id: 7, login: "octo", name: null }));
+    expect((await ownerIdentity("octo", request)).name).toBe("octo");
+  });
+
+  it("rejects an owner the account lookup does not confirm", async () => {
+    await expect(ownerIdentity("octo owner; rm", vi.fn())).rejects.toThrow("Invalid repository");
+    const other = vi.fn().mockResolvedValue(Response.json({ id: 7, login: "someone-else" }));
+    await expect(ownerIdentity("octo", other)).rejects.toThrow("another account");
   });
 
   it("resolves canonical release and immutable tag metadata without dispatch input", async () => {

@@ -1,40 +1,51 @@
 # Published engine adoption
 
-Keywork's successful release workflow sends `keywork-engine-published` to this repository
-after publication and its public install smoke check. `engine-update.yml` also reconciles
-daily and supports manual reruns, so a lost notification does not strand an update.
+This repository adopts a new Keywork engine by itself. Nothing is sent between repositories:
+Keywork publishes a public release, and `engine-update.yml` here reads it. The workflow runs
+twice an hour and can be run by hand from the Actions tab when waiting is not wanted. It
+uses only the token GitHub gives every workflow run, so there is no GitHub App, personal
+token, or shared secret to create, rotate, or lose.
 
-The event is only a wake-up signal. The updater reads the canonical public Keywork release,
-its lightweight tag's full commit SHA, and contract fixtures from that exact source. All
-five native artifacts must have their individual checksums and `SHA256SUMS`; these must
-agree with GitHub's stored artifact digest. Historical assets without that digest are
-downloaded and hashed. The host binary must report the exact release and current App
-contract before adoption continues.
+## What a run does
 
-The engine's contract number must equal the App's existing `contractVersion`. Its routes,
-request bodies, events, and event shapes must also pass the existing contract checker.
-Any drift stops the workflow for protocol review. Automation changes only `protocolVersion`
-in `packages/protocol/src/routes.ts`; it does not change the contract, Electron, migrations,
-or recorded fixtures.
+The updater reads the latest public Keywork release, its lightweight tag's full commit SHA,
+and the contract fixtures from that exact source. Then one of three things happens:
 
-Compatible updates share `automation/keywork-engine` and one PR. Newer releases replace
-older pending pins, while duplicates and older releases cannot downgrade either main or a
-pending update. The updater refuses unrelated branch edits and uses a push lease and an
-exact PR head for squash auto-merge. It runs focused adoption, download, and contract tests
-on the exact committed update before pushing it or requesting auto-merge. It verifies the
-tested commit remains unchanged, then binds auto-merge to that SHA. Existing PR CI and any
-configured required branch checks remain in force; no new global ruleset is needed.
-The `fix(deps): adopt keywork <version>` squash commit triggers the App's patch release,
-which publishes its SDK for downstream consumers.
+- **Nothing to adopt.** The published engine is not newer than `protocolVersion`. The run
+  says so and ends.
+- **Held.** The engine is newer but serves a contract number other than the App's
+  `contractVersion`. The run reports the hold as a notice and ends green. Adopting a contract
+  is a change a person makes in the App; once it lands, the next run moves the pin.
+- **Adopted.** The contract number matches, so the release is verified in full and its pin
+  is committed to `main`.
 
-Configure the same dependency GitHub App as `DEPENDENCY_APP_ID` (Actions variable) and
-`DEPENDENCY_APP_PRIVATE_KEY` (Actions secret) in Keywork and Keywork App. Install it on
-Keywork App with repository contents and pull requests write permissions. Enable repository
-auto-merge. These workflows do not need checks or actions permissions. App installation
-tokens let its branch pushes and merged dependency commits trigger ordinary CI and release
-workflows. Bot identity comes from the App token action, not a hard-coded account name.
+Full verification means the engine's routes, request bodies, events, and event shapes pass
+the existing contract checker; all five native artifacts carry individual checksums and a
+`SHA256SUMS` that agree with GitHub's stored artifact digest (historical assets without that
+digest are downloaded and hashed); and the host binary reports the exact release and the
+App's contract. Drift under an unchanged contract number is an engine defect and fails the
+run.
 
-Missing credentials and failed auto-merge requests fail visibly with setup instructions;
-there is no fallback to a user token or silent manual workflow. Rerun `engine-update` after
-fixing setup or an interrupted run. Publication notifications can also be retried from
-Keywork's failed notification job without rebuilding or changing an existing release tag.
+## The commit and the release
+
+Automation changes only `protocolVersion` in `packages/protocol/src/routes.ts`; it does not
+change the contract, Electron, migrations, or recorded fixtures. The commit is
+`fix(deps): adopt keywork <version>`, authored as the repository owner through the account's
+no-reply address and committed by `github-actions[bot]`, so the history shows who owns the
+change and that automation made it without adding a bot to the contributor list. Focused
+adoption, download, and contract tests run on that exact commit, and the engine tag is read
+again, before anything is pushed.
+
+The commit goes straight to `main`. If `main` moved while the release was being verified,
+the run holds and the next one adopts against the new `main`. A push made with the workflow
+token does not start other workflows, so the updater then starts `release.yml` on `main`
+itself. That run is the ordinary release: the full check suite gates it, and the `fix(deps)`
+commit selects at least a patch version. If starting the release fails after the push, run
+`release.yml` by hand; the pin is already in place.
+
+## Limits
+
+- Adoption lags a Keywork release by up to half an hour unless the workflow is run by hand.
+- GitHub pauses scheduled workflows in a repository with no activity for 60 days. Running
+  `engine-update` by hand re-enables the schedule.
+- A branch rule that forbids direct pushes to `main` would stop the updater. None exists.

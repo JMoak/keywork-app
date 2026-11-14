@@ -1,11 +1,9 @@
 name: engine-update
 
 on:
-  repository_dispatch:
-    types: [keywork-engine-published]
   workflow_dispatch:
   schedule:
-    - cron: "23 10 * * *"
+    - cron: "7,37 * * * *"
 
 concurrency:
   group: engine-update
@@ -18,46 +16,18 @@ jobs:
   adopt:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: write
     steps:
-      - name: require dependency automation credentials
-        env:
-          APP_ID: ${{ vars.DEPENDENCY_APP_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.DEPENDENCY_APP_PRIVATE_KEY }}
-        run: |
-          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
-            echo 'Configure DEPENDENCY_APP_ID and DEPENDENCY_APP_PRIVATE_KEY for a GitHub App with contents and pull requests write access to JMoak/keywork-app, and enable repository auto-merge.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-      - id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.DEPENDENCY_APP_ID }}
-          private-key: ${{ secrets.DEPENDENCY_APP_PRIVATE_KEY }}
-          owner: JMoak
-          repositories: keywork-app
-          permission-contents: write
-          permission-pull-requests: write
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
-          fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
-      - name: resolve dependency App identity
-        id: bot
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-        run: |
-          [[ "$APP_SLUG" =~ ^[a-zA-Z0-9-]+$ ]]
-          echo "login=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
-          echo "id=$(gh api "users/${APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-      - name: verify the published engine and coalesce its compatible update
+      - name: adopt the newest compatible engine release and start its App release
         run: bun scripts/engine-update.ts
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEPENDENCY_BOT_LOGIN: ${{ steps.bot.outputs.login }}
-          DEPENDENCY_BOT_ID: ${{ steps.bot.outputs.id }}
+          GH_TOKEN: ${{ github.token }}

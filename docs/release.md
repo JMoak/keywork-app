@@ -57,7 +57,7 @@ packaging an installer. The npm publication job consumes that archive immediatel
 all three native platforms fetch and verify the sidecar, build and package the app, and checksum
 their installers. The native publish job verifies every checksum, writes `SHA256SUMS`, runs the
 install clock, and publishes the completed GitHub release with the SDK archive retained for
-existing consumers. Native publication does not depend on npm publication or its notification.
+existing consumers. Native publication does not depend on npm publication.
 The reserve and native publish jobs have repository write access; the npm job has OIDC access.
 
 The stages share `release.yml` and its global release concurrency lock. An SDK can publish before
@@ -103,13 +103,10 @@ integrity, and provenance metadata, and the downloaded archive passes its integr
 tuple checks. A retry verifies an existing version instead of publishing it again. A newly
 published archive must also match the exact bytes uploaded by this run.
 
-After verification, the dependency GitHub App sends `repository_dispatch` to `JMoak/stead` with
-event type `keywork-sdk-published` and payload `{version, sourceSha, engine, contract, electron}`.
-Configure `vars.DEPENDENCY_APP_ID` and `secrets.DEPENDENCY_APP_PRIVATE_KEY`; the App installation
-needs contents write access to Stead for dispatch. Missing credentials produce an explicit
-notification setup warning without claiming delivery. A notification failure leaves the npm
-version intact, and rerunning the failed job verifies it and retries delivery.
-Delivery can repeat on retries; Stead uses the immutable version and source SHA to coalesce it.
+Publication notifies no consumer, and this repository holds no credential for another
+repository. A consumer such as Stead reads the public npm version and its `build.json` tuple
+when it advances its own pin. The same rule runs upstream: [engine-updates.md](engine-updates.md)
+describes how this repository adopts a published engine by itself.
 
 See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) for the package-side setup.
 

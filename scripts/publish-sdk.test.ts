@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   publicationDistTag,
-  sdkNotification,
   sdkPackage,
   verifyRegistryIdentity,
   verifySdkContents,
@@ -62,12 +61,5 @@ describe("verified npm SDK identity", () => {
     expect(publicationDistTag("0.3.1", "0.3.0")).toBe("latest");
     expect(publicationDistTag("0.3.1", "0.4.0")).toBe("release-0.3.1");
     expect(() => publicationDistTag("0.3.1", "broken")).toThrow("invalid latest");
-  });
-
-  it("notifies Stead with the verified release identity and compatibility tuple", () => {
-    expect(sdkNotification(publication)).toEqual({
-      event_type: "keywork-sdk-published",
-      client_payload: publication,
-    });
   });
 });
