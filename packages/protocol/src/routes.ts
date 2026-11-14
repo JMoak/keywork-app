@@ -19,7 +19,7 @@ import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workRoutes } from "./work.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.5.0";
+export const protocolVersion = "0.6.0";
 
 export const contractVersion = "1.32";
 
