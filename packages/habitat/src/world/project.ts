@@ -818,7 +818,9 @@ function reconcileAsks(
 }
 
 function upsertCreature(state: HabitatState, summary: CreatureSummary, at: string): HabitatState {
-  const known = state.creatures[summary.slug];
+  const known = Object.hasOwn(state.creatures, summary.slug)
+    ? state.creatures[summary.slug]
+    : undefined;
   const creature: Creature = {
     slug: summary.slug,
     name: summary.name,

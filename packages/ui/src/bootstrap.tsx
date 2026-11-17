@@ -26,7 +26,7 @@ export function mountDesktopRenderer(
   const companion = companionPageRequested() ? companionPortFromWindow() : undefined;
   return render(() => {
     if (companion !== undefined) {
-      return <CompanionPage port={companion} renderer={companionRenderer()} />;
+      return <CompanionPage port={companion} rendererFor={companionRenderer} />;
     }
     if (devPageRequested()) {
       return (

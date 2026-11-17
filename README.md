@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/keywork-app-hero.svg" alt="keywork · app — the terminal learned to typeset. The original density mark and serif typography beside luminous layered panes in violet, blue, and cyan." width="100%">
+  <img src="docs/assets/keywork-app-hero.svg" alt="keywork · app — make intent executable. A continuous ribbon woven from fine violet and cyan strands, beside Keywork’s density mark and serif typography." width="100%">
 </p>
 
 <p align="center">

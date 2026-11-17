@@ -39,6 +39,16 @@
   image-rendering: pixelated;
 }
 
+.kw-companion-canvas[hidden] {
+  display: none;
+}
+
+.kw-companion-unavailable {
+  padding: 0.5rem;
+  color: var(--kw-text-mid);
+  font: inherit;
+}
+
 .kw-companion-badge {
   position: absolute;
   top: -4px;

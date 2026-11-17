@@ -89,6 +89,29 @@ export {
   workingBeat,
 } from "./creature/semantic.ts";
 export {
+  isWorkshopFamily,
+  type WorkshopFamily,
+  workshopFamilies,
+  workshopFamilyOf,
+} from "./place/architecture.ts";
+export {
+  type Courtyard,
+  CourtyardCapacityError,
+  type CourtyardRange,
+  courtyardCapacity,
+  courtyardsInRange,
+  courtyardsOf,
+  reconcileCourtyardOrder,
+  type VacantCourtyard,
+} from "./place/index.ts";
+export {
+  type CourtyardDistrict,
+  courtyardDistrictAt,
+  courtyardDistricts,
+  districtCapacity,
+  districtOfCourt,
+} from "./place/settlement.ts";
+export {
   advance,
   type Beat,
   type Body,

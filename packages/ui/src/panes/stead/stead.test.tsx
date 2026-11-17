@@ -32,7 +32,7 @@ import { checkPaneDefinition } from "../testing.ts";
 import { acceptHint, acceptsOnly, overturnHint, overturnsOnly } from "./copy.ts";
 import { seatCreatures } from "./habitat.ts";
 import { composeStead } from "./habitat-render.ts";
-import { answerHint, steadKeys, steadPane } from "./index.tsx";
+import { answerHint, type SteadSpec, steadKeys, steadPane } from "./index.tsx";
 
 afterEach(() => {
   cleanup();
@@ -955,6 +955,365 @@ describe("the stead pane's power tiers", () => {
 });
 
 const wakeBudgetPerTenSeconds = 80;
+
+describe("the stead's optional courtyards", () => {
+  it("keeps valid prototype-like names independent from inherited appearance properties", async () => {
+    const stead = steadHarness({
+      creatures: [creatureOnTheWire(bot("constructor")), creatureOnTheWire(bot("neighbor"))],
+    });
+    const saved: SteadSpec[] = [];
+    const { container } = mountPane(
+      steadPane.component,
+      {
+        kind: "stead",
+        view: "courtyards",
+        workshopStyles: { neighbor: "gable" },
+        gardens: { neighbor: "herbs" },
+      },
+      {
+        ...stead.shell,
+        rebind: (_id, spec) => {
+          saved.push(spec as SteadSpec);
+        },
+      },
+    );
+    await settle();
+    const court = container.querySelector('[data-courtyard="constructor"]') as Element;
+    expect(court.querySelector("[data-workshop]")?.getAttribute("data-workshop")).toBe("gable");
+    fireEvent.click(court);
+    await settle();
+    expect(
+      (container.querySelector('select[aria-label="Workshop style"]') as HTMLSelectElement).value,
+    ).toBe("auto");
+    expect(
+      (container.querySelector('select[aria-label="Garden"]') as HTMLSelectElement).value,
+    ).toBe("none");
+    fireEvent.change(container.querySelector('select[aria-label="Workshop style"]') as Element, {
+      target: { value: "folded" },
+    });
+    expect(saved.at(-1)?.workshopStyles?.constructor).toBe("folded");
+    expect(saved.at(-1)?.workshopStyles?.neighbor).toBe("gable");
+  });
+
+  it("offers bounded additional neighborhoods when saved addresses are full", async () => {
+    const stead = steadHarness({ creatures: [creatureOnTheWire(bot("newcomer"))] });
+    const { container } = mountPane(
+      steadPane.component,
+      {
+        kind: "stead",
+        view: "courtyards",
+        courtOrder: Array.from({ length: 4096 }, (_, index) => `departed-${index}`),
+      },
+      stead.shell,
+    );
+    await settle();
+    const select = container.querySelector(
+      'select[aria-label="Neighborhood"]',
+    ) as HTMLSelectElement;
+    expect(select.options).toHaveLength(257);
+    expect(select.options[256]?.textContent).toContain("Additional neighborhood 1");
+    fireEvent.change(select, { target: { value: "256" } });
+    await settle();
+    expect(container.querySelectorAll(".kw-stead-row")).toHaveLength(1);
+    expect(container.querySelector('[data-slug="newcomer"]')).not.toBeNull();
+    expect(container.querySelector(".kw-stead-field")?.getAttribute("data-district")).toBe("256");
+  });
+
+  it("expands into bounded neighborhoods and preserves architectural choices, gardens and addresses", async () => {
+    const listed = Array.from({ length: 33 }, (_, index) => ({
+      ...creatureOnTheWire(bot(`c${String(index).padStart(2, "0")}`)),
+      created: "2026-11-17T12:00:00Z",
+    }));
+    const stead = steadHarness({ creatures: listed });
+    const saved: SteadSpec[] = [];
+    const { container } = mountPane(
+      steadPane.component,
+      { kind: "stead", view: "courtyards" },
+      {
+        ...stead.shell,
+        rebind: (_id, spec) => {
+          saved.push(spec as SteadSpec);
+        },
+      },
+    );
+    await settle();
+    expect(container.querySelectorAll("[data-courtyard]")).toHaveLength(16);
+    expect(container.querySelectorAll(".kw-stead-row")).toHaveLength(16);
+    const firstFamily = container
+      .querySelector('[data-courtyard="c00"] [data-workshop]')
+      ?.getAttribute("data-workshop");
+    expect(firstFamily).toBe("gable");
+    const neighborhood = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Neighborhood"]',
+    );
+    expect(neighborhood?.options).toHaveLength(3);
+    fireEvent.change(neighborhood as HTMLSelectElement, { target: { value: "1" } });
+    await settle();
+    expect(container.querySelector(".kw-courtyard-cell")?.getAttribute("data-address")).toBe(
+      "Court 17",
+    );
+    fireEvent.click(container.querySelector('[data-courtyard="c16"]') as Element);
+    await settle();
+    expect(container.querySelectorAll(".kw-stead-creature")).toHaveLength(16);
+    expect(container.querySelector(".kw-stead-field")?.getAttribute("data-district")).toBe("1");
+    fireEvent.change(container.querySelector('select[aria-label="Workshop style"]') as Element, {
+      target: { value: "lantern" },
+    });
+    fireEvent.change(container.querySelector('select[aria-label="Garden"]') as Element, {
+      target: { value: "flowers" },
+    });
+    expect(saved.at(-1)?.workshopStyles).toEqual({ c16: "lantern" });
+    expect(saved.at(-1)?.gardens).toEqual({ c16: "flowers" });
+    const undo = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Undo arrangement",
+    );
+    fireEvent.click(undo as Element);
+    expect(saved.at(-1)?.gardens).toBeUndefined();
+    expect(saved.at(-1)?.workshopStyles).toEqual({ c16: "lantern" });
+    fireEvent.change(container.querySelector('select[aria-label="Garden"]') as Element, {
+      target: { value: "mushrooms" },
+    });
+    const fold = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Fold back to courtyards",
+    );
+    fireEvent.click(fold as Element);
+    await settle();
+    const building = container.querySelector('[data-courtyard="c16"] [data-workshop]');
+    expect(building?.getAttribute("data-workshop")).toBe("lantern");
+    expect(building?.getAttribute("data-garden")).toBe("mushrooms");
+    const compact = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Arrange courts compactly",
+    );
+    fireEvent.click(compact as Element);
+    expect(container.querySelector(".kw-courtyards")?.getAttribute("data-alignment")).toBe(
+      "compact",
+    );
+    expect(saved.at(-1)?.courtOrder?.[16]).toBe("c16");
+    listed.push({ ...creatureOnTheWire(bot("new-but-old")), created: "2020-01-01T00:00:00Z" });
+    stead.emit([envelope(100, "", "creature.changed", { slug: "new-but-old", change: "created" })]);
+    await waitFor(() => expect(saved.at(-1)?.courtOrder).toHaveLength(34));
+    expect(saved.at(-1)?.courtOrder?.[33]).toBe("new-but-old");
+    expect(saved.at(-1)?.courtOrder?.[0]).toBe("c00");
+    const restored = saved.at(-1) as SteadSpec;
+    cleanup();
+    const again = mountPane(steadPane.component, restored, stead.shell);
+    await settle();
+    expect(again.container.querySelector(".kw-courtyards")?.getAttribute("data-alignment")).toBe(
+      "compact",
+    );
+    fireEvent.change(
+      again.container.querySelector('select[aria-label="Neighborhood"]') as Element,
+      { target: { value: "1" } },
+    );
+    await settle();
+    expect(
+      again.container
+        .querySelector('[data-courtyard="c16"] [data-workshop]')
+        ?.getAttribute("data-workshop"),
+    ).toBe("lantern");
+    expect(
+      again.container
+        .querySelector('[data-courtyard="c16"] [data-workshop]')
+        ?.getAttribute("data-garden"),
+    ).toBe("mushrooms");
+  });
+
+  it("keeps requests in another neighborhood visible without mounting its creatures", async () => {
+    const listed = Array.from({ length: 20 }, (_, index) =>
+      creatureOnTheWire(bot(`c${String(index).padStart(2, "0")}`)),
+    );
+    const stead = steadHarness({
+      creatures: listed,
+      waiting: [{ ...heldChore, creature: "c19", key: "C:/work:chore:c19/triage/grants" }],
+    });
+    const { container, act } = mountPane(
+      steadPane.component,
+      { kind: "stead", view: "courtyards" },
+      stead.shell,
+    );
+    await settle();
+    expect(container.querySelector('[data-courtyard="c19"]')).toBeNull();
+    expect(headText(container)).toContain("1 needs you");
+    expect(
+      container.querySelector('select[aria-label="Neighborhood"] option[value="1"]')?.textContent,
+    ).toContain("1 waiting");
+    act("stead.approve");
+    expect(stead.panes).toEqual(["needs-you"]);
+    expect(stead.answered).toEqual([]);
+  });
+
+  it("counts residents with unsupported artwork and never calls their home empty", async () => {
+    const resident = { ...creatureOnTheWire(bot("stone")), skin: "my-unavailable-art" };
+    const stead = steadHarness({ creatures: [resident] });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { container } = mountPane(
+        steadPane.component,
+        { kind: "stead", view: "courtyards" },
+        stead.shell,
+      );
+      await settle();
+      expect(headText(container)).toContain("1 creature");
+      expect(container.querySelector("[data-courtyard=stone]")).not.toBeNull();
+      expect(container.querySelector(".kw-empty")).toBeNull();
+      expect(container.textContent).toContain("Artwork unavailable for stone");
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("ages a folded working state on one shared clock without repainting the full scene", async () => {
+    vi.useFakeTimers();
+    try {
+      const stead = steadHarness({
+        summaries: [row("t1", "working", "reviewer", { working: true })],
+      });
+      const { container } = mountPane(
+        steadPane.component,
+        { kind: "stead", view: "courtyards" },
+        stead.shell,
+      );
+      await seated();
+      const court = () => container.querySelector('[data-courtyard="reviewer"]');
+      expect(court()?.getAttribute("data-state")).toBe("working");
+      const wakes = stageOf(container).dataset.wakes;
+      vi.advanceTimersByTime(31 * 60_000);
+      expect(court()?.getAttribute("data-state")).toBe("idle");
+      expect(headText(container)).not.toContain("working");
+      expect(stageOf(container).dataset.wakes).toBe(wakes);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+  it("remembers the chosen view and restores focus and scroll when opening and folding a court", async () => {
+    const stead = steadHarness({});
+    const rebind = vi.fn();
+    const { container } = mountPane(
+      steadPane.component,
+      { kind: "stead" },
+      { ...stead.shell, rebind },
+    );
+    await settle();
+    const choose = [
+      ...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button"),
+    ].find((button) => button.textContent === "Courtyards");
+    expect(choose).toBeDefined();
+    fireEvent.click(choose as HTMLButtonElement);
+    await settle();
+    expect(rebind).toHaveBeenLastCalledWith("p1", {
+      kind: "stead",
+      view: "courtyards",
+      courtOrder: ["reviewer", "scribe"],
+    });
+    const stage = container.querySelector<HTMLDivElement>(".kw-stead-stage");
+    expect(stage?.hidden).toBe(true);
+    fireEvent.click(container.querySelector('[data-courtyard="reviewer"]') as HTMLButtonElement);
+    await settle();
+    expect(stage?.hidden).toBe(false);
+    expect(document.activeElement?.textContent).toBe("reviewer's courtyard");
+    if (stage !== null) stage.scrollLeft = 137;
+    const fold = [...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button")].find(
+      (button) => button.textContent === "Fold back to courtyards",
+    );
+    fireEvent.click(fold as HTMLButtonElement);
+    await settle();
+    expect(stage?.hidden).toBe(true);
+    expect((document.activeElement as HTMLElement)?.dataset.courtyard).toBe("reviewer");
+    fireEvent.click(document.activeElement as HTMLButtonElement);
+    await settle();
+    expect(stage?.scrollLeft).toBe(137);
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
+    await settle();
+    expect((document.activeElement as HTMLElement)?.dataset.courtyard).toBe("reviewer");
+  });
+
+  it("keeps porch needs visible and live while the scene is folded", async () => {
+    const stead = steadHarness({});
+    const { container } = mountPane(
+      steadPane.component,
+      { kind: "stead", view: "courtyards", courtOrder: ["scribe", "reviewer"] },
+      stead.shell,
+    );
+    await settle();
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-courtyard]")].map(
+        (court) => court.dataset.courtyard,
+      ),
+    ).toEqual(["scribe", "reviewer"]);
+    stead.setWaiting([heldChore]);
+    await settle();
+    expect(container.querySelector('[data-courtyard="reviewer"]')?.getAttribute("data-state")).toBe(
+      "porch",
+    );
+    expect(headText(container)).toContain("1 needs you");
+    const needs = [...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button")].find(
+      (button) => button.textContent === "1 needs you",
+    );
+    fireEvent.click(needs as HTMLButtonElement);
+    expect(stead.panes).toEqual(["needs-you"]);
+    stead.setWaiting([]);
+    await settle();
+    expect(container.querySelector('[data-courtyard="reviewer"]')?.getAttribute("data-state")).toBe(
+      "idle",
+    );
+  });
+
+  it("opens the request instead of answering a hidden ask from an overview shortcut", async () => {
+    const stead = steadHarness({ waiting: [heldChore] });
+    const { act, container } = mountPane(
+      steadPane.component,
+      { kind: "stead", view: "courtyards" },
+      stead.shell,
+    );
+    await settle();
+    for (const action of [
+      "stead.approve",
+      "stead.once",
+      "stead.session",
+      "stead.workspace",
+      "stead.deny",
+      "stead.overturn",
+    ])
+      act(action);
+    expect(stead.panes).toEqual(Array(6).fill("needs-you"));
+    expect(stead.answered).toEqual([]);
+    expect(stead.overturned).toEqual([]);
+    expect(lineText(container)).toBe("Open the request to review it.");
+    expect(
+      container.querySelector("[data-courtyard]")?.closest("[data-native-activation]"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".kw-stead-views button")?.closest("[data-native-activation]"),
+    ).not.toBeNull();
+  });
+
+  it("stops scene scheduling while folded and resumes it when a court opens", async () => {
+    vi.useFakeTimers();
+    try {
+      const stead = steadHarness({});
+      const { container } = mountPane(
+        steadPane.component,
+        { kind: "stead", view: "courtyards" },
+        stead.shell,
+      );
+      await seated();
+      const field = stageOf(container);
+      const wakes = field.dataset.wakes;
+      vi.advanceTimersByTime(10_000);
+      expect(field.dataset.wakes).toBe(wakes);
+      const court = container.querySelector<HTMLButtonElement>("[data-courtyard]");
+      expect(court).not.toBeNull();
+      fireEvent.click(court as HTMLButtonElement);
+      await seated();
+      expect(Number(field.dataset.wakes)).toBeGreaterThan(Number(wakes ?? 0));
+      expect(field.dataset.tier).not.toBe("hidden");
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe("the stead pane against the registry's rules", () => {
   it("meets T7 and claims no key or command another action holds", () => {

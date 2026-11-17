@@ -2091,6 +2091,36 @@ validation, ground contact, sealed outlines, the crown clear for the glyph) and 
 own signals. Left for the art pass, as the direction says: the carter's rope-in-teeth ring
 and straw hat, and the joiner's sleeves and gate lantern.
 
+### Creature and courtyard ledger (2026-11-17, local implementation)
+
+See [Creatures and a stead that can fold](design/creatures-and-folding.md) for the art
+direction, twenty candidate concepts, remaining asset/appearance contracts and staged proof.
+The current working tree adds Tessera and Cairn as complete native 21-pose designs, a
+first-meeting design picker with roll/undo, live skin parity across the stead and companion,
+bounded atlas reuse, and an optional saved courtyard overview over the existing scene.
+Independent review fixes cover directional gaze, duplicate atlas allocation, hidden request
+actions, native keyboard activation, aging status, workshop centering and missing-art counts.
+This is source work, not a published SDK or Stead adoption. Imported pack installation,
+resolved trait variation and the full roster remain
+separate implementation cuts. Browser animation review and Windows/Linux qualification
+remain required before release.
+
+### Workshop and neighborhood ledger (2026-11-17, local implementation)
+
+The same design document now records eight native workshop families, stable automatic
+selection with saved overrides, ornamental herb/flower/mushroom gardens, responsive roomy
+or compact arrangement and one-step undo. Miniatures and open neighborhoods share the
+same facade. Sixteen-address neighborhoods bound mounted creatures and composed scenes;
+new residents append without moving existing addresses. Additional neighborhoods preserve
+access after the saved-address limit. Shared infrastructure is represented compactly with
+its real totals visible, and district backing resolution is bounded on high-density screens.
+
+Independent Astra review exposed and drove fixes for connected-home persistence,
+prototype-like names, missing-art action identity, overflow, garden footprint changes and
+unbounded storage/mill artwork. A proposed opt-in cultivation-to-decoration loop and shared
+places are specified separately; the implemented gardens do not grow, wilt or yield items.
+This remains canonical source work, not published SDK adoption or an installed Stead update.
+
 ## What is deliberately not in this plan
 
 - Shared workspaces across machines (keywork P2.3) and any multi-user story.

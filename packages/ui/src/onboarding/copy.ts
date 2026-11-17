@@ -37,7 +37,15 @@ export const skinKeys = "j k move · enter keeps";
 
 const skinWords: Readonly<Record<string, string>> = {
   kid: "the tinkerer · a small ranch hand in a leather apron, tools on its belt",
+  carter: "the carter · an attentive mule with expressive ears and sturdy panniers",
+  joiner: "the joiner · a patient badger with a pencil and a well-kept tool roll",
+  tessera: "Tessera · a careful six-legged porcelain creature that adjusts its shell panels",
+  cairn: "Cairn · three curious floating stones that find their own balance",
 };
+
+export function skinName(id: string): string {
+  return id === "kid" ? "Tinkerer" : `${id.charAt(0).toUpperCase()}${id.slice(1)}`;
+}
 
 export function skinLabel(id: string): string {
   return skinWords[id] ?? id;

@@ -31,11 +31,6 @@
   },
   {
     "path": "packages/ui/src/panes/stead/index.tsx",
-    "pattern": "^const steadSpec = z\\.object\\(\\{ kind: z\\.literal\\(\"stead\"\\) \\}\\);$",
-    "reason": "Persisted layout pane kind schema."
-  },
-  {
-    "path": "packages/ui/src/panes/stead/index.tsx",
     "pattern": "^\\s*kind: \"stead\",$",
     "reason": "Registered layout pane kind."
   },

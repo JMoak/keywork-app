@@ -110,3 +110,28 @@ it("introduces the name the customize card proposes first, and steps aside for a
   expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Open current conversation" })).toBeNull();
 });
+
+it("previews and rolls designs without creating anything, can undo, then saves the selected creature", async () => {
+  const createCreature = vi.fn(async () => ({ slug: "stone", name: "Stone" }) as CreatureSummary);
+  const shell = {
+    workspace: "C:/managed-home",
+    client: { creatures: async () => [], createCreature },
+    store: { surfaces: { refetch: async () => {} } },
+  } as unknown as ShellSeams;
+  render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
+  const cairn = screen.getByRole("button", { name: "Cairn" });
+  fireEvent.click(cairn);
+  expect(cairn.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "Roll a design" }));
+  expect(cairn.getAttribute("aria-pressed")).toBe("false");
+  expect(createCreature).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Undo roll" }));
+  expect(cairn.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "Explore first" }));
+  await waitFor(() =>
+    expect(createCreature).toHaveBeenCalledWith({
+      name: meetingName(shell.workspace),
+      skin: "cairn",
+    }),
+  );
+});

@@ -4,10 +4,13 @@ import { createRenderer, loadSkin, scaleFor } from "../panes/stead/habitat-rende
 import {
   devicePixelRatioOf,
   forcedColorsActive,
+  forcedColorsQuery,
   type Palettes,
   paletteSourceOf,
   palettesOf,
+  reducedMotionQuery,
   surfaceOf,
+  watchMedia,
   watchTheme,
 } from "../panes/stead/painter.ts";
 import { skinLabel } from "./copy.ts";
@@ -28,8 +31,8 @@ export function Portrait(props: PortraitProps) {
     return skin.ok ? createRenderer(skin.skin) : undefined;
   });
   const [frame, setFrame] = createSignal(0);
+  const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
   let palettes: Palettes | undefined;
-  let timer: ReturnType<typeof setTimeout> | undefined;
 
   const paint = (): void => {
     const skin = loaded();
@@ -60,25 +63,29 @@ export function Portrait(props: PortraitProps) {
       { scale },
     ).paint(surfaceOf(context), 0, 0);
   };
-  const breathe = (): void => {
-    const skin = loaded();
-    if (!skin.ok || prefersReducedMotion()) return;
-    const row = skin.skin.rows[portraitClip];
-    const hold = row.ms[frame() % row.frames] ?? row.ms[0] ?? 600;
-    timer = setTimeout(() => {
-      setFrame((current) => (current + 1) % row.frames);
-      breathe();
-    }, hold);
-  };
-
-  const painting = () => ({ frame: frame(), hueStop: props.hueStop });
-  createEffect(on(loaded, () => setFrame(0), { defer: true }));
-  createEffect(on(painting, paint));
+  createEffect(on([loaded, reducedMotion], () => setFrame(0)));
+  createEffect(on([renderer, frame, reducedMotion, () => props.hueStop], paint));
+  createEffect(
+    on([loaded, frame, reducedMotion], () => {
+      const skin = loaded();
+      if (!skin.ok || reducedMotion()) return;
+      const row = skin.skin.rows[portraitClip];
+      const hold = row.ms[frame() % row.frames] ?? row.ms[0] ?? 600;
+      const timer = setTimeout(() => setFrame((current) => (current + 1) % row.frames), hold);
+      onCleanup(() => clearTimeout(timer));
+    }),
+  );
   onMount(() => {
-    breathe();
-    onCleanup(watchTheme(paint));
+    const stops = [
+      watchTheme(paint),
+      watchMedia(forcedColorsQuery, paint),
+      watchMedia(reducedMotionQuery, () => setReducedMotion(prefersReducedMotion())),
+      watchPixelRatio(paint),
+    ];
+    onCleanup(() => {
+      for (const stop of stops) stop();
+    });
   });
-  onCleanup(() => clearTimeout(timer));
 
   return (
     <Show
@@ -87,11 +94,29 @@ export function Portrait(props: PortraitProps) {
     >
       <canvas
         class="kw-onboard-portrait"
-        ref={canvas}
+        ref={(element) => {
+          canvas = element;
+          paint();
+        }}
         role="img"
         data-skin={props.skin}
         aria-label={`${skinLabel(props.skin)}, idle`}
       />
     </Show>
   );
+}
+
+function watchPixelRatio(paint: () => void): () => void {
+  let stop: () => void = () => undefined;
+  const changed = (): void => {
+    stop();
+    stop = watchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`, changed);
+    paint();
+  };
+  changed();
+  window.addEventListener("resize", changed);
+  return () => {
+    stop();
+    window.removeEventListener("resize", changed);
+  };
 }

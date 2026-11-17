@@ -20,7 +20,7 @@ import type {
 } from "./port.ts";
 import { type CreatureFacts, snapshotFrom, type ThreadFacts } from "./snapshot.ts";
 
-export interface Resident extends CreatureFacts {
+export interface Resident extends Omit<CreatureFacts, "skin"> {
   readonly slug: string;
 }
 
@@ -53,7 +53,12 @@ export function creatureSnapshot(
     return [threadFacts(thread, threadReading(thread, world, now), answersFor)];
   });
   return snapshotFrom(
-    { name: resident.name, hueStop: resident.hueStop, slug: resident.slug },
+    {
+      name: resident.name,
+      hueStop: resident.hueStop,
+      slug: resident.slug,
+      skin: world.creatures[resident.slug]?.skin,
+    },
     facts,
     heldChoreOf(world, resident.slug),
     decidedOf(world, resident.slug),

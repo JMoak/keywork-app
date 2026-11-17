@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { chosenSkin, offeredSkins, skinChoices, surprise, surpriseMe } from "./skins.ts";
+import {
+  chosenSkin,
+  offeredSkins,
+  rolledSkin,
+  skinChoices,
+  surprise,
+  surpriseMe,
+} from "./skins.ts";
 
 describe("the skins on offer", () => {
+  it("rolls only other available designs and stays put when there is no alternative", () => {
+    expect(rolledSkin("kid", ["kid", "tessera", "cairn"], () => 0)).toBe("tessera");
+    expect(rolledSkin("kid", ["kid", "tessera", "cairn"], () => 0.99)).toBe("cairn");
+    expect(rolledSkin("kid", ["kid", "kid"])).toBe("kid");
+    expect(rolledSkin("kid", [])).toBe("kid");
+  });
   it("offers every registered skin but the placeholder, and the tinkerer when nothing else is registered", () => {
-    expect(offeredSkins()).toEqual(["kid", "carter", "joiner"]);
+    expect(offeredSkins()).toEqual(["kid", "carter", "joiner", "tessera", "cairn"]);
     expect(offeredSkins(["kid", "placeholder", "owl"])).toEqual(["kid", "owl"]);
     expect(offeredSkins(["placeholder"])).toEqual(["kid"]);
   });

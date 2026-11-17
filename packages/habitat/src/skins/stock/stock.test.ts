@@ -56,7 +56,7 @@ function differing(one: Uint8Array, other: Uint8Array): number {
 
 describe("the registry", () => {
   it("offers the carter and the joiner beside the kid, each loading sound", () => {
-    expect(skinIds()).toEqual(["kid", "carter", "joiner", "placeholder"]);
+    expect(skinIds()).toEqual(["kid", "carter", "joiner", "tessera", "cairn", "placeholder"]);
     for (const { id } of species) {
       const loaded = loadSkin(id);
       expect(loaded.ok, id).toBe(true);

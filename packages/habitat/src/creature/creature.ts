@@ -338,7 +338,7 @@ function ringKey(reading: CreatureReading): string {
   return `${carrier?.thread}:${carrier?.since}`;
 }
 
-function heldAtThePorch(
+export function heldAtThePorch(
   reading: CreatureReading,
   world: HabitatState,
   slug: Slug,

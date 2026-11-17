@@ -20,3 +20,17 @@ export function surprise(seed: string, offered: readonly string[]): string {
 export function chosenSkin(choice: string, seed: string, offered: readonly string[]): string {
   return choice === surpriseMe ? surprise(seed, offered) : choice;
 }
+
+export function rolledSkin(
+  current: string,
+  offered: readonly string[],
+  random = Math.random,
+): string {
+  const alternatives = [...new Set(offered)].filter((id) => id !== current);
+  if (alternatives.length === 0) return current;
+  return (
+    alternatives[
+      Math.min(alternatives.length - 1, Math.max(0, Math.floor(random() * alternatives.length)))
+    ] ?? current
+  );
+}
