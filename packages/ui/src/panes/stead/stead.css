@@ -18,6 +18,80 @@
   user-select: none;
 }
 
+.kw-stead-stage[hidden] {
+  display: none;
+}
+
+.kw-stead-views {
+  margin: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.kw-stead-views button {
+  padding: 0.35rem 0.6rem;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel);
+  border: 1px solid var(--kw-border);
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.kw-stead-views button[aria-pressed="true"] {
+  color: var(--kw-accent);
+  border-color: var(--kw-accent);
+}
+
+.kw-stead-views button:focus-visible {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+.kw-settlement-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.kw-settlement-controls label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  color: var(--kw-text-mid);
+}
+
+.kw-settlement-controls button,
+.kw-settlement-controls select {
+  padding: 0.35rem 0.6rem;
+  max-width: 100%;
+  font: inherit;
+  color: var(--kw-text);
+  border: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  border-radius: 0.3rem;
+}
+
+.kw-settlement-controls button:focus-visible,
+.kw-settlement-controls select:focus-visible,
+.kw-stead-views [data-court-detail]:focus-visible {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+.kw-settlement-controls button:disabled {
+  opacity: 0.5;
+}
+
 .kw-stead-presented {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

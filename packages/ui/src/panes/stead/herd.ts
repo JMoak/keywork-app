@@ -55,20 +55,38 @@ export function gatherHerd(
   world: HabitatState,
   now: number,
   load: SkinLoader = loadSkin,
+  visible?: readonly string[],
 ): Herd {
-  const slugs = Object.keys(world.creatures).sort();
-  const seated = new Set([
-    ...herd.members.map((member) => member.slug),
-    ...herd.refused.map((refused) => refused.slug),
-  ]);
-  const arriving = slugs.filter((slug) => !seated.has(slug));
-  if (arriving.length === 0) return herd;
-  const members = [...herd.members];
-  const refused = [...herd.refused];
-  for (const slug of arriving) {
+  const allSlugs = Object.keys(world.creatures).sort();
+  const ranks = new Map(allSlugs.map((slug, rank) => [slug, rank]));
+  const slugs =
+    visible === undefined
+      ? allSlugs
+      : [...new Set(visible)].filter((slug) => world.creatures[slug] !== undefined).sort();
+  const seated = new Map(herd.members.map((member) => [member.slug, member]));
+  const unavailable = new Map(herd.refused.map((refused) => [refused.slug, refused]));
+  const members: Member[] = [];
+  const refused: RefusedSkin[] = [];
+  for (const slug of slugs) {
     const resident = world.creatures[slug];
     if (resident === undefined) continue;
-    const loaded = load(resident.skin ?? defaultSkinId);
+    const id = resident.skin ?? defaultSkinId;
+    const previous = seated.get(slug);
+    const hue = coatOf(resident, ranks.get(slug) ?? 0);
+    if (previous?.skin.id === id) {
+      members.push(
+        previous.name === resident.name && previous.hueStop === hue
+          ? previous
+          : { ...previous, name: resident.name, hueStop: hue },
+      );
+      continue;
+    }
+    const missing = unavailable.get(slug);
+    if (missing?.id === id) {
+      refused.push(missing);
+      continue;
+    }
+    const loaded = load(id);
     if (!loaded.ok) {
       refused.push({ slug, id: loaded.id, faults: loaded.faults });
       continue;
@@ -76,17 +94,26 @@ export function gatherHerd(
     members.push({
       slug,
       name: resident.name,
-      hueStop: coatOf(resident, slugs.indexOf(slug)),
+      hueStop: hue,
       skin: loaded.skin,
       render: createRenderer(loaded.skin),
-      creature: createCreature(slug, now, {
-        rows: loaded.skin.rows,
-        place: "bench",
-        offsetMinutes: world.house.offsetMinutes,
-      }),
+      creature:
+        previous === undefined
+          ? createCreature(slug, now, {
+              rows: loaded.skin.rows,
+              place: "bench",
+              offsetMinutes: world.house.offsetMinutes,
+            })
+          : { ...previous.creature, rows: loaded.skin.rows },
     });
   }
-  members.sort((a, b) => a.slug.localeCompare(b.slug));
+  if (
+    members.length === herd.members.length &&
+    refused.length === herd.refused.length &&
+    members.every((member, index) => member === herd.members[index]) &&
+    refused.every((missing, index) => missing === herd.refused[index])
+  )
+    return herd;
   return { members, refused };
 }
 

@@ -27,6 +27,7 @@ export interface CreatureFacts {
   name: string;
   hueStop: number | undefined;
   slug?: string | undefined;
+  skin?: string | undefined;
 }
 
 export const statePriority: readonly SemanticState[] = [

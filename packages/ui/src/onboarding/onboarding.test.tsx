@@ -541,6 +541,41 @@ describe("first-run onboarding on the stead", () => {
 });
 
 describe("the card on the stead", () => {
+  it("carries a first-meet design into customization, cancellation, and creation", async () => {
+    const storage = memoryStorage();
+    const shell = fakeShell({ creatures: 0 });
+    const record = recorder();
+    const { container, getByRole } = render(() => (
+      <OnboardingOnTheStead
+        automatic
+        simple
+        shell={shell}
+        storage={storage}
+        seams={fakeSeams({ skins: ["kid", "cairn", "tessera"] }, record, storage)}
+      />
+    ));
+    await flush();
+    fireEvent.click(getByRole("button", { name: "Cairn" }));
+    fireEvent.click(getByRole("button", { name: "Customize first" }));
+    await flush();
+    expect(container.querySelector(".kw-onboard-portrait")?.getAttribute("data-skin")).toBe(
+      "cairn",
+    );
+    fireEvent.keyDown(inputOf(container), { key: "Escape" });
+    await flush();
+    expect(getByRole("button", { name: "Cairn" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(getByRole("button", { name: "Customize first" }));
+    await flush();
+    typeName(container, "Stone");
+    await flush();
+    expect(container.querySelector(".kw-onboard-portrait")?.getAttribute("data-skin")).toBe(
+      "cairn",
+    );
+    key(container, "a");
+    await flush();
+    expect(record.created[0]?.skin).toBe("cairn");
+  });
+
   it("waits for an explicit onboarding request when embedded in Keywork", async () => {
     const storage = memoryStorage();
     const seams = fakeSeams({}, recorder(), storage);

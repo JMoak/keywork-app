@@ -55,6 +55,7 @@ export interface CompanionCreature {
   name: string;
   hueStop: number | undefined;
   slug?: string | undefined;
+  skin?: string | undefined;
 }
 
 export interface CompanionSnapshot {

@@ -106,10 +106,14 @@ export function devicePixelRatioOf(): number {
 
 export function fitCanvas(cssWidth: number, scene: SteadScene, dpr: number): CanvasFit {
   const width = cssWidth > 0 ? cssWidth : fallbackStageWidth;
-  const scale = scaleFor(dpr);
-  const artWidth = Math.max(scene.width, Math.floor((width * dpr) / scale));
+  const preferredScale = scaleFor(dpr);
+  const artWidth = Math.max(scene.width, Math.floor((width * dpr) / preferredScale));
+  const scale =
+    scene.infrastructure === undefined
+      ? preferredScale
+      : Math.max(1, Math.min(preferredScale, Math.floor(8192 / artWidth)));
   const artHeight = paintedHeight(scene);
-  const cssPerArt = scale / dpr;
+  const cssPerArt = preferredScale / dpr;
   return {
     scale,
     dpr,

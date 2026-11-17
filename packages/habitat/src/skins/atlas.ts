@@ -15,17 +15,16 @@ export interface SlicedSkin {
 }
 
 export function sliceSkin(skin: Skin): SlicedSkin {
-  const known = slicedByIdentity.get(skin);
-  if (known !== undefined) return known;
+  const known = slicedByIdentity.get(skin)?.deref();
+  if (known !== undefined) return retainSlice(known);
   const hash = skinHash(skin);
-  const sliced = sliceCache.get(hash) ?? slicer(skin, hash);
-  sliceCache.set(hash, sliced);
-  slicedByIdentity.set(skin, sliced);
-  return sliced;
+  const sliced = matchingSlice(skin, hash) ?? slicer(skin, hash);
+  slicedByIdentity.set(skin, new WeakRef(sliced));
+  return retainSlice(sliced);
 }
 
 export function skinHash(skin: Skin): string {
-  return `${skin.cell.width}x${skin.cell.height}:${contentHash(skin.atlas)}`;
+  return `${manifestIdentity(skin)}:${contentHash(skin.atlas)}`;
 }
 
 export function contentHash(bitmap: IndexedBitmap): string {
@@ -49,6 +48,8 @@ export function sliceCacheSize(): number {
 
 export function clearSliceCache(): void {
   sliceCache.clear();
+  slicesByHash.clear();
+  retainedBytes = 0;
   slicedByIdentity = new WeakMap();
 }
 
@@ -100,8 +101,82 @@ export function opaqueCount(frame: IndexedFrame): number {
   return count;
 }
 
-const sliceCache = new Map<string, SlicedSkin>();
-let slicedByIdentity = new WeakMap<Skin, SlicedSkin>();
+const maximumSlices = 32;
+const maximumRetainedBytes = 32 * 1024 * 1024;
+const sliceCache = new Map<SlicedSkin, number>();
+const slicesByHash = new Map<string, Set<SlicedSkin>>();
+let retainedBytes = 0;
+let slicedByIdentity = new WeakMap<Skin, WeakRef<SlicedSkin>>();
+
+function manifestIdentity(skin: Skin): string {
+  return JSON.stringify([
+    skin.id,
+    skin.displayName,
+    skin.cell.width,
+    skin.cell.height,
+    skin.atlas.width,
+    skin.atlas.height,
+    skin.palette.identity,
+    skin.palette.ground,
+    skin.palette.outline,
+    skin.palette.accent,
+    skin.groundLine,
+    skin.gaze === undefined ? null : [skin.gaze.row, skin.gaze.directions],
+    poseNames.map((pose) => {
+      const row = skin.rows[pose];
+      return [row.frames, row.ms, row.loop, row.fallback ?? null];
+    }),
+  ]);
+}
+
+function matchingSlice(skin: Skin, hash: string): SlicedSkin | undefined {
+  const candidates = slicesByHash.get(hash);
+  if (candidates === undefined) return undefined;
+  for (const candidate of candidates) {
+    if (equalIndices(candidate.skin.atlas.indices, skin.atlas.indices)) return candidate;
+  }
+  return undefined;
+}
+
+function equalIndices(first: Uint8Array, second: Uint8Array): boolean {
+  if (first === second) return true;
+  if (first.length !== second.length) return false;
+  for (let index = 0; index < first.length; index += 1) {
+    if (first[index] !== second[index]) return false;
+  }
+  return true;
+}
+
+function retainSlice(sliced: SlicedSkin): SlicedSkin {
+  const retained = sliceCache.get(sliced);
+  if (retained !== undefined) {
+    sliceCache.delete(sliced);
+    sliceCache.set(sliced, retained);
+    return sliced;
+  }
+  const reservedBytes = sliced.skin.atlas.indices.buffer.byteLength * 2 + sliced.hash.length * 2;
+  if (reservedBytes > maximumRetainedBytes) return sliced;
+  sliceCache.set(sliced, reservedBytes);
+  retainedBytes += reservedBytes;
+  const candidates = slicesByHash.get(sliced.hash) ?? new Set<SlicedSkin>();
+  candidates.add(sliced);
+  slicesByHash.set(sliced.hash, candidates);
+  evictOldSlices();
+  return sliced;
+}
+
+function evictOldSlices(): void {
+  while (sliceCache.size > maximumSlices || retainedBytes > maximumRetainedBytes) {
+    const oldest = sliceCache.entries().next().value;
+    if (oldest === undefined) return;
+    const [sliced, reservedBytes] = oldest;
+    sliceCache.delete(sliced);
+    retainedBytes -= reservedBytes;
+    const candidates = slicesByHash.get(sliced.hash);
+    candidates?.delete(sliced);
+    if (candidates?.size === 0) slicesByHash.delete(sliced.hash);
+  }
+}
 
 function slicer(skin: Skin, hash: string): SlicedSkin {
   const columns = skin.atlas.width / skin.cell.width;
@@ -112,7 +187,8 @@ function slicer(skin: Skin, hash: string): SlicedSkin {
     columns,
     frame: (pose, index) => {
       const row = poseNames.indexOf(pose);
-      const column = Math.min(Math.max(0, index), skin.rows[pose].frames - 1);
+      const requested = Number.isNaN(index) ? 0 : Math.floor(index);
+      const column = Math.min(Math.max(0, requested), skin.rows[pose].frames - 1);
       const key = row * columns + column;
       const known = frames.get(key);
       if (known !== undefined) return known;

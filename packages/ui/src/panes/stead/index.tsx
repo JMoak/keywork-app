@@ -4,14 +4,21 @@ import "../overview/overview.css";
 import "./stead.css";
 import type { ToolRun } from "@keywork-app/client";
 import {
+  creatureReading,
+  districtCapacity,
   type Gesture,
   type HabitatState,
+  isWorkshopFamily,
   type Pointer,
   type PowerTier,
   type StepContext,
+  skyAt,
   type Thread,
   threadsOf,
+  workshopFamilies,
+  workshopFamilyOf,
 } from "@keywork-app/habitat";
+import { type GardenKind, gardenKinds } from "@keywork-app/habitat/render";
 import type { DenyReason } from "@keywork-app/protocol";
 import {
   createEffect,
@@ -74,9 +81,12 @@ import {
   overturnsOnly,
   skinRefusedLine,
   stateLabels,
+  steadName,
   steadTitle,
   whatAreYouDoing,
 } from "./copy.ts";
+import { createCourtyardView } from "./courtyard-view.ts";
+import { CourtyardOverview } from "./courtyards/index.tsx";
 import { HomeOpening } from "./creature-home.tsx";
 import { type PlacedMember, steadDrawer } from "./draw.ts";
 import { browserFieldHost, type FieldPicture, steadField } from "./field.ts";
@@ -89,7 +99,7 @@ import {
   type SceneTarget,
   type SteadScene,
 } from "./habitat-render.ts";
-import { emptyHerd, type Herd, type Member } from "./herd.ts";
+import { emptyHerd, gatherHerd, type Herd, type Member, stepHerd } from "./herd.ts";
 import { type SteadHomeScope, shellForStead } from "./home-scope.ts";
 import {
   type CanvasFit,
@@ -101,8 +111,39 @@ import {
   watchTheme,
 } from "./painter.ts";
 import { CreatureProjectControls } from "./project-controls.tsx";
+import { SettlementControls } from "./settlement-controls.tsx";
+import { savedChoice, settlementDistricts } from "./settlement-preferences.ts";
 
-const steadSpec = z.object({ kind: z.literal("stead") });
+const steadSpec = z.object({
+  kind: z.literal(steadName),
+  view: z
+    .enum(["scene", "courtyards"])
+    .optional()
+    .describe("Remember whether this habitat opens as a continuous scene or a courtyard overview."),
+  courtOrder: z
+    .array(z.string().min(1).max(128))
+    .max(4096)
+    .optional()
+    .describe("Keep courtyard addresses stable as creatures arrive, leave, and return."),
+  workshopStyles: z
+    .record(z.string().min(1).max(128), z.enum(workshopFamilies))
+    .refine((styles) => Object.keys(styles).length <= 4096)
+    .optional()
+    .describe("Remember optional architectural choices without changing workshop capabilities."),
+  gardens: z
+    .record(z.string().min(1).max(128), z.enum(gardenKinds))
+    .refine((gardens) => Object.keys(gardens).length <= 4096)
+    .optional()
+    .describe(
+      "Remember peaceful ornamental plantings; gardens do not simulate work or require care.",
+    ),
+  alignment: z
+    .enum(["roomy", "compact"])
+    .optional()
+    .describe(
+      "Fit courtyard tiles to the available width without changing their permanent addresses.",
+    ),
+});
 
 export type SteadSpec = z.output<typeof steadSpec>;
 
@@ -266,13 +307,19 @@ function threadAtThePorch(
 }
 
 export function threadFor(world: HabitatState, member: Member): string | undefined {
-  const carried = member.creature.reading.carrier?.thread;
+  return threadForCreature(world, member.slug, member.creature.reading.carrier?.thread);
+}
+
+function threadForCreature(
+  world: HabitatState,
+  slug: string,
+  carried: string | undefined,
+): string | undefined {
   if (carried !== undefined) return carried;
-  const conversation = world.creatures[member.slug]?.conversation;
+  const conversation = world.creatures[slug]?.conversation;
   if (conversation !== undefined) return conversation;
-  return threadsOf(world, member.slug).sort((a, b) =>
-    b.lastActivityAt.localeCompare(a.lastActivityAt),
-  )[0]?.id;
+  return threadsOf(world, slug).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))[0]
+    ?.id;
 }
 
 interface ArtPoint {
@@ -317,7 +364,7 @@ function SteadPane(props: PaneProps<SteadSpec>) {
 }
 
 function ConnectedStead(props: PaneProps<SteadSpec> & { readonly scope: SteadHomeScope }) {
-  const shell = shellForStead(props.shell, props.scope);
+  const shell = { ...shellForStead(props.shell, props.scope), rebind: props.shell.rebind };
   const pane = createMemo(() => parsePaneSpec(props.scope.presentedPane?.()));
   return (
     <Show when={pane()} keyed fallback={<Stead {...props} shell={shell} />}>
@@ -348,6 +395,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   let stage: HTMLDivElement | undefined;
   let field: HTMLDivElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
+  let courtHeading: HTMLSpanElement | undefined;
   keepKeyboardHome(
     () => onboarding.card() ?? root,
     () => props.focused,
@@ -367,8 +415,78 @@ function Stead(props: PaneProps<SteadSpec>) {
     offsetMinutes,
   });
   const [herd, setHerd] = createSignal<Herd>(emptyHerd);
+  const [preference, setPreference] = createSignal(props.spec);
+  createEffect(on(() => props.spec, setPreference, { defer: true }));
+  const remember = (change: Partial<SteadSpec>): void => {
+    setPreference((held) => ({ ...held, ...change }));
+    props.shell.rebind(props.id, preference());
+  };
+  const courts = createCourtyardView({
+    world,
+    preference,
+    rememberScene: true,
+    save: (next) =>
+      remember({
+        ...next,
+        courtOrder: next.courtOrder === undefined ? undefined : [...next.courtOrder],
+      }),
+  });
+  const districts = createMemo(() =>
+    settlementDistricts(courts.order(), Object.keys(world().creatures)),
+  );
+  const [district, setDistrict] = createSignal(0);
+  const districtIndex = () => Math.min(district(), Math.max(0, districts().length - 1));
+  const neighborhood = createMemo(() => districts()[districtIndex()]);
+  const sceneSlugs = createMemo(
+    () => neighborhood()?.slugs ?? Object.keys(world().creatures).sort().slice(0, districtCapacity),
+  );
+  const families = createMemo(() =>
+    Object.fromEntries(
+      districts().flatMap((district) =>
+        district.slugs.map((slug, offset) => [
+          slug,
+          workshopFamilyOf(district.start + offset, savedChoice(preference().workshopStyles, slug)),
+        ]),
+      ),
+    ),
+  );
+  const [appearanceUndo, setAppearanceUndo] =
+    createSignal<Pick<SteadSpec, "workshopStyles" | "gardens" | "alignment">>();
+  const changeAppearance = (
+    change: Pick<SteadSpec, "workshopStyles" | "gardens" | "alignment">,
+  ): void => {
+    const held = preference();
+    setAppearanceUndo({
+      workshopStyles: held.workshopStyles,
+      gardens: held.gardens,
+      alignment: held.alignment,
+    });
+    remember(change);
+  };
+  const chooseFamily = (value: string): void => {
+    const slug = courts.selected();
+    if (slug === undefined || (value !== "auto" && !isWorkshopFamily(value))) return;
+    const styles = isWorkshopFamily(value)
+      ? { ...preference().workshopStyles, [slug]: value }
+      : { ...preference().workshopStyles };
+    if (value === "auto") delete styles[slug];
+    changeAppearance({ workshopStyles: styles });
+  };
+  const chooseGarden = (value: string): void => {
+    const slug = courts.selected();
+    if (slug === undefined || (value !== "none" && !gardenKinds.some((garden) => garden === value)))
+      return;
+    const gardens =
+      value === "none"
+        ? { ...preference().gardens }
+        : { ...preference().gardens, [slug]: value as GardenKind };
+    if (value === "none") delete gardens[slug];
+    changeAppearance({ gardens });
+  };
+  const courtScroll = new Map<string, number>();
   const mountedAt = Date.now();
   const [frame, setFrame] = createSignal<PaintedFrame>();
+  const [overviewTime, setOverviewTime] = createSignal(Date.now());
   const [pointer, setPointer] = createSignal<ArtPoint>();
   const [hovered, setHovered] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
@@ -381,10 +499,18 @@ function Stead(props: PaneProps<SteadSpec>) {
   const members = (): readonly Member[] => herd().members;
   const meetsItsCreature = (): boolean =>
     profile.id === "stead" && props.shell.steadHome !== undefined;
-  const cursor = createCursor(() => members().length);
+  const visibleResidents = createMemo(() =>
+    [...sceneSlugs()].sort().flatMap((slug) => {
+      const resident = Object.hasOwn(world().creatures, slug) ? world().creatures[slug] : undefined;
+      return resident === undefined ? [] : [resident];
+    }),
+  );
+  const cursor = createCursor(() => visibleResidents().length);
   const keys = createMemo(() => steadKeys(props.shell.keys));
-  const current = (): Member | undefined => members()[cursor.index()];
-  const porch = createMemo(() => porchOf(world(), herd(), Date.now()));
+  const current = () => visibleResidents()[cursor.index()];
+  const porch = createMemo(() =>
+    porchOf(world(), herd(), courts.overview() ? overviewTime() : Date.now()),
+  );
   const placedFigures = (): readonly PlacedFigure[] =>
     (frame()?.figures ?? []).map((figure) => figure.placed);
   const heldAsk = (): HeldAsk | undefined => {
@@ -401,6 +527,8 @@ function Stead(props: PaneProps<SteadSpec>) {
   const overturnKey = (): string => props.shell.keys.chord("stead.overturn");
   const footLine = (): string | undefined => {
     if (notice() !== undefined) return notice();
+    if (courts.overview())
+      return waitingCount(props.shell) > 0 ? "Open the request to review it." : undefined;
     if (porch()?.kind === "chore") return acceptHint(keys().approve);
     if (porch()?.kind === "decided") {
       return overturnHint(overturnKey(), props.shell.keys.chord("stead.open"));
@@ -410,7 +538,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
 
   const baseContext = (tier: PowerTier): Omit<StepContext, "pointer" | "gestures"> => ({
-    visible: !documentHidden(),
+    visible: !documentHidden() && !courts.overview(),
     focused: props.focused,
     fullscreen: false,
     doNotDisturb: false,
@@ -448,6 +576,11 @@ function Stead(props: PaneProps<SteadSpec>) {
       }),
       stageWidth: stage?.clientWidth ?? 0,
       canvas,
+      sceneOptions: {
+        courtSlugs: sceneSlugs(),
+        workshops: families(),
+        gardens: preference().gardens,
+      },
     });
     setHerd(drawing.herd);
     setFrame({
@@ -466,13 +599,61 @@ function Stead(props: PaneProps<SteadSpec>) {
   const loop = steadField(
     browserFieldHost(),
     {
-      hidden: documentHidden,
+      hidden: () => documentHidden() || courts.overview(),
       resting: () => !props.focused || !windowFocused(),
       lastInputAt: () => lastInputAt,
     },
     draw,
   );
   const requestDraw = loop.request;
+
+  const visitCourt = (slug: string): void => {
+    const index = districts().findIndex((district) => district.slugs.includes(slug));
+    if (index >= 0) setDistrict(index);
+    courts.open(slug);
+    setPointer(undefined);
+    setHovered(undefined);
+    requestDraw();
+    queueMicrotask(() => {
+      const index = visibleResidents().findIndex((resident) => resident.slug === slug);
+      if (index >= 0) cursor.set(index);
+      const painted = frame();
+      const workshop = painted?.scene.hotspots.find(
+        (spot) => spot.target.kind === "workshop" && spot.target.creature === slug,
+      );
+      if (stage !== undefined && painted !== undefined && workshop !== undefined) {
+        stage.scrollLeft =
+          courtScroll.get(slug) ??
+          Math.max(
+            0,
+            (workshop.x + workshop.width / 2) * painted.fit.cssPerArt - stage.clientWidth / 2,
+          );
+      }
+      courtHeading?.focus({ preventScroll: true });
+    });
+  };
+  const foldCourt = (): void => {
+    const slug = courts.selected();
+    if (slug !== undefined && stage !== undefined) courtScroll.set(slug, stage.scrollLeft);
+    courts.fold();
+    setPointer(undefined);
+    setHovered(undefined);
+    queueMicrotask(() => {
+      const cards = [...(root?.querySelectorAll<HTMLButtonElement>("[data-courtyard]") ?? [])];
+      (cards.find((each) => each.dataset.courtyard === slug) ?? cards[0] ?? root)?.focus({
+        preventScroll: true,
+      });
+    });
+  };
+  const visitDistrict = (index: number): void => {
+    if (!Number.isInteger(index) || index < 0 || index >= districts().length) return;
+    if (courts.selected() !== undefined) foldCourt();
+    setDistrict(index);
+    setPointer(undefined);
+    setHovered(undefined);
+    cursor.set(0);
+    if (stage !== undefined) stage.scrollLeft = 0;
+  };
 
   const artPoint = (event: MouseEvent): ArtPoint | undefined => {
     const painted = frame();
@@ -493,10 +674,23 @@ function Stead(props: PaneProps<SteadSpec>) {
     props.shell.sessions.openSession(thread);
   };
   const openCreature = (slug: string): void => {
+    const resident = world().creatures[slug];
+    if (resident === undefined) return;
     const member = members().find((each) => each.slug === slug);
-    if (member === undefined) return;
-    cursor.set(members().indexOf(member));
-    openThread(member);
+    const index = visibleResidents().findIndex((resident) => resident.slug === slug);
+    if (index >= 0) cursor.set(index);
+    if (member !== undefined) {
+      openThread(member);
+      return;
+    }
+    const carried = creatureReading(world(), slug, Date.now()).carrier?.thread;
+    const thread = threadForCreature(world(), slug, carried);
+    if (thread === undefined) {
+      setNotice(noThreadYet(resident.name));
+      return;
+    }
+    setNotice(undefined);
+    props.shell.sessions.openSession(thread);
   };
   const openTarget = (target: SceneTarget): void => {
     switch (target.kind) {
@@ -571,6 +765,11 @@ function Stead(props: PaneProps<SteadSpec>) {
     if (spot !== undefined) openTarget(spot.target);
   };
   const onFieldKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && courts.selected() !== undefined && pointer() === undefined) {
+      event.preventDefault();
+      foldCourt();
+      return;
+    }
     if (event.key !== "Escape" || pointer() === undefined) return;
     event.preventDefault();
     onPointerLeave();
@@ -626,13 +825,17 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
   readWhyKeys(
     () => root,
-    () => (props.focused && !wordingHere() ? heldAsk()?.callId : undefined),
+    () => (props.focused && !courts.overview() && !wordingHere() ? heldAsk()?.callId : undefined),
     giveReason,
   );
 
   props.onAction((action) => {
     if (onboarding.take(action)) return;
     const pick = answerPicks[action];
+    if (courts.overview() && (pick !== undefined || action === "stead.overturn")) {
+      props.shell.openPane({ kind: "needs-you" });
+      return;
+    }
     if (pick !== undefined) return answer(pick);
     switch (action) {
       case "stead.overturn":
@@ -644,14 +847,56 @@ function Stead(props: PaneProps<SteadSpec>) {
         setNotice(undefined);
         return cursor.move(-1);
       case "stead.open": {
-        const member = current();
-        if (member !== undefined) openThread(member);
+        const resident = current();
+        if (resident !== undefined) openCreature(resident.slug);
         return;
       }
     }
   });
 
-  createEffect(on(world, requestDraw, { defer: true }));
+  createEffect(
+    on(
+      [world, courts.overview, overviewTime, sceneSlugs, families, () => preference().gardens],
+      ([currentWorld, overview]) => {
+        if (overview) {
+          const at = Date.now();
+          setHerd((previous) =>
+            stepHerd(
+              gatherHerd(previous, currentWorld, at, undefined, sceneSlugs()),
+              currentWorld,
+              at,
+              () => ({
+                ...baseContext("hidden"),
+                pointer: undefined,
+                gestures: [],
+              }),
+            ),
+          );
+        }
+        requestDraw();
+      },
+      { defer: true },
+    ),
+  );
+  createEffect(
+    on(courts.overview, (visible) => {
+      if (!visible) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const tick = (): void => {
+        clearTimeout(timer);
+        if (documentHidden()) return;
+        const at = Date.now();
+        setOverviewTime(at);
+        timer = setTimeout(tick, 60_000 - (at % 60_000));
+      };
+      const stop = listen(document, "visibilitychange", tick);
+      tick();
+      onCleanup(() => {
+        clearTimeout(timer);
+        stop();
+      });
+    }),
+  );
   createEffect(on(() => props.focused, requestDraw, { defer: true }));
   createEffect(on(windowFocused, requestDraw, { defer: true }));
   const porchCall = createMemo(() => heldAsk()?.callId);
@@ -683,17 +928,55 @@ function Stead(props: PaneProps<SteadSpec>) {
   });
   onCleanup(loop.stop);
 
-  const now = (): number => frame()?.at ?? Date.now();
+  const now = (): number => (courts.overview() ? overviewTime() : (frame()?.at ?? Date.now()));
   const needYou = (): number => waitingCount(props.shell);
   const board = createMemo(() => choreBoard(world(), now(), offsetMinutes));
+  const residents = () => Object.values(world().creatures);
+  const semanticMinute = createMemo(() => Math.floor(now() / 60_000));
+  const residentStates = createMemo(
+    () =>
+      new Map(
+        residents().map((resident) => [
+          resident.slug,
+          creatureSnapshot(
+            world(),
+            {
+              slug: resident.slug,
+              name: resident.name,
+              hueStop: undefined,
+            },
+            semanticMinute() * 60_000,
+          ).state,
+        ]),
+      ),
+  );
   const working = (): number =>
-    members().filter((member) => member.creature.reading.state === "working").length;
+    [...residentStates().values()].filter((state) => state === "working").length;
+  const districtSummaries = createMemo(() =>
+    districts().map((district) => ({
+      ...district,
+      occupied: district.slugs.filter((slug) => world().creatures[slug] !== undefined).length,
+      waiting: district.slugs.filter((slug) => residentStates().get(slug) === "porch").length,
+    })),
+  );
+  const condensedInfrastructure = createMemo(() => {
+    const shared = frame()?.scene.infrastructure;
+    if (
+      courts.overview() ||
+      shared === undefined ||
+      (shared.storehouseWings <= shared.shownStorehouseWings &&
+        shared.totalMills <= shared.shownMills &&
+        shared.totalParcels <= shared.shownParcels)
+    )
+      return undefined;
+    return `Across the stead: ${shared.storehouseWings} storehouse wings · ${shared.totalMills} mills (${shared.busyMills} running) · ${shared.totalParcels} outlying plots. Shared buildings are shown in miniature here.`;
+  });
   const head = (): string =>
     headLine({
-      creatures: members().length,
+      creatures: residents().length,
       needYou: needYou(),
       working: working(),
-      phase: frame()?.scene.sky.phase ?? "day",
+      phase: skyAt(now(), offsetMinutes).phase,
       clock: clockWord(now(), offsetMinutes),
       floating: members().find((member) => member.slug === props.shell.companion?.floating())?.name,
     });
@@ -720,8 +1003,101 @@ function Stead(props: PaneProps<SteadSpec>) {
         creatures={members().length}
         chord={props.shell.keys.chord("companion.toggle")}
       />
+      <fieldset
+        class="kw-stead-views"
+        aria-label={`${steadName} view`}
+        data-native-activation
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && courts.selected() !== undefined) {
+            event.preventDefault();
+            foldCourt();
+          }
+        }}
+      >
+        <button
+          type="button"
+          aria-pressed={!courts.configured()}
+          onClick={() => courts.choose("scene")}
+        >
+          Continuous {steadName}
+        </button>
+        <button
+          type="button"
+          aria-pressed={courts.configured()}
+          onClick={() => courts.choose("courtyards")}
+        >
+          Courtyards
+        </button>
+        <Show when={courts.selected() !== undefined}>
+          <span ref={courtHeading} tabIndex={-1} data-court-detail>
+            {world().creatures[courts.selected() ?? ""]?.name}'s courtyard
+          </span>
+          <button type="button" onClick={foldCourt}>
+            Fold back to courtyards
+          </button>
+        </Show>
+        <Show when={needYou() > 0}>
+          <button type="button" onClick={() => props.shell.openPane({ kind: "needs-you" })}>
+            {needYou()} needs you
+          </button>
+        </Show>
+      </fieldset>
+      <SettlementControls
+        districts={districtSummaries()}
+        district={districtIndex()}
+        onDistrict={visitDistrict}
+        selected={courts.selected()}
+        family={savedChoice(preference().workshopStyles, courts.selected() ?? "")}
+        automaticFamily={workshopFamilyOf(
+          (neighborhood()?.start ?? 0) + Math.max(0, sceneSlugs().indexOf(courts.selected() ?? "")),
+        )}
+        garden={savedChoice(preference().gardens, courts.selected() ?? "")}
+        onFamily={chooseFamily}
+        onGarden={chooseGarden}
+        overview={courts.overview()}
+        compact={preference().alignment === "compact"}
+        onArrange={() =>
+          changeAppearance({
+            alignment: preference().alignment === "compact" ? "roomy" : "compact",
+          })
+        }
+        canUndo={appearanceUndo() !== undefined}
+        onUndo={() => {
+          const previous = appearanceUndo();
+          if (previous !== undefined) {
+            remember(previous);
+            setAppearanceUndo(undefined);
+          }
+        }}
+      />
+      <Show when={courts.error()}>{(line) => <p role="status">{line()}</p>}</Show>
+      <Show when={condensedInfrastructure()}>
+        {(line) => <p class="kw-stead-board">{line()}</p>}
+      </Show>
+      <Show when={herd().refused.length > 0}>
+        <p class="kw-stead-board" role="status">
+          Artwork unavailable for{" "}
+          {herd()
+            .refused.map((refused) => world().creatures[refused.slug]?.name ?? refused.slug)
+            .join(", ")}
+          .
+        </p>
+      </Show>
+      <Show when={courts.overview()}>
+        <CourtyardOverview
+          world={world()}
+          order={courts.order()}
+          range={neighborhood()}
+          families={families()}
+          gardens={preference().gardens}
+          alignment={preference().alignment}
+          now={overviewTime()}
+          onOpen={visitCourt}
+        />
+      </Show>
       <div
         class="kw-stead-stage"
+        hidden={courts.overview()}
         ref={stage}
         style={{ height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px` }}
       >
@@ -730,6 +1106,7 @@ function Stead(props: PaneProps<SteadSpec>) {
           ref={field}
           role="application"
           data-tier={frame()?.tier}
+          data-district={districtIndex()}
           data-wakes={frame()?.wakes}
           data-frames={frame()?.frames}
           style={{
@@ -781,7 +1158,7 @@ function Stead(props: PaneProps<SteadSpec>) {
         simple={meetsItsCreature()}
       />
       <Show
-        when={members().length > 0}
+        when={residents().length > 0}
         fallback={
           <Show when={!meetsItsCreature() && onboarding.active() === undefined}>
             <EmptyState line={steadPane.emptyState(props.shell.keys)} />
@@ -798,17 +1175,14 @@ function Stead(props: PaneProps<SteadSpec>) {
         </p>
         <ol class="kw-stead-rows">
           <Index each={members()}>
-            {(member, at) => (
+            {(member) => (
               <CreatureRow
                 member={member()}
                 world={world()}
                 now={now()}
                 offsetMinutes={offsetMinutes}
-                cursor={props.focused && cursor.index() === at}
-                onPick={() => {
-                  cursor.set(at);
-                  openThread(member());
-                }}
+                cursor={props.focused && current()?.slug === member().slug}
+                onPick={() => openCreature(member().slug)}
               />
             )}
           </Index>

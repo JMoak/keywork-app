@@ -1,6 +1,8 @@
 import { day, minute, parseTs } from "../clock/clock.ts";
 import { hashSeed, mulberry32 } from "../clock/random.ts";
 import { type CreatureReading, creatureReading } from "../creature/semantic.ts";
+import { isWorkshopFamily, type WorkshopFamily } from "../place/architecture.ts";
+import { districtCapacity } from "../place/settlement.ts";
 import { type Place, parcelSlot, placeSlots, slotOf } from "../pose/pose.ts";
 import type { IndexedFrame } from "../skins/atlas.ts";
 import {
@@ -12,6 +14,9 @@ import {
   groundShadow,
 } from "../skins/legend.ts";
 import * as tiles from "../skins/world/tiles.ts";
+import type { GardenPlanting } from "../skins/world/workshops/gardens.ts";
+import { workshopDesign } from "../skins/world/workshops/index.ts";
+import { ringingTheBell } from "../world/bell.ts";
 import { type Sky, skyAt } from "../world/sky.ts";
 import {
   type Creature as CreatureOnTheStead,
@@ -26,6 +31,7 @@ import {
   threadsOf,
 } from "../world/types.ts";
 import { type Blit, blitInto } from "./raster.ts";
+import { workshopFrame } from "./workshop.ts";
 
 export const tileScale = 2;
 export const sceneHeight = 72;
@@ -40,6 +46,8 @@ export const lanternAfterWalkMs = 5 * minute;
 export const treeSeasonDays = 90;
 export const sailDriftMs = 1000;
 export const sailQuickMs = 160;
+export const districtMillCapacity = 2;
+export const districtParcelCapacity = 4;
 
 export type SlotAnchors = readonly number[];
 
@@ -68,11 +76,27 @@ export interface SteadScene {
   readonly sharedAnchors: SlotAnchors;
   readonly hotspots: readonly Hotspot[];
   readonly readings: Readonly<Record<Slug, CreatureReading>>;
+  readonly infrastructure?: SceneInfrastructure | undefined;
+}
+
+export interface SceneInfrastructure {
+  readonly storehouseWings: number;
+  readonly shownStorehouseWings: number;
+  readonly storehouseShelves: number;
+  readonly totalMills: number;
+  readonly shownMills: number;
+  readonly busyMills: number;
+  readonly loadedMills: number;
+  readonly totalParcels: number;
+  readonly shownParcels: number;
 }
 
 export interface SceneOptions {
   readonly seed?: number | undefined;
   readonly southern?: boolean | undefined;
+  readonly courtSlugs?: readonly string[] | undefined;
+  readonly workshops?: Readonly<Record<string, WorkshopFamily>> | undefined;
+  readonly gardens?: Readonly<Record<string, GardenPlanting>> | undefined;
 }
 
 export function composeStead(
@@ -81,11 +105,11 @@ export function composeStead(
   options: SceneOptions = {},
 ): SteadScene {
   const sky = skyAt(now, state.house.offsetMinutes, options.southern);
-  const creatures = inOrderOfRaising(Object.values(state.creatures));
+  const creatures = sceneCreatures(state, options.courtSlugs);
   const readings = Object.fromEntries(
     creatures.map((creature) => [creature.slug, creatureReading(state, creature.slug, now)]),
   ) as Record<Slug, CreatureReading>;
-  const layout = new Layout(state, now, sky, readings, options.seed ?? 0);
+  const layout = new Layout(state, now, sky, readings, options);
   layout.houseParcel(creatures);
   layout.otherParcels(creatures);
   return layout.finish();
@@ -167,6 +191,59 @@ export function threadsLive(state: HabitatState, creature: Slug): number {
 
 const grownTiles = new WeakMap<IndexedFrame, IndexedFrame>();
 
+function sceneCreatures(
+  state: HabitatState,
+  courtSlugs: readonly string[] | undefined,
+): readonly CreatureOnTheStead[] {
+  if (courtSlugs === undefined) return inOrderOfRaising(Object.values(state.creatures));
+  const selected = [...new Set(courtSlugs)];
+  if (selected.length > districtCapacity)
+    throw new RangeError(`A district scene holds up to ${districtCapacity} court addresses.`);
+  return selected.flatMap((slug) => {
+    const creature = Object.hasOwn(state.creatures, slug) ? state.creatures[slug] : undefined;
+    return creature === undefined ? [] : [creature];
+  });
+}
+
+function districtMills(
+  state: HabitatState,
+  mills: readonly Mill[],
+  slugs: readonly string[],
+): readonly Mill[] {
+  const house = Object.values(state.parcels).find((parcel) => parcel.roles.includes("house"))?.id;
+  const selected = new Set(slugs.map((slug) => state.creatures[slug]?.workshop.parcel));
+  const visible = new Set(
+    Object.values(state.parcels)
+      .filter((parcel) => parcel.id !== house && selected.has(parcel.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, districtParcelCapacity)
+      .map((parcel) => parcel.id),
+  );
+  return mills
+    .filter(
+      (mill) =>
+        mill.parcel === house ||
+        visible.has(mill.parcel) ||
+        (house === undefined && !Object.hasOwn(state.parcels, mill.parcel)),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.busy) - Number(a.busy) ||
+        Number(b.loaded.length > 0) - Number(a.loaded.length > 0) ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, districtMillCapacity);
+}
+
+function familyAt(
+  workshops: Readonly<Record<string, WorkshopFamily>> | undefined,
+  slug: string,
+): WorkshopFamily | undefined {
+  if (workshops === undefined || !Object.hasOwn(workshops, slug)) return undefined;
+  const family = workshops[slug];
+  return isWorkshopFamily(family) ? family : undefined;
+}
+
 interface Lanes {
   readonly from: number;
   readonly to: number;
@@ -178,6 +255,9 @@ class Layout {
   private readonly sky: Sky;
   private readonly readings: Readonly<Record<Slug, CreatureReading>>;
   private readonly seed: number;
+  private readonly options: SceneOptions;
+  private readonly allMills: readonly Mill[];
+  private readonly selectedMills: readonly Mill[];
   private readonly layers: Blit[] = [];
   private readonly hotspots: Hotspot[] = [];
   private readonly lanes: Lanes[] = [];
@@ -185,19 +265,29 @@ class Layout {
   private readonly perCreature = new Map<Slug, number[]>();
   private readonly foggedSpans: Lanes[] = [];
   private x = sceneMargin;
+  private shownMills = 0;
+  private shownStorehouseWings = 0;
+  private totalParcels = 0;
+  private shownParcels = 0;
 
   constructor(
     state: HabitatState,
     now: number,
     sky: Sky,
     readings: Readonly<Record<Slug, CreatureReading>>,
-    seed: number,
+    options: SceneOptions,
   ) {
     this.state = state;
     this.now = now;
     this.sky = sky;
     this.readings = readings;
-    this.seed = seed;
+    this.seed = options.seed ?? 0;
+    this.options = options;
+    this.allMills = Object.values(state.mills);
+    this.selectedMills =
+      options.courtSlugs === undefined
+        ? this.allMills
+        : districtMills(state, this.allMills, Object.keys(readings));
   }
 
   houseParcel(creatures: readonly CreatureOnTheStead[]): void {
@@ -213,9 +303,16 @@ class Layout {
   }
 
   otherParcels(creatures: readonly CreatureOnTheStead[]): void {
-    const others = Object.values(this.state.parcels)
-      .filter((parcel) => parcel.id !== this.houseParcelId())
+    const house = this.houseParcelId();
+    const selected = new Set(creatures.map((creature) => creature.workshop.parcel));
+    const parcels = Object.values(this.state.parcels).filter((parcel) => parcel.id !== house);
+    this.totalParcels = parcels.length;
+    const relevant = parcels
+      .filter((parcel) => this.options.courtSlugs === undefined || selected.has(parcel.id))
       .sort((a, b) => a.name.localeCompare(b.name));
+    const others =
+      this.options.courtSlugs === undefined ? relevant : relevant.slice(0, districtParcelCapacity);
+    this.shownParcels = others.length;
     others.forEach((parcel, index) => {
       this.lane(parcel);
       this.parcel(parcel, creatures, index === 0);
@@ -248,6 +345,21 @@ class Layout {
       sharedAnchors: [...this.shared],
       hotspots: this.hotspots,
       readings: this.readings,
+      ...(this.options.courtSlugs === undefined
+        ? {}
+        : {
+            infrastructure: {
+              storehouseWings: this.state.storehouse.wings,
+              shownStorehouseWings: this.shownStorehouseWings,
+              storehouseShelves: this.state.storehouse.shelves.length,
+              totalMills: this.allMills.length,
+              shownMills: this.shownMills,
+              busyMills: this.allMills.filter((mill) => mill.busy).length,
+              loadedMills: this.allMills.filter((mill) => mill.loaded.length > 0).length,
+              totalParcels: this.totalParcels,
+              shownParcels: this.shownParcels,
+            },
+          }),
     };
   }
 
@@ -279,7 +391,9 @@ class Layout {
     const { shelves, wings } = this.state.storehouse;
     const start = this.x;
     const top = groundY - tall(tiles.storehouse);
-    for (let wing = 0; wing < Math.max(1, wings); wing += 1) {
+    const shown = this.options.courtSlugs === undefined ? Math.max(1, wings) : 1;
+    this.shownStorehouseWings = shown;
+    for (let wing = 0; wing < shown; wing += 1) {
       const left = this.x;
       this.put(tiles.storehouse, left, top);
       const held = shelves.slice(wing * 12, wing * 12 + 12);
@@ -332,6 +446,49 @@ class Layout {
   }
 
   private workshop(creature: CreatureOnTheStead): void {
+    const family = familyAt(this.options.workshops, creature.slug);
+    if (family === undefined) {
+      this.legacyWorkshop(creature);
+      return;
+    }
+    const design = workshopDesign(family);
+    const reading = this.readings[creature.slug];
+    const frame = workshopFrame(family, {
+      lamps: reading?.lamps,
+      lanterns: reading?.lanterns,
+      notes: reading?.notes,
+      chores: creature.chores.length,
+      crates: reading?.crates,
+      boarded: creature.workshop.boardedAt !== undefined,
+      garden:
+        this.options.gardens !== undefined && Object.hasOwn(this.options.gardens, creature.slug)
+          ? this.options.gardens[creature.slug]
+          : undefined,
+    });
+    const left = this.x;
+    const top = groundY - tall(frame);
+    this.put(frame, left, top);
+    this.hotspot(left, top, wide(frame), tall(frame), {
+      kind: "workshop",
+      creature: creature.slug,
+    });
+    const own = this.perCreature.get(creature.slug) ?? [];
+    const door = left + units(design.door.x + design.door.width / 2);
+    const bench = left + wide(frame) + benchYard / 2;
+    const board = left + units(design.board.x + 1);
+    own[placeSlots.door] = door;
+    own[placeSlots.bench] = bench;
+    own[placeSlots.board] = board;
+    this.perCreature.set(creature.slug, own);
+    if (this.perCreature.size === 1) {
+      this.shared[placeSlots.door] = door;
+      this.shared[placeSlots.bench] = bench;
+      this.shared[placeSlots.board] = board;
+    }
+    this.x += wide(frame) + benchYard + buildingGap;
+  }
+
+  private legacyWorkshop(creature: CreatureOnTheStead): void {
     const reading = this.readings[creature.slug];
     const top = groundY - tall(tiles.workshop);
     const left = this.x;
@@ -397,6 +554,7 @@ class Layout {
   }
 
   private mill(mill: Mill, fogged: boolean): void {
+    this.shownMills += 1;
     const tower = fogged ? tiles.ghosted(tiles.millTower) : tiles.millTower;
     const top = groundY - tall(tiles.millTower);
     const left = this.x + units(3);
@@ -420,10 +578,8 @@ class Layout {
   }
 
   private gate(): void {
-    const others = Object.values(this.state.parcels).filter(
-      (parcel) => parcel.id !== this.houseParcelId(),
-    );
-    if (others.length === 0) {
+    const house = this.houseParcelId();
+    if (!Object.values(this.state.parcels).some((parcel) => parcel.id !== house)) {
       this.shared[placeSlots.gate] = this.x + units(4);
       return;
     }
@@ -471,7 +627,9 @@ class Layout {
     for (const mill of this.millsOn(parcel.id)) this.mill(mill, fogged);
     for (const creature of creatures) {
       if (creature.workshop.parcel !== parcel.id) continue;
-      const shop = fogged ? tiles.ghosted(tiles.workshop) : tiles.workshop;
+      const family = familyAt(this.options.workshops, creature.slug);
+      const facade = family === undefined ? tiles.workshop : workshopDesign(family).facade;
+      const shop = fogged ? tiles.ghosted(facade) : facade;
       this.put(shop, this.x, groundY - tall(shop));
       this.x += wide(shop) + buildingGap;
     }
@@ -552,7 +710,7 @@ class Layout {
   }
 
   private millsOn(parcel: string | undefined): Mill[] {
-    return Object.values(this.state.mills)
+    return this.selectedMills
       .filter(
         (mill) =>
           mill.parcel === parcel ||
@@ -572,10 +730,15 @@ class Layout {
   }
 
   private anyLampLit(): boolean {
+    if (this.options.courtSlugs !== undefined)
+      return Object.values(this.state.threads).some(
+        (thread) => !thread.removed && thread.kind !== "child" && thread.turn !== undefined,
+      );
     return Object.values(this.readings).some((reading) => reading.lamps > 0);
   }
 
   private ringing(): boolean {
+    if (this.options.courtSlugs !== undefined) return ringingTheBell(this.state).length > 0;
     return Object.values(this.readings).some((reading) => reading.state === "porch");
   }
 

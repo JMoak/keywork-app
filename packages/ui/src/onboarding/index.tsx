@@ -74,6 +74,7 @@ import {
   type Step,
   steps,
 } from "./sequence.ts";
+import { offeredSkins } from "./skins.ts";
 
 export {
   type Choice,
@@ -164,9 +165,17 @@ export interface OnboardingOnTheSteadProps {
 export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
   const controller = props.controller ?? props.shell.onboarding ?? createOnboardingController();
   const storage = props.storage ?? localStorageOrNone();
+  const [preferredSkin, setPreferredSkin] = createSignal<string>();
   const onboarding = startOnboarding({
     ...onboardingSeamsOf(props.shell, storage),
     ...props.seams,
+    get skins() {
+      const offered = props.seams?.skins ?? offeredSkins();
+      const preferred = preferredSkin();
+      return preferred !== undefined && offered.includes(preferred)
+        ? [preferred, ...offered.filter((id) => id !== preferred)]
+        : offered;
+    },
   });
   const listed = props.automatic ? createCreatureListing(props.shell) : () => undefined;
   const trusted = (): boolean => props.shell.trust.state().kind === "trusted";
@@ -204,7 +213,11 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
           shell={props.shell}
           creatures={listed()}
           first={homeIsEmpty()}
-          onCustomize={() => controller.request()}
+          initialSkin={preferredSkin()}
+          onCustomize={(skin) => {
+            setPreferredSkin(skin);
+            controller.request();
+          }}
         />
       </Show>
       <Show when={showing()}>

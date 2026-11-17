@@ -1,4 +1,5 @@
 import type { HabitatState, MotionPrefs, Pose, StepContext } from "@keywork-app/habitat";
+import type { SceneOptions } from "@keywork-app/habitat/render";
 import { restingPose } from "@keywork-app/habitat/render";
 import { type FieldPicture, restfulMotion, samplingTier, standingStill } from "./field.ts";
 import {
@@ -46,6 +47,7 @@ export interface SteadView {
   readonly memberContext: (member: Member) => StepContext;
   readonly stageWidth: number;
   readonly canvas: HTMLCanvasElement | undefined;
+  readonly sceneOptions?: SceneOptions;
 }
 
 export interface SteadDrawing {
@@ -106,13 +108,13 @@ export function steadDrawer(): SteadDrawer {
   return {
     draw: (view) => {
       const herd = stepHerd(
-        gatherHerd(view.herd, view.world, view.mountedAt),
+        gatherHerd(view.herd, view.world, view.mountedAt, undefined, view.sceneOptions?.courtSlugs),
         view.world,
         view.now,
         view.memberContext,
       );
       const poses = posesFor(herd, view.context, motionless);
-      const scene = composeStead(view.world, view.now);
+      const scene = composeStead(view.world, view.now, view.sceneOptions);
       const fit = fitCanvas(view.stageWidth, scene, devicePixelRatioOf());
       const figures = placeMembers(herd, poses, scene, view.context.tier === "rest");
       const painted = paint(view, scene, fit, figures);

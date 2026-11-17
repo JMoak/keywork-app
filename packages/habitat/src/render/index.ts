@@ -1,3 +1,9 @@
+export {
+  type GardenPlanting as GardenKind,
+  gardenPlantings as gardenKinds,
+  gardenTile,
+} from "../skins/world/workshops/gardens.ts";
+export { workshopDesign, workshopDesigns } from "../skins/world/workshops/index.ts";
 export { glyphFrame, glyphGap, glyphGlyphs, glyphSize } from "./glyph.ts";
 export {
   crownRow,
@@ -90,3 +96,4 @@ export {
   threadsLive,
   xOfSlot,
 } from "./stead.ts";
+export { type WorkshopFrameOptions, workshopFrame } from "./workshop.ts";

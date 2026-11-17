@@ -58,6 +58,7 @@ export interface PageHost extends SchedulerHost {
 export interface CompanionPageProps {
   port: CompanionPort;
   renderer?: Renderer | undefined;
+  rendererFor?: ((skinId: string | undefined) => Renderer | undefined) | undefined;
   host?: PageHost | undefined;
 }
 
@@ -83,9 +84,15 @@ export function browserPageHost(): PageHost {
 
 export function CompanionPage(props: CompanionPageProps) {
   const host = props.host ?? browserPageHost();
-  const renderer = props.renderer ?? placeholderRenderer;
-  const rows: Rows = renderer.rows ?? referenceRows;
   const [snapshot, setSnapshot] = createSignal<CompanionSnapshot>();
+  const skinId = createMemo(() => snapshot()?.creature.skin);
+  const renderer = createMemo(() =>
+    props.rendererFor === undefined
+      ? (props.renderer ?? placeholderRenderer)
+      : props.rendererFor(skinId()),
+  );
+  const rows = (): Rows => renderer()?.rows ?? referenceRows;
+  const unavailable = () => renderer() === undefined;
   const [conditions, setConditions] = createSignal<CompanionConditions>(restingConditions);
   const [hovering, setHovering] = createSignal(false);
   const [dragging, setDragging] = createSignal(false);
@@ -99,6 +106,8 @@ export function CompanionPage(props: CompanionPageProps) {
   let lastReport = host.now();
   let lastGreet = Number.NEGATIVE_INFINITY;
   let mirror: Mirror = createMirror(host.now(), seedOf(undefined));
+  let mirroredRenderer: Renderer | undefined;
+  let mirroredResident: string | undefined;
   let drag: DragState = idleDrag;
   let holdTimer: unknown;
   let pending = { dx: 0, dy: 0 };
@@ -123,12 +132,13 @@ export function CompanionPage(props: CompanionPageProps) {
   };
   const label = () => {
     const current = snapshot();
-    return current === undefined ? "companion" : accessibleName(current);
+    const name = current === undefined ? "companion" : accessibleName(current);
+    return unavailable() ? `${name}, appearance unavailable` : name;
   };
 
   const react = (beat: typeof greetBeat): void => {
     if (still()) return;
-    mirror = playInput(mirror, beat, prefs(), rows);
+    mirror = playInput(mirror, beat, prefs(), rows());
     setReacting(true);
     scheduler.poke();
   };
@@ -136,25 +146,38 @@ export function CompanionPage(props: CompanionPageProps) {
   const draw = (now: number): number | undefined => {
     const current = snapshot();
     const seed = seedOf(current?.creature);
-    if (seed !== mirror.seed) mirror = createMirror(now, seed);
-    mirror = followSnapshot(mirror, current, now, prefs(), rows);
-    const pose = shownPose(mirror.body, rows, prefs());
+    const selected = renderer();
+    const resident = current?.creature.slug ?? current?.creature.name;
+    if (selected !== mirroredRenderer || resident !== mirroredResident) {
+      mirror = createMirror(now, seed);
+      mirroredRenderer = selected;
+      mirroredResident = resident;
+      shown = undefined;
+    }
+    mirror = followSnapshot(mirror, current, now, prefs(), rows());
+    const pose = shownPose(mirror.body, rows(), prefs());
     const look: Look = {
       pose,
+      renderer: selected,
       tokens: tokens(),
       deviceScale: deviceScaleFor(conditions().scale, host.devicePixelRatio()),
       hueStop: current?.creature.hueStop,
       forcedColors: conditions().forcedColors,
+      wantsMask: conditions().wantsMask,
     };
     if (shown === undefined || !sameLook(shown, look)) {
       shown = look;
-      const frame = renderer(
-        { clip: pose.clip, frame: pose.frame, facing: pose.facing },
-        look.tokens,
-        { deviceScale: look.deviceScale, hueStop: look.hueStop, forcedColors: look.forcedColors },
-      );
+      const frame =
+        selected === undefined
+          ? unavailableFrame
+          : selected({ clip: pose.clip, frame: pose.frame, facing: pose.facing }, look.tokens, {
+              deviceScale: look.deviceScale,
+              hueStop: look.hueStop,
+              forcedColors: look.forcedColors,
+            });
       paintFrame(canvas, frame, host.devicePixelRatio());
       refreshMask(frame);
+      if (selected === undefined) setInteractive(false);
     }
     if (!painted) {
       painted = true;
@@ -162,7 +185,7 @@ export function CompanionPage(props: CompanionPageProps) {
     }
     report(now);
     if (reacting() && mirror.body.clip.lane !== "input") setReacting(false);
-    return pose.nextWakeAt;
+    return selected === undefined ? undefined : pose.nextWakeAt;
   };
   const scheduler = tierScheduler(host, draw);
 
@@ -210,7 +233,7 @@ export function CompanionPage(props: CompanionPageProps) {
   const applyDrag = (effect: DragEffect): void => {
     switch (effect.kind) {
       case "face":
-        mirror = playInput(mirror, walkBeat(effect.facing), prefs(), rows);
+        mirror = playInput(mirror, walkBeat(effect.facing), prefs(), rows());
         setDragging(true);
         scheduler.poke();
         return;
@@ -305,9 +328,22 @@ export function CompanionPage(props: CompanionPageProps) {
   createEffect(() => scheduler.setTier(tier(), conditions().onBattery));
   createEffect(() => scheduler.setStill(still()));
   createEffect(
-    on([() => snapshot()?.state, () => snapshot()?.threadId, tokens], () => scheduler.poke(), {
-      defer: true,
-    }),
+    on(
+      [
+        () => snapshot()?.state,
+        () => snapshot()?.threadId,
+        () => snapshot()?.tool,
+        () => snapshot()?.creature.slug ?? snapshot()?.creature.name,
+        () => conditions().scale,
+        () => conditions().wantsMask,
+        renderer,
+        tokens,
+      ],
+      () => scheduler.poke(),
+      {
+        defer: true,
+      },
+    ),
   );
 
   onMount(() => {
@@ -368,13 +404,19 @@ export function CompanionPage(props: CompanionPageProps) {
       <button
         type="button"
         class="kw-companion-creature"
+        data-hit={unavailable() ? "" : undefined}
         aria-label={label()}
         tabIndex={conditions().keyboardReachable ? 0 : -1}
         onClick={(event) => {
           if (event.detail === 0) open();
         }}
       >
-        <canvas ref={canvas} class="kw-companion-canvas" />
+        <canvas ref={canvas} class="kw-companion-canvas" hidden={unavailable()} />
+        <Show when={unavailable()}>
+          <span class="kw-companion-unavailable" role="status">
+            appearance unavailable
+          </span>
+        </Show>
         <Badge
           activeThreads={snapshot()?.activeThreads ?? 0}
           finishedUnseen={snapshot()?.finishedUnseen ?? 0}
@@ -416,21 +458,32 @@ function nudgeOf(key: string): NudgeStep | undefined {
 
 interface Look {
   readonly pose: ShownPose;
+  readonly renderer: Renderer | undefined;
   readonly tokens: ReturnType<typeof tokensFromStyle>;
   readonly deviceScale: number;
   readonly hueStop: number | undefined;
   readonly forcedColors: boolean;
+  readonly wantsMask: boolean;
 }
+
+const unavailableFrame: RenderedFrame = {
+  width: 1,
+  height: 1,
+  alpha: new Uint8Array(1),
+  paint: (context) => context.clearRect(0, 0, 1, 1),
+};
 
 function sameLook(a: Look, b: Look): boolean {
   return (
+    a.renderer === b.renderer &&
     a.pose.clip === b.pose.clip &&
     a.pose.frame === b.pose.frame &&
     a.pose.facing === b.pose.facing &&
     a.tokens === b.tokens &&
     a.deviceScale === b.deviceScale &&
     a.hueStop === b.hueStop &&
-    a.forcedColors === b.forcedColors
+    a.forcedColors === b.forcedColors &&
+    a.wantsMask === b.wantsMask
   );
 }
 
