@@ -1,14 +1,49 @@
 # Creatures and a stead that can fold
 
-Status: a first native implementation is in the working tree on `codex/creatures-courtyards`.
+Status: native implementation continues on `codex/creatures-courtyards`.
 It is not an SDK release or an installed Stead update. The remaining contracts below are
 proposals, not changes to the engine's current creature format.
+
+**Latest direction, 2026-11-19:** the full-color illustrated interpretation below is the
+new approved visual baseline. The native pixel adaptation was still too constrained;
+the user explicitly preferred the subsequent smooth, richly drawn characters. The
+consumer home, first meeting and profile now use those illustrations in local source.
+The live miniature world still uses the authored pixel animations. This is an intentional
+transition, not a claim that the new illustrations already have complete motion sets.
+
+**Earlier art direction correction, 2026-11-19:** Jordan preferred the character in the original
+creature concept sheet to the cleaner native interpretation, then selected **B · Bold
+Little Legends** from three new studies. This is the selected visual baseline. The native
+adaptation below now carries its shapes and materials through three full pose sets. This
+implements the direction; the user has not yet approved the resulting native animation.
+
+The [selected concept board](art/bold-little-legends-2026-11-19.png) establishes strong warm
+outlines, broad deliberate color shapes and prominent material marks. The
+[large/small concept study](art/bold-little-legends-size-study-2026-11-19.png) explores the
+same language at reduced visual complexity. Both are generated art studies, not validated
+sprite sheets or evidence of actual in-app size. The built-in image-generation
+[prompt record](art/bold-little-legends-prompts.json) preserves their provenance.
+
+Keep Folio's paired olive leaf wings, cream throat and slender neck opening; Tessera's
+single overhanging porcelain dome, teal botanical sprigs and jointed legs; Cairn's tilted
+upper slab, pierced middle stone, small lower shard and selective moss. Purl retains its
+ochre/teal mantle and large lateral eye; Hush retains open air around a contained storm;
+Knot expresses itself through the twist and tension of one continuous patterned ribbon.
+These shapes and materials carry identity and must survive simplification.
+
+Do not substitute generic colored plates or pebbles for those features, and do not assume
+a larger atlas alone fixes their loss. Before authoring another complete pose set, compare
+one faithful neutral pose at native and doubled drawing resolution at identical display
+size. Qualify the silhouette, material cues, transparency, ground line and theme handling.
+Changing image resolution requires preserving logical footprint and pointer targeting.
+The earlier cut used 48×52 authored cells; the 96×104 Cairn comparison remains a neutral
+study. Neither is a resolution or palette ceiling for the illustrated product.
 
 ## Direction
 
 Creatures can be animals, imagined biology, materials, mechanisms, weather or geometry.
 Their common language is the drawing and the quality of movement: clear silhouettes,
-deliberate pixel clusters, readable outlines, restrained theme roles and expressive pauses.
+confident contours, rich material color, selective detail and expressive pauses.
 They do not need a common skeleton, face, number of limbs or relationship to gravity.
 
 Character should show in how something notices, waits, handles a task and settles afterward.
@@ -19,6 +54,151 @@ The target is a starter selection of roughly 20–22 genuinely different designs
 approve them in small animated batches at actual display size. A concept grid is an art
 brief; a production creature includes a complete manifest, authored motion, graceful still
 frames and validation. Palette swaps do not count as additional designs.
+
+## Illustrated home: a place worth returning to, 2026-11-19
+
+Stead should feel like a small extraordinary place where useful things happen. A creature
+can be a leaf-winged dragon, a porcelain organism or an arrangement of impossible stones;
+its drawing and behavior make it approachable without giving every shape a mascot face.
+Quiet modern controls belong beside this world. A new keeper should immediately understand
+who is here, what they can do together and what needs their attention.
+
+The latest local implementation includes full-color transparent Folio, Tessera and Cairn
+portraits and a separately illustrated workshop clearing. The originals are preserved in
+`packages/ui/src/creatures/assets/illustrations/`; the
+[asset briefs and provenance](art/illustrated-home-2026-11-19.json) record their sources.
+The raster renderer preserves their colors and alpha instead of reducing them to a native
+palette. Validated source rectangles, normalized ground anchors, facing and independent
+logical footprints keep large art crisp without changing a creature's geometry. Decoding
+is shared and bounded; an unavailable asset falls back to the existing still portrait.
+Explicit frame clips are supported by the renderer contract, but these three assets are
+stills. A still is never bobbed or slid around to imply that it is an authored animation.
+
+The first meeting defaults to Folio while retaining explicit choices, rolling and undo.
+The large illustration leads; the existing motion study is behind “See it move” and is
+clearly labeled “Pixel animation.” Profile artwork uses the same source and placement.
+Loading failure offers a retry instead of pretending an empty world was loaded. Creating
+the first resident preserves model setup through live refresh, and the returning home
+does not compete with the active encounter or advanced setup.
+
+Returning Stead keepers see a composed clearing, one featured resident and a concrete
+action. A real request can feature its resident; unattributed requests remain reviewable.
+“Talk to” opens that resident's ongoing conversation, independently of any active job.
+Neighbor controls expose name, status and permanent address, retaining keyboard focus
+as time and state change. The home mounts at most sixteen neighbors, including overflow
+neighborhoods beyond the retained-address limit. Held chores use the same porch meaning
+as other surfaces. Hidden workbench approvals cannot be answered through inherited keys.
+
+“Explore the stead” opens the existing scene or courtyard mode with the saved architecture,
+gardens and arrangement. Back home restores focus. Home suspends the native scene loop
+and avoids hidden whole-world work summaries and project-link reads. The Keywork profile
+keeps its existing workbench entry point. The illustrated clearing is a home vignette;
+its painted building does not claim to preview every saved architectural choice.
+
+The next visual milestone is a continuous journey, not another gallery of disconnected
+ideas: meet Folio, ask for something, return to a real result at its workshop threshold.
+First author one full-fidelity action with visible contact, weight and release. Then carry
+that illustration and workshop language into the courtyard detail transition. Review both
+at a narrow 320-pixel pane and a normal desktop width, with keyboard use and reduced motion.
+Only an approved working sequence should become the template for the broader roster.
+
+The broader vision has four connected parts:
+
+- **An authored bestiary.** Build the roughly twenty-design roster across living biology,
+  material beings, weather, mechanisms and abstract forms. Contrast silhouettes, movement
+  and habits as deliberately as color. Every candidate earns its place with a recognizable
+  neutral pose and one distinctive action before a full animation set is commissioned.
+- **Places that unfold.** A small home, a courtyard and a neighborhood are views of the same
+  persistent residents and work. Expanding changes how much can be seen; folding preserves
+  addresses, pending requests and the keeper's place. Architecture and planting vary with
+  authored compatibility rules, preview and undo. The current immediate fold remains until
+  a richer transition can preserve those guarantees.
+- **Personal character.** Resolved variations combine compatible material marks, anatomy
+  and accessories without erasing a design's identity. Let a keeper lock what they like,
+  reroll the rest and bring their own artwork. Installed sprites need a durable asset-pack
+  contract, declared animation states and reliable fallback; a temporary image URL is not
+  an installation. These contracts remain separate work, not completed by this portrait API.
+- **Optional life around the work.** Cultivation, tiny crafted objects and creature moments
+  enrich the place without attendance penalties or invented productivity rewards. A real
+  result can appear at a threshold; an ornamental garden never impersonates real work.
+  Durable play belongs in the owning runtime before an interface claims it is saved.
+
+Independent review checked transparent crops and grounding at small and large sizes on
+light and dark backgrounds. The clearing's arch avoids the creatures' defining openings;
+the scene uses containment rather than destructive background cropping. These were offline
+art and composition checks, not live browser captures. Full desktop layout, animation and
+Windows/Linux release qualification remain outstanding.
+
+The final integrated local run passed **633 tests in 82 files** across native art, the
+illustration pipeline, companion, encounter, creature profile, home and courtyard routes.
+Both full-app home suites also passed **11 tests**, including notification focus and
+preservation of the existing courtyard preference. The static type, theme, color, copy,
+architecture and test-import checks exited 0. Changed-source formatting exited 0 with
+four advisory CSS importance warnings for sizing the legacy portrait fallback. The
+production UI build passed; all four emitted PNGs match their source hashes byte for byte.
+The build retains its large-chunk advisory. These are local proofs, not CI or release proof.
+
+## Bold Little Legends: renderer and interface iteration, 2026-11-19
+
+Folio, Tessera and Cairn have each been redrawn across 120 frames and all 21 native poses.
+Folio now has paired leaf wings with forked gold veins, a cream S-neck, teal flank and an
+open tail curl. Tessera has a continuous overhanging porcelain dome, large botanical marks
+and six articulated, tapered legs. Cairn has a slanted slab, a truly transparent aperture
+through its middle stone, a pointed lower shard and localized moss. Each retains eight
+compass looks. Full native PNG exports and the day/night proof are generated in
+`artifacts/shots/bold-legends/`; they are artwork exports, not installable user packs.
+
+An optional material profile on the native skin manifest selects leaf, porcelain or
+sandstone relationships. Semantic `--kw-art-*` theme tokens define the authored pigments;
+a restrained ambient tint lets them sit within each theme. The coat seed varies small
+markings while preserving the dominant material. Legacy creatures keep their coat palette,
+and signal inks and forced colors retain their established roles. The manifest cache
+includes this metadata. No creature wire format or engine-side appearance field changed.
+
+The first meeting and profile now share a character stage with actual pose playback,
+turning and pause controls. A gallery uses still native portraits, while the selected
+character can move. Material descriptions distinguish anatomy and character from live
+work status. Preview controls do not issue work or mutate a creature. The meeting retains
+roll, undo and its explicit creation actions; the profile retains its existing body-change
+save route and keyboard choices.
+
+The shared portrait handles motion preference changes, document visibility, offscreen
+suspension, inherited pane themes and display-density changes. It caches resolved pigments
+and skips unchanged drawings. Its logical display footprint is independent of a source
+cell's resolution, so the 48×52 and 96×104 preview fixtures occupy the same space. That
+normalization currently applies to portraits: the world and floating companion still use
+their native cell geometry. A higher-resolution production atlas needs corresponding
+grounding, placement and hit-mask work in those surfaces before it can be installed.
+
+The renderer compiles palette-independent drawing runs once per canonical frame and shares
+them across instances. Paint-only portraits avoid scaled hit-mask allocation. Retained
+drawing data is bounded to 512 entries / 8 MiB; retained masks to 64 entries / 4 MiB. These
+are cache limits, not a total application-memory claim. Existing callers can retain their
+frames independently. Oversized or nonfinite scale requests fail before allocation.
+
+An interleaved local counting-surface benchmark of 4,800 Folio paints measured median
+dispatch time of 6.50 ms against 13.70 ms for the reference pixel scanner, with identical
+draw calls and covered pixels. It measures drawing preparation and dispatch, not browser
+frame rate. Regression tests compare exact pixels, mirroring, transparency, masks, cache
+eviction, pane-local theme changes and idle redraw suppression. Separate review exposed
+and drove fixes for stale courtyard pigments, redundant preview painting and picker focus.
+
+An already-open floating companion now follows remembered gallery themes and system
+appearance changes, including while motionless. A tucked window keeps the latest choice
+for its next reveal. Theme updates preserve clip progress and hit masks. This uses the
+existing boot theme resolver; server-only theme definitions are not carried by that
+companion bridge.
+
+The integrated local Windows run passed **645 tests in 77 files**, including the full
+workspace keyboard path and all native appearance surfaces. Type, color, architecture,
+copy, theme synchronization, test-import and changed-source formatting checks passed.
+Independent review rechecked the corrected paths with focused reruns. The motion fixture
+uses a fixed clock epoch so the engine's intentional timing jitter remains deterministic.
+
+The current source remains a six-design selection. User sprite installation, resolved
+anatomical variation, the remaining roster and cultivation are separate unfinished work.
+Offline native artwork has been inspected. Live layout and animation qualification on
+Windows and Linux remain outstanding; these changes have not been published or installed.
 
 ## First native build
 
@@ -51,6 +231,64 @@ cache includes the complete rendering manifest and compares bytes after its hash
 Its limits are 32 retained slices and 32 MiB of reserved atlas/frame storage. Caller-owned
 registries are revalidated, not treated as immutable built-ins.
 
+## A living field guide: 2026-11-19
+
+The next artistic cut makes each court a composed place. A fixed 144×84 landscape contains
+the existing workshop, its threshold and path, a foreground landing and distant terrain.
+The creature remains the focal point. Its own ground line anchors it to the landing; the
+facade sits slightly farther back. Clear space around the body, entrance and roof makes
+their silhouettes readable. Terrain texture stays subordinate to those three shapes.
+
+Three settings are selected by permanent address: an orchard terrace, a stone garden and
+a tidal inlet. Returning residents and reserved vacancies keep that assignment. Orchard
+canopies, quarried arches and offshore stacks provide different large shapes; restrained
+theme-derived terrain pigments separate their materials. Signal inks keep their established
+meanings, and forced colors use the canonical system palette. These are cosmetic settings,
+not simulated geography or a new crop system.
+
+The overview now has a quieter editorial hierarchy: a neighborhood heading, readable serif
+names, small monospace addresses, and written status with a simple state mark. The common
+art aperture scales scenery and resident together. Roomy courts reach a clean 2× native
+size when there is space; narrow and compact courts scale proportionally. Habitat names
+are available to assistive technology. Hover changes ink rather than moving the scene.
+
+Appearance controls live behind an explicit button in an open courtyard. Choosing a style
+or garden keeps the editor open; Done returns focus. Escape closes the editor before
+folding the courtyard, while select menus retain their native Escape behavior. Moving to
+another resident starts with the editor closed. Saved choices and one-step undo retain
+their existing persistence route.
+
+The initial Folio cut joined the five existing offered designs. That paper-winged dragon had **120
+authored frames across all 21 poses**, including eight compass looks. It creases a sheet
+with its snout, raises a folded wing to listen, shelters beneath a buckled cover when blocked
+and closed like a bookmarked book to rest. The Bold Little Legends leaf-wing redraw above
+replaces that interpretation. Its atlas is offered through the shared
+registry, onboarding, profile, stead and companion. The importer and resolved trait system
+remain unfinished; adding this authored design does not claim to complete the roster.
+
+Three Astra specialists handled environment art, character art and independent review while
+the main implementation integrated the UI. Review corrected reversed standing/walking
+orientation, a distracting shoreline, suppressed habitat descriptions, excessive portrait
+resolution and unnecessary redraws. Unchanged visual facts, a semantic minute tick, a rename
+and a same-density resize now avoid repainting the folded artwork. Both layers share an
+integer backing-scale ceiling of four, keeping sixteen native courts' RGBA canvas buffers
+at or below 14.25 MiB, excluding masks, atlases and runtime overhead. There are no new
+animation timers, dependencies or engine-format changes.
+
+Continue this art direction through authored material relationships and characteristic
+movement. Future creatures can be weather, interwoven ribbons or open geometric forms;
+each needs a complete motion grammar and a readable actual-size silhouette. Future shared
+places should have one recognizable form and a clear interaction before accumulating props.
+Custom sprite installation and live desktop qualification remain the next product gaps.
+
+Local validation on Windows: **558 tests in 68 files passed**, covering skins, place/render,
+companion, onboarding, stead, profile and full-shell courtyard keyboard routing. Type,
+color, architecture guardrail, copy, test-import and changed-source Biome checks passed.
+The native day/night compositions and Folio's 2×/4× sheets were visually reviewed; the
+animated proof is an offline render. CSS layout, desktop animation and native select-menu
+behavior still need live Windows/Linux qualification. No publication or installed Stead
+adoption is implied.
+
 ## Twenty candidate concepts
 
 This is a candidate library, not a claim that all twenty have production sheets. Keep the
@@ -62,7 +300,7 @@ three existing creatures available while selecting the final starter roster.
 | Purl | Small cuttlefish | Mantle pulses; arms arrange tools | Curved shelves and tidal bands |
 | Tine | Mantis-like craftsperson | Forelimbs fold into precise working angles | Fine braces and tall narrow openings |
 | Shale | Pangolin-like burrower | Scales settle in overlapping waves | Layered stone and curved thresholds |
-| Folio | Compact paper-winged dragon | Wings fold like a book; tail holds a place | Accordion roofs and booklike shutters |
+| Folio | Compact leaf-winged dragon | Veined leaves fold to shelter its cream neck; tail curls to rest | Veined canopies and botanical screens |
 | Tessera | Porcelain shell on six feet | Shell panels adjust; tripods coordinate | Segmented ceramic tiles |
 | Vela | Floating air ray | Rippling fins counterbalance a carried parcel | Suspended canopies |
 | Hush | Weather held within a ring | Cloud gathers to listen; ring tilts to work | Open circles and sheltered hollows |

@@ -76,6 +76,36 @@ describe("the creature profile", () => {
     expect(fact(container, "vision")).toBe("inherit · workspace, then user");
   });
 
+  it("keeps the live state while previewing rest and lets the keeper change body from a still gallery", async () => {
+    const { container, harness } = await open();
+    const button = (name: string) =>
+      [...container.querySelectorAll("button")].find(
+        (item) => item.textContent?.trim() === name,
+      ) as HTMLButtonElement;
+    const telling = container.querySelector(".kw-creature-telling")?.textContent;
+    fireEvent.click(button("Open conversation"));
+    expect(harness.opened).toEqual(["t0"]);
+    expect(container.querySelector(".kw-studio-motion-portrait")).toBeNull();
+    fireEvent.click(button("See it move"));
+    fireEvent.click(button("Rest"));
+    expect(container.querySelector(".kw-studio-motion-portrait")?.getAttribute("data-clip")).toBe(
+      "nap",
+    );
+    expect(container.querySelector(".kw-creature-portrait")?.getAttribute("data-clip")).toBe(
+      "idle",
+    );
+    expect(container.querySelector(".kw-creature-telling")?.textContent).toBe(telling);
+    expect(lastCall(harness.served, "PATCH")).toBeUndefined();
+    fireEvent.click(button("Change body"));
+    const picker = container.querySelector(".kw-creature-body-picker") as HTMLElement;
+    expect(picker.querySelectorAll("canvas[data-still]")).toHaveLength(7);
+    const selected = picker.querySelector("button[aria-label='Tessera']") as HTMLButtonElement;
+    fireEvent.click(selected);
+    await settle();
+    expect(lastCall(harness.served, "PATCH")?.body).toEqual({ body: { skin: "tessera" } });
+    expect(container.querySelector(".kw-creature-body-picker")).toBeNull();
+  });
+
   it("names the bare host plainly instead of pretending it is sealed", async () => {
     const { container } = await open({ detail: { ...wrenDetail(), workshop: "host" } });
     expect(fact(container, "workshop")).toBe("host · the bare node, unconfined");
@@ -189,7 +219,7 @@ describe("the creature profile", () => {
     }));
     act("creature.skin");
     expect(container.querySelector("[data-tone='ask']")?.textContent).toBe(
-      "body for Wren · 1 kid · 2 carter · 3 joiner · 4 tessera · 5 cairn · 6 placeholder · any other key cancels",
+      "body for Wren · 1 kid · 2 carter · 3 joiner · 4 tessera · 5 cairn · 6 folio · 7 placeholder · Esc cancels",
     );
     choose(container, "2");
     await settle();

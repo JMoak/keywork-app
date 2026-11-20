@@ -98,7 +98,7 @@ export function steadDrawer(): SteadDrawer {
         figures: figures.map((figure) => ({
           placed: figure.placed,
           render: figure.member.render,
-          palette: resolved.coat(figure.member.hueStop),
+          palette: resolved.coat(figure.member.hueStop, figure.member.skin.material),
         })),
       },
       fit,

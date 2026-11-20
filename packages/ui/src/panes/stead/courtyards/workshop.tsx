@@ -1,13 +1,14 @@
 import type { Courtyard, WorkshopFamily } from "@keywork-app/habitat";
 import {
+  courtyardFrame,
+  courtyardPalette,
+  courtyardSettingOf,
   type GardenKind,
   paintIndexed,
-  resolvePalette,
-  scaleFor,
-  workshopFrame,
 } from "@keywork-app/habitat/render";
 import { createEffect, createMemo, on } from "solid-js";
 import { devicePixelRatioOf, forcedColorsActive, paletteSourceOf, surfaceOf } from "../painter.ts";
+import { courtyardPaintScale } from "./painting.ts";
 
 export interface CourtyardWorkshopProps {
   readonly court: Courtyard;
@@ -18,33 +19,51 @@ export interface CourtyardWorkshopProps {
 
 export function CourtyardWorkshop(props: CourtyardWorkshopProps) {
   let canvas: HTMLCanvasElement | undefined;
-  const frame = createMemo(() =>
-    workshopFrame(props.family, {
-      lamps: props.court.reading.lamps,
-      lanterns: props.court.reading.lanterns,
-      notes: props.court.reading.notes,
-      chores: props.court.creature.chores.length,
-      crates: props.court.reading.crates,
-      boarded: props.court.creature.workshop.boardedAt !== undefined,
-      garden: props.garden,
-    }),
+  const visual = createMemo(
+    () =>
+      [
+        props.court.index,
+        props.family,
+        props.garden,
+        props.court.reading.lamps,
+        props.court.reading.lanterns,
+        props.court.reading.notes,
+        props.court.creature.chores.length,
+        props.court.reading.crates,
+        props.court.creature.workshop.boardedAt !== undefined,
+      ] as const,
+    undefined,
+    { equals: (a, b) => a.every((value, index) => value === b[index]) },
   );
+  const frame = createMemo(() => {
+    const [address, family, garden, lamps, lanterns, notes, chores, crates, boarded] = visual();
+    return courtyardFrame(address, family, {
+      garden,
+      lamps,
+      lanterns,
+      notes,
+      chores,
+      crates,
+      boarded,
+    });
+  });
   const paint = (): void => {
     if (canvas === undefined) return;
     const held = frame();
     const dpr = devicePixelRatioOf();
-    const scale = scaleFor(dpr);
+    const scale = courtyardPaintScale(dpr);
     canvas.width = held.width * scale;
     canvas.height = held.height * scale;
-    canvas.style.width = `${canvas.width / dpr}px`;
-    canvas.style.height = `${canvas.height / dpr}px`;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     const context = canvas.getContext("2d");
     if (context === null) return;
     context.imageSmoothingEnabled = false;
-    const palette = resolvePalette(paletteSourceOf(canvas), {
-      world: true,
-      forcedColors: forcedColorsActive(),
-    });
+    const palette = courtyardPalette(
+      paletteSourceOf(canvas),
+      props.court.index,
+      forcedColorsActive(),
+    );
     paintIndexed(surfaceOf(context), held, palette, scale);
   };
 
@@ -58,6 +77,7 @@ export function CourtyardWorkshop(props: CourtyardWorkshopProps) {
       }}
       class="kw-courtyard-workshop"
       data-workshop={props.family}
+      data-setting={courtyardSettingOf(props.court.index)}
       data-garden={props.garden}
       data-boarded={props.court.creature.workshop.boardedAt !== undefined ? "" : undefined}
       data-still=""

@@ -1,4 +1,5 @@
 import { legibleInks } from "./legible.ts";
+import { materialVariables } from "./materials.ts";
 import type { Theme } from "./schema.ts";
 import { densityLevels, diffKeys, syntaxKeys, terminalKeys } from "./sections.ts";
 import { keyworkNight } from "./themes.ts";
@@ -32,6 +33,7 @@ export function themeVariables(theme: Theme): ThemeVariables {
     "--kw-accent-soft": inks.accentSoft,
     "--kw-success": inks.success,
     "--kw-error": inks.error,
+    ...materialVariables(theme),
     ...Object.fromEntries(
       rampStops(inks.ramp).map((stop, index) => [`--kw-ramp-${index + 1}`, stop]),
     ),

@@ -100,6 +100,7 @@ import {
   type SteadScene,
 } from "./habitat-render.ts";
 import { emptyHerd, gatherHerd, type Herd, type Member, stepHerd } from "./herd.ts";
+import { SteadHome } from "./home.tsx";
 import { type SteadHomeScope, shellForStead } from "./home-scope.ts";
 import {
   type CanvasFit,
@@ -390,6 +391,11 @@ function ConnectedStead(props: PaneProps<SteadSpec> & { readonly scope: SteadHom
 function Stead(props: PaneProps<SteadSpec>) {
   const keyboard = useKeyboardScope();
   const profile = useProductProfile();
+  const [exploring, setExploring] = createSignal(false);
+  const [encounterShowing, setEncounterShowing] = createSignal(false);
+  const consumerHome = () => profile.id === "stead";
+  const placeVisible = () => !consumerHome() || (exploring() && !encounterShowing());
+  const quietView = () => !placeVisible() || courts.overview();
   const onboarding = props.shell.onboarding ?? createOnboardingController();
   let root: HTMLElement | undefined;
   let stage: HTMLDivElement | undefined;
@@ -509,7 +515,9 @@ function Stead(props: PaneProps<SteadSpec>) {
   const keys = createMemo(() => steadKeys(props.shell.keys));
   const current = () => visibleResidents()[cursor.index()];
   const porch = createMemo(() =>
-    porchOf(world(), herd(), courts.overview() ? overviewTime() : Date.now()),
+    placeVisible()
+      ? porchOf(world(), herd(), quietView() ? overviewTime() : Date.now())
+      : undefined,
   );
   const placedFigures = (): readonly PlacedFigure[] =>
     (frame()?.figures ?? []).map((figure) => figure.placed);
@@ -538,7 +546,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
 
   const baseContext = (tier: PowerTier): Omit<StepContext, "pointer" | "gestures"> => ({
-    visible: !documentHidden() && !courts.overview(),
+    visible: !documentHidden() && !quietView(),
     focused: props.focused,
     fullscreen: false,
     doNotDisturb: false,
@@ -599,7 +607,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const loop = steadField(
     browserFieldHost(),
     {
-      hidden: () => documentHidden() || courts.overview(),
+      hidden: () => documentHidden() || quietView(),
       resting: () => !props.focused || !windowFocused(),
       lastInputAt: () => lastInputAt,
     },
@@ -608,6 +616,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const requestDraw = loop.request;
 
   const visitCourt = (slug: string): void => {
+    setExploring(true);
     const index = districts().findIndex((district) => district.slugs.includes(slug));
     if (index >= 0) setDistrict(index);
     courts.open(slug);
@@ -691,6 +700,16 @@ function Stead(props: PaneProps<SteadSpec>) {
     }
     setNotice(undefined);
     props.shell.sessions.openSession(thread);
+  };
+  const talkToCreature = (slug: string): void => {
+    const resident = Object.hasOwn(world().creatures, slug) ? world().creatures[slug] : undefined;
+    if (resident === undefined) return;
+    if (resident.conversation === undefined) {
+      setNotice(noThreadYet(resident.name));
+      return;
+    }
+    setNotice(undefined);
+    props.shell.sessions.openSession(resident.conversation);
   };
   const openTarget = (target: SceneTarget): void => {
     switch (target.kind) {
@@ -825,15 +844,31 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
   readWhyKeys(
     () => root,
-    () => (props.focused && !courts.overview() && !wordingHere() ? heldAsk()?.callId : undefined),
+    () => (props.focused && !quietView() && !wordingHere() ? heldAsk()?.callId : undefined),
     giveReason,
   );
 
   props.onAction((action) => {
     if (onboarding.take(action)) return;
+    if (consumerHome() && encounterShowing()) return;
     const pick = answerPicks[action];
-    if (courts.overview() && (pick !== undefined || action === "stead.overturn")) {
+    if (quietView() && (pick !== undefined || action === "stead.overturn")) {
       props.shell.openPane({ kind: "needs-you" });
+      return;
+    }
+    if (!placeVisible()) {
+      if (action === "stead.open")
+        root?.querySelector<HTMLButtonElement>(".kw-home-primary")?.click();
+      else if (action === "stead.down" || action === "stead.up") {
+        const neighbors = [
+          ...(root?.querySelectorAll<HTMLButtonElement>(".kw-home-neighbor") ?? []),
+        ];
+        const active = document.activeElement;
+        const index = active instanceof HTMLButtonElement ? neighbors.indexOf(active) : -1;
+        const next =
+          action === "stead.down" ? index + 1 : index < 0 ? neighbors.length - 1 : index - 1;
+        neighbors[Math.max(0, Math.min(neighbors.length - 1, next))]?.focus();
+      }
       return;
     }
     if (pick !== undefined) return answer(pick);
@@ -856,9 +891,17 @@ function Stead(props: PaneProps<SteadSpec>) {
 
   createEffect(
     on(
-      [world, courts.overview, overviewTime, sceneSlugs, families, () => preference().gardens],
+      [
+        world,
+        quietView,
+        overviewTime,
+        sceneSlugs,
+        families,
+        () => preference().gardens,
+        placeVisible,
+      ],
       ([currentWorld, overview]) => {
-        if (overview) {
+        if (overview && placeVisible()) {
           const at = Date.now();
           setHerd((previous) =>
             stepHerd(
@@ -879,7 +922,7 @@ function Stead(props: PaneProps<SteadSpec>) {
     ),
   );
   createEffect(
-    on(courts.overview, (visible) => {
+    on(quietView, (visible) => {
       if (!visible) return;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = (): void => {
@@ -916,7 +959,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   onMount(() => {
     loop.redraw();
     const stops = [
-      watchTheme(requestDraw),
+      watchTheme(requestDraw, root),
       watchMedia(forcedColorsQuery, requestDraw),
       watchMedia(reducedMotionQuery, requestDraw),
       stage === undefined ? () => undefined : watchSize(stage, requestDraw),
@@ -928,15 +971,17 @@ function Stead(props: PaneProps<SteadSpec>) {
   });
   onCleanup(loop.stop);
 
-  const now = (): number => (courts.overview() ? overviewTime() : (frame()?.at ?? Date.now()));
+  const now = (): number => (quietView() ? overviewTime() : (frame()?.at ?? Date.now()));
   const needYou = (): number => waitingCount(props.shell);
-  const board = createMemo(() => choreBoard(world(), now(), offsetMinutes));
+  const board = createMemo(() =>
+    placeVisible() ? choreBoard(world(), now(), offsetMinutes) : undefined,
+  );
   const residents = () => Object.values(world().creatures);
   const semanticMinute = createMemo(() => Math.floor(now() / 60_000));
   const residentStates = createMemo(
     () =>
       new Map(
-        residents().map((resident) => [
+        (placeVisible() ? residents() : []).map((resident) => [
           resident.slug,
           creatureSnapshot(
             world(),
@@ -953,7 +998,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const working = (): number =>
     [...residentStates().values()].filter((state) => state === "working").length;
   const districtSummaries = createMemo(() =>
-    districts().map((district) => ({
+    (placeVisible() ? districts() : []).map((district) => ({
       ...district,
       occupied: district.slugs.filter((slug) => world().creatures[slug] !== undefined).length,
       waiting: district.slugs.filter((slug) => residentStates().get(slug) === "porch").length,
@@ -962,6 +1007,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const condensedInfrastructure = createMemo(() => {
     const shared = frame()?.scene.infrastructure;
     if (
+      !placeVisible() ||
       courts.overview() ||
       shared === undefined ||
       (shared.storehouseWings <= shared.shownStorehouseWings &&
@@ -972,14 +1018,17 @@ function Stead(props: PaneProps<SteadSpec>) {
     return `Across the stead: ${shared.storehouseWings} storehouse wings · ${shared.totalMills} mills (${shared.busyMills} running) · ${shared.totalParcels} outlying plots. Shared buildings are shown in miniature here.`;
   });
   const head = (): string =>
-    headLine({
-      creatures: residents().length,
-      needYou: needYou(),
-      working: working(),
-      phase: skyAt(now(), offsetMinutes).phase,
-      clock: clockWord(now(), offsetMinutes),
-      floating: members().find((member) => member.slug === props.shell.companion?.floating())?.name,
-    });
+    placeVisible()
+      ? headLine({
+          creatures: residents().length,
+          needYou: needYou(),
+          working: working(),
+          phase: skyAt(now(), offsetMinutes).phase,
+          clock: clockWord(now(), offsetMinutes),
+          floating: members().find((member) => member.slug === props.shell.companion?.floating())
+            ?.name,
+        })
+      : "";
   const bubbleRun = (): ToolRun | undefined => {
     const held = heldAsk();
     return held === undefined
@@ -995,222 +1044,276 @@ function Stead(props: PaneProps<SteadSpec>) {
       ref={root}
       data-hit={hovered() === undefined ? undefined : ""}
     >
-      <div class="kw-ov-head">
-        <span class="kw-ov-head-lead">{head()}</span>
-      </div>
-      <CompanionSwitchRow
-        switch={props.shell.companion?.toggle()}
-        creatures={members().length}
-        chord={props.shell.keys.chord("companion.toggle")}
-      />
-      <fieldset
-        class="kw-stead-views"
-        aria-label={`${steadName} view`}
-        data-native-activation
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && courts.selected() !== undefined) {
-            event.preventDefault();
-            foldCourt();
-          }
-        }}
-      >
-        <button
-          type="button"
-          aria-pressed={!courts.configured()}
-          onClick={() => courts.choose("scene")}
-        >
-          Continuous {steadName}
-        </button>
-        <button
-          type="button"
-          aria-pressed={courts.configured()}
-          onClick={() => courts.choose("courtyards")}
-        >
-          Courtyards
-        </button>
-        <Show when={courts.selected() !== undefined}>
-          <span ref={courtHeading} tabIndex={-1} data-court-detail>
-            {world().creatures[courts.selected() ?? ""]?.name}'s courtyard
-          </span>
-          <button type="button" onClick={foldCourt}>
-            Fold back to courtyards
-          </button>
-        </Show>
-        <Show when={needYou() > 0}>
-          <button type="button" onClick={() => props.shell.openPane({ kind: "needs-you" })}>
-            {needYou()} needs you
-          </button>
-        </Show>
-      </fieldset>
-      <SettlementControls
-        districts={districtSummaries()}
-        district={districtIndex()}
-        onDistrict={visitDistrict}
-        selected={courts.selected()}
-        family={savedChoice(preference().workshopStyles, courts.selected() ?? "")}
-        automaticFamily={workshopFamilyOf(
-          (neighborhood()?.start ?? 0) + Math.max(0, sceneSlugs().indexOf(courts.selected() ?? "")),
-        )}
-        garden={savedChoice(preference().gardens, courts.selected() ?? "")}
-        onFamily={chooseFamily}
-        onGarden={chooseGarden}
-        overview={courts.overview()}
-        compact={preference().alignment === "compact"}
-        onArrange={() =>
-          changeAppearance({
-            alignment: preference().alignment === "compact" ? "roomy" : "compact",
-          })
-        }
-        canUndo={appearanceUndo() !== undefined}
-        onUndo={() => {
-          const previous = appearanceUndo();
-          if (previous !== undefined) {
-            remember(previous);
-            setAppearanceUndo(undefined);
-          }
-        }}
-      />
-      <Show when={courts.error()}>{(line) => <p role="status">{line()}</p>}</Show>
-      <Show when={condensedInfrastructure()}>
-        {(line) => <p class="kw-stead-board">{line()}</p>}
-      </Show>
-      <Show when={herd().refused.length > 0}>
-        <p class="kw-stead-board" role="status">
-          Artwork unavailable for{" "}
-          {herd()
-            .refused.map((refused) => world().creatures[refused.slug]?.name ?? refused.slug)
-            .join(", ")}
-          .
-        </p>
-      </Show>
-      <Show when={courts.overview()}>
-        <CourtyardOverview
-          world={world()}
-          order={courts.order()}
-          range={neighborhood()}
-          families={families()}
-          gardens={preference().gardens}
-          alignment={preference().alignment}
-          now={overviewTime()}
-          onOpen={visitCourt}
-        />
-      </Show>
-      <div
-        class="kw-stead-stage"
-        hidden={courts.overview()}
-        ref={stage}
-        style={{ height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px` }}
-      >
-        <div
-          class="kw-stead-field"
-          ref={field}
-          role="application"
-          data-tier={frame()?.tier}
-          data-district={districtIndex()}
-          data-wakes={frame()?.wakes}
-          data-frames={frame()?.frames}
-          style={{
-            width: frame() === undefined ? undefined : `${frame()?.fit.cssWidth}px`,
-            height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px`,
-          }}
-          onPointerMove={onPointerMove}
-          onPointerLeave={onPointerLeave}
-          onPointerDown={onPointerDown}
-          onClick={onClick}
-          onKeyDown={onFieldKeyDown}
-        >
-          <canvas class="kw-stead-canvas" ref={canvas} />
-          <Index each={frame()?.figures ?? []}>
-            {(figure) => (
-              <Figure
-                figure={figure()}
-                fit={frame()?.fit}
-                hit={hovered() === figure().member.slug}
-                cursor={props.focused && current()?.slug === figure().member.slug}
-              />
-            )}
-          </Index>
-          <Show when={porchFigure(porch(), frame())}>
-            {(standing) => (
-              <Bubble
-                placement="porch"
-                bubble={porchBubble(standing().porch)}
-                style={bubbleStyle(standing())}
-                run={bubbleRun()}
-                keys={keys()}
-                overturnChord={overturnKey()}
-                wording={wordingHere()}
-                onOpen={() => openPorch(standing().porch)}
-                onAnswer={(pick) => answer(pick)}
-                onAccept={acceptGrants}
-                onOverturn={overturn}
-                onReason={(reason) => giveReason(reason, reason === "other")}
-                onWords={sendWords}
-              />
-            )}
-          </Show>
-        </div>
-      </div>
       <OnboardingOnTheStead
         shell={props.shell}
         controller={onboarding}
         automatic={profile.startup === "creature"}
         simple={meetsItsCreature()}
+        hasResidents={residents().length > 0}
+        onShowingChange={setEncounterShowing}
       />
-      <Show
-        when={residents().length > 0}
-        fallback={
-          <Show when={!meetsItsCreature() && onboarding.active() === undefined}>
-            <EmptyState line={steadPane.emptyState(props.shell.keys)} />
-          </Show>
-        }
-      >
-        <p
-          class="kw-stead-board"
-          role="note"
-          aria-label="chore board"
-          data-next-at={board().nextAt}
-        >
-          {board().line}
-        </p>
-        <ol class="kw-stead-rows">
-          <Index each={members()}>
-            {(member) => (
-              <CreatureRow
-                member={member()}
-                world={world()}
-                now={now()}
-                offsetMinutes={offsetMinutes}
-                cursor={props.focused && current()?.slug === member().slug}
-                onPick={() => openCreature(member().slug)}
-              />
-            )}
-          </Index>
-        </ol>
+      <Show when={consumerHome() && !exploring() && !encounterShowing() && residents().length > 0}>
+        <SteadHome
+          world={world()}
+          order={courts.order()}
+          range={neighborhood()}
+          selected={current()?.slug}
+          waiting={waitingIn(props.shell)}
+          needsYou={needYou()}
+          now={now()}
+          onTalk={talkToCreature}
+          onCourt={visitCourt}
+          onExplore={() => {
+            setExploring(true);
+            requestDraw();
+            queueMicrotask(() => root?.querySelector<HTMLElement>(".kw-stead-back-home")?.focus());
+          }}
+          onRequests={() => props.shell.openPane({ kind: "needs-you" })}
+          onCreate={() => {
+            onboarding.request();
+            root?.scrollTo({ top: 0 });
+          }}
+        />
       </Show>
-      <Show when={props.shell.steadHome} keyed>
-        {(scope) => (
-          <Show when={current()?.slug} keyed>
-            {(slug) => (
-              <CreatureProjectControls
-                creature={{
-                  slug,
-                  get name() {
-                    return current()?.name ?? slug;
-                  },
-                }}
-                scope={scope}
-                feed={props.shell.feed}
-                conversation={async (slug) => {
-                  const creature = await props.shell.client.creature(slug);
-                  return "refused" in creature ? undefined : creature.conversation || undefined;
-                }}
-              />
-            )}
+      <div class="kw-stead-workbench" hidden={!placeVisible()}>
+        <Show when={consumerHome()}>
+          <button
+            type="button"
+            class="kw-home-text-button kw-stead-back-home"
+            data-native-activation
+            onClick={() => {
+              setExploring(false);
+              setPointer(undefined);
+              setHovered(undefined);
+              requestDraw();
+              queueMicrotask(() =>
+                root?.querySelector<HTMLElement>(".kw-home-heading button")?.focus(),
+              );
+            }}
+          >
+            ← Back home
+          </button>
+        </Show>
+        <div class="kw-ov-head">
+          <span class="kw-ov-head-lead">{head()}</span>
+        </div>
+        <CompanionSwitchRow
+          switch={props.shell.companion?.toggle()}
+          creatures={members().length}
+          chord={props.shell.keys.chord("companion.toggle")}
+        />
+        <fieldset
+          class="kw-stead-views"
+          aria-label={`${steadName} view`}
+          data-native-activation
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && courts.selected() !== undefined) {
+              event.preventDefault();
+              foldCourt();
+            }
+          }}
+        >
+          <button
+            type="button"
+            aria-pressed={!courts.configured()}
+            onClick={() => courts.choose("scene")}
+          >
+            Continuous {steadName}
+          </button>
+          <button
+            type="button"
+            aria-pressed={courts.configured()}
+            onClick={() => courts.choose("courtyards")}
+          >
+            Courtyards
+          </button>
+          <Show when={courts.selected() !== undefined}>
+            <span ref={courtHeading} tabIndex={-1} data-court-detail>
+              {world().creatures[courts.selected() ?? ""]?.name}'s courtyard
+            </span>
+            <button type="button" onClick={foldCourt}>
+              Fold back to courtyards
+            </button>
           </Show>
+          <Show when={needYou() > 0}>
+            <button type="button" onClick={() => props.shell.openPane({ kind: "needs-you" })}>
+              {needYou()} needs you
+            </button>
+          </Show>
+        </fieldset>
+        <SettlementControls
+          onFold={foldCourt}
+          districts={districtSummaries()}
+          district={districtIndex()}
+          onDistrict={visitDistrict}
+          selected={courts.selected()}
+          family={savedChoice(preference().workshopStyles, courts.selected() ?? "")}
+          automaticFamily={workshopFamilyOf(
+            (neighborhood()?.start ?? 0) +
+              Math.max(0, sceneSlugs().indexOf(courts.selected() ?? "")),
+          )}
+          garden={savedChoice(preference().gardens, courts.selected() ?? "")}
+          onFamily={chooseFamily}
+          onGarden={chooseGarden}
+          overview={courts.overview()}
+          compact={preference().alignment === "compact"}
+          onArrange={() =>
+            changeAppearance({
+              alignment: preference().alignment === "compact" ? "roomy" : "compact",
+            })
+          }
+          canUndo={appearanceUndo() !== undefined}
+          onUndo={() => {
+            const previous = appearanceUndo();
+            if (previous !== undefined) {
+              remember(previous);
+              setAppearanceUndo(undefined);
+            }
+          }}
+        />
+        <Show when={courts.error()}>{(line) => <p role="status">{line()}</p>}</Show>
+        <Show when={condensedInfrastructure()}>
+          {(line) => <p class="kw-stead-board">{line()}</p>}
+        </Show>
+        <Show when={herd().refused.length > 0}>
+          <p class="kw-stead-board" role="status">
+            Artwork unavailable for{" "}
+            {herd()
+              .refused.map((refused) => world().creatures[refused.slug]?.name ?? refused.slug)
+              .join(", ")}
+            .
+          </p>
+        </Show>
+        <Show when={placeVisible() && courts.overview()}>
+          <CourtyardOverview
+            world={world()}
+            order={courts.order()}
+            range={neighborhood()}
+            families={families()}
+            gardens={preference().gardens}
+            alignment={preference().alignment}
+            neighborhood={neighborhood()?.address}
+            now={overviewTime()}
+            onOpen={visitCourt}
+          />
+        </Show>
+        <div
+          class="kw-stead-stage"
+          hidden={quietView()}
+          ref={stage}
+          style={{ height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px` }}
+        >
+          <div
+            class="kw-stead-field"
+            ref={field}
+            role="application"
+            data-tier={frame()?.tier}
+            data-district={districtIndex()}
+            data-wakes={frame()?.wakes}
+            data-frames={frame()?.frames}
+            style={{
+              width: frame() === undefined ? undefined : `${frame()?.fit.cssWidth}px`,
+              height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px`,
+            }}
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
+            onPointerDown={onPointerDown}
+            onClick={onClick}
+            onKeyDown={onFieldKeyDown}
+          >
+            <canvas class="kw-stead-canvas" ref={canvas} />
+            <Index each={frame()?.figures ?? []}>
+              {(figure) => (
+                <Figure
+                  figure={figure()}
+                  fit={frame()?.fit}
+                  hit={hovered() === figure().member.slug}
+                  cursor={props.focused && current()?.slug === figure().member.slug}
+                />
+              )}
+            </Index>
+            <Show when={porchFigure(porch(), frame())}>
+              {(standing) => (
+                <Bubble
+                  placement="porch"
+                  bubble={porchBubble(standing().porch)}
+                  style={bubbleStyle(standing())}
+                  run={bubbleRun()}
+                  keys={keys()}
+                  overturnChord={overturnKey()}
+                  wording={wordingHere()}
+                  onOpen={() => openPorch(standing().porch)}
+                  onAnswer={(pick) => answer(pick)}
+                  onAccept={acceptGrants}
+                  onOverturn={overturn}
+                  onReason={(reason) => giveReason(reason, reason === "other")}
+                  onWords={sendWords}
+                />
+              )}
+            </Show>
+          </div>
+        </div>
+        <Show
+          when={placeVisible() && residents().length > 0}
+          fallback={
+            <Show when={!meetsItsCreature() && onboarding.active() === undefined}>
+              <EmptyState line={steadPane.emptyState(props.shell.keys)} />
+            </Show>
+          }
+        >
+          <p
+            class="kw-stead-board"
+            role="note"
+            aria-label="chore board"
+            data-next-at={board()?.nextAt}
+          >
+            {board()?.line}
+          </p>
+          <ol class="kw-stead-rows">
+            <Index each={members()}>
+              {(member) => (
+                <CreatureRow
+                  member={member()}
+                  world={world()}
+                  now={now()}
+                  offsetMinutes={offsetMinutes}
+                  cursor={props.focused && current()?.slug === member().slug}
+                  onPick={() => openCreature(member().slug)}
+                />
+              )}
+            </Index>
+          </ol>
+        </Show>
+        <Show when={placeVisible() ? props.shell.steadHome : undefined} keyed>
+          {(scope) => (
+            <Show when={current()?.slug} keyed>
+              {(slug) => (
+                <CreatureProjectControls
+                  creature={{
+                    slug,
+                    get name() {
+                      return current()?.name ?? slug;
+                    },
+                  }}
+                  scope={scope}
+                  feed={props.shell.feed}
+                  conversation={async (slug) => {
+                    const creature = await props.shell.client.creature(slug);
+                    return "refused" in creature ? undefined : creature.conversation || undefined;
+                  }}
+                />
+              )}
+            </Show>
+          )}
+        </Show>
+      </div>
+      <Show when={placeVisible() ? footLine() : notice()}>
+        {(line) => (
+          <p class="kw-ov-line" role="status">
+            {line()}
+          </p>
         )}
       </Show>
-      <Show when={footLine()}>{(line) => <p class="kw-ov-line">{line()}</p>}</Show>
     </section>
   );
 }

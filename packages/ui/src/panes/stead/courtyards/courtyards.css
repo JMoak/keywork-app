@@ -1,115 +1,183 @@
 .kw-courtyards {
-  padding: 0.75rem;
+  padding: 1rem 1.25rem 1.5rem;
   color: var(--kw-text);
 }
-
-.kw-courtyards-intro {
-  margin: 0 0 0.75rem;
-  color: var(--kw-text-mid);
+.kw-courtyards-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding: 0.25rem 0 1.25rem;
 }
-
+.kw-courtyard-heading {
+  color: var(--kw-text-mid);
+  font-size: 0.75rem;
+  letter-spacing: 0.025em;
+}
+.kw-courtyards-heading h2 {
+  margin: 0;
+  font: 500 1.65rem / 1.15 var(--kw-font-prose);
+}
+.kw-courtyards-intro {
+  margin: 0;
+  max-width: 27ch;
+  color: var(--kw-text-mid);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
 .kw-courtyard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(calc(288px + 1.5rem + 2px), 100%), 1fr));
+  gap: 1.25rem;
   list-style: none;
   padding: 0;
   margin: 0;
 }
-
 .kw-courtyard-cell {
   min-width: 0;
 }
-
 .kw-courtyard,
 .kw-courtyard-vacant {
   display: grid;
-  grid-template-rows: auto 7.5rem auto auto;
-  gap: 0.25rem;
+  grid-template-rows: auto 1fr auto;
   align-content: start;
+  gap: 0.75rem;
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 0.625rem;
+  padding: 0.75rem;
   border: 1px solid var(--kw-border);
-  background: var(--kw-panel);
+  border-radius: 0.45rem;
+  background: var(--kw-background);
   color: var(--kw-text);
   font: inherit;
   text-align: left;
   overflow-wrap: anywhere;
 }
-
 .kw-courtyard {
   cursor: pointer;
 }
-
 .kw-courtyard:hover,
 .kw-courtyard[aria-current="location"] {
   border-color: var(--kw-accent);
-  background: var(--kw-panel-lift);
 }
-
 .kw-courtyard:focus-visible {
   outline: 2px solid var(--kw-border-focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
-
-.kw-courtyard-address,
-.kw-courtyard-state,
-.kw-courtyard-missing {
-  color: var(--kw-text-mid);
-  font-size: 0.875em;
+.kw-courtyard-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1ch;
 }
-
+.kw-courtyard-setting {
+  color: var(--kw-text-dim);
+}
 .kw-courtyard-art {
-  display: grid;
-  align-items: end;
-  min-width: 0;
+  position: relative;
+  display: block;
+  align-self: end;
+  justify-self: center;
+  width: min(100%, 288px);
+  aspect-ratio: 12 / 7;
+  isolation: isolate;
   overflow: hidden;
+  background: var(--kw-panel);
 }
-
 .kw-courtyard-portrait,
 .kw-courtyard-workshop {
+  position: absolute;
   display: block;
-  grid-area: 1 / 1;
   image-rendering: pixelated;
   forced-color-adjust: none;
 }
-
 .kw-courtyard-portrait {
-  justify-self: start;
-  position: relative;
   z-index: 1;
 }
-
 .kw-courtyard-workshop {
-  justify-self: end;
+  inset: 0;
 }
-
 .kw-courtyard-missing {
-  max-width: 6rem;
-  align-self: center;
-  justify-self: start;
-  grid-area: 1 / 1;
+  position: absolute;
+  z-index: 1;
+  inset: 35% 5% auto 55%;
+  color: var(--kw-text-mid);
+  font-size: 0.75rem;
 }
-
-.kw-courtyards[data-alignment="compact"] .kw-courtyard-grid {
-  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
-  gap: 0.5rem;
+.kw-courtyard-caption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.3rem 0.75rem;
+  padding: 0.25rem 0 0;
 }
-
 .kw-courtyard-name {
-  font-weight: 600;
+  font: 600 1.2rem / 1.25 var(--kw-font-prose);
 }
-
-.kw-courtyard-vacant {
-  border-style: dashed;
-  background: var(--kw-background);
+.kw-courtyard-enter {
   color: var(--kw-text-dim);
 }
-
+.kw-courtyard:hover .kw-courtyard-enter {
+  color: var(--kw-accent);
+}
+.kw-courtyard-state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+  color: var(--kw-text-mid);
+  font-size: 0.8rem;
+}
+.kw-courtyard-state-mark {
+  width: 0.35rem;
+  height: 0.35rem;
+  flex: none;
+  border: 1px solid currentColor;
+}
+.kw-courtyard[data-state="porch"] .kw-courtyard-state {
+  color: var(--kw-accent);
+}
+.kw-courtyard[data-state="blocked"] .kw-courtyard-state {
+  color: var(--kw-error);
+}
+.kw-courtyard[data-state="back"] .kw-courtyard-state {
+  color: var(--kw-success);
+}
+.kw-courtyard[data-state="working"] .kw-courtyard-state-mark,
+.kw-courtyard[data-state="porch"] .kw-courtyard-state-mark {
+  background: currentColor;
+}
+.kw-courtyards[data-alignment="compact"] .kw-courtyard-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+  gap: 0.75rem;
+}
+.kw-courtyard-vacant {
+  border-style: dashed;
+  color: var(--kw-text-dim);
+  font-size: 0.875rem;
+}
+.kw-courtyard-reserved-art {
+  display: grid;
+  place-items: end center;
+  align-self: end;
+  justify-self: center;
+  width: min(100%, 288px);
+  aspect-ratio: 12 / 7;
+  padding-bottom: 15%;
+}
+.kw-courtyard-reserved-art span {
+  width: 70%;
+  height: 0.75rem;
+  border-top: 1px dashed var(--kw-border);
+  border-bottom: 1px solid var(--kw-border);
+}
 @media (forced-colors: active) {
   .kw-courtyard[aria-current="location"] {
-    border-width: 2px;
+    outline: 2px solid Highlight;
+  }
+  .kw-courtyard-art {
+    background: Canvas;
   }
 }

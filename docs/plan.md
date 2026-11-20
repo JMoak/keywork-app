@@ -2121,6 +2121,50 @@ unbounded storage/mill artwork. A proposed opt-in cultivation-to-decoration loop
 places are specified separately; the implemented gardens do not grow, wilt or yield items.
 This remains canonical source work, not published SDK adoption or an installed Stead update.
 
+### Living field guide ledger (2026-11-19, local implementation)
+
+The 2026-11-19 local artistic cut is recorded in
+[A living field guide](design/creatures-and-folding.md#a-living-field-guide-2026-11-19).
+It adds three address-stable landscape compositions, theme-derived terrain materials,
+Folio's complete 21-pose paper-dragon atlas, quieter overview typography and an accessible
+appearance disclosure. Shared art scaling, native ground anchors, bounded canvas storage
+and skipped unchanged repaints keep the richer scenery suitable for the existing sixteen-
+court neighborhoods. The integrated local run passed 558 tests in 68 files. This is source
+completion with offline visual proof; live desktop qualification and release adoption remain.
+
+### Bold Little Legends ledger (2026-11-19, local implementation)
+
+The selected direction now has three complete redraws: Folio's leaf-winged dragon,
+Tessera's painted porcelain dome and Cairn's pierced sandstone. Material metadata and
+semantic art pigments preserve their identities across the picker, profile, courtyard,
+stead and floating companion. The shared preview supports local pose playback, direction,
+pause, reduced motion, visibility suspension and stable display size for higher-resolution
+source artwork. The first meeting and profile now expose a visual gallery and character
+stage. The core renderer shares compiled drawing runs, defers hit-mask allocation and
+bounds both caches. See [the implementation record](design/creatures-and-folding.md#bold-little-legends-renderer-and-interface-iteration-2026-11-19)
+for proof and remaining runtime qualification. This does not complete user pack installation,
+resolved traits, the twenty-design roster or cultivation, and is not a published SDK update.
+
+### Illustrated consumer home ledger (2026-11-19, local implementation)
+
+The approved full-color direction now has three transparent character illustrations and
+a workshop clearing in the canonical UI source. The new raster renderer preserves source
+color and alpha with validated crops, independent logical placement and bounded decoding.
+First meeting, profile and returning Stead home use the illustrations. The native world
+and companion retain their real pixel animations; the new assets are explicitly stills.
+
+The consumer home leads with a resident and real conversation/request routes, with at most
+sixteen stable-address neighbors. Existing scene/courtyard modes remain behind Explore,
+with focus restoration and hidden rendering/work-summary suspension. Model setup survives
+first-resident refresh without a second active home below it. Failed initial reads have a
+retry path. Hidden map shortcuts cannot answer unseen requests. The Keywork profile keeps
+its established entry point. See [the updated vision and implementation record](design/creatures-and-folding.md#illustrated-home-a-place-worth-returning-to-2026-11-19).
+
+Next proof: one fully authored illustrated action and a coherent meet → ask → return to
+real result journey through the first courtyard. Broader roster, imported asset installation,
+resolved variation and durable cultivation remain separate cuts. This is uncommitted source
+work, not published artifacts or an installed Stead update.
+
 ## What is deliberately not in this plan
 
 - Shared workspaces across machines (keywork P2.3) and any multi-user story.

@@ -1,6 +1,7 @@
 import type { Skin } from "../pose/skin.ts";
 import { cairnSkin } from "./cairn/index.ts";
 import { carterSkin } from "./carter/index.ts";
+import { folioSkin } from "./folio/index.ts";
 import { joinerSkin } from "./joiner/index.ts";
 import { kidSkin } from "./kid/index.ts";
 import {
@@ -18,6 +19,7 @@ export const skins: Readonly<Record<string, SkinSource>> = {
   joiner: () => joinerSkin() as Skin,
   tessera: tesseraSkin,
   cairn: cairnSkin,
+  folio: folioSkin,
   placeholder: placeholderSkin,
 };
 

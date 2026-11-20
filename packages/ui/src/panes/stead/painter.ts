@@ -1,4 +1,4 @@
-import type { Season, SkyPhase } from "@keywork-app/habitat";
+import type { MaterialProfile, Season, SkyPhase } from "@keywork-app/habitat";
 import { prefersReducedMotion } from "../../chrome/stamp.ts";
 import { keyworkNight, themeVariables } from "../../theme/index.ts";
 import { mixOklab } from "../../theme/oklab.ts";
@@ -39,7 +39,7 @@ export interface Palettes {
   readonly world: Palette;
   readonly glyphs: SteadPainting["glyphs"];
   readonly sky: SteadPainting["sky"];
-  coat(hueStop: number): Palette;
+  coat(hueStop: number, material?: MaterialProfile): Palette;
 }
 
 export const fallbackStageWidth = 640;
@@ -75,17 +75,18 @@ export function palettesOf(
     ...tokensRead.map((name) => (forcedColors ? "" : source.read(name))),
   ].join("|");
   if (previous !== undefined && previous.key === key) return previous;
-  const coats = new Map<number, Palette>();
+  const coats = new Map<string, Palette>();
   return {
     key,
     world: resolvePalette(source, { world: true, season, forcedColors }),
     glyphs: resolveGlyphPalette(source, forcedColors),
     sky: resolveSky(source, phase, forcedColors),
-    coat: (hueStop) => {
-      const known = coats.get(hueStop);
+    coat: (hueStop, material) => {
+      const key = `${hueStop}:${material ?? "coat"}`;
+      const known = coats.get(key);
       if (known !== undefined) return known;
-      const coat = resolvePalette(source, { hueStop, season, forcedColors });
-      coats.set(hueStop, coat);
+      const coat = resolvePalette(source, { hueStop, season, forcedColors, material });
+      coats.set(key, coat);
       return coat;
     },
   };
@@ -181,15 +182,32 @@ export function watchMedia(query: string, react: () => void): () => void {
   return () => list.removeEventListener("change", react);
 }
 
-export function watchTheme(react: () => void): () => void {
+export function watchTheme(react: () => void, element?: Element): () => void {
   if (typeof MutationObserver !== "function" || typeof document === "undefined") {
     return () => undefined;
   }
-  const observer = new MutationObserver(() => react());
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["data-theme", "data-appearance", "style", "class"],
+  const target = element ?? document.documentElement;
+  const colors = (): string => {
+    const source = paletteSourceOf(target);
+    return [source.appearance, ...tokensRead.map((name) => source.read(name))].join("|");
+  };
+  let previous = colors();
+  const observer = new MutationObserver(() => {
+    const next = colors();
+    if (next === previous) return;
+    previous = next;
+    react();
   });
+  for (
+    let ancestor: Element | null = element ?? document.documentElement;
+    ancestor !== null;
+    ancestor = ancestor.parentElement
+  ) {
+    observer.observe(ancestor, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-appearance", "style", "class"],
+    });
+  }
   return () => observer.disconnect();
 }
 

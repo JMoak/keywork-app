@@ -3,6 +3,7 @@ import "./onboarding.css";
 import type { CreatureSummary, SessionSummary } from "@keywork-app/protocol";
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   Match,
@@ -157,6 +158,8 @@ export interface OnboardingOnTheSteadProps {
   readonly shell: ShellSeams;
   readonly automatic?: boolean;
   readonly simple?: boolean;
+  readonly hasResidents?: boolean;
+  onShowingChange?(showing: boolean): void;
   readonly controller?: OnboardingController;
   readonly storage?: OnboardingStorage | undefined;
   readonly seams?: Partial<OnboardingSeams> | undefined;
@@ -177,7 +180,9 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
         : offered;
     },
   });
-  const listed = props.automatic ? createCreatureListing(props.shell) : () => undefined;
+  const listing = props.automatic ? createCreatureListing(props.shell) : undefined;
+  const listed = () => listing?.rows();
+  const [meeting, setMeeting] = createSignal(false);
   const trusted = (): boolean => props.shell.trust.state().kind === "trusted";
   const wanted = (): boolean =>
     props.automatic === true &&
@@ -187,7 +192,7 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
       remembered: rememberedOnboarding(storage, onboardingStorageKey(props.shell.workspace)),
     });
   const homeIsEmpty = (): boolean =>
-    props.automatic === true && trusted() && listed()?.length === 0;
+    props.automatic === true && trusted() && !props.hasResidents && listed()?.length === 0;
   const underway = (): boolean => {
     const kind = onboarding.phase().kind;
     return kind === "making" || kind === "made" || kind === "failed";
@@ -195,6 +200,17 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
   const showing = (): boolean =>
     controller.requested() ||
     (onboarding.phase().kind !== "closed" && (underway() || (props.simple !== true && wanted())));
+  const awaitingListing = () =>
+    props.simple === true &&
+    listing !== undefined &&
+    trusted() &&
+    !props.hasResidents &&
+    listed() === undefined;
+  const visible = createMemo(
+    () => showing() || awaitingListing() || (props.simple === true && meeting()),
+  );
+  createEffect(() => props.onShowingChange?.(visible()));
+  onCleanup(() => props.onShowingChange?.(false));
   createEffect(
     on(
       () => onboarding.phase().kind,
@@ -209,11 +225,26 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
   return (
     <>
       <Show when={props.simple && !showing()}>
+        <Show when={awaitingListing()}>
+          <section class="kw-illustrated-home" aria-label="Your creatures" data-native-activation>
+            <p role="status">
+              {listing?.failed()
+                ? "We couldn’t load your creatures."
+                : "Looking for your creatures…"}
+            </p>
+            <Show when={listing?.failed()}>
+              <button type="button" class="kw-meet-minor" onClick={listing?.retry}>
+                Retry
+              </button>
+            </Show>
+          </section>
+        </Show>
         <MeetCreature
           shell={props.shell}
           creatures={listed()}
           first={homeIsEmpty()}
           initialSkin={preferredSkin()}
+          onShowingChange={setMeeting}
           onCustomize={(skin) => {
             setPreferredSkin(skin);
             controller.request();
@@ -226,6 +257,7 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
           workspace={props.shell.workspace}
           controller={controller}
           home={props.shell.steadHome !== undefined}
+          label={props.hasResidents ? "Meet another creature" : onboardingName}
         />
       </Show>
     </>
@@ -237,6 +269,7 @@ export interface OnboardingCardProps {
   readonly workspace: string;
   readonly controller?: OnboardingController;
   readonly home?: boolean;
+  readonly label?: string;
 }
 
 export function OnboardingCard(props: OnboardingCardProps) {
@@ -290,7 +323,7 @@ export function OnboardingCard(props: OnboardingCardProps) {
   return (
     <aside
       class="kw-onboard"
-      aria-label={onboardingName}
+      aria-label={props.label ?? onboardingName}
       tabIndex={-1}
       ref={root}
       data-phase={phase().kind}
@@ -549,29 +582,52 @@ function failureOf(phase: ReturnType<Onboarding["phase"]>): string | undefined {
   return phase.kind === "failed" ? phase.reason : undefined;
 }
 
-function createCreatureListing(
-  shell: Pick<ShellSeams, "client" | "feed" | "trust">,
-): () => readonly CreatureSummary[] | undefined {
-  const [listed, setListed] = createSignal<readonly CreatureSummary[]>();
-  const read = (): void => {
-    void creaturesListed(shell.client).then((listing) => {
-      if (listing !== undefined) setListed(listing);
-    });
-  };
+function createCreatureListing(shell: Pick<ShellSeams, "client" | "feed" | "trust">) {
+  const [rows, setRows] = createSignal<readonly CreatureSummary[]>();
+  const [failed, setFailed] = createSignal(false);
+  const trustedRoot = createMemo(() => {
+    const trust = shell.trust.state();
+    return trust.kind === "trusted" ? trust.root : undefined;
+  });
+  let read: (() => Promise<void>) | undefined;
   createEffect(
-    on(
-      () => shell.trust.state().kind,
-      (kind) => {
-        if (kind === "trusted") read();
-      },
-    ),
-  );
-  onCleanup(
-    shell.feed.subscribe((batch) => {
-      if (batch.some((envelope) => envelope.type === "creature.changed")) read();
+    on(trustedRoot, (root) => {
+      setRows(undefined);
+      setFailed(false);
+      if (root === undefined) return;
+      let active = true;
+      let pending = false;
+      let changed = false;
+      read = async () => {
+        if (pending) {
+          changed = true;
+          return;
+        }
+        pending = true;
+        setFailed(false);
+        do {
+          changed = false;
+          const next = await creaturesListed(shell.client);
+          if (!active) return;
+          if (!changed) {
+            if (next === undefined) setFailed(true);
+            else setRows(next);
+          }
+        } while (changed);
+        pending = false;
+      };
+      const unsubscribe = shell.feed.subscribe((batch) => {
+        if (batch.some((envelope) => envelope.type === "creature.changed")) void read?.();
+      });
+      onCleanup(() => {
+        active = false;
+        read = undefined;
+        unsubscribe();
+      });
+      void read();
     }),
   );
-  return listed;
+  return { rows, failed, retry: () => void read?.() };
 }
 
 function focusIsHere(root: HTMLElement | undefined): boolean {

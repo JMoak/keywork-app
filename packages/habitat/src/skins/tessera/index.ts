@@ -18,7 +18,6 @@ import {
   leg,
   page,
   parcel,
-  rightPlate,
   underside,
   workpiece,
 } from "./parts.ts";
@@ -57,6 +56,7 @@ export function tesseraSkin(): Skin {
     cell: defaultCell,
     atlas: assembleAtlas(defaultCell, frames),
     palette: defaultPaletteRoles,
+    material: "porcelain",
     rows: tesseraRows,
     groundLine: 51,
   };
@@ -197,27 +197,27 @@ function body(stance: Stance = {}): Placement[] {
   const tuck = Math.max(0, fold - 3);
   const raised = (offset: number): number => (trip === 0 ? 0 : (trip + offset) % 8 < 4 ? 2 : 0);
   const roots = [
-    [15, 29],
-    [32, 29],
-    [14, 33],
-    [33, 33],
-    [20, 35],
-    [28, 35],
+    [12, 32],
+    [35, 34],
+    [16, 34],
+    [31, 35],
+    [21, 35],
+    [26, 35],
   ] as const;
   const knees = [
-    [8 - spread + fold, 34 - lift - tuck],
-    [39 + spread - fold, 34 - lift - tuck],
-    [9 - spread + fold, 40 - lift - tuck],
-    [38 + spread - fold, 40 - lift - tuck],
-    [17 - spread + Math.floor(fold / 2), 43 - lift - tuck],
-    [30 + spread - Math.floor(fold / 2), 43 - lift - tuck],
+    [7 - spread + fold, 40 - lift - tuck],
+    [40 + spread - fold, 41 - lift - tuck],
+    [12 - spread + fold, 42 - lift - tuck],
+    [36 + spread - fold, 42 - lift - tuck],
+    [20 - spread + Math.floor(fold / 2), 41 - lift - tuck],
+    [28 + spread - Math.floor(fold / 2), 42 - lift - tuck],
   ] as [number, number][];
   const feet = [
-    [5 - spread + fold + stride, 44 - raised(0)],
-    [41 + spread - fold + stride, 44 - raised(4)],
-    [8 - spread + fold - stride, 49 - raised(4)],
-    [38 + spread - fold - stride, 49 - raised(0)],
-    [17 + Math.floor(fold / 2) + stride, 49 - raised(0)],
+    [6 - spread + fold + stride, 48 - raised(0)],
+    [42 + spread - fold + stride, 48 - raised(4)],
+    [12 - spread + fold - stride, 49 - raised(4)],
+    [36 + spread - fold - stride, 49 - raised(0)],
+    [19 + Math.floor(fold / 2) + stride, 46 - raised(0)],
     [29 - Math.floor(fold / 2) + stride, 49 - raised(4)],
   ] as [number, number][];
   const leftFront = feet[4] as [number, number];
@@ -230,12 +230,14 @@ function body(stance: Stance = {}): Placement[] {
       rightFront[1] = 39;
       break;
     case "listen":
-      rightFront[0] = 36;
+      knees[5] = [37, 38 - lift];
+      rightFront[0] = 41;
       rightFront[1] = 29 - gesture;
       break;
     case "wave":
-      rightFront[0] = 38 - Math.floor(gesture / 2);
-      rightFront[1] = 16 + gesture;
+      knees[5] = [38, 37 - lift];
+      rightFront[0] = 40 - Math.floor(gesture / 2);
+      rightFront[1] = 20 + gesture;
       break;
     case "tap":
       rightFront[0] = 33;
@@ -252,19 +254,22 @@ function body(stance: Stance = {}): Placement[] {
         knees[index] as readonly [number, number],
         feet[index] as readonly [number, number],
       ],
-      index >= 4,
+      index === 2 || index === 3 || index === 5,
     ),
   );
   const dy = -lift;
+  const raisedForeleg =
+    stance.foreleg === "listen" || stance.foreleg === "wave" || stance.foreleg === "tap";
   return [
-    ...legs,
-    place(underside, { dx: lean, dy }),
-    place(leftPlate, { dx: lean - panelSpread, dy: dy + (stance.closed ? 1 : 0) }),
-    place(rightPlate, { dx: lean + panelSpread, dy: dy + (stance.closed ? 1 : 0) }),
+    ...legs.slice(0, 4),
+    place(underside, { dx: lean, dy, layer: "behind" }),
+    ...legs.slice(4, raisedForeleg ? 5 : 6),
     place(crown, { dx: lean + attentionX, dy: dy - crownLift + attentionY }),
+    place(leftPlate, { dx: lean - panelSpread, dy: dy + (stance.closed ? 1 : 0) }),
     place(frontPlate, {
-      dx: lean + Math.trunc(attentionX / 2),
-      dy: dy + (stance.closed ? -1 : 1) + Math.trunc(attentionY / 2),
+      dx: lean + (stance.closed ? -2 : panelSpread) + Math.trunc(attentionX / 2),
+      dy,
     }),
+    ...(raisedForeleg ? legs.slice(5).map((limb) => ({ ...limb, layer: "front" as const })) : []),
   ];
 }

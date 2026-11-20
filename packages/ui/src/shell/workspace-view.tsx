@@ -369,7 +369,11 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (place.workspace !== props.workspace) {
       const scope = steadHome();
       if (scope?.shell.workspace === place.workspace) {
-        const shown = tiler.summon({ kind: steadPane.kind }, screen());
+        const existing = tiler.lastFocusedOf(steadPane.kind);
+        const shown =
+          existing === undefined
+            ? tiler.summon({ kind: steadPane.kind }, screen())
+            : tiler.focus(existing);
         act(shown);
         if (!shown.ok) return;
         if (place.kind === "session")

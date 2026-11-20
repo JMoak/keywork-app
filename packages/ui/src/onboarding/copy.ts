@@ -41,6 +41,7 @@ const skinWords: Readonly<Record<string, string>> = {
   joiner: "the joiner · a patient badger with a pencil and a well-kept tool roll",
   tessera: "Tessera · a careful six-legged porcelain creature that adjusts its shell panels",
   cairn: "Cairn · three curious floating stones that find their own balance",
+  folio: "Folio · a curious leaf-winged dragon that folds its wings and curls its tail to rest",
 };
 
 export function skinName(id: string): string {

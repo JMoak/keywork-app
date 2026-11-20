@@ -9,6 +9,7 @@ import type { GardenKind } from "@keywork-app/habitat/render";
 import { cleanup, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { keyworkDay, keyworkNight, themeVariables } from "../../../theme/index.ts";
 import { forcedColorsQuery } from "../painter.ts";
 import { CourtyardOverview } from "./index.tsx";
 
@@ -27,6 +28,22 @@ afterEach(() => {
 });
 
 describe("courtyard workshop miniatures", () => {
+  it("does not repaint unchanged artwork for a semantic clock tick, rename, or same-density resize", () => {
+    const ink = canvasInk();
+    const [habitat, setHabitat] = createSignal(world(creature("a")));
+    const [time, setTime] = createSignal(now);
+    const view = render(() => (
+      <CourtyardOverview world={habitat()} order={["a"]} now={time()} onOpen={() => {}} />
+    ));
+    const canvases = [...view.container.querySelectorAll("canvas")];
+    for (const canvas of canvases) ink.take(canvas);
+    setTime(now + 60_000);
+    setHabitat(world({ ...creature("a"), name: "A new name" }));
+    window.dispatchEvent(new Event("resize"));
+    expect(view.getByRole("button").getAttribute("aria-label")).toContain("A new name");
+    for (const canvas of canvases) expect(ink.take(canvas)).toEqual([]);
+  });
+
   it("updates the building and chosen garden without remounting its focused court", () => {
     const ink = canvasInk();
     const [families, setFamilies] = createSignal<Readonly<Record<string, WorkshopFamily>>>({});
@@ -145,9 +162,9 @@ describe("courtyard workshop miniatures", () => {
     media.set(forcedColorsQuery, true);
     const forced = ink.take(canvas);
     expect(forced.length).toBeGreaterThan(0);
-    expect(forced.every(([color]) => ["Canvas", "CanvasText", "Highlight"].includes(color))).toBe(
-      true,
-    );
+    expect(
+      forced.every(([color]) => ["Canvas", "CanvasText", "Highlight", "GrayText"].includes(color)),
+    ).toBe(true);
     const width = canvas.width;
     vi.stubGlobal("devicePixelRatio", 2);
     window.dispatchEvent(new Event("resize"));
@@ -271,6 +288,13 @@ function testMedia() {
 
 function themeWatcher() {
   const callbacks = new Set<MutationCallback>();
+  let variables = themeVariables(keyworkNight);
+  vi.spyOn(window, "getComputedStyle").mockImplementation(
+    () =>
+      ({
+        getPropertyValue: (name: string) => variables[name] ?? "",
+      }) as CSSStyleDeclaration,
+  );
   vi.stubGlobal(
     "MutationObserver",
     class {
@@ -291,6 +315,7 @@ function themeWatcher() {
   );
   return {
     change: () => {
+      variables = themeVariables(keyworkDay);
       for (const callback of callbacks) callback([], {} as MutationObserver);
     },
     observers: () => callbacks.size,

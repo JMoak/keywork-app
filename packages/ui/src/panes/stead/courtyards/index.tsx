@@ -7,8 +7,16 @@ import {
   type WorkshopFamily,
   workshopFamilyOf,
 } from "@keywork-app/habitat";
-import type { GardenKind } from "@keywork-app/habitat/render";
-import { createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
+import { courtyardSettingOf, type GardenKind } from "@keywork-app/habitat/render";
+import {
+  createMemo,
+  createSignal,
+  createUniqueId,
+  Index,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { stateLabels } from "../copy.ts";
 import { defaultSkinId } from "../habitat-render.ts";
 import { coatOf } from "../herd.ts";
@@ -27,10 +35,13 @@ export interface CourtyardOverviewProps {
   readonly families?: Readonly<Record<string, WorkshopFamily>> | undefined;
   readonly gardens?: Readonly<Record<string, GardenKind>> | undefined;
   readonly alignment?: "roomy" | "compact" | undefined;
+  readonly neighborhood?: string | undefined;
   readonly onOpen: (slug: string) => void;
 }
 
 export function CourtyardOverview(props: CourtyardOverviewProps) {
+  let root: HTMLElement | undefined;
+  const overviewId = createUniqueId();
   const courts = createMemo(() =>
     props.range === undefined
       ? courtyardsOf(props.world, props.order, props.now)
@@ -49,7 +60,7 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
   onMount(() => {
     const repaint = (): void => void setAppearance((version) => version + 1);
     const stops = [
-      watchTheme(repaint),
+      watchTheme(repaint, root),
       watchMedia(forcedColorsQuery, repaint),
       watchPixelRatio(repaint),
     ];
@@ -60,12 +71,18 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
 
   return (
     <section
+      ref={root}
       class="kw-courtyards"
       aria-label="Courtyard overview"
       data-alignment={props.alignment ?? "roomy"}
       data-native-activation
     >
-      <p class="kw-courtyards-intro">A place for each creature. Open a courtyard to step inside.</p>
+      <header class="kw-courtyards-heading">
+        <div>
+          <h2>{props.neighborhood ?? "Around the stead"}</h2>
+        </div>
+        <p class="kw-courtyards-intro">Open a courtyard to step inside.</p>
+      </header>
       <Show when={courts().length > 0} fallback={<p>No courtyards yet.</p>}>
         <ol
           class="kw-courtyard-grid"
@@ -80,6 +97,9 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
                   fallback={
                     <div class="kw-courtyard-vacant">
                       <span class="kw-courtyard-address">{court().address}</span>
+                      <span class="kw-courtyard-reserved-art" aria-hidden="true">
+                        <span />
+                      </span>
                       <span>Reserved place</span>
                     </div>
                   }
@@ -92,14 +112,24 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
                       data-state={resident().reading.state}
                       aria-current={props.selected === resident().slug ? "location" : undefined}
                       aria-label={`Open ${resident().creature.name}'s courtyard · ${stateLabels[resident().reading.state]} · ${resident().address}`}
+                      aria-describedby={`${overviewId}-setting-${resident().index}`}
                       onClick={() => props.onOpen(resident().slug)}
                     >
-                      <span class="kw-courtyard-address">{resident().address}</span>
+                      <span class="kw-courtyard-heading">
+                        <span class="kw-courtyard-address">{resident().address}</span>
+                        <span
+                          class="kw-courtyard-setting"
+                          id={`${overviewId}-setting-${resident().index}`}
+                        >
+                          {settingTitle(courtyardSettingOf(resident().index))}
+                        </span>
+                      </span>
                       <span class="kw-courtyard-art" aria-hidden="true">
                         <CourtyardPortrait
                           skin={resident().creature.skin ?? defaultSkinId}
                           hueStop={coatOf(resident().creature, ranks().get(resident().slug) ?? 0)}
                           appearance={appearance()}
+                          inScene
                         />
                         <CourtyardWorkshop
                           court={resident()}
@@ -111,9 +141,15 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
                           appearance={appearance()}
                         />
                       </span>
-                      <span class="kw-courtyard-name">{resident().creature.name}</span>
-                      <span class="kw-courtyard-state">
-                        {stateLabels[resident().reading.state]}
+                      <span class="kw-courtyard-caption">
+                        <span class="kw-courtyard-name">{resident().creature.name}</span>
+                        <span class="kw-courtyard-enter" aria-hidden="true">
+                          ›
+                        </span>
+                        <span class="kw-courtyard-state">
+                          <span class="kw-courtyard-state-mark" aria-hidden="true" />
+                          {stateLabels[resident().reading.state]}
+                        </span>
                       </span>
                     </button>
                   )}
@@ -127,11 +163,19 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
   );
 }
 
+function settingTitle(setting: ReturnType<typeof courtyardSettingOf>): string {
+  return { orchard: "Orchard terrace", quarry: "Stone garden", inlet: "Tidal inlet" }[setting];
+}
+
 function watchPixelRatio(repaint: () => void): () => void {
   let stop = (): void => undefined;
+  let ratio: number | undefined;
   const changed = (): void => {
+    const current = devicePixelRatioOf();
+    if (ratio === current) return;
+    ratio = current;
     stop();
-    stop = watchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`, changed);
+    stop = watchMedia(`(resolution: ${ratio}dppx)`, changed);
     repaint();
   };
   changed();

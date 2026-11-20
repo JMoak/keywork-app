@@ -76,14 +76,14 @@ export function courtyardsInRange(
     .map((slug, offset) => courtyardAt(world, slug, range.start + offset, now));
 }
 
-function courtyardAt(
+export function courtyardAt(
   world: HabitatState,
   slug: string,
   index: number,
   now: number,
 ): Courtyard | VacantCourtyard {
   const place = { slug, index, address: `Court ${index + 1}` };
-  const creature = world.creatures[slug];
+  const creature = Object.hasOwn(world.creatures, slug) ? world.creatures[slug] : undefined;
   if (creature === undefined) return { ...place, kind: "vacant" };
   return {
     ...place,

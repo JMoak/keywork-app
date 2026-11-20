@@ -1,0 +1,285 @@
+.kw-creature-studio {
+  --kw-studio-pigment: var(--kw-art-clay);
+  --kw-encounter-type: "DM Sans", system-ui, sans-serif;
+  container-type: inline-size;
+  min-width: 0;
+  color: var(--kw-text);
+  font: 400 1rem / 1.45 var(--kw-encounter-type);
+}
+.kw-creature-studio[data-design="folio"] {
+  --kw-studio-pigment: var(--kw-art-olive);
+}
+.kw-creature-studio[data-design="tessera"] {
+  --kw-studio-pigment: var(--kw-art-teal);
+}
+.kw-creature-studio[data-design="cairn"] {
+  --kw-studio-pigment: var(--kw-art-stone);
+}
+.kw-studio-scene {
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  border-radius: 1.25rem;
+  padding: clamp(0.75rem, 3cqi, 2.5rem);
+  background:
+    radial-gradient(
+      ellipse at 23% 42%,
+      color-mix(in oklab, var(--kw-art-cream) 36%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 5% 85%,
+      color-mix(in oklab, var(--kw-studio-pigment) 23%, transparent),
+      transparent 62%
+    ),
+    color-mix(in oklab, var(--kw-art-ochre) 9%, var(--kw-panel));
+}
+.kw-studio-picture {
+  --kw-illustration-width: min(100%, 22.5rem);
+  --kw-illustration-height: auto;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  justify-self: stretch;
+  min-width: 0;
+  min-height: clamp(15rem, 35cqi, 23rem);
+}
+.kw-studio-picture::before {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  bottom: 7%;
+  width: min(53%, 12rem);
+  height: 9%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in oklab, var(--kw-art-ink) 20%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+}
+.kw-studio-picture canvas,
+.kw-gallery-thumbnail canvas,
+.kw-studio-motion-art canvas {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  forced-color-adjust: none;
+}
+.kw-studio-picture canvas[data-artwork="illustrated"] {
+  image-rendering: auto;
+}
+.kw-gallery-thumbnail canvas,
+.kw-studio-motion-art canvas {
+  image-rendering: pixelated;
+}
+.kw-studio-caption {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-width: 0;
+  gap: 0.9rem;
+  padding: 0.75rem clamp(0.25rem, 2cqi, 1.5rem);
+}
+.kw-studio-title {
+  font: 500 clamp(2rem, 5cqi, 4rem) / 1.08 var(--kw-font-prose);
+  overflow-wrap: anywhere;
+}
+.kw-studio-description {
+  display: grid;
+  max-width: 35ch;
+  gap: 0.4rem;
+}
+.kw-studio-material {
+  color: var(--kw-text-mid);
+  font: 600 0.82rem / 1.4 var(--kw-encounter-type);
+}
+.kw-studio-story {
+  color: var(--kw-text-mid);
+  font: 400 clamp(0.95rem, 1.65cqi, 1.1rem) / 1.55 var(--kw-font-prose);
+}
+.kw-encounter-actions,
+.kw-studio-motions,
+.kw-studio-playback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.kw-encounter-primary,
+.kw-encounter-secondary,
+.kw-studio-disclosure,
+.kw-studio-controls button,
+.kw-gallery-choice {
+  cursor: pointer;
+  border: 0;
+  color: var(--kw-text);
+  background: transparent;
+  font:
+    550 0.88rem / 1.3 "DM Sans",
+    system-ui,
+    sans-serif;
+}
+.kw-encounter-primary,
+.kw-encounter-secondary,
+.kw-studio-disclosure {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.85rem;
+}
+.kw-encounter-primary {
+  padding-inline: 1.15rem;
+  background: var(--kw-text);
+  color: var(--kw-background);
+  font-weight: 650;
+}
+.kw-encounter-primary:hover {
+  background: var(--kw-text-mid);
+}
+.kw-encounter-secondary:hover,
+.kw-studio-disclosure:hover,
+.kw-studio-controls button:hover {
+  background: color-mix(in oklab, var(--kw-text) 7%, transparent);
+}
+.kw-studio-disclosure {
+  min-height: 2.25rem;
+  padding-inline: 0.3rem;
+  color: var(--kw-text-mid);
+  text-decoration: underline;
+  text-underline-offset: 0.23em;
+}
+.kw-studio-inspector,
+.kw-creature-gallery {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+}
+.kw-studio-inspector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.2rem;
+  margin-top: 0.6rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.8rem;
+  background: var(--kw-panel);
+}
+.kw-studio-motion-art {
+  display: grid;
+  place-items: center;
+}
+.kw-studio-controls {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.kw-studio-controls strong {
+  font-size: 0.92rem;
+}
+.kw-studio-controls button {
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.5rem;
+  color: var(--kw-text-mid);
+}
+.kw-studio-motions [aria-pressed="true"] {
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  box-shadow: inset 0 0 0 1px var(--kw-border);
+}
+.kw-studio-playback button {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.kw-creature-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  max-width: 100%;
+  padding: 0.2rem;
+  overflow-x: auto;
+  scroll-padding-inline: 0.2rem;
+}
+.kw-gallery-choice {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 4.25rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--kw-border);
+  border-radius: 0.75rem;
+  color: var(--kw-text-mid);
+}
+.kw-gallery-choice:hover {
+  background: var(--kw-panel-lift);
+}
+.kw-gallery-choice[aria-pressed="true"] {
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border-color: var(--kw-text-mid);
+  box-shadow: inset 0 -2px var(--kw-text-mid);
+}
+.kw-gallery-thumbnail {
+  display: grid;
+  place-items: center;
+  min-height: 52px;
+}
+.kw-creature-studio button:focus-visible,
+.kw-gallery-choice:focus-visible {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 1px;
+}
+.kw-creature-studio button:disabled,
+.kw-gallery-choice:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.kw-studio-still {
+  display: none;
+}
+@container (max-width: 35rem) {
+  .kw-studio-scene {
+    grid-template-columns: minmax(0, 1fr);
+    background:
+      radial-gradient(
+        ellipse at 50% 22%,
+        color-mix(in oklab, var(--kw-studio-pigment) 24%, transparent),
+        transparent 58%
+      ),
+      color-mix(in oklab, var(--kw-art-ochre) 8%, var(--kw-panel));
+  }
+  .kw-studio-picture {
+    --kw-illustration-width: min(100%, 15rem);
+    min-height: 12rem;
+  }
+  .kw-studio-caption {
+    padding: 0.4rem 0.65rem 0.8rem;
+    gap: 0.6rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kw-studio-playback .kw-studio-toggle {
+    display: none;
+  }
+  .kw-studio-still {
+    display: inline-flex;
+    align-items: center;
+    color: var(--kw-text-dim);
+    font-size: 0.8rem;
+  }
+}
+@media (forced-colors: active) {
+  .kw-studio-scene {
+    background: Canvas;
+  }
+  .kw-encounter-primary,
+  .kw-gallery-choice[aria-pressed="true"],
+  .kw-studio-motions [aria-pressed="true"] {
+    border: 2px solid Highlight;
+  }
+}

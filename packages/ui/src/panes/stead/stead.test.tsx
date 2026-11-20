@@ -982,6 +982,11 @@ describe("the stead's optional courtyards", () => {
     expect(court.querySelector("[data-workshop]")?.getAttribute("data-workshop")).toBe("gable");
     fireEvent.click(court);
     await settle();
+    fireEvent.click(
+      [...container.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Appearance",
+      ) as Element,
+    );
     expect(
       (container.querySelector('select[aria-label="Workshop style"]') as HTMLSelectElement).value,
     ).toBe("auto");
@@ -1056,6 +1061,11 @@ describe("the stead's optional courtyards", () => {
     await settle();
     expect(container.querySelectorAll(".kw-stead-creature")).toHaveLength(16);
     expect(container.querySelector(".kw-stead-field")?.getAttribute("data-district")).toBe("1");
+    fireEvent.click(
+      [...container.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Appearance",
+      ) as Element,
+    );
     fireEvent.change(container.querySelector('select[aria-label="Workshop style"]') as Element, {
       target: { value: "lantern" },
     });

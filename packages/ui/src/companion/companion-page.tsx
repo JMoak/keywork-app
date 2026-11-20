@@ -1,7 +1,10 @@
 import { type MotionPrefs, type Rows, referenceRows } from "@keywork-app/habitat";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { cardKeys } from "../page/ask-card.tsx";
-import { wearRememberedTheme } from "../theme/wardrobe.ts";
+import type { Theme } from "../theme/schema.ts";
+import { rememberedThemeKeys } from "../theme/themes.ts";
+import { applyTheme } from "../theme/variables.ts";
+import { watchSystemAppearance, wearRememberedTheme } from "../theme/wardrobe.ts";
 import { accessibleName } from "./announce.ts";
 import {
   createMirror,
@@ -97,6 +100,7 @@ export function CompanionPage(props: CompanionPageProps) {
   const [hovering, setHovering] = createSignal(false);
   const [dragging, setDragging] = createSignal(false);
   const [reacting, setReacting] = createSignal(false);
+  const [theme, setTheme] = createSignal<Theme>();
   let stage: HTMLDivElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
   let mask: HitMask | undefined;
@@ -123,9 +127,10 @@ export function CompanionPage(props: CompanionPageProps) {
   };
   const tier = () => effectiveTier(conditions().ceiling, desire());
   const prefs = (): MotionPrefs => ({ reducedMotion: still(), tier: tier() });
-  const tokens = createMemo(() =>
-    tokensFromStyle(host.readToken, snapshot()?.creature.hueStop, conditions().forcedColors),
-  );
+  const tokens = createMemo(() => {
+    theme();
+    return tokensFromStyle(host.readToken, snapshot()?.creature.hueStop, conditions().forcedColors);
+  });
   const bubble = () => {
     const current = snapshot();
     return conditions().quiet || current === undefined ? undefined : bubbleShown(current);
@@ -347,9 +352,28 @@ export function CompanionPage(props: CompanionPageProps) {
   );
 
   onMount(() => {
-    wearRememberedTheme({ storage: host.storage });
-    const stops = [props.port.onSnapshot(receive), props.port.onConditions(setConditions)];
+    const refresh = () =>
+      wearRememberedTheme({
+        storage: host.storage,
+        apply: (chosen) => {
+          if (chosen === theme()) return;
+          applyTheme(chosen);
+          setTheme(chosen);
+        },
+      });
+    const storageChanged = (event: StorageEvent): void => {
+      if (event.storageArea !== null && event.storageArea !== host.storage) return;
+      if (event.key === null || rememberedThemeKeys.some((key) => key === event.key)) refresh();
+    };
+    window.addEventListener("storage", storageChanged);
+    const stops = [
+      watchSystemAppearance(refresh),
+      props.port.onSnapshot(receive),
+      props.port.onConditions(setConditions),
+    ];
+    refresh();
     onCleanup(() => {
+      window.removeEventListener("storage", storageChanged);
       for (const stop of stops) stop();
     });
   });

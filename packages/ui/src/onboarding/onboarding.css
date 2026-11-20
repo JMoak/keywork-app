@@ -129,3 +129,63 @@
   padding: 0;
   border-top: none;
 }
+
+.kw-meet-creature[aria-label] {
+  border: 0;
+  border-radius: 1.25rem;
+  padding: 0;
+  gap: 1.35rem;
+  background: transparent;
+  font:
+    400 1rem / 1.45 "DM Sans",
+    system-ui,
+    sans-serif;
+}
+.kw-meet-creature .kw-studio-caption h2 {
+  max-width: 100%;
+  margin: 0;
+  color: var(--kw-text);
+  font: 500 clamp(2.4rem, 5.8cqi, 4.5rem) / 1.03 var(--kw-font-prose);
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+.kw-meet-selection {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0 clamp(0.25rem, 2.5%, 2rem) 0.75rem;
+}
+.kw-meet-gallery-heading,
+.kw-meet-roll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1rem;
+}
+.kw-meet-gallery-heading {
+  justify-content: space-between;
+}
+.kw-meet-gallery-heading strong {
+  color: var(--kw-text);
+  font:
+    600 1rem / 1.4 "DM Sans",
+    system-ui,
+    sans-serif;
+}
+.kw-meet-minor {
+  min-height: 2.5rem;
+  padding: 0.2rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--kw-text-mid);
+  font:
+    500 0.85rem / 1.4 "DM Sans",
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.kw-meet-minor:hover {
+  color: var(--kw-text);
+}

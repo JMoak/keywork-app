@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { poseNames } from "../../pose/skin.ts";
 import { contentHash, mirrorFrame, sliceSkin } from "../atlas.ts";
-import type { Sprite } from "../kid/sprite.ts";
+import { dim, fog, glass, groundShadow, lamplight, needsYou, outline, trouble } from "../legend.ts";
 import { groundContact, outlineSeals, validateAtlas } from "../loader.ts";
 import { tesseraFrame, tesseraRows, tesseraSkin } from "./index.ts";
-import { crown } from "./parts.ts";
 
 describe("Tessera's authored atlas", () => {
   const skin = tesseraSkin();
@@ -14,6 +13,7 @@ describe("Tessera's authored atlas", () => {
     const rebuilt = tesseraSkin();
     expect(validateAtlas(skin)).toEqual([]);
     expect(skin.cell).toEqual({ width: 48, height: 52 });
+    expect(skin.material).toBe("porcelain");
     expect(skin.atlas.width).toBe(384);
     expect(skin.atlas.height).toBe(52 * poseNames.length);
     expect(contentHash(rebuilt.atlas)).toBe(contentHash(skin.atlas));
@@ -30,7 +30,9 @@ describe("Tessera's authored atlas", () => {
         const label = `${pose} ${index}`;
         expect(pixels.length, label).toBe(48 * 52);
         expect(pixels.filter((value) => value > 0).length, label).toBeGreaterThan(300);
-        expect(Math.max(...pixels), label).toBeLessThanOrEqual(12);
+        expect(Math.max(...pixels), label).toBeLessThanOrEqual(dim);
+        expect(pixels.includes(lamplight) || pixels.includes(needsYou), label).toBe(false);
+        expect(pixels.includes(trouble), label).toBe(pose === "blocked");
         expect(
           pixels.some(
             (value, at) =>
@@ -40,6 +42,26 @@ describe("Tessera's authored atlas", () => {
         ).toBe(false);
       }
     }
+  });
+
+  it("joins three painted porcelain plates into one dome over six separately tapered legs", () => {
+    const idle = tesseraFrame("idle", 0);
+    const plates = glazedRegions(idle).filter((region) => region.length > 40);
+    expect(plates).toHaveLength(3);
+    for (const plate of plates) {
+      expect(plate.filter((at) => idle[at] === glass || idle[at] === fog).length).toBeGreaterThan(
+        8,
+      );
+      expect(plate.some((at) => idle[at] === dim)).toBe(true);
+    }
+    for (const y of [30, 31, 32, 33]) {
+      const band = inkRuns(idle, y);
+      expect(band).toHaveLength(1);
+      expect(band[0]).toBeGreaterThan(34);
+    }
+    const shins = [43, 44, 45, 46].map((y) => inkRuns(idle, y));
+    expect(shins.filter((runs) => runs.length === 6).length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...inkRuns(idle, 50))).toBe(1);
   });
 
   it("moves in every requested pose and mirrors walking without losing a column", () => {
@@ -70,7 +92,7 @@ describe("Tessera's authored atlas", () => {
 
   it("turns its crown toward the requested compass octant with its feet planted", () => {
     const idle = tesseraFrame("idle", 0);
-    const neutral = partOrigin(idle, crown.sprite);
+    const neutral = crownTip(idle);
     const octants = [
       [0, 1, 0],
       [1, 1, 1],
@@ -83,7 +105,7 @@ describe("Tessera's authored atlas", () => {
     ] as const;
     for (const [direction, horizontal, vertical] of octants) {
       const frame = tesseraFrame("look", direction);
-      const turned = partOrigin(frame, crown.sprite);
+      const turned = crownTip(frame);
       expect(Math.sign(turned.x - neutral.x), `octant ${direction} x`).toBe(horizontal);
       expect(Math.sign(turned.y - neutral.y), `octant ${direction} y`).toBe(vertical);
       expect(frame.slice(40 * 48), `octant ${direction} feet`).toEqual(idle.slice(40 * 48));
@@ -146,22 +168,43 @@ function bounds(pixels: Uint8Array): { left: number; right: number; top: number;
   };
 }
 
-function partOrigin(pixels: Uint8Array, sprite: Sprite): { x: number; y: number } {
-  const matches: { x: number; y: number }[] = [];
-  for (let y = 0; y <= 52 - sprite.height; y += 1) {
-    for (let x = 0; x <= 48 - sprite.width; x += 1) {
-      if (
-        sprite.pixels.every(
-          (value, at) =>
-            value === 0 ||
-            value === pixels[(y + Math.floor(at / sprite.width)) * 48 + x + (at % sprite.width)],
-        )
-      )
-        matches.push({ x, y });
+function crownTip(pixels: Uint8Array): { x: number; y: number } {
+  const y = bounds(pixels).top;
+  const row = pixels.subarray(y * 48, (y + 1) * 48);
+  return { x: (row.indexOf(outline) + row.lastIndexOf(outline)) / 2, y };
+}
+
+function inkRuns(pixels: Uint8Array, y: number): number[] {
+  const runs: number[] = [];
+  let length = 0;
+  for (const pixel of pixels.subarray(y * 48, (y + 1) * 48)) {
+    if (pixel) length++;
+    else if (length > 0) {
+      runs.push(length);
+      length = 0;
     }
   }
-  expect(matches).toHaveLength(1);
-  const origin = matches[0];
-  if (origin === undefined) throw new Error("the crown is missing from the rendered frame");
-  return origin;
+  return runs;
+}
+
+function glazedRegions(pixels: Uint8Array): number[][] {
+  const remaining = new Set(
+    [...pixels.keys()].filter((at) => {
+      const value = pixels[at] ?? 0;
+      return (value > 0 && value < groundShadow) || value >= glass;
+    }),
+  );
+  const regions: number[][] = [];
+  for (const start of remaining) {
+    const region = [start];
+    remaining.delete(start);
+    for (let i = 0; i < region.length; i++) {
+      const at = region[i] as number;
+      for (const next of [at - 48, at + 48, at - 1, at + 1]) {
+        if (remaining.delete(next)) region.push(next);
+      }
+    }
+    regions.push(region);
+  }
+  return regions;
 }

@@ -15,6 +15,7 @@ import {
 import { z } from "zod";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
 import { relativeAge } from "../../chrome/telemetry.ts";
+import { CreatureGallery, CreatureStudio } from "../../creatures/studio.tsx";
 import { hostFetch } from "../../host/transport.ts";
 import type { BindingSpec } from "../../keys/keymap.ts";
 import { onboardingActionId } from "../../onboarding/index.tsx";
@@ -93,7 +94,6 @@ import {
   noCraftToForget,
 } from "./craft.tsx";
 import { DeleteCard } from "./delete-card.tsx";
-import { PortraitView } from "./portrait.tsx";
 import {
   choresOf,
   creatureFilePath,
@@ -305,6 +305,7 @@ interface Card {
 function CreatureProfile(props: PaneProps<CreatureSpec>) {
   const keyboard = useKeyboardScope();
   let root: HTMLElement | undefined;
+  let changeBodyButton: HTMLButtonElement | undefined;
   keepKeyboardHome(
     () => root,
     () => props.focused,
@@ -460,8 +461,13 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     void write("name", { name }, renamedLine(name));
   };
   const dress = (skin: string): void => {
-    setPrompt(undefined);
+    closeBodyPicker();
     void write("body", { body: { skin } }, skinChangedLine(skin));
+  };
+  const closeBodyPicker = (): void => {
+    const open = prompt()?.kind === "skin";
+    setPrompt(undefined);
+    if (open) changeBodyButton?.focus();
   };
   const setModel = (modelClass: ModelClass, text: string): void => {
     setPrompt(undefined);
@@ -573,6 +579,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
   };
 
   props.onAction((action, argument) => {
+    if (prompt()?.kind === "skin") return closeBodyPicker();
     if (prompt() !== undefined || card() !== undefined || forgetting() !== undefined) {
       setPrompt(undefined);
       setCard(undefined);
@@ -625,6 +632,10 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
 
   const skinChoices = (): Readonly<Record<string, string>> =>
     Object.fromEntries(skinIds().map((id, index) => [String(index + 1), id]));
+  const bodyShortcuts = () =>
+    Object.entries(skinChoices())
+      .map(([key, id]) => `${key} ${id}`)
+      .join(" · ");
   const asking = <Kind extends Prompt["kind"]>(kind: Kind) => {
     const pending = prompt();
     return pending?.kind === kind ? (pending as Extract<Prompt, { kind: Kind }>) : undefined;
@@ -642,16 +653,92 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
           {(held) => (
             <>
               <header class="kw-creature-head">
-                <PortraitView skin={held().skin} hueStop={hue()} name={held().name} />
-                <div class="kw-creature-identity">
-                  <p class="kw-creature-title">
-                    <span class="kw-creature-name">{held().name}</span>
-                    <span class="kw-creature-handle">{handleLine(held().slug)}</span>
-                  </p>
-                  <p class="kw-creature-telling">{telling()}</p>
+                <CreatureStudio
+                  skin={held().skin}
+                  hueStop={hue()}
+                  name={held().name}
+                  portraitClass="kw-creature-portrait"
+                  heading={
+                    <div class="kw-creature-identity">
+                      <p class="kw-creature-title">
+                        <span class="kw-creature-name">{held().name}</span>
+                        <span class="kw-creature-handle">{handleLine(held().slug)}</span>
+                      </p>
+                      <p class="kw-creature-telling">{telling()}</p>
+                    </div>
+                  }
+                  actions={
+                    <div class="kw-encounter-actions">
+                      <button
+                        type="button"
+                        class="kw-encounter-primary"
+                        onClick={() => openThread(held().conversation)}
+                      >
+                        Open conversation
+                      </button>
+                      <button
+                        type="button"
+                        class="kw-encounter-secondary"
+                        ref={changeBodyButton}
+                        aria-expanded={asking("skin") !== undefined}
+                        onClick={() =>
+                          asking("skin") ? closeBodyPicker() : setPrompt({ kind: "skin" })
+                        }
+                      >
+                        Change body
+                      </button>
+                    </div>
+                  }
+                />
+                <details class="kw-creature-shortcuts">
+                  <summary data-keys-owned>Keyboard shortcuts</summary>
                   <p class="kw-creature-hints">{keyHints(keys())}</p>
-                </div>
+                </details>
               </header>
+              <Show when={asking("skin")}>
+                <fieldset
+                  class="kw-creature-body-picker"
+                  aria-label="Change body"
+                  data-native-activation
+                  data-keys-owned
+                  onKeyDown={(event) => {
+                    if (
+                      event.altKey ||
+                      event.ctrlKey ||
+                      event.metaKey ||
+                      event.shiftKey ||
+                      event.isComposing ||
+                      event.repeat
+                    )
+                      return;
+                    const id = skinChoices()[event.key];
+                    if (typeof id === "string") dress(id);
+                    else if (event.key === "Escape") closeBodyPicker();
+                    else return;
+                    event.stopPropagation();
+                    event.preventDefault();
+                  }}
+                >
+                  <p
+                    class="kw-ov-line"
+                    data-tone="ask"
+                    tabIndex={-1}
+                    ref={(line) => queueMicrotask(() => line.focus())}
+                  >
+                    {skinQuestion(creature()?.name ?? "")} · {bodyShortcuts()} · Esc cancels
+                  </p>
+                  <CreatureGallery
+                    designs={skinIds()}
+                    thumbnails
+                    selected={creature()?.skin ?? ""}
+                    hueStop={hue()}
+                    onSelect={dress}
+                  />
+                  <button type="button" class="kw-creature-body-button" onClick={closeBodyPicker}>
+                    Cancel
+                  </button>
+                </fieldset>
+              </Show>
               <dl class="kw-creature-facts" aria-label="identity">
                 <dt>{sectionWords.body}</dt>
                 <dd data-fact="body">
@@ -783,14 +870,6 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
           initial={creature()?.name}
           placeholder={renamePlaceholder}
           onSubmit={rename}
-          onCancel={() => setPrompt(undefined)}
-        />
-      </Show>
-      <Show when={asking("skin")}>
-        <ChoiceLine
-          question={skinQuestion(creature()?.name ?? "")}
-          choices={skinChoices()}
-          onChoose={(key) => dress(skinChoices()[key] ?? "")}
           onCancel={() => setPrompt(undefined)}
         />
       </Show>

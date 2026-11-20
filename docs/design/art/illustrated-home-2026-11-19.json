@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-19",
+  "mode": "built-in image_gen",
+  "reference": "docs/design/art/bold-little-legends-2026-11-19.png",
+  "referenceRole": "Style and character identity reference",
+  "briefRecord": "Reproduction briefs summarizing the generation instructions; not verbatim tool transcripts.",
+  "sharedBrief": "Create smooth high-resolution hand-inked, gouache-like illustration for Stead's modern consumer app, preserving the Bold Little Legends reference's distinctive anatomy, warm contours and rich material character. Use real transparent alpha, generous clear margins, no text, no watermark, no pixel grid, no decorative frame. Preserve openings as transparency. The asset is a still, not an animation sheet.",
+  "assets": [
+    {
+      "path": "packages/ui/src/creatures/assets/illustrations/folio.png",
+      "sourceArtifact": "exec-7e4473f3-eb9c-4646-b269-91affa8be7dc.png",
+      "size": [1122, 1402],
+      "sha256": "af90fd4bacb26a5321c6cfe8beb1a375513c4f48573d2649fe4db3980e83584d",
+      "brief": "Isolated cream leaf-winged dragon. Broad paired olive wings with forked gold veins, gold horns, teal material marks, slender S-neck with an open throat window and a curled tail. Gentle, alert personality. Keep clear separation between limbs, wing tips and tail. No ground or cast shadow. The original direction requested right-facing; the accepted output faces left and its runtime metadata records left."
+    },
+    {
+      "path": "packages/ui/src/creatures/assets/illustrations/tessera.png",
+      "sourceArtifact": "exec-469004bd-830a-486d-aa50-e1ce7dc3d85d.png",
+      "size": [1254, 1254],
+      "sha256": "a3b8a85ee76c08df9a1eada8fcf209cfccd395a60cd7acb84166098f68c4c30d",
+      "brief": "Isolated unconventional porcelain creature with one continuous scalloped overhanging ivory dome, teal painted botanical sprigs and selective gold repair seams. Six slender articulated legs emerge below the dome. Preserve the single continuous ceramic silhouette and readable joint gaps. No added face, decorative scene or ground shadow."
+    },
+    {
+      "path": "packages/ui/src/creatures/assets/illustrations/cairn.png",
+      "sourceArtifact": "exec-2a4aa645-52bd-4d5b-891a-cce8942004d0.png",
+      "size": [1086, 1448],
+      "sha256": "e62ec7ee863dae6342127489c23b8ef558fe8e03e790080797aeaa195cfb26bf",
+      "brief": "Isolated impossible sandstone creature made of exactly three suspended warm stone masses: a tilted upper slab, a pierced middle stone with a genuinely transparent hole and a small pointed lower shard. Selective olive moss and subtle warm geological marks. Maintain air between masses. Character comes from balance and tilt, without a face, extra stones or ground."
+    },
+    {
+      "path": "packages/ui/src/creatures/assets/illustrations/clearing.png",
+      "sourceArtifact": "exec-7da7bd56-4f9f-4de4-becc-2493b1d253b8.png",
+      "size": [1774, 887],
+      "sha256": "7fe1baa2a5ae284075f09b3626508e4f4d373420e1d2cb4c39de27d184da8b24",
+      "brief": "Wide 2:1 home clearing in the same illustrated language. A small welcoming workshop with an olive roof and teal doorway occupies the left third, a tree frames the upper left, and warm sandstone ground opens across the center and right. A distant rock arch gives depth. Leave clear contact space for a separately rendered creature on the right, with no actors painted into the scene. Organic transparent outer edges, no interface, text, border or opaque rectangular backdrop."
+    }
+  ],
+  "integration": "Original PNGs are copied unchanged into the workspace. Runtime crop rectangles and anchors live in creatures/artwork.ts. Home composes clearing and creature separately. The three character assets are still illustrations; existing pixel animations remain explicit.",
+  "review": "Independent offline transparency, crop, silhouette, ground contact and light/dark composition review. Live desktop capture and release qualification remain pending."
+}

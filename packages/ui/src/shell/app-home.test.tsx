@@ -158,9 +158,16 @@ it("uses the same home from the optional Keywork pane while the IDE stays attach
   await waitFor(() => expect(h.connect).toHaveBeenCalledTimes(2));
 
   fireEvent.click(screen.getByRole("button", { name: "Back to creatures" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Courtyards" }));
+  expect(await screen.findByRole("button", { name: /Open Wren's courtyard/ })).toBeTruthy();
   h.activate({ kind: "ask", workspace: homePath, sessionId: conversation.id, callId: "home-ask" });
-  await screen.findByRole("button", { name: "Back to creatures" });
+  const back = await screen.findByRole("button", { name: "Back to creatures" });
   expect(h.switchWorkspace).not.toHaveBeenCalled();
+  fireEvent.click(back);
+  expect(
+    (await screen.findByRole("button", { name: "Courtyards" })).getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(await screen.findByRole("button", { name: /Open Wren's courtyard/ })).toBeTruthy();
 });
 
 it("reopens runtime consent only when the keeper explicitly retries home", async () => {

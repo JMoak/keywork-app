@@ -16,7 +16,7 @@ describe("the skins on offer", () => {
     expect(rolledSkin("kid", [])).toBe("kid");
   });
   it("offers every registered skin but the placeholder, and the tinkerer when nothing else is registered", () => {
-    expect(offeredSkins()).toEqual(["kid", "carter", "joiner", "tessera", "cairn"]);
+    expect(offeredSkins()).toEqual(["kid", "carter", "joiner", "tessera", "cairn", "folio"]);
     expect(offeredSkins(["kid", "placeholder", "owl"])).toEqual(["kid", "owl"]);
     expect(offeredSkins(["placeholder"])).toEqual(["kid"]);
   });

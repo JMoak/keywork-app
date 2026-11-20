@@ -4,7 +4,7 @@ import { contentHash, mirrorFrame, sliceSkin } from "../atlas.ts";
 import type { Sprite } from "../kid/sprite.ts";
 import { outlineSeals, validateAtlas } from "../loader.ts";
 import { cairnFrame, cairnRows, cairnSkin } from "./index.ts";
-import { summit } from "./parts.ts";
+import { levelSummit, shard, summit } from "./parts.ts";
 
 describe("Cairn's authored atlas", () => {
   const skin = cairnSkin();
@@ -20,6 +20,7 @@ describe("Cairn's authored atlas", () => {
     expect(rebuilt.atlas.indices).not.toBe(skin.atlas.indices);
     expect(Object.keys(skin.rows)).toEqual(poseNames);
     expect(skin.groundLine).toBe(51);
+    expect(skin.material).toBe("sandstone");
   });
 
   it("seals every silhouette and leaves a clear pixel around the whole cell", () => {
@@ -30,7 +31,9 @@ describe("Cairn's authored atlas", () => {
         const label = `${pose} ${index}`;
         expect(pixels.length, label).toBe(48 * 52);
         expect(pixels.filter((value) => value > 0).length, label).toBeGreaterThan(250);
-        expect(Math.max(...pixels), label).toBeLessThanOrEqual(12);
+        expect(Math.max(...pixels), label).toBeLessThanOrEqual(15);
+        expect(pixels.includes(12), label).toBe(pose === "blocked");
+        expect(pixels.includes(10) || pixels.includes(11), label).toBe(false);
         expect(
           pixels.some(
             (value, at) =>
@@ -66,9 +69,10 @@ describe("Cairn's authored atlas", () => {
     });
   });
 
-  it("inclines the summit toward the requested compass octant above a steady foundation", () => {
+  it("inclines the summit toward the requested compass octant above a steady shard", () => {
     const idle = cairnFrame("idle", 0);
     const neutral = partOrigin(idle, summit.sprite);
+    expect(skin.gaze).toEqual({ row: poseNames.indexOf("look"), directions: 8 });
     const octants = [
       [0, 1, 0],
       [1, 1, 1],
@@ -84,38 +88,80 @@ describe("Cairn's authored atlas", () => {
       const turned = partOrigin(frame, summit.sprite);
       expect(Math.sign(turned.x - neutral.x), `octant ${direction} x`).toBe(horizontal);
       expect(Math.sign(turned.y - neutral.y), `octant ${direction} y`).toBe(vertical);
-      expect(frame.slice(37 * 48), `octant ${direction} foundation`).toEqual(idle.slice(37 * 48));
+      expect(partOrigin(frame, shard.sprite), `octant ${direction} shard`).toEqual(
+        partOrigin(idle, shard.sprite),
+      );
     }
     expect(
       new Set(octants.map(([direction]) => contentHash(sliced.frame("look", direction)))).size,
     ).toBe(8);
   });
 
-  it("floats as three separate stones without drawing a shadow into its sheet", () => {
-    for (let index = 0; index < cairnRows.idle.frames; index += 1) {
-      const pixels = cairnFrame("idle", index);
-      expect(connectedAreas(pixels), `idle ${index}`).toHaveLength(3);
-      expect(pixels.slice(49 * 48).every((value) => value === 0)).toBe(true);
-      expect(pixels.every((value) => value <= 4 || value === 9)).toBe(true);
+  it("keeps open air between three unequal stones in idle, wait and every look", () => {
+    for (const pose of ["idle", "wait", "look"] as const) {
+      for (let index = 0; index < cairnRows[pose].frames; index += 1) {
+        const pixels = cairnFrame(pose, index);
+        const stones = regions(pixels, (value) => value !== 0);
+        const label = `${pose} ${index}`;
+        expect(stones, label).toHaveLength(3);
+        const [cap = [], ring = [], lower = []] = stones;
+        expect(ring.length, label).toBeGreaterThan(cap.length * 1.5);
+        expect(cap.length, label).toBeGreaterThan(lower.length * 2);
+        expect(
+          pixels.slice(50 * 48).every((value) => value === 0),
+          label,
+        ).toBe(true);
+        for (const stone of stones) {
+          const moss = stone.filter((at) => [5, 6, 7, 8, 15].includes(pixels[at] ?? 0));
+          expect(moss.length, label).toBeGreaterThan(stone.length * 0.05);
+          expect(moss.length, label).toBeLessThan(stone.length * 0.3);
+        }
+      }
     }
   });
 
-  it("keeps the foundation steady while the summit works independently", () => {
-    const first = cairnFrame("work", 0);
-    const last = cairnFrame("work", 3);
-    expect(first.slice(38 * 48)).toEqual(last.slice(38 * 48));
-    expect(first.slice(0, 38 * 48)).not.toEqual(last.slice(0, 38 * 48));
-    const idleFirst = cairnFrame("idle", 0);
-    const idleShifted = cairnFrame("idle", 2);
-    expect(idleFirst.slice(37 * 48)).toEqual(idleShifted.slice(37 * 48));
-    expect(idleFirst.slice(0, 37 * 48)).not.toEqual(idleShifted.slice(0, 37 * 48));
+  it("tilts the cap toward the upper right and narrows the lower shard to a point", () => {
+    const [cap = [], , lower = []] = regions(cairnFrame("idle", 0), (value) => value !== 0);
+    const capRows = occupiedRows(cap);
+    expect(Math.min(...(capRows[0] ?? []))).toBeGreaterThan(
+      Math.max(...(capRows.at(-1) ?? [])) + 4,
+    );
+    const lowerRows = occupiedRows(lower);
+    expect(Math.max(...lowerRows.map((row) => row.length))).toBeGreaterThan(10);
+    expect(lowerRows.at(-1)?.length).toBeLessThanOrEqual(3);
   });
 
-  it("settles into one low resting mound and opens upward to wait", () => {
+  it("keeps a through-hole open in every rendered frame, including the foreshortened arch", () => {
+    for (const pose of poseNames) {
+      for (let index = 0; index < cairnRows[pose].frames; index += 1) {
+        const label = `${pose} ${index}`;
+        const [opening] = aperture(cairnFrame(pose, index));
+        const foreshortened = pose === "sit" || pose === "nap" || (pose === "raise" && index < 4);
+        expect(opening?.length ?? 0, label).toBeGreaterThanOrEqual(foreshortened ? 12 : 32);
+        expect(
+          opening?.every((at) => at % 48 > 8 && at % 48 < 37 && at >= 48 * 17 && at < 48 * 40),
+          label,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("holds the pierced stone still while the top counterbalances the striking shard", () => {
+    const lifted = cairnFrame("work", 0);
+    const struck = cairnFrame("work", 3);
+    expect(aperture(lifted)[0]).toEqual(aperture(struck)[0]);
+    expect(partOrigin(struck, levelSummit.sprite).x).toBeLessThan(
+      partOrigin(lifted, levelSummit.sprite).x,
+    );
+    expect(struck.slice(37 * 48, 45 * 48)).not.toEqual(lifted.slice(37 * 48, 45 * 48));
+  });
+
+  it("settles edge-on at the ground line and opens upward to wait", () => {
+    const idle = cairnFrame("idle", 0);
     const resting = cairnFrame("nap", 0);
-    expect(connectedAreas(resting)).toHaveLength(1);
-    expect(top(resting)).toBeGreaterThanOrEqual(26);
-    expect(top(cairnFrame("wait", 0))).toBeLessThan(top(cairnFrame("idle", 0)));
+    expect(top(resting) - top(idle)).toBeGreaterThanOrEqual(14);
+    expect(top(cairnFrame("wait", 0))).toBeLessThan(top(idle));
+    expect(idle.slice(49 * 48).every((value) => value === 0)).toBe(true);
     expect(resting.slice(50 * 48, 51 * 48).some((value) => value !== 0)).toBe(true);
   });
 
@@ -148,29 +194,40 @@ function top(pixels: Uint8Array): number {
   return Math.floor(pixels.findIndex((value) => value !== 0) / 48);
 }
 
-function connectedAreas(pixels: Uint8Array): number[] {
-  const unseen = new Set([...pixels.keys()].filter((at) => pixels[at] !== 0));
-  const areas: number[] = [];
-  while (unseen.size > 0) {
-    const seed = unseen.values().next().value;
-    if (seed === undefined) break;
+function aperture(pixels: Uint8Array): number[][] {
+  return regions(pixels, (value) => value === 0)
+    .filter((region) => region[0] !== 0 && region.length > 5)
+    .sort((first, second) => second.length - first.length);
+}
+
+function occupiedRows(stone: number[]): number[][] {
+  return Array.from({ length: 52 }, (_, y) =>
+    stone.filter((at) => Math.floor(at / 48) === y).map((at) => at % 48),
+  ).filter((row) => row.length > 0);
+}
+
+function regions(pixels: Uint8Array, includes: (value: number) => boolean): number[][] {
+  const unseen = new Set([...pixels.keys()].filter((at) => includes(pixels[at] ?? 0)));
+  const found: number[][] = [];
+  for (const seed of unseen) {
+    const region: number[] = [];
     const pending = [seed];
-    let area = 0;
     while (pending.length > 0) {
       const at = pending.pop();
       if (at === undefined || !unseen.delete(at)) continue;
-      area += 1;
+      region.push(at);
       for (const adjacent of [
         at - 48,
         at + 48,
         ...(at % 48 > 0 ? [at - 1] : []),
         ...(at % 48 < 47 ? [at + 1] : []),
-      ])
+      ]) {
         if (unseen.has(adjacent)) pending.push(adjacent);
+      }
     }
-    areas.push(area);
+    found.push(region);
   }
-  return areas.sort((first, second) => first - second);
+  return found;
 }
 
 function partOrigin(pixels: Uint8Array, sprite: Sprite): { x: number; y: number } {

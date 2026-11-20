@@ -24,6 +24,9 @@ export const poseNames = [
 
 export type PoseName = (typeof poseNames)[number];
 
+export const materialProfiles = ["leaf", "porcelain", "sandstone"] as const;
+export type MaterialProfile = (typeof materialProfiles)[number];
+
 export interface Row {
   readonly frames: number;
   readonly ms: readonly number[];
@@ -52,6 +55,7 @@ export interface Skin {
   readonly palette: PaletteRoles;
   readonly rows: Readonly<Record<PoseName, Row>>;
   readonly groundLine: number;
+  readonly material?: MaterialProfile;
   readonly gaze?: { readonly row: number; readonly directions: 8 | 16 };
 }
 
@@ -106,6 +110,8 @@ export function validateRows(rows: Readonly<Record<PoseName, Row>>): string[] {
 
 export function validateSkin(skin: Skin): string[] {
   const faults = validateRows(skin.rows);
+  if (skin.material !== undefined && !materialProfiles.includes(skin.material))
+    faults.push(`unknown material profile ${skin.material}`);
   const columns = Math.max(...poseNames.map((name) => skin.rows[name].frames));
   if (skin.atlas.width !== skin.cell.width * columns) {
     faults.push(`atlas width ${skin.atlas.width} is not ${columns} cells of ${skin.cell.width}`);

@@ -1,4 +1,6 @@
+import type { MaterialProfile } from "../pose/skin.ts";
 import type { Season, SkyPhase } from "../world/sky.ts";
+import { materialPalette } from "./materials.ts";
 
 export type Palette = readonly string[];
 
@@ -15,6 +17,7 @@ export interface PaletteOptions {
   readonly season?: Season | undefined;
   readonly world?: boolean | undefined;
   readonly forcedColors?: boolean | undefined;
+  readonly material?: MaterialProfile | undefined;
 }
 
 export interface PaletteRole {
@@ -58,6 +61,18 @@ export const tokensRead: readonly string[] = [
   "--kw-border",
   "--kw-terminal-cyan",
   "--kw-terminal-red",
+  "--kw-ramp-1",
+  "--kw-ramp-2",
+  "--kw-ramp-3",
+  "--kw-art-cream",
+  "--kw-art-olive",
+  "--kw-art-moss",
+  "--kw-art-teal",
+  "--kw-art-ochre",
+  "--kw-art-clay",
+  "--kw-art-ink",
+  "--kw-art-stone",
+  "--kw-art-light",
 ];
 
 export const identityShadowShare = 0.35;
@@ -83,7 +98,7 @@ export function resolvePalette(source: PaletteSource, options: PaletteOptions = 
     options.season,
     paper,
   );
-  return [
+  const palette = [
     transparentColor,
     source.mix(identity, towardDark, identityShadowShare),
     identity,
@@ -101,6 +116,9 @@ export function resolvePalette(source: PaletteSource, options: PaletteOptions = 
     source.read("--kw-text-faint"),
     source.read("--kw-text-dim"),
   ];
+  return options.material !== undefined && options.world !== true
+    ? materialPalette(source, options.material, palette)
+    : palette;
 }
 
 export const forcedPalette: Palette = [

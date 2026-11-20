@@ -4,7 +4,25 @@ export {
   gardenTile,
 } from "../skins/world/workshops/gardens.ts";
 export { workshopDesign, workshopDesigns } from "../skins/world/workshops/index.ts";
+export {
+  courtyardFrame,
+  courtyardLayout,
+  courtyardPalette,
+  courtyardSettingOf,
+} from "./courtyard.ts";
 export { glyphFrame, glyphGap, glyphGlyphs, glyphSize } from "./glyph.ts";
+export {
+  type Illustration,
+  type IllustrationClip,
+  type IllustrationPlacement,
+  type IllustrationPoint,
+  type IllustrationRect,
+  type IllustrationSize,
+  illustrationFrame,
+  illustrationPixel,
+  placeIllustration,
+  validateIllustration,
+} from "./illustration.ts";
 export {
   crownRow,
   eyeLine,

@@ -50,6 +50,31 @@ it("leaves Enter and Space to native courtyard controls through workspace key ro
   expect(enter.defaultPrevented).toBe(false);
   fireEvent.click(court);
   await waitFor(() => expect(document.activeElement?.textContent).toBe("Stone's courtyard"));
+  const appearance = screen.getByRole("button", { name: "Appearance" });
+  appearance.focus();
+  for (const key of ["Enter", " "]) {
+    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    appearance.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  }
+  fireEvent.click(appearance);
+  expect(appearance.getAttribute("aria-expanded")).toBe("true");
+  const style = screen.getByRole("combobox", { name: "Workshop style" });
+  style.focus();
+  const nativeEscape = new KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    cancelable: true,
+  });
+  style.dispatchEvent(nativeEscape);
+  expect(nativeEscape.defaultPrevented).toBe(false);
+  expect(appearance.getAttribute("aria-expanded")).toBe("true");
+  const done = screen.getByRole("button", { name: /^Done$/ });
+  done.focus();
+  fireEvent.keyDown(done, { key: "Escape" });
+  expect(appearance.getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(appearance);
+  expect(screen.queryByRole("combobox", { name: "Workshop style" })).toBeNull();
   fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
   await waitFor(() =>
     expect((document.activeElement as HTMLElement)?.dataset.courtyard).toBe("stone"),

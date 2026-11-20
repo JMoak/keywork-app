@@ -121,6 +121,7 @@ function manifestIdentity(skin: Skin): string {
     skin.palette.outline,
     skin.palette.accent,
     skin.groundLine,
+    skin.material ?? null,
     skin.gaze === undefined ? null : [skin.gaze.row, skin.gaze.directions],
     poseNames.map((pose) => {
       const row = skin.rows[pose];

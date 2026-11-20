@@ -1,0 +1,253 @@
+.kw-illustrated-home {
+  padding: clamp(1rem, 3vw, 2.5rem);
+  color: var(--kw-text);
+  font-family: "DM Sans", system-ui, sans-serif;
+  min-width: 0;
+}
+.kw-stead-workbench[hidden] {
+  display: none;
+}
+.kw-stead-back-home {
+  margin: 0.5rem 1rem;
+}
+.kw-home-heading,
+.kw-home-neighbors-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.kw-home-heading h2 {
+  margin: 0.3rem 0 0;
+  font: 500 clamp(1.6rem, 3vw, 2.3rem) / 1.1 var(--kw-font-prose);
+}
+.kw-home-eyebrow {
+  margin: 0;
+  color: var(--kw-text-dim);
+  font-size: 0.85rem;
+}
+.kw-home-text-button {
+  padding: 0.55rem 0;
+  min-height: 2.75rem;
+  border: 0;
+  background: none;
+  color: var(--kw-text-mid);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.kw-home-text-button:hover {
+  color: var(--kw-text);
+}
+.kw-home-encounter {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(15rem, 1fr);
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+  margin: 2rem 0 3rem;
+}
+.kw-home-landscape {
+  margin: 0;
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1.65;
+  isolation: isolate;
+}
+.kw-home-landscape::before {
+  content: "";
+  position: absolute;
+  inset: 14% 4% 2%;
+  border-radius: 50%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in oklab, var(--kw-art-ochre) 14%, transparent),
+    transparent 72%
+  );
+}
+.kw-home-scenery {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+}
+.kw-home-resident {
+  position: absolute;
+  right: 13%;
+  bottom: 14%;
+  width: 37%;
+  isolation: isolate;
+}
+.kw-home-resident::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 65%;
+  left: 18%;
+  height: 4%;
+  bottom: 1%;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--kw-art-ink) 20%, transparent);
+  filter: blur(2px);
+}
+.kw-home-resident {
+  --kw-illustration-width: 100%;
+}
+.kw-home-resident canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+.kw-home-greeting {
+  min-width: 0;
+}
+.kw-home-state {
+  font-size: 0.85rem;
+  color: var(--kw-text-dim);
+}
+.kw-home-state[data-state="porch"] {
+  color: var(--kw-accent);
+}
+.kw-home-state[data-state="blocked"] {
+  color: var(--kw-error);
+}
+.kw-home-greeting h3 {
+  font: 500 clamp(2rem, 5vw, 3.5rem) / 1.05 var(--kw-font-prose);
+  margin: 0.55rem 0 0.85rem;
+  overflow-wrap: anywhere;
+}
+.kw-home-greeting > p {
+  max-width: 35ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--kw-text-mid);
+}
+.kw-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-top: 1.4rem;
+}
+.kw-home-primary {
+  min-height: 2.9rem;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid var(--kw-accent);
+  border-radius: 0.65rem;
+  color: var(--kw-background);
+  background: var(--kw-accent);
+  font:
+    500 0.95rem / 1.3 "DM Sans",
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+.kw-home-greeting .kw-home-request-note {
+  margin-top: 0.7rem;
+  font-size: 0.8rem;
+  color: var(--kw-text-dim);
+}
+.kw-home-neighbors-heading {
+  margin-bottom: 0.9rem;
+}
+.kw-home-neighbors-heading h3 {
+  font: 500 1.2rem / 1.3 var(--kw-font-prose);
+  margin: 0;
+}
+.kw-home-neighbors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.8rem;
+}
+.kw-home-neighbors li {
+  min-width: 0;
+}
+.kw-home-neighbor {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem;
+  width: 100%;
+  min-height: 6rem;
+  border: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  border-radius: 0.7rem;
+  color: var(--kw-text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.kw-home-neighbor:hover {
+  border-color: var(--kw-accent-soft);
+  background: var(--kw-panel-lift);
+}
+.kw-home-neighbor-portrait {
+  flex: 0 0 3.75rem;
+  width: 3.75rem;
+  --kw-illustration-width: 100%;
+}
+.kw-home-neighbor-portrait canvas {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+.kw-home-neighbor-copy {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kw-home-neighbor-copy strong {
+  font-weight: 500;
+}
+.kw-home-neighbor-copy > span {
+  font-size: 0.85rem;
+  color: var(--kw-text-mid);
+}
+.kw-home-neighbor-copy small {
+  font-size: 0.75rem;
+  color: var(--kw-text-dim);
+}
+.kw-home-vacancy {
+  min-height: 6rem;
+  padding: 0.85rem;
+  color: var(--kw-text-dim);
+}
+.kw-home-vacancy span {
+  font-size: 0.75rem;
+}
+.kw-illustrated-home button:focus-visible {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 3px;
+}
+@container frame (max-width: 719.98px) {
+  .kw-home-encounter {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin: 1.2rem 0 2rem;
+  }
+  .kw-home-landscape {
+    max-height: 23rem;
+  }
+  .kw-home-greeting > p {
+    max-width: none;
+  }
+}
+@media (forced-colors: active) {
+  .kw-home-scenery {
+    visibility: hidden;
+  }
+  .kw-home-primary {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+}

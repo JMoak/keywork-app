@@ -7,17 +7,15 @@ import type { ShellSeams } from "../panes/registry.ts";
 import { MeetCreature, meetingName } from "./meet.tsx";
 import { proposeNames } from "./names.ts";
 
-vi.mock("./portrait.tsx", () => ({ Portrait: () => <span>Creature portrait</span> }));
-
 afterEach(cleanup);
 
-it("lets the keeper meet and keep a creature before setup, then binds the selected model without sending a prompt", async () => {
+it("starts the first conversation with Folio, then binds the selected model without sending a prompt", async () => {
   const draft: CreatureSummary = {
     slug: "wren",
     name: "Wren",
     sigil: "W",
     created: "2026-11-10T00:00:00Z",
-    skin: "kid",
+    skin: "folio",
     seed: 0,
     workshop: "wren-home",
     models: { strong: "inherit", loop: "inherit", decide: "inherit", vision: "inherit" },
@@ -69,14 +67,17 @@ it("lets the keeper meet and keep a creature before setup, then binds the select
   const proposed = meetingName("C:/managed-home");
   render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
   expect(screen.getByRole("heading", { name: `Meet ${proposed}` })).toBeTruthy();
+  expect(
+    screen.getByText(
+      `${proposed} can help with projects on your computer. Try asking it to explain a file.`,
+    ),
+  ).toBeTruthy();
   expect(createCreature).not.toHaveBeenCalled();
   expect(serverFetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Explore first" }));
-  expect(await screen.findByRole("heading", { name: "Wren" })).toBeTruthy();
-  expect(createCreature).toHaveBeenCalledWith({ name: proposed, skin: "kid" });
-  expect(serverFetch).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Folio" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.queryByRole("group", { name: "Animation preview" })).toBeNull();
+  expect(screen.getByRole("group", { name: "Creature design" }).querySelector("canvas")).toBeNull();
   expect(openSession).not.toHaveBeenCalled();
-
   fireEvent.click(screen.getByRole("button", { name: "Start a conversation" }));
   expect(
     await screen.findByRole("heading", { name: "How would you like Wren to reply?" }),
@@ -86,6 +87,7 @@ it("lets the keeper meet and keep a creature before setup, then binds the select
   fireEvent.click(screen.getByRole("button", { name: "Open conversation" }));
   await waitFor(() => expect(openSession).toHaveBeenCalledWith("wren-thread"));
   expect(createCreature).toHaveBeenCalledOnce();
+  expect(createCreature).toHaveBeenCalledWith({ name: proposed, skin: "folio" });
   expect(updateCreature).toHaveBeenCalledWith("wren", { models: { strong: model } });
   expect(inject).not.toHaveBeenCalled();
   expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
@@ -122,6 +124,14 @@ it("previews and rolls designs without creating anything, can undo, then saves t
   const cairn = screen.getByRole("button", { name: "Cairn" });
   fireEvent.click(cairn);
   expect(cairn.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "See it move" }));
+  fireEvent.click(screen.getByRole("button", { name: "Work" }));
+  expect(
+    screen
+      .getByRole("img", { name: `${meetingName(shell.workspace)}, work` })
+      .getAttribute("data-skin"),
+  ).toBe("cairn");
+  expect(createCreature).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Roll a design" }));
   expect(cairn.getAttribute("aria-pressed")).toBe("false");
   expect(createCreature).not.toHaveBeenCalled();
@@ -134,4 +144,46 @@ it("previews and rolls designs without creating anything, can undo, then saves t
       skin: "cairn",
     }),
   );
+  await waitFor(() =>
+    expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull(),
+  );
+});
+
+it("keeps a design explicitly brought back from customization", () => {
+  const customize = vi.fn();
+  const shell = { workspace: "C:/managed-home" } as unknown as ShellSeams;
+  render(() => (
+    <MeetCreature shell={shell} creatures={[]} initialSkin="carter" first onCustomize={customize} />
+  ));
+  expect(screen.getByRole("button", { name: "Carter" }).getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "Customize first" }));
+  expect(customize).toHaveBeenCalledWith("carter");
+});
+
+it("returns home from model setup without recreating a resident found on the final check", async () => {
+  const resident = {
+    slug: "kit",
+    name: "Kit",
+    skin: "tessera",
+    models: { strong: "inherit" },
+    conversation: "existing-thread",
+  } as CreatureSummary;
+  const createCreature = vi.fn();
+  const openSession = vi.fn();
+  const shell = {
+    workspace: "C:/managed-home",
+    host: { ...browserHost(), serverFetch: vi.fn().mockRejectedValue(new Error("Offline")) },
+    client: { creatures: async () => [resident], createCreature },
+    sessions: { openSession },
+  } as unknown as ShellSeams;
+  render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start a conversation" }));
+  expect(
+    await screen.findByRole("heading", { name: "How would you like Kit to reply?" }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Explore first" }));
+  expect(screen.queryByRole("heading", { name: "How would you like Kit to reply?" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
+  expect(createCreature).not.toHaveBeenCalled();
+  expect(openSession).not.toHaveBeenCalled();
 });

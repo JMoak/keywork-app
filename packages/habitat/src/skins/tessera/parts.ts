@@ -1,71 +1,92 @@
 import { type Placement, place } from "../kid/cell.ts";
 import { type Part, part } from "../kid/sprite.ts";
-import { groundBase, groundHighlight, groundLight } from "../legend.ts";
+import {
+  groundBase,
+  groundHighlight,
+  groundLight,
+  groundShadow,
+  identityLight,
+} from "../legend.ts";
 
 export type Point = readonly [x: number, y: number];
 
-export const crown = part("tessera crown", 15, 13, [
-  ".......hhhhh.......",
-  "....hhhhhhhhhhh....",
-  "..hhhhhhhhhhhhhhh..",
-  ".hhhhhhhhhhhhhhlll.",
-  "hhhhhhhclhhhhhlllll",
-  "hhhhhccclcchhllllll",
-  "hhhhhhclclhhlllllls",
-  ".hhhhhhlhhhhhlllls.",
-  "...lllllllssssss...",
+export const crown = glazed("porcelain crown", 13, 14, [
+  "........hhhllll",
+  ".....hhhhhhFllllll",
+  "...hhhhhhhhFlllDDlll",
+  "..hhhhhhhhhllDDDDllll",
+  ".hhhhhlllllFlDEDDlDDll",
+  "hhhFlllllllFFlEFDDElll",
+  "hhFllllllllllDDDEEDllcc",
+  "hFlllllllllllDEDlDccccc",
+  ".llllllccccccDDccccccs",
+  "..lllcccccccssssccsss",
+  "...cccsssss",
 ]);
 
-export const leftPlate = part("tessera left plate", 7, 21, [
-  "....hhhhh....",
-  "..hhhhhhhhh..",
-  ".hhhhhhhhhhh.",
-  "hhhhhchhhllll",
-  "hhhccclhlllll",
-  "hhhhclchlllls",
-  "hhhhhlhllllss",
-  "hhhhhlllllsss",
-  ".lllllllssss.",
-  "..llllsssss..",
-  "....sssss....",
+export const leftPlate = glazed("sprigged shoulder plate", 4, 19, [
+  ".............hhlll",
+  "...........hhhhhhll",
+  ".........hhhhhhhhFll",
+  "........hhhhhlDlhFlll",
+  ".......hhhDDhlDlhllDll",
+  "......hhhDDDDhElhhDDEl",
+  ".....hhhhllDEDhElDDEll",
+  "....hhhhhhhhDDEEEllcl",
+  "...hhhlDDDlllhEllllc",
+  "..hhllDDDEEllhEllllc",
+  "..hlllDDlllEEEEDllc",
+  ".hlllFllllllllElllc",
+  ".hllFllllllccllElcc",
+  "hlllFlllccccccEccs",
+  "llccccccssscccccsc",
+  "lccss....sssssccs",
+  "cs..........ssss",
 ]);
 
-export const rightPlate = part("tessera right plate", 29, 22, [
-  "...hhhhh....",
-  ".hhhhhhhhh..",
-  "hhhhhhhllll.",
-  "hhhchhllllll",
-  "hhcclcllllls",
-  "hhhlclllllss",
-  "hhhllllllsss",
-  ".llllllssss.",
-  "..lllsssss..",
-  "...sssss....",
+export const frontPlate = glazed("overlapping flank plate", 18, 21, [
+  "...........hhhhll",
+  "........hhhhhhlllll",
+  "......hhhhhhhFlDDlll",
+  ".....hhhhhhhFlDDDDlll",
+  "....hhhhhllllFlEDEllDcl",
+  "...hhhhhlDlllDDDEFDDDDc",
+  "..hhhhhlDDlhDDDEEDDDclcl",
+  "..hhhllDDEllllDDEDDllcll",
+  ".hhhllllEllDDllDlllFlllc",
+  ".hlllDDlElDDEllDllllFllcc",
+  "hllhDDDEEDDElllDlllFlllcc",
+  "hllDDllEEllDDllDllllFlccc",
+  "llDDllEElllDEDlllccclFcccs",
+  "lllllEElllllcccccscsclcccs",
+  "llllEElllcccsss.....sscccs",
+  "lllEcccsss............scss",
+  "lcccss..................ss",
+  "csss",
 ]);
 
-export const frontPlate = part("tessera front plate", 17, 24, [
-  "....hhhhh....",
-  "..hhhhhhhhh..",
-  ".hhhhhhhhhhh.",
-  "hhhhhhhhhhlll",
-  "hhhhchhhhllll",
-  "hhccclcclllll",
-  "hhhclchllllll",
-  "hhhhlhlllllls",
-  ".hhhllllllss.",
-  "..llllllsss..",
-  "....lssss....",
+export const underside = glazed("earthen breast under the lip", 8, 29, [
+  "....gggggggggggggggggggg",
+  "..gwwwgggggggggggggggggggg",
+  ".ggwwgggggwwwgggggggwwwgggg",
+  "ggggggggggwwgggggggggggggggg",
+  "gdggggddgggggdddggggggdddgggg",
+  "ddgggddddgggdddddgggggddddgg",
+  ".ddddddgdggggddddggggdgdddd",
+  "..dgdddddggggggddggddddd",
+  "....dddddggggddddddddd",
+  ".......dddddddddd",
 ]);
 
-export const underside = part("tessera underside", 13, 30, [
-  "....gggggggggggg....",
-  "..gggggggggggggggg..",
-  ".ggwwwwwwwwwwwwgggg.",
-  "ggwwggggggggggwwggdd",
-  "ggggdddddddddddddddd",
-  ".dddddddddddddddddd.",
-  "...dddddddddddddd...",
-]);
+function glazed(name: string, x: number, y: number, rows: readonly string[]): Part {
+  const width = Math.max(...rows.map((row) => row.length));
+  return part(
+    name,
+    x,
+    y,
+    rows.map((row) => row.padEnd(width, ".")),
+  );
+}
 
 export const parcel = part("tessera parcel", 18, 31, [
   ".wwwwwwwwww.",
@@ -105,24 +126,56 @@ export const chisel = part("tessera chisel", 29, 31, ["hh", "ll", "ll", "ww", "g
 
 export const fault = part("tessera fault seam", 22, 25, ["!.", "!!", ".!", "!!", "!."]);
 
-export function leg(name: string, points: readonly Point[], light = false): Placement {
-  const left = Math.min(...points.map(([x]) => x));
-  const top = Math.min(...points.map(([, y]) => y));
-  const width = Math.max(...points.map(([x]) => x)) - left + 2;
-  const height = Math.max(...points.map(([, y]) => y)) - top + 1;
+export function leg(
+  name: string,
+  points: readonly [Point, Point, Point],
+  near: boolean,
+): Placement {
+  const [hip, knee, tip] = points;
+  const side = knee[0] < 24 ? -1 : 1;
+  const ankle: Point = [
+    Math.max(3, Math.min(44, tip[0] + side)),
+    Math.round((knee[1] + tip[1] * 2) / 3),
+  ];
+  const joints = [hip, knee, ankle, tip];
+  const left = Math.min(...joints.map(([x]) => x)) - 2;
+  const top = Math.min(...joints.map(([, y]) => y)) - 2;
+  const width = Math.max(...joints.map(([x]) => x)) - left + 3;
+  const height = Math.max(...joints.map(([, y]) => y)) - top + 3;
   const pixels = new Uint8Array(width * height);
-  for (let at = 1; at < points.length; at += 1) {
-    const from = points[at - 1] as Point;
-    const to = points[at] as Point;
-    const steps = Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1]));
-    for (let step = 0; step <= steps; step += 1) {
-      const share = steps === 0 ? 0 : step / steps;
-      const x = Math.round(from[0] + (to[0] - from[0]) * share) - left;
-      const y = Math.round(from[1] + (to[1] - from[1]) * share) - top;
-      pixels[y * width + x] = light ? groundHighlight : groundLight;
-      pixels[y * width + x + 1] = light ? groundLight : groundBase;
+
+  function dab(x: number, y: number, ink: number): void {
+    pixels[(y - top) * width + x - left] = ink;
+  }
+
+  function bone(from: Point, to: Point, thick: number, thin: number, lit: boolean): void {
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    const steps = Math.max(1, Math.abs(dx), Math.abs(dy));
+    for (let step = 0; step <= steps; step++) {
+      const share = step / steps;
+      const cx = Math.round(from[0] + share * dx);
+      const cy = Math.round(from[1] + share * dy);
+      const radius = thick * (1 - share) + thin * share;
+      for (let y = -2; y <= 2; y++) {
+        for (let x = -2; x <= 2; x++) {
+          if (x * x + y * y > radius * radius) continue;
+          const value = x + y;
+          const shade = value < 0 ? groundLight : value === 0 ? groundBase : groundShadow;
+          dab(cx + x, cy + y, lit && value < -0.5 ? groundHighlight : shade);
+        }
+      }
     }
   }
-  const drawn: Part = { name, x: left, y: top, sprite: { width, height, pixels } };
-  return place(drawn, { layer: "behind" });
+
+  bone(hip, knee, 2, 1.7, near);
+  bone(knee, ankle, 1.5, 0.85, near);
+  bone(ankle, tip, 0.85, 0.45, near);
+  const [kx, ky] = knee;
+  dab(kx, ky - 1, near ? identityLight : groundHighlight);
+  dab(kx - 1, ky, near ? groundHighlight : groundLight);
+  dab(kx, ky, near ? groundHighlight : groundBase);
+  dab(kx, ky + 1, groundShadow);
+  dab(kx + side, ky + 1, groundShadow);
+  return place({ name, x: left, y: top, sprite: { width, height, pixels } }, { layer: "behind" });
 }

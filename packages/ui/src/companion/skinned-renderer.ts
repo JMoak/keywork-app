@@ -1,4 +1,4 @@
-import type { Skin } from "@keywork-app/habitat";
+import type { MaterialProfile, Skin } from "@keywork-app/habitat";
 import {
   createRenderer,
   type Palette,
@@ -14,7 +14,13 @@ export function skinnedRenderer(skin: Skin, source: () => PaletteSource): Render
   const render = createRenderer(skin);
   const coats = new Map<string, Palette>();
   const renderer: Renderer = (pose, _tokens, prefs) => {
-    const palette = coatFor(coats, source(), prefs.hueStop, prefs.forcedColors === true);
+    const palette = coatFor(
+      coats,
+      source(),
+      prefs.hueStop,
+      prefs.forcedColors === true,
+      skin.material,
+    );
     const frame = render(pose, palette, { scale: prefs.deviceScale });
     return {
       width: frame.width,
@@ -40,15 +46,19 @@ function coatFor(
   source: PaletteSource,
   hueStop: number | undefined,
   forcedColors: boolean,
+  material: MaterialProfile | undefined,
 ): Palette {
   const key = forcedColors
     ? "forced"
-    : [source.appearance, hueStop ?? "accent", ...tokensRead.map((name) => source.read(name))].join(
-        "|",
-      );
+    : [
+        source.appearance,
+        hueStop ?? "accent",
+        material ?? "coat",
+        ...tokensRead.map((name) => source.read(name)),
+      ].join("|");
   const known = coats.get(key);
   if (known !== undefined) return known;
-  const coat = resolvePalette(source, { hueStop, forcedColors });
+  const coat = resolvePalette(source, { hueStop, forcedColors, material });
   coats.set(key, coat);
   return coat;
 }

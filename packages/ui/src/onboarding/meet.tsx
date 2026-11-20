@@ -1,12 +1,12 @@
+import "./onboarding.css";
 import type { CreatureSummary } from "@keywork-app/protocol";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createRenderEffect, createSignal, onCleanup, Show } from "solid-js";
+import { CreatureGallery, CreatureStudio } from "../creatures/studio.tsx";
 import { ModelSetup } from "../model-setup/index.tsx";
 import type { SelectedModel } from "../model-setup/inventory.ts";
 import type { ShellSeams } from "../panes/registry.ts";
 import { creaturesListed } from "../shell/first-frame.ts";
-import { skinLabel, skinName } from "./copy.ts";
 import { proposeNames } from "./names.ts";
-import { Portrait } from "./portrait.tsx";
 import { fallbackName } from "./sequence.ts";
 import { offeredSkins, rolledSkin } from "./skins.ts";
 
@@ -19,40 +19,40 @@ export function MeetCreature(props: {
   readonly creatures: readonly CreatureSummary[] | undefined;
   readonly first: boolean;
   readonly initialSkin?: string | undefined;
+  onShowingChange?(showing: boolean): void;
   onCustomize(skin: string): void;
 }) {
-  const [created, setCreated] = createSignal<CreatureSummary>();
   const [settingUp, setSettingUp] = createSignal<CreatureSummary>();
   const [met, setMet] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const name = meetingName(props.shell.workspace);
   const designs = offeredSkins();
+  const firstDesign = designs.includes("folio") ? "folio" : (designs[0] ?? "kid");
   const [skin, setSkin] = createSignal(
     props.initialSkin !== undefined && designs.includes(props.initialSkin)
       ? props.initialSkin
-      : (designs[0] ?? "kid"),
+      : firstDesign,
   );
   const [beforeRoll, setBeforeRoll] = createSignal<string>();
   const homeIsEmpty = () => props.first && (props.creatures?.length ?? 0) === 0;
-  const introducing = () => !met() && (created() !== undefined || homeIsEmpty());
+  const introducing = () => !met() && (busy() || homeIsEmpty());
+  createRenderEffect(() => props.onShowingChange?.(settingUp() !== undefined || introducing()));
   let disposed = false;
   onCleanup(() => {
     disposed = true;
+    props.onShowingChange?.(false);
   });
 
   const make = async (): Promise<CreatureSummary> => {
     const listed = await creaturesListed(props.shell.client);
     if (listed === undefined || disposed)
       throw new Error("Could not read the creatures in your home.");
-    const existing = listed[0] ?? created();
+    const existing = listed[0];
     if (existing !== undefined) return existing;
     const answer = await props.shell.client.createCreature({ name, skin: skin() });
     if (!("slug" in answer)) throw new Error("Could not save your creature. Try again.");
-    if (!disposed) {
-      setCreated(answer);
-      void props.shell.store.surfaces.refetch("bots");
-    }
+    if (!disposed) void props.shell.store.surfaces.refetch("bots");
     return answer;
   };
 
@@ -61,8 +61,10 @@ export function MeetCreature(props: {
     setBusy(true);
     setNotice(undefined);
     try {
-      const resident = created() ?? (await make());
-      if (!disposed && talk) setSettingUp(resident);
+      const resident = await make();
+      if (disposed) return;
+      if (talk) setSettingUp(resident);
+      else setMet(true);
     } catch {
       if (!disposed) setNotice("We could not save your creature. Try again.");
     } finally {
@@ -106,50 +108,61 @@ export function MeetCreature(props: {
             aria-busy={busy()}
             data-native-activation
           >
-            <Show
-              when={created()}
-              fallback={
-                <div class="kw-meet-creature-intro">
-                  <Portrait skin={skin()} hueStop={1} />
-                  <div class="kw-meet-creature-copy">
-                    <span class="kw-model-kicker">Your creature</span>
-                    <h2>{`Meet ${name}`}</h2>
-                    <p>{meetLine(name)}</p>
-                  </div>
+            <CreatureStudio
+              skin={skin()}
+              hueStop={1}
+              name={name}
+              disabled={busy()}
+              portraitClass="kw-onboard-portrait"
+              introduction={`${name} can help with projects on your computer. Try asking it to explain a file.`}
+              heading={<h2>{`Meet ${name}`}</h2>}
+              actions={
+                <div class="kw-encounter-actions">
+                  <button
+                    type="button"
+                    class="kw-encounter-primary"
+                    disabled={busy()}
+                    onClick={() => void meet(true)}
+                  >
+                    Start a conversation
+                  </button>
+                  <button
+                    type="button"
+                    class="kw-encounter-secondary"
+                    disabled={busy()}
+                    onClick={() => void meet(false)}
+                  >
+                    Explore first
+                  </button>
                 </div>
               }
-            >
-              {(resident) => (
-                <div class="kw-meet-creature-intro">
-                  <div class="kw-meet-creature-copy">
-                    <span class="kw-model-kicker">Your creature</span>
-                    <h2>{resident().name}</h2>
-                    <p>{madeHereLine(resident().name)}</p>
-                  </div>
-                </div>
-              )}
-            </Show>
-            <Show when={created() === undefined}>
-              <fieldset class="kw-model-actions kw-meet-designs" aria-label="Creature design">
-                <For each={designs}>
-                  {(id) => (
-                    <button
-                      type="button"
-                      class="kw-model-link"
-                      aria-pressed={skin() === id}
-                      disabled={busy()}
-                      onClick={() => {
-                        setSkin(id);
-                        setBeforeRoll(undefined);
-                      }}
-                    >
-                      {skinName(id)}
-                    </button>
-                  )}
-                </For>
+            />
+            <div class="kw-meet-selection">
+              <div class="kw-meet-gallery-heading">
+                <strong>Choose a design</strong>
                 <button
                   type="button"
-                  class="kw-model-link"
+                  class="kw-meet-minor"
+                  disabled={busy()}
+                  onClick={() => props.onCustomize(skin())}
+                >
+                  Customize first
+                </button>
+              </div>
+              <CreatureGallery
+                designs={designs}
+                selected={skin()}
+                hueStop={1}
+                disabled={busy()}
+                onSelect={(id) => {
+                  setSkin(id);
+                  setBeforeRoll(undefined);
+                }}
+              />
+              <div class="kw-meet-roll">
+                <button
+                  type="button"
+                  class="kw-meet-minor"
                   disabled={busy() || designs.length < 2}
                   onClick={() => {
                     setBeforeRoll(skin());
@@ -162,7 +175,7 @@ export function MeetCreature(props: {
                   {(previous) => (
                     <button
                       type="button"
-                      class="kw-model-link"
+                      class="kw-meet-minor"
                       disabled={busy()}
                       onClick={() => {
                         setSkin(previous());
@@ -173,27 +186,7 @@ export function MeetCreature(props: {
                     </button>
                   )}
                 </Show>
-              </fieldset>
-              <p aria-live="polite">{skinLabel(skin())}</p>
-            </Show>
-            <div class="kw-model-actions">
-              <button type="button" class="kw-model-primary" onClick={() => void meet(true)}>
-                Start a conversation
-              </button>
-              <Show when={created() === undefined}>
-                <button type="button" class="kw-model-link" onClick={() => void meet(false)}>
-                  Explore first
-                </button>
-                <button
-                  type="button"
-                  class="kw-model-link"
-                  onClick={() => {
-                    if (!busy()) props.onCustomize(skin());
-                  }}
-                >
-                  Customize first
-                </button>
-              </Show>
+              </div>
             </div>
             <Show when={notice()}>{(line) => <p role="status">{line()}</p>}</Show>
           </section>
@@ -209,17 +202,12 @@ export function MeetCreature(props: {
           scope="conversation"
           current={resident.models.strong === "inherit" ? undefined : resident.models.strong}
           onContinue={(model) => openConversation(resident, model)}
-          onExplore={() => setSettingUp(undefined)}
+          onExplore={() => {
+            setMet(true);
+            setSettingUp(undefined);
+          }}
         />
       )}
     </Show>
   );
-}
-
-function meetLine(name: string): string {
-  return `${name} lives on this computer and can take on work for you. Start a conversation to choose the model it talks with, or look around first.`;
-}
-
-function madeHereLine(name: string): string {
-  return `${name} is on the stead. Start a conversation when you are ready; you will choose the model it talks with.`;
 }

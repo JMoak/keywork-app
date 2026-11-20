@@ -1,77 +1,125 @@
 import { part } from "../kid/sprite.ts";
 
-export const foundation = part("cairn foundation", 12, 38, [
-  "......hhhhhhhhhhh......",
-  "...hhhhhllllllllhhhh...",
-  ".hhhllllllllllllllllhh.",
-  "hhllllllcllllllllllllll",
-  "hllllllcccllllllllllccc",
-  "llllllcclcccllllllccccs",
-  "lllcccllccllllcccccccss",
-  ".cccccccccccccccccssss.",
-  "...ccccccccccsssssss...",
-  "......sssssssssss......",
+export const summit = part("Cairn canted sandstone slab", 10, 4, [
+  "...................hhhDD.",
+  "...............hhhlhhhDDl",
+  "............pwwppgllhhDhl",
+  "..........wppwwgghhDDhlE.",
+  "........ppwggFdDhDDhlEcc.",
+  "......wppwgDDhDDhhllcscs.",
+  ".....wwgDhhhDhlppglEccss.",
+  "...lDhDDhhllwpwwgcEccss..",
+  "..hhDlhhllgwggFcccss.....",
+  "lDhhhlllEEccEccss........",
+  "EcllEEcccsccsss..........",
+  ".scccsssoossc............",
 ]);
 
-export const heart = part("cairn heart stone", 16, 22, [
-  ".....hhhhhh.....",
-  "...hhhhllllhh...",
-  ".hhllllllllllhh.",
-  "hhllllllclllllll",
-  "hllllllccllllllc",
-  "hlllllccclllllcc",
-  "lllllcclcllllccc",
-  "llllclllclllcccs",
-  ".lllllllcllccss.",
-  "..llllllllccss..",
-  "...cccccccsss...",
-  ".....ssssss.....",
+export const heart = part("Cairn pierced sandstone", 7, 19, [
+  "...............lhhhhDDDll......",
+  "............lhDDDDhhhlllDDl....",
+  "..........hhDDhhlllEEhhDDhhgg..",
+  "........lDhhhllccsssosllhwwpgg.",
+  "......hhhDlEEccss....schlwwpwwg",
+  "....lhDDlEEccss.......shhwpwwg.",
+  "...hhDhlEEcsss........sllwgFg..",
+  "..hDDllEEcsss.........lEEcgFd..",
+  ".lDhllEEccss.........lhlccFd...",
+  "lDDhlEEccss.........lhDlEcsc...",
+  "EhlcllEcsss........lhhhlEcss...",
+  "pgllcllEEcss......lhhhlEcss....",
+  "gppggllEEccs....lhDDhhlcss.....",
+  ".gwppwhhEEEllhhhDDDDhlEcss.....",
+  "..dgFFEllDhDDDDhhllEEcss.......",
+  "....ccccllDhhlEEccscss.........",
+  "......scsElEElEccss............",
+  "........ssccscss...............",
+  "..........sss..................",
 ]);
 
-export const summit = part("cairn summit stone", 19, 10, [
-  ".....hhh....",
-  "...hhhhhh...",
-  "..hhhhlllh..",
-  ".hhlllllllh.",
-  "hhlllllcllll",
-  "hlllllcclllc",
-  ".llllclllcc.",
-  "..cccccccs..",
-  "....ssss....",
+export const shard = part("Cairn inverted sandstone shard", 19, 40, [
+  ".....hhDhl..",
+  "...hhDDhhwpg",
+  ".hhhDDhwppwg",
+  "lDhhhlwgggFc",
+  "EcllllEcccss",
+  ".scEEhlcsss.",
+  "...sscEc....",
+  ".....cs.....",
 ]);
 
-export const parcel = part("cairn held parcel", 18, 31, [
-  ".wwwwwwwwww.",
-  "wwppwwwwppww",
-  "wggggwwggggw",
-  "wggggwwggggw",
-  "wggggwwggggw",
-  "wggggwwggggw",
-  "wggggwwggggw",
-  "wddddwwddddw",
-  ".ddddwwdddd.",
+export const levelSummit = part("Cairn level capstone", 9, 8, [
+  "..............wwpggghhhDDD",
+  "........wpwwpgllhhDDDhllE.",
+  ".....wwppggDDDhhhllhEEcc..",
+  "..hhwggDhDDlDhlllwwgscs...",
+  "lDhDDlhhhhllwwggFccss.....",
+  "EElllEEccccEccsscss.......",
+  "..sscccsssssss............",
 ]);
 
-export const page = part("cairn suspended page", 32, 28, [
-  "hhhhhhhhh.",
-  "hppppppphh",
-  "hpssssppph",
-  "hpppppppph",
-  "hpssssspph",
-  "hpppppppph",
-  "hpssspppph",
-  "hhhhhhhhhh",
+export const lowHeart = part("Cairn edge-on pierced sandstone", 7, 22, [
+  ".............lhhDDhhl......",
+  ".........lhhDDhllEEhhhwwg..",
+  "......lhDDllccssscssllppwwg",
+  "...lhDDlEcccs.....shhwppgw.",
+  ".hhDhlEccs.........lhgwFd..",
+  ".hhlllEcss.........lhhwgd..",
+  "lhhllEcss.......lhhhlEcs...",
+  "pglEhEEcss....lhhDllEcs....",
+  ".gppgllEEllhhDDhllEcsc.....",
+  "..dgFElhDhDhhllEccss.......",
+  "....scssEllEEcsss..........",
+  "........sccsss.............",
 ]);
 
-export const workpiece = part("cairn workpiece", 31, 40, [
-  "..wwwww..",
-  ".wpppppw.",
-  "wppwwwppw",
-  "wwgggggww",
-  "wgggggggd",
-  ".ddddddd.",
+export const tiltedShard = part("Cairn striking shard", 18, 39, [
+  "...hhDhwpg.",
+  ".hhDDhwwpwg",
+  "lhDhhlggwF.",
+  "clllhlEcccs",
+  ".EcclEclcss",
+  "...sccEcss.",
+  "....sEcsc..",
+  "......scs..",
+  ".......ss..",
 ]);
 
-export const chisel = part("cairn chisel", 35, 31, ["hh", "ll", "ww", "gg", "gg", "ss"]);
+export const parcel = part("Cairn suspended parcel", 32, 32, [
+  ".Ehhwlh.",
+  "EhhwwhhE",
+  "Eccggccl",
+  "csEwgEcc",
+  "sccggccs",
+  ".sssdds.",
+]);
 
-export const fault = part("cairn broken seam", 24, 30, ["!.", "!!", ".!", "!!", "!."]);
+export const page = part("Cairn folded field sheet", 33, 29, [
+  "hhhhhh..",
+  "hDDDDhh.",
+  "hcccDDlh",
+  "hDDDDDDh",
+  "hccchDDh",
+  "hDDDlDlh",
+  ".lhhhhl.",
+]);
+
+export const workpiece = part("Cairn workstone", 32, 45, [
+  "..hhDhhl.",
+  ".lllDhhhl",
+  "cllhllccc",
+  "scEccscsc",
+  ".sssssss.",
+]);
+
+export const chisel = part("Cairn chisel", 33, 35, [
+  "...hh",
+  "..hll",
+  "..Es.",
+  ".cs..",
+  ".cs..",
+  "ss...",
+  "s....",
+]);
+
+export const fault = part("Cairn fresh fault", 7, 28, [".!..", ".!..", "..!!", "..!.", "!!.."]);
