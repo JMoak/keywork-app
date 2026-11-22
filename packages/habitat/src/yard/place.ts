@@ -20,6 +20,7 @@ export const yardMetrics = {
   readable: { width: 480, height: 320, shortSideShare: 0.4, aspect: 1.5 },
   code: { columns: 80, column: 8.4, gutter: 48 },
   rail: { width: 272, head: 40, card: 64, fold: 32, length: 5 },
+  band: { inset: 8, height: 32, head: 144, card: 120, widest: 184, fold: 44 },
   node: { height: 96 },
   hub: { share: 0.3, min: 360, max: 640 },
   working: { areaShare: 1.5 },
@@ -98,6 +99,38 @@ export function defaultHub(viewport: Rect): Rect {
   return { x: inner.x + left, y: inner.y, width, height: inner.height };
 }
 
+export function holdsARailBeside(viewport: Rect): boolean {
+  const { margin, gap, rail, hub } = yardMetrics;
+  return viewport.width - margin - rail.width - gap >= hub.min;
+}
+
+export function hubBeneathTheBand(viewport: Rect): Rect {
+  const { margin, band } = yardMetrics;
+  const depth = band.inset + band.height + margin;
+  return { ...viewport, y: viewport.y + depth, height: Math.max(0, viewport.height - depth) };
+}
+
+export function railAlongTheTop(viewport: Rect, hub: Rect): RailRects | undefined {
+  const { gap, margin, band, rail } = yardMetrics;
+  const inner = innerOf(viewport);
+  const y = hub.y - margin - band.height;
+  const spansTheField = hub.x <= inner.x && right(hub) >= right(inner);
+  const bare = band.head + gap + band.fold;
+  if (!spansTheField || y < viewport.y || inner.width < bare) return undefined;
+  const room = inner.width - bare - gap;
+  const count = Math.max(0, Math.min(rail.length, Math.floor((room + gap) / (band.card + gap))));
+  const width =
+    count === 0 ? 0 : Math.min(band.widest, Math.floor((room - (count - 1) * gap) / count));
+  const first = inner.x + band.head + gap;
+  const along = (x: number, wide: number): Rect => ({ x, y, width: wide, height: band.height });
+  return {
+    head: along(inner.x, band.head),
+    cards: Array.from({ length: count }, (_, index) => along(first + index * (width + gap), width)),
+    fold: along(first + count * (width + gap), band.fold),
+    region: along(inner.x, inner.width),
+  };
+}
+
 export function overlaps(a: Rect, b: Rect): boolean {
   return a.x < right(b) && b.x < right(a) && a.y < bottom(b) && b.y < bottom(a);
 }
@@ -107,12 +140,14 @@ export interface Extent {
   readonly height: number;
 }
 
-interface Rail {
+export interface RailRects {
   readonly head: Rect;
   readonly cards: readonly Rect[];
   readonly fold: Rect;
   readonly region: Rect;
 }
+
+type Rail = RailRects;
 
 interface Position {
   readonly rect: Rect;
@@ -181,7 +216,7 @@ function yardPlacements(
   ladder: readonly YardSetting[],
   plots: readonly PlotCard[],
 ): readonly Placement[] {
-  const rail = railBeside(input.viewport, input.hub);
+  const rail = railBeside(input.viewport, input.hub) ?? railAlongTheTop(input.viewport, input.hub);
   const reserved = rail === undefined ? [input.hub] : [input.hub, rail.region];
   const satellites = satellitesOf(input, ladder, reserved);
   const unfolded = new Set(satellites.map((placement) => placement.id));

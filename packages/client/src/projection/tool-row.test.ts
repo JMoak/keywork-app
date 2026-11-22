@@ -17,6 +17,17 @@ describe("a tool's subject", () => {
     ).toBe("diff · the math change");
   });
 
+  it("names what an arrangement arranged, the shape or how many by hand, with its mood after it", () => {
+    expect(toolSubject({ shape: "lead-and-cards", lead: "s1", mood: "calm" })).toBe(
+      "lead-and-cards · calm",
+    );
+    const byHand = { panes: ["a", "b", "c"], seats: [{}, {}, {}], mood: "playful" };
+    expect(toolSubject(byHand)).toBe("3 panes by hand · playful");
+    expect(toolSubject({ seats: [{}] })).toBe("1 pane by hand");
+    expect(toolSubject({ relation: "tasks" })).toBe("as tasks");
+    expect(toolSubject({ shape: "a hexagon", mood: "calm" })).toBe("a hexagon");
+  });
+
   it("cuts a long subject visibly", () => {
     const subject = toolSubject({ command: "x".repeat(200) });
     expect(subject).toHaveLength(60);

@@ -18,6 +18,7 @@ import { permissionsPane } from "./permissions/index.tsx";
 import { posturePane } from "./posture/index.tsx";
 import type { PaneDefinition } from "./registry.ts";
 import { screenPane } from "./screen/index.tsx";
+import { settingPane } from "./setting/index.tsx";
 import { steadPane } from "./stead/index.tsx";
 import { terminalPane } from "./terminal/index.tsx";
 import { themesPane } from "./themes/index.tsx";
@@ -50,6 +51,7 @@ export const paneDefinitions = [
   millsPane,
   workshopPane,
   creaturePane,
+  settingPane,
 ] as const;
 
 export type PaneSpec = SpecOf<(typeof paneDefinitions)[number]>;

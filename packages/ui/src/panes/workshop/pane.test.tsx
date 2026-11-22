@@ -6,7 +6,7 @@ import { browserHost } from "../../host/browser.ts";
 import type { HostPort, ServerRequestInit, ServerResponseHead } from "../../host/port.ts";
 import { inertFeed, inertShellExtras } from "../../shell/trust-testing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { houseOffsetMinutes } from "../stead/habitat.ts";
+import { clockOffsetMinutes } from "../stead/habitat.ts";
 import { raisedWord } from "./copy.ts";
 import { type WorkshopSpec, workshopPane } from "./index.tsx";
 import type { WorkshopRecord } from "./port.ts";
@@ -253,7 +253,7 @@ describe("the workshop pane", () => {
     const { container } = mount({ kind: "workshop", creature: "wren" }, h);
     await waitFor(() => expect(headText(container)).toContain("· up ·"));
     expect(headText(container)).toBe(
-      `bare host · running · up · raised ${raisedWord(bareWorkshop.createdAt, houseOffsetMinutes())}`,
+      `bare host · running · up · raised ${raisedWord(bareWorkshop.createdAt, clockOffsetMinutes())}`,
     );
     expect(limits(container)).toEqual([
       "bare host: no VM boundary, no egress policy and no credential proxy; brokered credentials appear only as sentinels",

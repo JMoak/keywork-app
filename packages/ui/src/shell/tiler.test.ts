@@ -1,6 +1,6 @@
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
-import type { Screen } from "../layout/index.ts";
+import { minPaneSize, type Screen } from "../layout/index.ts";
 import { definitionOf, type PaneDefinition, type PaneKind } from "../panes/index.ts";
 import {
   createTiler,
@@ -495,6 +495,131 @@ describe("a full stage", () => {
       const closing = tiler.findPane((spec) => spec.kind === "conversation");
       expect(tiler.close(closing as string).ok).toBe(true);
       expect(tiler.crowds(conversation("one more"), screen)).toBe(false);
+    });
+  });
+});
+
+describe("panes outside the window", () => {
+  const onTheDesktop = { x: 1720, y: 60, width: 640, height: 480 };
+
+  it("keeps a pane outside in its own list, off the stage and off the shelf, with its spec", () => {
+    withTiler((tiler) => {
+      tiler.summon(sessions, screen);
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      expect(tiler.sendOutside("conversation-1").ok).toBe(true);
+      expect(tiler.isOutside("conversation-1")).toBe(true);
+      expect(tiler.slots(screen).map((slot) => slot.id)).toEqual([
+        sessionsPaneId,
+        "conversation-2",
+      ]);
+      expect(tiler.shelf(screen)).toEqual([]);
+      expect(tiler.outside()).toEqual([
+        {
+          id: "conversation-1",
+          spec: conversation("s1"),
+          rect: undefined,
+          follows: true,
+          focused: false,
+          spawnRank: 1,
+        },
+      ]);
+    });
+  });
+
+  it("remembers where the pane stands, and that the keeper moved it, through a snapshot", () => {
+    const snapshot = withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      tiler.sendOutside("conversation-1");
+      expect(tiler.placeOutside("conversation-1", onTheDesktop, "keeper").ok).toBe(true);
+      return JSON.parse(JSON.stringify(tiler.snapshot()));
+    });
+    createRoot((dispose) => {
+      const restored = createTiler(parseTilerState(snapshot));
+      expect(restored.outside()).toMatchObject([
+        { id: "conversation-1", rect: onTheDesktop, follows: false },
+      ]);
+      dispose();
+    });
+  });
+
+  it("counts a pane leaving as a change to the layout, and where it stands outside as its own count", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      const before = tiler.version();
+      tiler.sendOutside("conversation-1");
+      expect(tiler.version()).toBe(before + 1);
+      tiler.placeOutside("conversation-1", onTheDesktop, "host");
+      expect(tiler.version()).toBe(before + 1);
+      expect(tiler.placements()).toBe(1);
+      expect(tiler.outside()[0]?.rect).toEqual(onTheDesktop);
+      expect(tiler.placeOutside("conversation-1", onTheDesktop, "host").ok).toBe(false);
+      expect(tiler.sendOutside("conversation-1").ok).toBe(false);
+      expect(tiler.version()).toBe(before + 1);
+      expect(tiler.placements()).toBe(1);
+    });
+  });
+
+  it("says a pane waits on the shelf when bringing one inside leaves no room for every pane", () => {
+    withTiler((tiler) => {
+      const roomForOne = { width: minPaneSize.width + 40, height: minPaneSize.height + 40 };
+      tiler.open(conversation("s1"), roomForOne);
+      tiler.sendOutside("conversation-1");
+      expect(tiler.open(conversation("s2"), roomForOne)).toEqual({ ok: true });
+      expect(tiler.bringInside("conversation-1", roomForOne)).toEqual({
+        ok: true,
+        notice: shelfNotices.tucked(1),
+      });
+      expect(tiler.focused()).toBe("conversation-1");
+      expect(tiler.isOutside("conversation-1")).toBe(false);
+      expect(tiler.shelf(roomForOne).map((entry) => entry.id)).toEqual(["conversation-2"]);
+    });
+  });
+
+  it("brings every pane inside at once and leaves the focus where it was", () => {
+    withTiler((tiler) => {
+      tiler.summon(sessions, screen);
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      tiler.sendOutside("conversation-1");
+      tiler.sendOutside("conversation-2");
+      tiler.focus(sessionsPaneId);
+      expect(tiler.bringAllInside(screen).ok).toBe(true);
+      expect(tiler.outside()).toEqual([]);
+      expect(tiler.focused()).toBe(sessionsPaneId);
+      expect(tiler.bringAllInside(screen)).toMatchObject({ ok: false, refused: "nothing-to-do" });
+    });
+  });
+
+  it("opens a pane already outside without seating it, focusing it or disturbing a zoom", () => {
+    withTiler((tiler) => {
+      tiler.summon(sessions, screen);
+      tiler.open(conversation("s1"), screen);
+      tiler.zoom();
+      const before = tiler.slots(screen);
+      const opened = tiler.openOutside(conversation(), screen);
+      expect(opened).toBe("conversation-2");
+      expect(tiler.spec("conversation-2")).toEqual(conversation());
+      expect(tiler.slots(screen)).toEqual(before);
+      expect(tiler.zoomed()).toBe("conversation-1");
+      expect(tiler.focused()).toBe("conversation-1");
+      expect(tiler.outside().map((entry) => entry.id)).toEqual(["conversation-2"]);
+      expect(tiler.openOutside(conversation(), screen)).toBe("conversation-3");
+    });
+  });
+
+  it("steps across to a pane outside, and says so when nothing floats and nothing is outside", () => {
+    withTiler((tiler) => {
+      tiler.open(conversation("s1"), screen);
+      tiler.open(conversation("s2"), screen);
+      expect(tiler.focusAcrossLayers(screen).notice).toBe(
+        "no pane is floating or outside the window",
+      );
+      tiler.sendOutside("conversation-1");
+      expect(tiler.focusAcrossLayers(screen).ok).toBe(true);
+      expect(tiler.focused()).toBe("conversation-1");
     });
   });
 });

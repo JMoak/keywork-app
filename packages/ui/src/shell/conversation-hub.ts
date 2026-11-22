@@ -16,6 +16,8 @@ export const hubTileFloor = yardMetrics.hub.min;
 
 export const hubTabsHeight = 32;
 
+export const hubRowFloor = yardMetrics.readable.height;
+
 export const emptyHub: ConversationHub = { slots: [], tabs: [] };
 
 export function conversationHub(
@@ -37,6 +39,29 @@ export function conversationHub(
     slots: [
       { ...hub, rect: { ...whole, width: half } },
       { ...focused, rect: { ...whole, x: half, width: whole.width - half } },
+    ],
+    tabs: [],
+  };
+}
+
+export function hubColumn(
+  slots: readonly PaneSlot[],
+  screen: Screen,
+  conversation: PaneId | undefined,
+): ConversationHub {
+  const focused = slots.find((slot) => slot.focused);
+  const hub = slots.find((slot) => slot.id === conversation) ?? focused ?? slots[0];
+  const whole: Rect = { x: 0, y: 0, width: screen.width, height: screen.height };
+  if (hub === undefined) return emptyHub;
+  if (focused === undefined || focused.id === hub.id) {
+    return { slots: [{ ...hub, rect: whole }], tabs: [] };
+  }
+  const half = Math.round(whole.height / 2);
+  if (Math.min(half, whole.height - half) < hubRowFloor) return tabbed(hub, focused, whole);
+  return {
+    slots: [
+      { ...hub, rect: { ...whole, height: half } },
+      { ...focused, rect: { ...whole, y: half, height: whole.height - half } },
     ],
     tabs: [],
   };

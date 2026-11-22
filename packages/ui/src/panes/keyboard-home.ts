@@ -1,6 +1,8 @@
 import { createEffect, createMemo, onCleanup, onMount } from "solid-js";
 import { isTextField } from "../keys/typing.ts";
 import { markKeyboardHome, useKeyboardScope } from "../shell/keyboard-claim.ts";
+import { isElement, styleOf, windowOf } from "../surfaces/runtime/realm.ts";
+import { everyWindow, listenInEveryWindow } from "../surfaces/runtime/windows.ts";
 
 export function keepKeyboardHome(
   root: () => HTMLElement | undefined,
@@ -29,27 +31,30 @@ export interface StrayKeys {
 export function sendStrayKeysHome(strays: StrayKeys): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target;
-    if (event.defaultPrevented || !(target instanceof Element) || !isStray(event, target)) return;
+    if (event.defaultPrevented || !isElement(target) || !isStray(event, target)) return;
     const home = strays.takeHome(target);
     if (home === undefined || event.key !== "Escape") return;
     event.preventDefault();
     home.dispatchEvent(new KeyboardEvent("keydown", escapeAgain));
   };
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
+  return listenInEveryWindow("keydown", onKeyDown);
 }
 
 export function holdKeysWherePressed(root: HTMLElement): () => void {
   const onPointerDown = (event: PointerEvent): void => {
     const pressed = event.target;
-    if (event.button !== 0 || !(pressed instanceof Element)) return;
+    if (event.button !== 0 || !isElement(pressed)) return;
     const pane = pressed.closest<HTMLElement>("[data-pane-id]");
     if (pane === null || holdsFocusOfItsOwn(pressed, pane)) return;
     const holder = scrollerBetween(pressed, pane) ?? pane;
     if (!holder.hasAttribute("tabindex")) holder.tabIndex = -1;
   };
-  root.addEventListener("pointerdown", onPointerDown, true);
-  return () => root.removeEventListener("pointerdown", onPointerDown, true);
+  const listener = onPointerDown as EventListener;
+  return everyWindow((realm) => {
+    const pressedIn = realm === windowOf(root) ? root : realm.document;
+    pressedIn.addEventListener("pointerdown", listener, true);
+    return () => pressedIn.removeEventListener("pointerdown", listener, true);
+  });
 }
 
 const escapeAgain: KeyboardEventInit = {
@@ -88,6 +93,6 @@ function scrollerBetween(from: Element, pane: HTMLElement): HTMLElement | undefi
 }
 
 function scrolls(element: HTMLElement): boolean {
-  const { overflowY } = getComputedStyle(element);
+  const { overflowY } = styleOf(element);
   return overflowY === "auto" || overflowY === "scroll";
 }

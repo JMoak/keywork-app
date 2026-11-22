@@ -148,6 +148,17 @@
   color: var(--kw-text-dim);
 }
 
+.kw-yard-card-agent {
+  margin-right: 1ch;
+}
+
+.kw-yard-card-tag {
+  margin-left: 1ch;
+  padding: 0 1ch;
+  color: var(--kw-background);
+  background: var(--kw-text-mid);
+}
+
 .kw-yard-card-why {
   color: var(--kw-text-mid);
 }
@@ -182,6 +193,13 @@
   background: var(--kw-background);
 }
 
+.kw-yard-note[data-markdown] {
+  white-space: normal;
+}
+.kw-yard-note[data-markdown] > :first-child {
+  margin-top: 0;
+}
+
 .kw-yard-crumb {
   position: absolute;
   z-index: 1;
@@ -207,6 +225,34 @@
   padding-left: 1.875rem;
 }
 
+.kw-yard-rail[data-band] .kw-yard-rail-head,
+.kw-yard-rail[data-band] .kw-yard-folded {
+  padding: 0 0.5rem;
+}
+.kw-yard-rail[data-band][data-active] .kw-yard-rail-head {
+  white-space: nowrap;
+  line-height: inherit;
+}
+.kw-yard-rail[data-band] .kw-yard-card {
+  padding: 0 0.5rem;
+}
+.kw-yard-rail[data-band] .kw-yard-card-by,
+.kw-yard-rail[data-band] .kw-yard-card-why {
+  display: none;
+}
+.kw-yard-rail[data-band] .kw-yard-card-title[data-more]::after {
+  content: " +" attr(data-more);
+  color: var(--kw-text-dim);
+}
+
 .kw-yard-satellite[data-size="card"] .kw-frame-body {
   visibility: hidden;
+}
+
+.kw-setting {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }

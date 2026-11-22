@@ -257,7 +257,11 @@ function FileSlot(props: PaneProps<FileSpec>) {
   };
   const rereadQuietly = (): void => void reread();
   rereadWhenFilesMove(props.shell.feed, rereadQuietly);
-  rereadOnReturn(() => props.focused, rereadQuietly);
+  rereadOnReturn(
+    () => props.focused,
+    rereadQuietly,
+    () => root,
+  );
 
   createEffect(() => {
     const current = state();

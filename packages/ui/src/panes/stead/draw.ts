@@ -82,7 +82,7 @@ export function steadDrawer(): SteadDrawer {
       paletteSourceOf(view.canvas),
       scene.sky.phase,
       scene.sky.season,
-      forcedColorsActive(),
+      forcedColorsActive(view.canvas),
       palettes,
     );
     const resolved = palettes;
@@ -115,7 +115,7 @@ export function steadDrawer(): SteadDrawer {
       );
       const poses = posesFor(herd, view.context, motionless);
       const scene = composeStead(view.world, view.now, view.sceneOptions);
-      const fit = fitCanvas(view.stageWidth, scene, devicePixelRatioOf());
+      const fit = fitCanvas(view.stageWidth, scene, devicePixelRatioOf(view.canvas));
       const figures = placeMembers(herd, poses, scene, view.context.tier === "rest");
       const painted = paint(view, scene, fit, figures);
       motionless = figures.every((figure) => standingStill(figure.pose));

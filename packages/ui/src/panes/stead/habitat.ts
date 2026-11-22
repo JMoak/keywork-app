@@ -210,8 +210,14 @@ export function choreKeepersIn(batch: readonly BusEnvelope[]): Set<string> {
   return keepers;
 }
 
+// The habitat subtracts the house's offset, as Date.getTimezoneOffset is subtracted; a clock
+// word adds its own. Each takes the one named for it.
 export function houseOffsetMinutes(now = new Date()): number {
-  return -now.getTimezoneOffset();
+  return now.getTimezoneOffset();
+}
+
+export function clockOffsetMinutes(now = new Date()): number {
+  return -houseOffsetMinutes(now);
 }
 
 // A Solid store reconciled by key keeps its array and row identities, so a reader that

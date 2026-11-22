@@ -20,7 +20,7 @@ import type {
 import { day, hour, minute, parseTs } from "../clock/clock.ts";
 import { attend } from "../yard/attention.ts";
 import { type YardState, yardOf } from "../yard/types.ts";
-import { proposeSetting, seatSettings, settleSetting } from "../yard/wire.ts";
+import { changeSetting, proposeSetting, seatSettings, settleSetting } from "../yard/wire.ts";
 import {
   type CreatureSummary,
   type GrantSummary,
@@ -180,6 +180,8 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
       return creatureChanged(state, envelope.payload, at);
     case "show.proposed":
       return setOut(state, envelope.payload.setting, at);
+    case "show.changed":
+      return withYard(state, (yard) => changeSetting(yard, envelope.payload.setting));
     case "show.settled":
       return withYard(state, (yard) => settleSetting(yard, envelope.payload, at));
     case "routine.fired":
@@ -218,6 +220,7 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
     case "mesh.pair":
     case "mesh.revocation":
     case "mesh.peers":
+    case "show.arranged":
       return state;
     case "extension.notice":
       if (id === "") return state;

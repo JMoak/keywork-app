@@ -1,4 +1,5 @@
 import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
+import type { SettingSubject } from "@keywork-app/protocol";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
 import type { TitleBot } from "../chrome/identity.ts";
@@ -97,6 +98,9 @@ export interface PaneAdornments {
   readonly hueRank?: number | undefined;
   readonly quiet?: boolean | undefined;
   readonly ribbon?: string | undefined;
+  readonly agent?: string | undefined;
+  readonly agentColor?: string | undefined;
+  readonly tag?: string | undefined;
 }
 
 export interface PaneView<Spec extends PaneSpecBase> {
@@ -171,6 +175,7 @@ export interface ShellSeams {
   readonly needsYou?: NeedsYouSeams;
   readonly commands?: CommandRegistry;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
+  openFromSetting?(settingId: string, what: SettingSubject): void;
   closePane?(paneId: PaneId): void;
   openInEditor?(path: string, line?: number): Promise<void>;
   server?(): ServerStanding;

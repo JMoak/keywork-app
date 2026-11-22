@@ -1,3 +1,4 @@
+import type { ScreenRect, SurfaceMover } from "../surfaces/port.ts";
 import {
   type Arrangement,
   type DockSide,
@@ -29,7 +30,12 @@ import { arrangementRects, holds, type Regions, regionsOf } from "./scene.ts";
 import {
   floatRectOn,
   liftedInPlace,
+  newlyOutside,
   nudged,
+  type OutsidePlace,
+  type OutsidePlacer,
+  placedOutside,
+  sameOutsidePlace,
   sameUnitRect,
   scaled,
   tuckedFor,
@@ -38,6 +44,7 @@ import {
 } from "./standing.ts";
 import {
   arrangementOf,
+  isScreenRect,
   type LayoutState,
   layoutStateOf,
   openingOrderOf,
@@ -66,7 +73,13 @@ export type Verdict =
   | { ok: true; notice?: string | undefined }
   | { ok: false; refused: Refusal; notice?: string | undefined };
 
-export type Refusal = "no-room" | "no-focus" | "unknown-pane" | "already-open" | "nothing-to-do";
+export type Refusal =
+  | "no-room"
+  | "no-focus"
+  | "unknown-pane"
+  | "already-open"
+  | "nothing-to-do"
+  | "outside";
 
 export type Absence = "shelved" | "tucked";
 
@@ -81,6 +94,13 @@ export interface Floating {
   readonly z: number;
 }
 
+export interface Outside {
+  readonly id: PaneId;
+  readonly rect: ScreenRect | undefined;
+  readonly follows: boolean;
+  readonly by: OutsidePlacer | undefined;
+}
+
 export class Layout {
   private arrangement: Arrangement = emptyArrangement();
   private focusedId: PaneId | undefined;
@@ -90,6 +110,7 @@ export class Layout {
   private floats = new Map<PaneId, UnitRect>();
   private shelf: PaneId[] = [];
   private pins = new Set<PaneId>();
+  private outsidePlaces = new Map<PaneId, OutsidePlace>();
 
   static parse(value: unknown): LayoutState | undefined {
     return parseLayoutState(value);
@@ -100,6 +121,7 @@ export class Layout {
       floats: this.floats,
       shelved: this.shelf,
       pinned: this.pins,
+      outside: this.outsidePlaces,
     });
   }
 
@@ -110,9 +132,10 @@ export class Layout {
     this.floats = new Map(standing.floats);
     this.shelf = [...standing.shelved];
     this.pins = new Set(standing.pinned);
+    this.outsidePlaces = new Map(standing.outside);
     this.trail = [];
     this.zoomedId = undefined;
-    this.focusOn(state.focused ?? this.present()[0]);
+    this.focusOn(state.focused ?? this.present()[0] ?? this.mostRecentOutside());
   }
 
   panes(): PaneId[] {
@@ -160,7 +183,20 @@ export class Layout {
   }
 
   isPinned(id: PaneId): boolean {
-    return this.pins.has(id);
+    return this.pins.has(id) && !this.isOutside(id);
+  }
+
+  isOutside(id: PaneId): boolean {
+    return this.outsidePlaces.has(id);
+  }
+
+  outside(): Outside[] {
+    return [...this.outsidePlaces].map(([id, { rect, follows, by }]) => ({
+      id,
+      rect,
+      follows,
+      by,
+    }));
   }
 
   rects(screen: Screen): Map<PaneId, Rect> {
@@ -235,6 +271,14 @@ export class Layout {
     return this.seatFocusing(dockedAt(this.arrangement, side, id), id);
   }
 
+  openOutside(id: PaneId, screen: Screen, home: DockSide | "main", beside?: PaneId): Verdict {
+    if (this.panes().includes(id)) return refused("already-open");
+    this.arrangement = this.seatedAtHome(id, screen, home, beside);
+    this.opened.push(id);
+    this.outsidePlaces.set(id, newlyOutside);
+    return ok;
+  }
+
   hasRoomBeside(screen: Screen, beside: PaneId | undefined = this.focusedId): boolean {
     return this.showsWithoutTucking(this.seatedBeside(newcomer, screen, beside), screen);
   }
@@ -257,17 +301,16 @@ export class Layout {
     this.shelf = this.shelf.filter((pane) => pane !== id);
     this.floats.delete(id);
     this.pins.delete(id);
+    this.outsidePlaces.delete(id);
     if (this.zoomedId === id) this.zoomedId = undefined;
-    if (this.focusedId === id) this.focusOn(this.heir(side, slot) ?? this.takenOffTheShelf());
+    if (this.focusedId === id) this.focusOn(this.successor(side, slot));
     return ok;
   }
 
   focus(id: PaneId): Verdict {
     if (!this.panes().includes(id)) return refused("unknown-pane");
     this.shelf = this.shelf.filter((pane) => pane !== id);
-    if (this.zoomedId !== undefined && this.zoomedId !== id && !this.isFloating(id)) {
-      this.zoomedId = undefined;
-    }
+    if (this.zoomedId !== id && this.joinsTheTiling(id)) this.zoomedId = undefined;
     this.focusOn(id);
     return ok;
   }
@@ -294,7 +337,7 @@ export class Layout {
     const ring = this.layerRing(screen);
     const at = this.focusedId === undefined ? -1 : ring.indexOf(this.focusedId);
     const next = ring[(at + 1) % ring.length];
-    if (next === undefined || next === this.focusedId || this.floats.size === 0) {
+    if (next === undefined || next === this.focusedId || !this.hasLayersOverTheTiling()) {
       return refused("nothing-to-do");
     }
     return this.focus(next);
@@ -302,6 +345,7 @@ export class Layout {
 
   zoomToggle(): Verdict {
     if (this.focusedId === undefined) return refused("no-focus");
+    if (this.isOutside(this.focusedId)) return refused("outside");
     this.zoomedId = this.zoomedId === this.focusedId ? undefined : this.focusedId;
     return ok;
   }
@@ -309,6 +353,7 @@ export class Layout {
   floatToggle(screen: Screen): Verdict {
     const id = this.focusedId;
     if (id === undefined) return refused("no-focus");
+    if (this.isOutside(id)) return refused("outside");
     if (this.floats.delete(id)) return ok;
     this.floats.set(id, liftedInPlace(this.rects(screen).get(id), screen));
     if (this.zoomedId === id) this.zoomedId = undefined;
@@ -323,6 +368,7 @@ export class Layout {
 
   shelve(id: PaneId): Verdict {
     if (!this.panes().includes(id)) return refused("unknown-pane");
+    if (this.isOutside(id)) return refused("outside");
     if (this.isShelved(id) || this.present().length <= 1) return refused("nothing-to-do");
     this.shelf = [...this.shelf, id];
     if (this.zoomedId === id) this.zoomedId = undefined;
@@ -342,13 +388,55 @@ export class Layout {
   pinToggle(): Verdict {
     const id = this.focusedId;
     if (id === undefined) return refused("no-focus");
+    if (this.isOutside(id)) return refused("outside");
     if (!this.pins.delete(id)) this.pins.add(id);
     return ok;
+  }
+
+  outsideToggle(): Verdict {
+    const id = this.focusedId;
+    if (id === undefined) return refused("no-focus");
+    return this.isOutside(id) ? this.bringInside(id) : this.sendOutside(id);
+  }
+
+  sendOutside(id: PaneId): Verdict {
+    if (!this.panes().includes(id)) return refused("unknown-pane");
+    if (this.isOutside(id)) return refused("nothing-to-do");
+    this.shelf = this.shelf.filter((pane) => pane !== id);
+    this.floats.delete(id);
+    if (this.zoomedId === id) this.zoomedId = undefined;
+    this.outsidePlaces.set(id, newlyOutside);
+    return ok;
+  }
+
+  placeOutside(id: PaneId, rect: ScreenRect, by: SurfaceMover, placer?: OutsidePlacer): Verdict {
+    const held = this.outsidePlaces.get(id);
+    if (held === undefined) return refused("unknown-pane");
+    if (!isScreenRect(rect)) return refused("nothing-to-do");
+    const placed = placedOutside(held, rect, by, placer);
+    if (sameOutsidePlace(held, placed)) return refused("nothing-to-do");
+    this.outsidePlaces.set(id, placed);
+    return ok;
+  }
+
+  bringInside(id: PaneId): Verdict {
+    if (!this.panes().includes(id)) return refused("unknown-pane");
+    if (!this.outsidePlaces.delete(id)) return refused("nothing-to-do");
+    return this.focus(id);
+  }
+
+  bringAllInside(): Verdict {
+    const returning = [...this.outsidePlaces.keys()];
+    const focused = this.focusedId;
+    if (returning.length === 0) return refused("nothing-to-do");
+    for (const id of returning) this.bringInside(id);
+    return focused === undefined ? ok : this.focus(focused);
   }
 
   move(direction: Direction, screen: Screen): Verdict {
     const id = this.focusedId;
     if (id === undefined) return refused("no-focus");
+    if (this.isOutside(id)) return refused("outside");
     const float = this.floats.get(id);
     if (float !== undefined) return this.refloat(id, float, nudged(float, direction));
     const side = this.dockSideOf(id);
@@ -364,6 +452,7 @@ export class Layout {
     const id = this.focusedId;
     const tree = this.arrangement.tree;
     if (id === undefined) return refused("no-focus");
+    if (this.isOutside(id)) return refused("outside");
     const tiled = this.tiledRects(screen);
     if (tree === undefined || this.dockSideOf(id) !== undefined || !tiled.has(id)) {
       return refused("nothing-to-do");
@@ -378,6 +467,7 @@ export class Layout {
     const id = this.focusedId;
     if (id === undefined) return refused("no-focus");
     if (id === other || !this.panes().includes(other)) return refused("unknown-pane");
+    if (this.isOutside(id) || this.isOutside(other)) return refused("outside");
     this.arrangement = swapped(this.arrangement, id, other);
     this.zoomedId = undefined;
     return ok;
@@ -395,6 +485,7 @@ export class Layout {
 
   dock(id: PaneId, side: DockSide): Verdict {
     if (!this.panes().includes(id)) return refused("unknown-pane");
+    if (this.isOutside(id)) return refused("outside");
     const landed = this.floats.delete(id);
     if (this.dockSideOf(id) === side) return landed ? ok : refused("nothing-to-do");
     return this.seat(dockedAt(lifted(this.arrangement, id), side, id));
@@ -402,6 +493,7 @@ export class Layout {
 
   undock(id: PaneId, screen: Screen): Verdict {
     if (!this.panes().includes(id)) return refused("unknown-pane");
+    if (this.isOutside(id)) return refused("outside");
     const landed = this.floats.delete(id);
     const from = this.dockSideOf(id);
     if (from === undefined) return landed ? ok : refused("nothing-to-do");
@@ -439,6 +531,7 @@ export class Layout {
   resizeFocused(delta: number, screen: Screen): Verdict {
     const id = this.focusedId;
     if (id === undefined) return refused("no-focus");
+    if (this.isOutside(id)) return refused("outside");
     const float = this.floats.get(id);
     if (float !== undefined) return this.refloat(id, float, scaled(float, delta));
     const tree = this.arrangement.tree;
@@ -447,6 +540,18 @@ export class Layout {
     const resized = resizeAroundLeaf(tree, id, delta, (pane) => tiled.has(pane));
     if (JSON.stringify(resized) === JSON.stringify(tree)) return refused("nothing-to-do");
     return this.resize(withTree(this.arrangement, resized), screen);
+  }
+
+  private seatedAtHome(
+    id: PaneId,
+    screen: Screen,
+    home: DockSide | "main",
+    beside: PaneId | undefined,
+  ): Arrangement {
+    if (home !== "main") return dockedAt(this.arrangement, home, id);
+    return beside === undefined
+      ? this.seatedInMain(id, screen)
+      : this.seatedBeside(id, screen, beside);
   }
 
   private seatedBeside(id: PaneId, screen: Screen, beside: PaneId | undefined): Arrangement {
@@ -473,13 +578,21 @@ export class Layout {
   }
 
   private showsWithoutTucking(candidate: Arrangement, screen: Screen): boolean {
-    const staged = without(candidate, (id) => this.isShelved(id) || this.isFloating(id));
+    const staged = without(candidate, (id) => this.leavesItsSeat(id));
     const waiting = tuckedFor(staged, [newcomer, ...this.standing()], screen);
     return waiting.length <= this.tucked(screen).length;
   }
 
   private staged(): Arrangement {
-    return without(this.arrangement, (id) => this.isShelved(id) || this.isFloating(id));
+    return without(this.arrangement, (id) => this.leavesItsSeat(id));
+  }
+
+  private leavesItsSeat(id: PaneId): boolean {
+    return this.isShelved(id) || this.isFloating(id) || this.isOutside(id);
+  }
+
+  private joinsTheTiling(id: PaneId): boolean {
+    return !this.isFloating(id) && !this.isOutside(id);
   }
 
   private tucked(screen: Screen): PaneId[] {
@@ -492,10 +605,7 @@ export class Layout {
 
   private showingOf(candidate: Arrangement, screen: Screen): Arrangement {
     const tucked = this.tucked(screen);
-    return without(
-      candidate,
-      (id) => this.isShelved(id) || this.isFloating(id) || tucked.includes(id),
-    );
+    return without(candidate, (id) => this.leavesItsSeat(id) || tucked.includes(id));
   }
 
   private standing(): PaneId[] {
@@ -509,7 +619,7 @@ export class Layout {
   }
 
   private present(): PaneId[] {
-    return this.panes().filter((id) => !this.isShelved(id));
+    return this.panes().filter((id) => !this.isShelved(id) && !this.isOutside(id));
   }
 
   private mostRecentPresent(): PaneId | undefined {
@@ -521,6 +631,18 @@ export class Layout {
     const returning = this.shelf.at(-1);
     this.shelf = this.shelf.slice(0, -1);
     return returning;
+  }
+
+  private mostRecentOutside(): PaneId | undefined {
+    return this.trail.find((id) => this.isOutside(id)) ?? this.outside()[0]?.id;
+  }
+
+  private successor(side: DockSide | undefined, slot: number): PaneId | undefined {
+    return this.heir(side, slot) ?? this.takenOffTheShelf() ?? this.mostRecentOutside();
+  }
+
+  private hasLayersOverTheTiling(): boolean {
+    return this.floats.size + this.outsidePlaces.size > 0;
   }
 
   private floatingBottomUp(): PaneId[] {
@@ -536,7 +658,7 @@ export class Layout {
   private layerRing(screen: Screen): PaneId[] {
     const tiled = this.tiledAnchor(screen, this.zoomedId);
     const floating = [...this.floats.keys()].filter((id) => !this.isShelved(id));
-    return [...(tiled === undefined ? [] : [tiled]), ...floating];
+    return [...(tiled === undefined ? [] : [tiled]), ...floating, ...this.outsidePlaces.keys()];
   }
 
   private refloat(id: PaneId, held: UnitRect, wanted: UnitRect): Verdict {
@@ -614,7 +736,7 @@ export class Layout {
   }
 
   private heir(side: DockSide | undefined, slot: number): PaneId | undefined {
-    const here = (id: PaneId): boolean => !this.isShelved(id);
+    const here = (id: PaneId): boolean => !this.isShelved(id) && !this.isOutside(id);
     const { docks } = this.arrangement;
     const main = mainPanes(this.arrangement).filter(here);
     const stacks = { left: docks.left.panes.filter(here), right: docks.right.panes.filter(here) };
@@ -677,7 +799,7 @@ export class Layout {
   ): boolean {
     const stack = reordered.docks[side].panes;
     const passed = stack[stack.indexOf(id) - step];
-    return passed !== undefined && (this.isShelved(passed) || this.isFloating(passed));
+    return passed !== undefined && this.leavesItsSeat(passed);
   }
 
   private moveInMain(id: PaneId, direction: Direction, screen: Screen): Verdict {
@@ -712,7 +834,7 @@ export class Layout {
     const origin = rects.get(focused);
     if (origin === undefined) return undefined;
     const tiled = [...rects].filter(
-      ([id]) => id !== focused && !this.isFloating(id) && eligible(id),
+      ([id]) => id !== focused && this.joinsTheTiling(id) && eligible(id),
     );
     return this.isFloating(focused)
       ? nearestTowards(origin, tiled, direction)

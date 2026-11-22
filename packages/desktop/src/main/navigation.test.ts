@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { isRendererPage } from "../shared/renderer-page.ts";
-import { navigationVerdict, redirectVerdict, windowOpenVerdict } from "./navigation.ts";
+import {
+  leavingSurfaceVerdict,
+  navigationVerdict,
+  redirectVerdict,
+  windowOpenVerdict,
+} from "./navigation.ts";
 import { stopUrl } from "./screen/indicator.ts";
 
 const app = "file:///C:/keywork/out/renderer/index.html";
@@ -66,6 +71,60 @@ describe("a new window", () => {
     expect(windowOpenVerdict("https://example.com/", banner, isAppPage)).toEqual({
       kind: "refuse",
     });
+  });
+});
+
+describe("a pane leaving the window", () => {
+  it("is admitted as a blank window the app page opens under a pane name", () => {
+    expect(windowOpenVerdict("about:blank", app, isAppPage, "kw-surface:1")).toEqual({
+      kind: "surface",
+    });
+    expect(
+      windowOpenVerdict("about:blank", `${app}?thread=7`, isAppPage, "kw-surface:pool-12"),
+    ).toEqual({ kind: "surface" });
+  });
+
+  it("is refused under any other name, and a pane name admits no other page", () => {
+    for (const frameName of ["", "_blank", "surface:1", "kw-surfaces", " kw-surface:1"]) {
+      expect(windowOpenVerdict("about:blank", app, isAppPage, frameName)).toEqual({
+        kind: "refuse",
+      });
+    }
+    for (const target of [app, "about:srcdoc", "about:blank#x", "data:text/html,<p>", "blob:x"]) {
+      expect(windowOpenVerdict(target, app, isAppPage, "kw-surface:1")).toEqual({
+        kind: "refuse",
+      });
+    }
+  });
+
+  it("still sends a web link to the browser whatever the window is named", () => {
+    expect(windowOpenVerdict("https://example.com/", app, isAppPage, "kw-surface:1")).toEqual({
+      kind: "hand-off",
+      url: "https://example.com/",
+    });
+  });
+
+  it("is refused to every page but the app's own", () => {
+    for (const opener of [banner, "about:blank", "https://example.com/"]) {
+      expect(windowOpenVerdict("about:blank", opener, isAppPage, "kw-surface:1")).toEqual({
+        kind: "refuse",
+      });
+    }
+  });
+});
+
+describe("a pane outside the window", () => {
+  it("never navigates and never opens a window: a web link goes to the browser", () => {
+    expect(leavingSurfaceVerdict("https://example.com/rig-test")).toEqual({
+      kind: "hand-off",
+      url: "https://example.com/rig-test",
+    });
+  });
+
+  it("refuses everything else, the app's page and another pane included", () => {
+    for (const target of [app, "about:blank", "file:///C:/notes.md", "javascript:alert(1)"]) {
+      expect(leavingSurfaceVerdict(target)).toEqual({ kind: "refuse" });
+    }
   });
 });
 

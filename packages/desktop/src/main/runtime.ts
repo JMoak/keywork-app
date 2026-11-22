@@ -41,6 +41,7 @@ import {
   wireScreen,
 } from "./screen/index.ts";
 import { type DesktopShell, desktopShell } from "./shell.ts";
+import { startElectronSurfaces } from "./surfaces/index.ts";
 import { wireSurroundings } from "./surroundings-electron.ts";
 import { fileSeams } from "./system.ts";
 import { trayModel } from "./tray.ts";
@@ -68,7 +69,13 @@ export function startDesktop(profile: ProductProfile): void {
   else app.quit();
 
   function launch(): void {
-    guardEveryNavigation();
+    const surfaces = startElectronSurfaces({
+      platform: process.platform,
+      sessionType: process.env.XDG_SESSION_TYPE,
+      backdrop: keyworkNight.tokens.background,
+      moverPath: process.env.KEYWORK_PANES_MOVER,
+    });
+    guardEveryNavigation(surfaces.door);
     nameTheAppForToasts();
     registerProtocolClient(protocolHandlerFor(invocation));
     prepareScreenBeforeReady({ commandLine: app.commandLine, protocol });
@@ -182,6 +189,7 @@ export function startDesktop(profile: ProductProfile): void {
           await desktop.leave();
           await interruptWorkStoppingWithTheApp(workspaces);
           host.abortRelays();
+          surfaces.dispose();
           (await companionReady).dispose();
           surroundings.dispose();
           foreground?.stop();
@@ -296,10 +304,10 @@ export function startDesktop(profile: ProductProfile): void {
         focused?.close();
         return;
       case "reload":
-        focused?.webContents.reload();
+        consoleOf(focused)?.webContents.reload();
         return;
       case "toggle-devtools":
-        focused?.webContents.toggleDevTools();
+        consoleOf(focused)?.webContents.toggleDevTools();
         return;
       case "about":
         await dialog.showMessageBox(aboutBox(aboutInfo(), profile));
@@ -311,4 +319,8 @@ export function startDesktop(profile: ProductProfile): void {
         app.quit();
     }
   }
+}
+
+function consoleOf(focused: BrowserWindow | null): BrowserWindow | null {
+  return focused?.getParentWindow() ?? focused;
 }

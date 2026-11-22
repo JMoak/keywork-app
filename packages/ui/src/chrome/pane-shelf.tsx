@@ -21,41 +21,48 @@ export interface PaneShelfProps {
 
 export const tuckedGloss = "waiting for room";
 
+export const shelfMetrics = { countedFrom: 4 } as const;
+
 export function PaneShelf(props: PaneShelfProps) {
   return (
     <Show when={props.items.length > 0}>
       <nav class="kw-shelf" aria-label="panes on the shelf">
         <span class="kw-shelf-lead" aria-hidden="true">
           shelf
+          <Show when={props.items.length >= shelfMetrics.countedFrom}>
+            <span class="kw-shelf-count"> · {props.items.length}</span>
+          </Show>
         </span>
-        <For each={props.items}>
-          {(item) => (
-            <button
-              type="button"
-              class="kw-shelf-pane"
-              data-why={item.why}
-              data-state={item.state}
-              aria-label={shelfLabel(item)}
-              onClick={() => props.onReturn(item.id)}
-            >
-              <Show when={item.state !== "idle"}>
-                <span class="kw-shelf-stamp" aria-hidden="true">
-                  {stampGlyph(item.state)}
-                </span>
-              </Show>
-              <span class="kw-shelf-ordinal">{item.ordinal}</span>
-              <Show when={item.pinned}>
-                <span class="kw-shelf-pin" aria-hidden="true">
-                  {pinMark}
-                </span>
-              </Show>
-              <span class="kw-shelf-name">{item.name}</span>
-              <Show when={item.why === "tucked"}>
-                <span class="kw-shelf-why">{tuckedGloss}</span>
-              </Show>
-            </button>
-          )}
-        </For>
+        <div class="kw-shelf-panes">
+          <For each={props.items}>
+            {(item) => (
+              <button
+                type="button"
+                class="kw-shelf-pane"
+                data-why={item.why}
+                data-state={item.state}
+                aria-label={shelfLabel(item)}
+                onClick={() => props.onReturn(item.id)}
+              >
+                <Show when={item.state !== "idle"}>
+                  <span class="kw-shelf-stamp" aria-hidden="true">
+                    {stampGlyph(item.state)}
+                  </span>
+                </Show>
+                <span class="kw-shelf-ordinal">{item.ordinal}</span>
+                <Show when={item.pinned}>
+                  <span class="kw-shelf-pin" aria-hidden="true">
+                    {pinMark}
+                  </span>
+                </Show>
+                <span class="kw-shelf-name">{item.name}</span>
+                <Show when={item.why === "tucked"}>
+                  <span class="kw-shelf-why">{tuckedGloss}</span>
+                </Show>
+              </button>
+            )}
+          </For>
+        </div>
         <Show when={props.hint}>
           {(hint) => <kbd class="kw-shelf-hint">{hint()} returns the last</kbd>}
         </Show>

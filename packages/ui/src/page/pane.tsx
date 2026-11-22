@@ -45,6 +45,7 @@ import { createStore } from "solid-js/store";
 import { useProductProfile } from "../chrome/product.ts";
 import { AskCard, type AskChords } from "./ask-card.tsx";
 import { type BotLabel, childRowSpans, openChildHint, plainBot } from "./child-row.ts";
+import { type DisplayRun, displayRunLine, displayRuns } from "./display-run.ts";
 import { followTail, type TailFollow } from "./follow.ts";
 import { LedgerLine, type LedgerVerbs, ledgerFacts, markText } from "./ledger.tsx";
 import { Markdown } from "./markdown.tsx";
@@ -117,6 +118,16 @@ export function ConversationPane(props: ConversationPaneProps) {
   const unfolded = (index: number): boolean => folds[index] === true;
   const toggle = (index: number): void => setFolds(index, !unfolded(index));
   const [ledgerFolds, setLedgerFolds] = createStore<Record<number, boolean>>({});
+  const [runFolds, setRunFolds] = createStore<Record<number, boolean>>({});
+  const displayed = createMemo(() => displayRuns(props.projection.entries));
+  const runHeadedAt = (index: number): DisplayRun | undefined => {
+    const run = displayed().get(index);
+    return run?.head === index ? run : undefined;
+  };
+  const foldedIntoItsRun = (index: number): boolean => {
+    const run = displayed().get(index);
+    return run !== undefined && runFolds[run.head] !== true;
+  };
   const closingAt = createMemo(
     () => new Map((props.ledger?.turns ?? []).map((turn) => [turn.end, turn])),
   );
@@ -146,24 +157,35 @@ export function ConversationPane(props: ConversationPaneProps) {
         <Index each={props.projection.entries}>
           {(entry, index) => (
             <>
-              <Entry
-                entry={entry()}
-                forgotten={isForgotten(entry(), props.forgotten)}
-                summary={summaryKindOf(props.projection, entry())}
-                streaming={props.projection.streaming === index}
-                unfolded={unfolded(index)}
-                onToggle={() => toggle(index)}
-                onAnswerAsk={props.onAnswerAsk}
-                askChords={props.askChords}
-                quiet={props.quiet}
-                onOpenSession={props.onOpenSession}
-                botLabel={props.botLabel}
-                askAccepted={props.askAccepted}
-                onOpenSpill={props.onOpenSpill}
-                onResend={props.onResend}
-                untrusted={props.untrusted}
-                queuedBehind={callsQueuedBehind(props.projection.entries, index)}
-              />
+              <Show when={runHeadedAt(index)}>
+                {(run) => (
+                  <DisplayRunRow
+                    run={run()}
+                    unfolded={runFolds[index] === true}
+                    onToggle={() => setRunFolds(index, (open) => !open)}
+                  />
+                )}
+              </Show>
+              <Show when={!foldedIntoItsRun(index)}>
+                <Entry
+                  entry={entry()}
+                  forgotten={isForgotten(entry(), props.forgotten)}
+                  summary={summaryKindOf(props.projection, entry())}
+                  streaming={props.projection.streaming === index}
+                  unfolded={unfolded(index)}
+                  onToggle={() => toggle(index)}
+                  onAnswerAsk={props.onAnswerAsk}
+                  askChords={props.askChords}
+                  quiet={props.quiet}
+                  onOpenSession={props.onOpenSession}
+                  botLabel={props.botLabel}
+                  askAccepted={props.askAccepted}
+                  onOpenSpill={props.onOpenSpill}
+                  onResend={props.onResend}
+                  untrusted={props.untrusted}
+                  queuedBehind={callsQueuedBehind(props.projection.entries, index)}
+                />
+              </Show>
               <Show when={closingAt().get(index)}>
                 {(turn) => (
                   <TurnClose
@@ -656,6 +678,25 @@ function ToolRow(props: ToolRowProps) {
       <Show when={props.unfolded && disclosable()}>
         <ToolDetail lines={run().detail ?? []} />
       </Show>
+    </Row>
+  );
+}
+
+function DisplayRunRow(props: { run: DisplayRun; unfolded: boolean; onToggle: () => void }) {
+  return (
+    <Row voice="machine" replay={props.run.runs.every((run) => run.replay)}>
+      <button
+        type="button"
+        class="kw-tool"
+        data-walk=""
+        data-display-run=""
+        aria-expanded={props.unfolded}
+        onClick={() => props.onToggle()}
+      >
+        <span class="kw-tool-span" data-tone="meta" data-part="head">
+          {displayRunLine(props.run.runs)}
+        </span>
+      </button>
     </Row>
   );
 }

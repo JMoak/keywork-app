@@ -1,6 +1,7 @@
 import type { ProductId } from "@keywork-app/product";
 import type { CompanionHost } from "../companion/port.ts";
 import type { ScreenPort } from "../panes/screen/port.ts";
+import type { SurfacesPort } from "../surfaces/port.ts";
 
 export interface HostPort {
   readonly productId?: ProductId;
@@ -42,6 +43,7 @@ export interface HostPort {
   readonly companion?: CompanionHost | undefined;
   readonly screen?: ScreenPort | undefined;
   readonly surroundings?: SurroundingsPort | undefined;
+  readonly surfaces?: SurfacesPort | undefined;
 }
 
 export interface SurroundingsPort {

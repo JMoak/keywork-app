@@ -12,6 +12,7 @@ import {
 } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { useKeyboardScope } from "../shell/keyboard-claim.ts";
+import { focusedIn, restsOnPage } from "../surfaces/runtime/realm.ts";
 import {
   askingWhy,
   askWhy,
@@ -156,7 +157,7 @@ export function AskCard(props: AskCardProps) {
     if (sayingWhy() && card !== undefined && focusRestsNear(card)) card.focus();
   });
   onCleanup(() => {
-    if (card?.contains(document.activeElement)) keyboard?.returnHome();
+    if (card?.contains(focusedIn(card))) keyboard?.returnHome();
   });
 
   return (
@@ -471,9 +472,7 @@ function toneOf(choice: AskChoice): AnswerTone {
 }
 
 function focusRestsNear(card: HTMLElement): boolean {
-  const active = document.activeElement;
-  if (active === null || active === document.body) return true;
-  return paneOf(card)?.contains(active) ?? false;
+  return restsOnPage(card) || (paneOf(card)?.contains(focusedIn(card)) ?? false);
 }
 
 function paneOf(card: HTMLElement): Element | null {

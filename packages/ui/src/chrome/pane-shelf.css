@@ -19,13 +19,23 @@
   margin-right: 2ch;
 }
 
+.kw-shelf-panes {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 .kw-shelf-pane {
   display: inline-flex;
-  flex: 0 1 auto;
+  flex: none;
   align-items: baseline;
   gap: 1ch;
-  min-width: 0;
+  max-width: 44ch;
   margin-right: 3ch;
+  overflow: hidden;
   padding: 0;
   border: 0;
   font: inherit;
@@ -40,7 +50,7 @@
 }
 .kw-shelf-pane:focus-visible {
   outline: 1px solid var(--kw-border-focus);
-  outline-offset: 2px;
+  outline-offset: -1px;
 }
 .kw-shelf-pane[data-state="needs-you"],
 .kw-shelf-pane[data-state="finished-unseen"] {
@@ -61,8 +71,16 @@
 
 .kw-shelf-name {
   min-width: 0;
+  max-width: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.kw-shelf-why {
+  order: -1;
+}
+.kw-shelf-pane[data-why="tucked"] ~ .kw-shelf-pane[data-why="tucked"] .kw-shelf-why {
+  display: none;
 }
 
 .kw-shelf-hint {

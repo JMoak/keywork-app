@@ -1,5 +1,6 @@
 import { createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
 import { readingMs } from "../../chrome/reading-time.ts";
+import { nothing, observeSize } from "../../surfaces/runtime/realm.ts";
 import "./overview.css";
 
 export interface Cursor {
@@ -29,10 +30,7 @@ export function keepInView(row: HTMLElement, isCursor: () => boolean): void {
 }
 
 function whenResized(element: Element | null, react: () => void): () => void {
-  if (element === null || typeof ResizeObserver !== "function") return () => {};
-  const observer = new ResizeObserver(() => react());
-  observer.observe(element);
-  return () => observer.disconnect();
+  return element === null ? nothing : observeSize(element, react);
 }
 
 export type RowDensity = "light" | "medium" | "heavy" | "full";

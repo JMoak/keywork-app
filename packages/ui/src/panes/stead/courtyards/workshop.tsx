@@ -32,7 +32,7 @@ export function CourtyardWorkshop(props: CourtyardWorkshopProps) {
   const paint = (): void => {
     if (canvas === undefined) return;
     const held = frame();
-    const dpr = devicePixelRatioOf();
+    const dpr = devicePixelRatioOf(canvas);
     const scale = scaleFor(dpr);
     canvas.width = held.width * scale;
     canvas.height = held.height * scale;
@@ -43,7 +43,7 @@ export function CourtyardWorkshop(props: CourtyardWorkshopProps) {
     context.imageSmoothingEnabled = false;
     const palette = resolvePalette(paletteSourceOf(canvas), {
       world: true,
-      forcedColors: forcedColorsActive(),
+      forcedColors: forcedColorsActive(canvas),
     });
     paintIndexed(surfaceOf(context), held, palette, scale);
   };

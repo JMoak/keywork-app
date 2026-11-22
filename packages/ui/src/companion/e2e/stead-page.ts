@@ -20,7 +20,7 @@ const world = coldStart({
   at: new Date(mountedAt).toISOString(),
   sessions: [],
   creatures: [{ slug: "kid", name: "kid", skin: defaultSkinId }],
-  offsetMinutes: -new Date(mountedAt).getTimezoneOffset(),
+  offsetMinutes: new Date(mountedAt).getTimezoneOffset(),
 });
 
 const stage = document.createElement("div");

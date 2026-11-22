@@ -1,4 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
+import { everyWindow, holdsFocus, openWindows } from "../surfaces/runtime/windows.ts";
 
 export interface FocusableWindow {
   hasFocus(): boolean;
@@ -17,6 +18,25 @@ export function windowFocus(target: FocusableWindow | undefined = browserWindow(
     target.removeEventListener("focus", gained);
     target.removeEventListener("blur", lost);
   });
+  return focused;
+}
+
+export function anyWindowFocus(): () => boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return () => true;
+  const [focused, setFocused] = createSignal(document.hasFocus());
+  onCleanup(
+    everyWindow((realm) => {
+      const gained = (): void => void setFocused(true);
+      const lost = (): void =>
+        void setFocused(openWindows().some((other) => other !== realm && holdsFocus(other)));
+      realm.addEventListener("focus", gained);
+      realm.addEventListener("blur", lost);
+      return () => {
+        realm.removeEventListener("focus", gained);
+        realm.removeEventListener("blur", lost);
+      };
+    }),
+  );
   return focused;
 }
 

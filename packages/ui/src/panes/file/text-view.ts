@@ -1,5 +1,6 @@
 import { Compartment, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, lineNumbers } from "@codemirror/view";
+import { followWindow } from "../../surfaces/runtime/editor.ts";
 import { codeHighlighting, codeTheme, readOnlyCode } from "../../theme/code.ts";
 import { dressInLanguage } from "../../theme/languages.ts";
 
@@ -45,7 +46,7 @@ export function mountTextView(
   };
   return {
     replace: (next, nextNumbering, nextPath = path) => {
-      shown.view.destroy();
+      discard(shown);
       shown = build(host, next, nextNumbering, nextPath);
       if (search.query !== "") reveal(searchFrom(shown.view, search.query, 0));
     },
@@ -75,7 +76,7 @@ export function mountTextView(
       return reveal({ ...search, at: (search.at + step + count) % count });
     },
     languageLoaded: () => shown.language,
-    destroy: () => shown.view.destroy(),
+    destroy: () => discard(shown),
   };
 }
 
@@ -174,6 +175,12 @@ function showFound(view: EditorView, search: Search): void {
 interface Shown {
   readonly view: EditorView;
   readonly language: Promise<void>;
+  readonly unfollow: () => void;
+}
+
+function discard(shown: Shown): void {
+  shown.unfollow();
+  shown.view.destroy();
 }
 
 function build(host: HTMLElement, text: string, numbering: LineNumbering, path?: string): Shown {
@@ -190,5 +197,9 @@ function build(host: HTMLElement, text: string, numbering: LineNumbering, path?:
     ],
     parent: host,
   });
-  return { view, language: dressInLanguage(view, language, path) };
+  return {
+    view,
+    language: dressInLanguage(view, language, path),
+    unfollow: followWindow(view),
+  };
 }

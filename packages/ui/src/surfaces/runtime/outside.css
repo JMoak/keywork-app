@@ -1,0 +1,6 @@
+.kw-outside {
+  position: fixed;
+  inset: 0;
+  background: var(--kw-background);
+  color: var(--kw-text);
+}

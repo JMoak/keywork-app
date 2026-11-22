@@ -2062,17 +2062,322 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
 - **Motion.** Lifting and settling travel in `--kw-tempo-quick` (three steps, 120 ms) on the
   one slot that changes layer; measured in Chromium as 960, 853, 747, 640 px wide, and as
   960 then 640 under reduced motion.
-- **Owed: leaving the window (decided by Jordan, 2026-11-12).** A float that crosses the
-  window's edge becomes a frameless child OS window with no chrome of its own, so the
-  console still reads as one window. The mechanism is the same pane on a new surface: the
-  renderer opens the child window and re-parents the pane's live DOM into it, as VS Code's
-  floating windows do, so nothing remounts and a terminal, a draft and the scroll position
-  cross the edge intact. It needs one internal `window.open` admitted by the navigation
-  policy, and every pane kind proven in a second document (focus, key routing, observers,
-  the terminal renderer). It is built after the Electron main-process rewrite in flight on
-  2026-11-12 lands, never against it. Weighed and declined: a second console window per
+- **Leaving the window (decided by Jordan, 2026-11-12; built 2026-11-20, not yet released in
+  an SDK).** A pane can stand on the desktop as a frameless, opaque OS window owned by the
+  console, so it stays above it, minimises with it and stays out of the taskbar. The
+  mechanism is the same pane in a new document: the renderer opens `about:blank` under the
+  frame name `kw-surface:<n>` (the one internal `window.open` the navigation policy admits)
+  and moves the pane's live `.kw-frame` into it, so nothing remounts and a draft, a caret
+  and a scroll position cross the edge. Weighed and declined: a second console window per
   pane (the pane remounts at the edge) and one oversized transparent main window (the app
   redraws its own frame, and transparency with click-through is fragile on Wayland).
+  - **Built.** The contract is `packages/ui/src/surfaces/port.ts` (`HostPort.surfaces`).
+    The host (`packages/desktop/src/main/surfaces/`) keeps the windows, shows a creature's
+    pane inactive and a keeper's with focus, glides positions on one timer, carries
+    followers when the console moves, restacks panes without focusing them (`stack`), and
+    tells the keeper's moves from its own. The renderer runtime (`ui/src/surfaces/runtime/`)
+    keeps three windows warm, mirrors styles and theme, moves the pane with its scroll,
+    caret and focus, and reaches listeners, observers and frames into every window. The
+    layout (`ui/src/layout/`) records panes outside with their screen rectangle and whether
+    they follow, and can open one already outside (`openOutside`). `ui/src/surfaces/feel/`
+    decides where panes stand and when they move: `patterns.ts` and the `pattern-*` files
+    seat a burst (cards, deals, the catalogue, a composition made safe), `choreography.ts`
+    plans arrivals, recalls, deals, spreads, a pane arising from another and a drill into
+    one, and holds a creature's arrival while the keeper types, and `surface-chrome` draws
+    the strip a pane wears outside. `ui/src/surfaces/outside/` ties these together for any
+    pane body (`panes-outside.tsx`), with the display grid and the named sizes in `grid.ts`
+    and a pane's arriving size and seat in `resting.ts`; `ui/src/shell/outside-panes.ts`
+    binds it to the tiler.
+  - **Verbs.** `pane.outside` (`leader enter`, palette `outside`) sends the focused pane
+    outside with the keeper's focus and brings it back; `pane.inside-all`
+    (`leader backspace`) brings every pane back. `pane.outside-deal`
+    (`leader shift+enter`, palette `deal`) deals every pane outside into the next
+    arrangement for that many panes and round to the first, the pane the keeper is in
+    taking the largest seat, and says which (`dealt as tower · 1 of 4`); it is the outside
+    key shifted, as the letters are the spread's key shifted. `pane.outside-spread`
+    (`leader ;`) spreads them so none overlaps, each under a letter, and puts them back;
+    `pane.outside-hints` (`leader :`) letters them where they stand, a letter focusing and
+    raising its pane; `pane.outside-behind` (`leader \`) sends the focused pane behind the
+    others. Focus moves by direction (`leader h`, `j`, `k`, `l`) between panes outside and
+    across the console's edge, by ordinal (`alt+1` to `alt+9`, shown on a pane's strip
+    outside while alt is held), and `leader tab` steps through panes outside after the
+    floats. The move chords (`leader shift+h`, `j`, `k`, `l`) step a pane outside to the
+    next stop on its display's grid: halves, thirds and quarters, a gap beside the console
+    or another pane, and in line with the console. Grow and shrink (`leader shift+.` and
+    `leader shift+,`) step it along the named sizes: card, reading, working, half, full.
+    Focusing a pane raises it above the others; a creature's pane is slipped under the one
+    the keeper is in. Terminal and screen panes stay inside and say so; a verb for the
+    tiling pressed on a pane outside names the chord that brings it in; without a host
+    port the window keeps its panes inside and brings saved ones back on load.
+  - **Where arrivals stand (2026-11-20).** A pane that returns keeps the rectangle it
+    stood in while a display still shows its strip. The rest arrive at a named size: the
+    smallest of card, reading and working that holds the pane as it stood inside, working
+    for an unmeasured pane to work in and reading for one to read (`sizeFor`, which no
+    longer adds a title strip). One to three stand in a column beside the console, level
+    with its top, stepping down the named sizes until the column fits; where no side has
+    room they stand over the console's far two thirds. Four to seven stand as a grid of
+    cards beside the console, then in the strip below or above it, then over its far
+    side. Eight to sixteen are dealt. Nothing that arrives moves a pane already outside:
+    a newcomer sits one gap from those standing. Only when nothing can stand apart does a
+    burst fall back to the plain cascade, every title in sight.
+  - **Deals.** An arrangement is a list of seats, each bounded by lines of the room it is
+    dealt on: the edges, the half, the thirds and the quarters, cut by `gridTracks` with
+    the one gap, so a seat may span any of them. `pattern-catalogue.ts` names four for
+    each count from eight to twelve, drawn as letters
+    (`drawn("tower", "abb", "acd", "aef", "agh")`), one that mirrors itself and three that
+    do not: tower, ledger, studio, banner (8); marquee, square, tower, pair (9); studio,
+    gallery, tower, steps (10); marquee, keystone, tower, lead (11); marquee, dozen,
+    brickwork, tower (12). Every other count up to sixteen is dealt in even rows, or
+    columns. A deal stands on the first room that gives its smallest seat 320 by 160:
+    beside the console, else over all but a title's width of the console's near edge, else
+    the whole display. The heaviest pane takes the largest seat: one that waits on the
+    keeper outranks one to read, which outranks one that can wait, and the pane the keeper
+    sent or is in leads. A keeper's burst and his deal key land the same way every time; a
+    creature's burst is drawn with seeded dice among every arrangement that holds, turned
+    either way, never the one dealt last, and the dice break equal weights.
+  - **Timing.** A burst starts one pane at a time, 60 ms apart for up to nine and closer
+    for more, so sixteen have all started within 510 ms; each glides 140 to 200 ms from
+    the console's edge. The order is the shape's: a column top to bottom, a grid or a deal
+    as a wave from the console's corner. That order is the stacking order, restacked once
+    the burst has appeared, under the pane the keeper is in. Recall plays the reverse, the
+    top pane first, and a deal glides each pane to its seat on its own turn. Reduced
+    motion keeps the turns and drops the travel. A creature's panes that leave within a
+    frame of one another (16 ms, at most 48 ms from the first) are seated as one burst;
+    they have already left and painted while they wait, and the keeper's own pane never
+    waits with them. A newer plan, or the keeper's hand, supersedes the turns an older
+    plan has not yet played.
+  - **For a creature's own choreography (exported and tested; no tool or key calls it
+    yet).** `madeSafe` (`feel/pattern-compose.ts`) takes seats written as shares of the
+    room and returns an arrangement on the grid's lines, inside the display, every seat a
+    quarter wide and tall at least, nothing overlapping, with a plain sentence for each
+    thing it changed or left out. `composed` seats panes on it as written, and
+    `PanesOutside.compose` plays it over the panes outside, leaving any the keeper placed
+    by hand or key since his last deal where he put them. `arisePlan`, `drillInPlan` and
+    `drillOutPlan` (`feel/choreography.ts`), with the seats from `arisenBeside` and
+    `drilledInto` (`outside/resting.ts`), plan a pane growing out of another's edge to a
+    seat beside it, a new pane taking the lead seat while its parent steps down beside
+    it, and the reverse. After any of it, `leader backspace` still brings every pane
+    inside and the deal key returns to the catalogue.
+  - **Snap and maximise (Jordan, 2026-11-20).** Panes outside are maximisable, which is
+    also what Windows asks before it snaps a window to an edge. A maximised pane does not
+    follow the console, is skipped by every glide and by the spread, and its window is
+    closed rather than kept when the pane comes inside, because a maximised window ignores
+    placement and can only be restored by a call that takes focus. A snap or a maximise is
+    reported as the keeper's move with the bounds the pane really has.
+  - **A creature's choreography over the wire (contract 1.33; built 2026-11-20, not yet run
+    against an engine).** The protocol mirrors the setting's `where`, `seat`, `weight`, `mood`
+    and the `card` size, the `show.arranged` event and `PUT
+    /sessions/{sessionId}/settings/placements`. A setting can stand as a pane of its own kind
+    (`panes/setting/`, the yard's renderers through `yard/setting-body.tsx`): it has an id,
+    persists with the layout, takes every verb a pane takes outside and inside, and closing it
+    answers the setting dismissed. `shell/setting-panes.ts` decides which settings leave the
+    yard for a pane outside: one whose creature said `where: "outside"`, one an arrangement
+    names, one the keeper opened from a pane that is outside, and one whose unfolding beside
+    the conversation would send a seated pane to the shelf. A seat is twelfths of the stage
+    (`outside/stage.ts`): the first room, beside the console, then over all but its near edge,
+    then the whole display, that holds four panes and every pane the thread already has
+    outside; it is made safe by `madeSafe` and read back onto the same lattice for the
+    report. `show.arranged` is played by `PanesOutside.arrange`: seats written outright, or
+    a shape drawn in `feel/arrangements.ts` (grid, columns, rows, lead and stack, lead and
+    cards, split, board, with the catalogue's arrangements of the same character from eight
+    to twelve and an even grid when none holds), the lead in the largest seat, over the whole
+    display when asked. A setting grown `from` one outside arises beside it, and with
+    `weight: "lead"` takes its parent's seat while the parent steps down; when it leaves the
+    parent takes the seat back, chains included. A pane the keeper placed is never moved by
+    any of it and the report says so. `mood` sets the pace every plan takes (`feel/pace.ts`,
+    one table): brisk is the timing above, calm glides longer with wider gaps and a slower
+    landing, eager closes both up, playful varies order and rhythm from the seeded dice,
+    urgent lands everything at once a beat behind the lead; reduced motion and the hidden
+    tier ignore it. The console reports placements when a seat is decided, when a setting
+    arrives or leaves, 200 ms after the keeper's last move, and with what it did in answer
+    to an arrangement (`shell/placements.ts`). The warm pool keeps the reserve of three and
+    tops up one window a turn to twelve less those already out. Panes outside wear a hairline
+    of their pane ink on all four sides, and a show carries the pane's hue as the frame
+    colour.
+  - **The console as the hub (2026-11-20, after the first run against an engine; the first
+    two passes were run in the app, the third pass below is unit tested only).** This
+    replaces, for
+    a creature's panes only, what the
+    entries above say about standing over the console and about arrivals never moving a pane
+    already out; the keeper's own panes and his deal key are as they were.
+    - *Room.* A creature's panes stand only in the rooms beside the console
+      (`roomsToDealOn`, `stageBeside` in `outside/stage.ts`), never over it unless an
+      arrangement asks for the whole display. When they need more than is free there, the
+      console makes room (`shell/making-room.ts`): it glides to the nearer side of its work
+      area, one gap in from the side, the top and the bottom so it lines up with the panes,
+      no wider than `hubMetrics.width` (the readable width and a gap either side, 504),
+      through `SurfacesPort.moveConsole`, which the host plays with the
+      panes' easing and without carrying followers (`main/surfaces/surfaces.ts`,
+      `glideFrame`). Enough room means: a few (under eight) stand as cards at the size they
+      asked for; eight or more can take every arrangement the catalogue has for that many;
+      a lead, or a shape the creature named, holds as asked. Where even the hub's stage is
+      too small at card size, as many as fit are seated and the rest go back to the rail as
+      cards, said in the status line and in the arrangement's answer. A pane that is no
+      thread's (the measuring hook's) has no card to go back to and stands as it did before.
+    - *Hub form.* While panes are outside the console shows the conversation of their
+      thread, and the pane the keeper is in below it (`hubColumn`); the tiling is not
+      touched, so it is exactly as it was when the console returns, and nothing is said to
+      wait for room. It returns where it stood, maximised if it was, when no pane is
+      outside. Moved or sized by the keeper meanwhile, it is his for the rest of that spell:
+      not snapped back, not returned. `pane.outside-room` (`leader shift+backspace`, palette
+      `make-room`) turns this off and on. The spell is kept in storage beside the layout.
+    - *One arrangement.* A thread's panes are one troupe (`panes-outside.tsx`). Each arrival
+      decides the arrangement for the new count at once (so its seat is reported at once),
+      and the move is played after 240 ms of quiet, 720 ms at most, or when the turn ends:
+      panes already out glide to their seats on the deal's turns, newcomers arrive in
+      theirs, nobody arrives twice. A lead takes the largest seat of lead and cards; a seat
+      the creature wrote is kept and the rest are dealt in the room clear of it; a pane the
+      keeper placed stays. After the creature composes by hand, or the keeper deals,
+      newcomers stand beside what is there. A shape the creature asked for is kept as the
+      troupe grows.
+    - *Reports.* A setting on its way outside is left out of the picture until it has a
+      seat, and nothing else waits for it.
+    - *Restart.* The layout records who placed each pane outside. Panes return in their
+      seats with that remembered, after the settings settled meanwhile have been closed; a
+      creature's pane that cannot stand outside goes back to the rail, never inside. The
+      host says when the app is leaving (`onLeaving`), and from then a pane whose window
+      goes is left as the layout has it. Windows closing with the app is the likely cause of
+      nine panes coming inside on the first relaunch; that is read from the code, not yet
+      confirmed in the app.
+    - *Transcript.* Two or more consecutive `show`, `arrange`, `withdraw` or `shown` rows
+      fold into one line in the keeper's words (`page/display-run.ts`), opened to see them.
+      A lone `arrange` row names what was arranged, the shape or "3 panes by hand", with the
+      mood after it (`toolSubject` in the client).
+    - *A lead faces the hub (second pass).* When a pane carries lead weight, or an
+      arrangement names a lead, only the picture with its largest seat nearest the console is
+      offered (`leadNearestTheConsole` in `feel/patterns.ts`); troupes with no lead keep both
+      pictures. Lead and cards no longer counts the tower, and tries the pictures whose lead
+      is larger than a card both ways first (`inOrderOfChoice` in `feel/arrangements.ts`).
+    - *An arrangement owns the stage.* Panes of the same thread that an arrangement did not
+      name, and that one of its seats covers, step aside as cards into the room it leaves
+      (`steppedAside`); those with no room there go back to the rail. A written seat is cut
+      back to clear a pane that is not the creature's to move (`cutBackToClear`), and a dealt
+      one only uses room clear of such panes. The answer names what stepped aside and what
+      went back.
+    - *Drilling is a move of the whole troupe.* A pane that arises from one outside and
+      leads opens a drill: where every pane of the troupe stood, and its shape, are
+      remembered once; the troupe is dealt again as lead and cards with the newest child
+      heaviest, then its ancestors, then the rest in their old order; the lightest go to the
+      rail while the count passes what the stage holds. The child emerges from its parent as
+      the others move. When it leaves it retreats into its parent (`retreatPlan`); a drill
+      still open is dealt again for the shorter path, and when none is left every remembered
+      pane returns to its seat, panes the drill sent to the rail are set out again in theirs
+      (`setOutAgain`), and panes that joined meanwhile take free room. A pane the keeper
+      moved stays and is forgotten. A pane that only arises takes a free seat next to its
+      parent, or joins the troupe. The memory is not saved: a restart, or a fresh
+      arrangement, ends a drill with everything where it stands. `drillInPlan`,
+      `drillOutPlan` and `drilledInto` are no longer called.
+    - *No pane without a seat.* A pane is shown only with a seat (`seatedForReal`), of card
+      size for a creature's; the host refuses a rectangle with no area;
+      a saved rectangle smaller than a card, or over the console, is seated afresh. Read
+      from the code, the window 199 by 121 came from a pane shown before it was seated.
+    - *Putting away.* "Bring every pane inside" seats the keeper's own panes inside and
+      returns what a creature set out to the rail (`putAway`), told as beside and by the
+      keeper, remembered across a restart, and free for the creature to set out again. The
+      pane's own button still seats that one inside.
+    - *Reports.* A placement may carry a `note`; "no room outside" is sent with a setting
+      that asked for outside and went back to the rail.
+    - *Shelf.* Its entries never shrink: names are cut, the row scrolls, "waiting for room"
+      is said once before the first, and the count is shown from four.
+    - *A narrow yard keeps its conversation (third pass).* Where the yard's viewport cannot
+      hold the conversation at `yardMetrics.hub.min` beside the rail (narrower than 660), the
+      rail lies along the top as one slim row (`railAlongTheTop` in habitat's
+      `yard/place.ts`, `yardMetrics.band`): the head line, as many title-only cards as fit
+      at 120 wide or more, and the rest counted in the fold; the conversation takes the full
+      width beneath (`hubBeneathTheBand`). `RailLayout.band` says which form the rail has;
+      the rail steps with left and right as well as j and k in the band, and its log and
+      reading open beneath the whole band. Nothing unfolds beside a conversation that
+      narrow. In hub form what would unfold or stage goes outside instead
+      (`SettingPanesSeams.opensOutside`), and a card the keeper opens from the band is set
+      out as his own pane (`setOutByHand`).
+    - *The drill's own picture.* A drill is drawn by `drillSeats` (`outside/drill-seats.ts`),
+      not through the catalogue: the lead takes the hub's half of the stage and three
+      quarters of its height; the trail is the row beneath it, the parent nearest the hub,
+      then older ancestors, as many as stand at card width and three at most; everything
+      else, older ancestors first, stands as cards in the other half in a grid of as many
+      columns and rows as hold at card size, the lightest going to the rail. Seats are given
+      by path order. The picture is the same at every depth, so a level deeper moves the old
+      lead down into the trail and little else. The console makes room for it; where fewer
+      than two card columns stand beside the lead the catalogue deal is used as before.
+    - *An arrangement brings its own newcomers.* What an `arrange` names that is not yet out
+      lands unseen (`Sending.arranging`) and is seated by the arrangement itself, entering
+      in its seat while the panes already out glide to theirs: one performance, no default
+      deal first. An arrangement during a drill applies to the troupe as it stands, drops
+      the drill's memory and says so (`Arranged.letGo`).
+    - *What the creature is told.* `arrangementSaid` no longer lists seats: one clause for
+      what was done, then only what differs from what was asked, naming up to four panes
+      that share an outcome and counting the rest. A `withdraw` row is named by the title
+      its `show` gave (the client's projection finds the show that answered with that id).
+    - *The rail across a restart.* What went back to the rail for want of room, a drill's
+      overflow included, is remembered with what the keeper put away
+      (`${profile.id}.put-away:<workspace>`, now `{ putAway, noRoom }`; the earlier list is
+      still read) and stays on the rail until an `arrange` or a new `show` names it.
+    - *Proof.* `outside/hub.test.ts` (the hub, the stage beside it, a troupe's places, a
+      lead facing the console), `shell/making-room.test.ts` (the spell: out, the keeper's
+      hand, home, a restart), the last two blocks of `outside/panes-outside.test.tsx`
+      (growing, the keeper's pane, no room; drills, stepping aside, no pane without a seat),
+      the last two blocks of `shell/outside-panes.test.tsx` (a restart; nine shows end to
+      end, put away on the bulk verb, and the note when there is no room),
+      `page/display-run.test.ts`, `feel/arrangements.test.ts`, and "the console moved to make
+      room for panes" in `main/surfaces/surfaces.test.ts`. Third pass: the narrow blocks of
+      `yard/layout.test.ts` and `yard/rail.test.tsx`, "the picture of a drill" in
+      `outside/hub.test.ts`, "an arrangement that names things not yet out" in
+      `outside/panes-outside.test.tsx`, two more cases in the nine-things block of
+      `shell/outside-panes.test.tsx`, `shell/placements.test.ts`, and "a setting taken back"
+      in the client's `projection/project.test.ts`.
+  - **Proof.** Host: `main/surfaces/*.test.ts`. Runtime, feel and the pieces between:
+    `ui/src/surfaces/**/*.test.ts(x)`. A creature's choreography: `outside/stage.test.ts`,
+    `feel/arrangements.test.ts`, `feel/pace.test.ts`, `shell/placements.test.ts`, the last
+    block of `outside/panes-outside.test.tsx` and one case in `runtime/pool.test.ts`.
+    Placement: `feel/pattern-cards.test.ts` (one to
+    sixteen panes on 1366x768, 1920x1080 and 3840x2160 with the console windowed, wide,
+    centred and maximised: apart, a gap inside the display, all started within about half
+    a second), `feel/pattern-deals.test.ts` (every arrangement in the catalogue on those
+    displays: nothing overlapping, every edge on a grid line, inside the display, seats
+    large enough to read, the heaviest pane in the largest seat, and the deal key through
+    every arrangement and back to the first), `feel/pattern-compose.test.ts` (a
+    composition made safe, two hundred seeded ones among them), `feel/choreography.test.ts`
+    (the turns, the wait for company, arising and drilling), `outside/resting.test.ts`
+    and `outside/panes-outside.test.tsx`. Layout and tiler: `layout/standing.test.ts`,
+    `shell/tiler.test.ts`. The wired workspace: `shell/outside-panes.test.tsx`,
+    `shell/pane-steadiness.test.tsx`. Measured on Windows 11 with
+    `bun run perf:panes-outside` (sixteen fresh conversation panes, one at a time,
+    2026-11-20 after the placement work): first frame from a warm window p50 36 ms, p95
+    47 ms (budget 50; the same build with the wait for company switched off showed a pane
+    in 27 to 35 ms, and an earlier build measured 23 and 26); sixteen panes gliding
+    together 100 position updates a second each (budget 55); sixteen idle panes cost the
+    renderer 0.44% and the GPU 0.80% of a core (budget 1% each).
+    `bun run check:panes-flicker` records every frame the console presents through focus
+    moves, a split, a close and a pane leaving and returning, and fails on a frame that
+    matches neither the picture before nor after, on a pane element that is rebuilt, or on
+    motion beyond the title strip's; both checks fail on any uncaught exception. In a real
+    run a conversation, the stead pane, the changes pane and a file pane each went outside
+    and came back; a draft typed inside and then outside came home whole. In another
+    (2026-11-20, a 1920x1032 work area) eight panes a creature sent in one moment were
+    dealt as the tower over all but the near edge of a windowed console, none overlapping
+    and the console keeping focus, each shown about 60 ms after the last; the deal key
+    dealt ledger and then studio; `leader backspace` brought all eight inside; and over
+    the maximised console the same burst was dealt as the banner.
+  - **Found on the way.** Every layout change rebuilt a file pane's editor and reset its
+    scroll, because a pane's component was handed its spec through an object rebuilt on
+    every layout version; the component now sees a spec and a focus that change only when
+    they change. The pool lost a window whose ready announcement arrived while
+    `window.open` was still returning.
+  - **Owed.** The creature's choreography has not run against an engine, and the recorded
+    mirrors of contract 1.33 (`client/src/fixtures/doc.json`, `protocol/src/fixtures/events.md`,
+    `protocol/src/fixtures/event-shapes.json`) wait on its release. Cards on the rail still
+    narrow the conversation and can send a seated pane to the shelf; only what unfolds goes
+    outside instead. A setting pane's place survives a restart but who placed it does not.
+    Seats finer than a quarter are widened, and sixths and twelfths snap to halves, thirds
+    and quarters. The relation-led choice among stair, fan, burst and pile
+    (`feel/pattern-choice.ts`) is still called by nothing. A deal over the console covers
+    all but a title's width of it, and its lines are the room's, not the display's that the
+    move chords step on. No pointer has dragged a
+    pane to an edge or double-clicked its strip under test (the window carries the styles
+    and hit-tests Windows needs; input at the OS level is not driven). Linux and macOS
+    have not been run. Terminal and screen panes outside. A maximised pane comes back at
+    its stored rectangle, not maximised. The pool opens windows with a synchronous
+    `window.open` that holds the shared renderer for some 15 ms each.
 - **Owed.** No screenshot stage covers a float or the shelf.
 
 ### Stock ledger (2026-11-12): the carter and the joiner

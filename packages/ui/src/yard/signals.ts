@@ -1,6 +1,7 @@
 import { type Accessor, createEffect, createSignal, on, onCleanup } from "solid-js";
 import type { Surroundings, SurroundingsPort } from "../host/port.ts";
 import type { DraftLedger } from "../shell/drafts.ts";
+import { listenInEveryDocument, openWindows } from "../surfaces/runtime/windows.ts";
 
 export interface KeeperSignals {
   readonly visible: boolean;
@@ -102,13 +103,14 @@ function browserPage(): KeeperPage {
     return { hidden: () => false, fullscreen: () => false, watch: () => () => undefined };
   }
   const events = ["visibilitychange", "fullscreenchange"] as const;
+  const pages = (): Document[] => openWindows().map((realm) => realm.document);
   return {
-    hidden: () => document.visibilityState === "hidden",
-    fullscreen: () => document.fullscreenElement != null,
+    hidden: () => pages().every((page) => page.visibilityState === "hidden"),
+    fullscreen: () => pages().some((page) => page.fullscreenElement != null),
     watch: (changed) => {
-      for (const event of events) document.addEventListener(event, changed);
+      const stops = events.map((event) => listenInEveryDocument(event, changed));
       return () => {
-        for (const event of events) document.removeEventListener(event, changed);
+        for (const stop of stops) stop();
       };
     },
   };

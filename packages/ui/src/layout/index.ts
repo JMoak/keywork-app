@@ -23,6 +23,7 @@ export {
   type Absence,
   type Floating,
   Layout,
+  type Outside,
   type Refusal,
   type Shelved,
   type Verdict,
@@ -38,7 +39,13 @@ export {
   type PointerStep,
 } from "./pointer.ts";
 export { arrangementRects, holds, type Regions, regionsOf } from "./scene.ts";
-export { floatStep, type UnitRect } from "./standing.ts";
+export {
+  floatStep,
+  type OutsidePlace,
+  type OutsidePlacer,
+  outsidePlacers,
+  type UnitRect,
+} from "./standing.ts";
 export {
   type LayoutState,
   layoutStateIds,

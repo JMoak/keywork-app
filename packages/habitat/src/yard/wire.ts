@@ -21,6 +21,18 @@ export function proposeSetting(yard: YardState, setting: Setting): YardState {
     : withSetting(continued, held);
 }
 
+export function changeSetting(yard: YardState, setting: Setting): YardState {
+  const held = yard.settings[setting.id];
+  if (held === undefined || !stillShown(setting)) return yard;
+  const { mark: _before, ...rest } = held;
+  const { mark, agent } = setting;
+  return withSetting(yard, {
+    ...rest,
+    ...(mark !== undefined && { mark }),
+    ...(agent !== undefined && { agent }),
+  });
+}
+
 export function settleSetting(yard: YardState, settled: ShowSettled, at: string): YardState {
   const held = yard.settings[settled.id];
   if (held === undefined) return yard;

@@ -29,11 +29,13 @@ import {
 import { clockWord } from "../chrome/clock-word.ts";
 import type { Rect } from "../layout/index.ts";
 import type { ShellSeams } from "../panes/index.ts";
-import { houseOffsetMinutes } from "../panes/stead/habitat.ts";
+import { clockOffsetMinutes } from "../panes/stead/habitat.ts";
 import { frameTick } from "../shell/frame-tick.ts";
+import { observeSize } from "../surfaces/runtime/realm.ts";
 import type { TrailStep } from "./actions.ts";
 import type { RailView } from "./control.ts";
 import {
+  agentMarkLabel,
   attendedLine,
   budgetLine,
   decisionLine,
@@ -98,6 +100,7 @@ export interface YardProps {
   onWalk?: ((from: string, step: TrailStep) => void) | undefined;
   onRestore?: ((plot: PlotCard) => void) | undefined;
   onRailLeft?: ((next: EventTarget | null) => void) | undefined;
+  opensOutside?: boolean | undefined;
   onAnswer(setting: YardSetting, outcome: KeeperShowOutcome): void;
   onReturn(): void;
   children: JSX.Element;
@@ -159,7 +162,7 @@ export function Yard(props: YardProps) {
   const railSlots = createMemo((): RailSlots | undefined => {
     const rail = layout().rail;
     if (rail === undefined) return undefined;
-    if (trail() === undefined) return slotsNow(rail);
+    if (trail() === undefined || rail.band) return slotsNow(rail);
     const blocked = [layout().hub, ...layout().satellites.map((placement) => placement.rect)];
     return slotsAlongTheTrail(rail, railRowsBeneath(rail.head, viewport(), blocked));
   });
@@ -252,6 +255,9 @@ export function Yard(props: YardProps) {
     shown: setting.shown,
     pinned: setting.state === "pinned",
     withdrawn: isGhost(setting.id),
+    agent: setting.agent === undefined ? undefined : agentMarkLabel(setting.agent),
+    agentColor: setting.agent?.color,
+    tag: setting.mark,
     grouped: floods.closedAt(setting.id)?.members.length,
     level: levelOf(setting.id),
   });
@@ -277,7 +283,7 @@ export function Yard(props: YardProps) {
     const card = props.card;
     if (card === undefined || !props.on) return undefined;
     return viewOfCard(card, titleOf, (ms) =>
-      clockWord(ms, props.offsetMinutes ?? houseOffsetMinutes()),
+      clockWord(ms, props.offsetMinutes ?? clockOffsetMinutes()),
     );
   });
   const cursorPlace = createMemo<number>((held) => {
@@ -312,6 +318,7 @@ export function Yard(props: YardProps) {
       yardOn: props.on,
       drawnAsPanel: (id) => drawnAsPanel(layout(), id),
       roomBeside,
+      opensOutside: props.opensOutside === true,
     });
     if (way === "read") read(setting);
     else props.onEnter(setting, way);
@@ -349,11 +356,7 @@ export function Yard(props: YardProps) {
       setViewport({ x: 0, y: 0, width: field.clientWidth, height: field.clientHeight });
     };
     measure();
-    if (field !== undefined && typeof ResizeObserver === "function") {
-      const observer = new ResizeObserver(measure);
-      observer.observe(field);
-      onCleanup(() => observer.disconnect());
-    }
+    if (field !== undefined) onCleanup(observeSize(field, measure));
   });
 
   return (
@@ -405,7 +408,8 @@ export function Yard(props: YardProps) {
               card={cardView()}
               reading={reading()}
               onCloseReading={() => setReading(undefined)}
-              log={within(rail(), logBelowHead(rail().head, viewport()))}
+              log={within(rail(), logBelowHead(rail(), viewport()))}
+              band={layout().rail?.band === true}
               head={within(rail(), rail().head)}
               fold={withinOrNone(rail(), rail().fold)}
               folded={rail().folded}
@@ -621,11 +625,11 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
-function logBelowHead(head: Rect, viewport: Rect): Rect {
+function logBelowHead({ head, region }: ShownRail, viewport: Rect): Rect {
   const { gap, margin } = yardMetrics;
   const top = head.y + head.height + gap;
   const bottom = viewport.y + viewport.height - margin;
-  return { ...head, y: top, height: Math.max(0, bottom - top) };
+  return { x: region.x, y: top, width: region.width, height: Math.max(0, bottom - top) };
 }
 
 function railTarget(rail: ShownRail | undefined): Array<[string, Rect]> {

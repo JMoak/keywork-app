@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { openChild } from "../surfaces/runtime/testing.ts";
+import { admitWindow } from "../surfaces/runtime/windows.ts";
 import { frameTick, hiddenBackstopMs } from "./frame-tick.ts";
 
 interface FakeWindow {
@@ -38,4 +40,35 @@ describe("frameTick", () => {
     window.frames[0]?.();
     expect(flushes).toBe(1);
   });
+
+  it("takes its frame from a pane's window that is showing while the console is covered", () => {
+    const child = openChild();
+    const dismiss = admitWindow(child);
+    const asked: string[] = [];
+    const frames = (name: string) => (callback: FrameRequestCallback) => {
+      asked.push(name);
+      callback(0);
+      return 0;
+    };
+    const consoleFrames = window.requestAnimationFrame;
+    window.requestAnimationFrame = frames("console");
+    child.requestAnimationFrame = frames("outside");
+    const tick = frameTick();
+    tick(() => undefined);
+    covered(document, true);
+    tick(() => undefined);
+    covered(document, false);
+    dismiss();
+    tick(() => undefined);
+    window.requestAnimationFrame = consoleFrames;
+    child.close();
+    expect(asked).toEqual(["console", "outside", "console"]);
+  });
 });
+
+function covered(page: Document, hidden: boolean): void {
+  Object.defineProperty(page, "visibilityState", {
+    value: hidden ? "hidden" : "visible",
+    configurable: true,
+  });
+}

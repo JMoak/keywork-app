@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, type JSX, onCleanup, onMount } from "solid-js";
 import type { ContextLevel } from "../instruments/context.ts";
 import { tierOf, type WidthTier } from "../page/tiers.ts";
+import { observeSize } from "../surfaces/runtime/realm.ts";
 import type { Outfit } from "../theme/attire.ts";
 import type { Theme } from "../theme/schema.ts";
 import { dressElement, swapAtOnce, undressElement } from "../theme/variables.ts";
@@ -30,8 +31,12 @@ export interface PaneFrameProps {
   pinned?: boolean | undefined;
   quiet?: boolean | undefined;
   ribbon?: string | undefined;
+  agent?: string | undefined;
+  agentColor?: string | undefined;
+  tag?: string | undefined;
   onFocus?: (() => void) | undefined;
   onGauge?: (() => void) | undefined;
+  ref?: ((frame: HTMLElement) => void) | undefined;
   children: JSX.Element;
 }
 
@@ -64,7 +69,10 @@ export function PaneFrame(props: PaneFrameProps) {
   });
   return (
     <section
-      ref={frame}
+      ref={(section) => {
+        frame = section;
+        props.ref?.(section);
+      }}
       class="kw-frame"
       aria-label={`${props.name} pane`}
       data-attire={dressed()?.source}
@@ -91,6 +99,9 @@ export function PaneFrame(props: PaneFrameProps) {
         pinned={props.pinned}
         quiet={props.quiet}
         ribbon={props.ribbon}
+        agent={props.agent}
+        agentColor={props.agentColor}
+        tag={props.tag}
         themeMark={dressed()}
         instruments={worn()?.instruments}
         onGauge={props.onGauge}
@@ -143,11 +154,8 @@ function drainedOnReturn(
 }
 
 function followWidthTier(element: HTMLElement, onTier: (tier: WidthTier) => void): () => void {
-  if (typeof ResizeObserver !== "function") return () => undefined;
-  const observer = new ResizeObserver(([entry]) => {
+  return observeSize(element, ([entry]) => {
     const width = entry?.contentRect.width ?? 0;
     if (width > 0) onTier(tierOf(width));
   });
-  observer.observe(element);
-  return () => observer.disconnect();
 }

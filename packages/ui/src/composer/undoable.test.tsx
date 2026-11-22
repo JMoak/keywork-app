@@ -1,5 +1,7 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { shareDelegatedEvents } from "../surfaces/runtime/delegation.ts";
+import { openChild } from "../surfaces/runtime/testing.ts";
 import { Composer } from "./composer.tsx";
 import { redoLastUndo } from "./undoable.ts";
 
@@ -60,6 +62,29 @@ describe("composer edits the undo stack can take back", () => {
     const { commands } = mounted();
     expect(redoLastUndo()).toBe(true);
     expect(commands.at(-1)?.command).toBe("redo");
+  });
+
+  it("edits through the page the field stands in when its pane is outside the window", () => {
+    const { input, commands } = mounted();
+    const child = openChild();
+    const outside: string[] = [];
+    Object.defineProperty(child.document, "execCommand", {
+      configurable: true,
+      value: (command: string): boolean => {
+        outside.push(command);
+        return true;
+      },
+    });
+    const stopSharing = shareDelegatedEvents(child.document);
+    child.document.body.append(input);
+    input.focus();
+    typeInto(input, "hello");
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(redoLastUndo(child.document)).toBe(true);
+    stopSharing();
+    child.close();
+    expect(outside).toEqual(["delete", "redo"]);
+    expect(commands).toEqual([]);
   });
 });
 

@@ -1,5 +1,13 @@
 import type { Season, SkyPhase } from "@keywork-app/habitat";
 import { prefersReducedMotion } from "../../chrome/stamp.ts";
+import {
+  followMedia,
+  inWindowOf,
+  mediaMatches,
+  observeSize,
+  pixelRatioOf,
+  styleOf,
+} from "../../surfaces/runtime/realm.ts";
 import { keyworkNight, themeVariables } from "../../theme/index.ts";
 import { mixOklab } from "../../theme/oklab.ts";
 import {
@@ -50,7 +58,7 @@ export function paletteSourceOf(
   element: Element,
   fallback: Readonly<Record<string, string>> = themeVariables(keyworkNight),
 ): PaletteSource {
-  const style = getComputedStyle(element);
+  const style = styleOf(element);
   const applied = style.getPropertyValue("--kw-background").trim() !== "";
   const read = (name: string): string =>
     applied ? style.getPropertyValue(name).trim() : (fallback[name] ?? "");
@@ -91,17 +99,16 @@ export function palettesOf(
   };
 }
 
-export function forcedColorsActive(): boolean {
-  return mediaMatches(forcedColorsQuery);
+export function forcedColorsActive(anchor?: Node): boolean {
+  return typeof document !== "undefined" && mediaMatches(anchor ?? document, forcedColorsQuery);
 }
 
 export function reducedMotionActive(): boolean {
   return prefersReducedMotion();
 }
 
-export function devicePixelRatioOf(): number {
-  const ratio = typeof window === "undefined" ? 1 : window.devicePixelRatio;
-  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+export function devicePixelRatioOf(anchor?: Node): number {
+  return typeof document === "undefined" ? 1 : pixelRatioOf(anchor ?? document);
 }
 
 export function fitCanvas(cssWidth: number, scene: SteadScene, dpr: number): CanvasFit {
@@ -173,31 +180,26 @@ export function surfaceOf(context: CanvasRenderingContext2D): PaintSurface {
   };
 }
 
-export function watchMedia(query: string, react: () => void): () => void {
-  if (typeof matchMedia !== "function") return () => undefined;
-  const list = matchMedia(query);
-  if (typeof list.addEventListener !== "function") return () => undefined;
-  list.addEventListener("change", react);
-  return () => list.removeEventListener("change", react);
+export function watchMedia(query: string, react: () => void, anchor?: Node): () => void {
+  if (typeof document === "undefined") return () => undefined;
+  return followMedia(anchor ?? document, query, react);
 }
 
-export function watchTheme(react: () => void): () => void {
-  if (typeof MutationObserver !== "function" || typeof document === "undefined") {
-    return () => undefined;
-  }
-  const observer = new MutationObserver(() => react());
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["data-theme", "data-appearance", "style", "class"],
+export function watchTheme(react: () => void, anchor?: Node): () => void {
+  if (typeof document === "undefined") return () => undefined;
+  return inWindowOf(anchor ?? document, (realm) => {
+    if (typeof realm.MutationObserver !== "function") return () => undefined;
+    const observer = new realm.MutationObserver(() => react());
+    observer.observe(realm.document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-appearance", "style", "class"],
+    });
+    return () => observer.disconnect();
   });
-  return () => observer.disconnect();
 }
 
 export function watchSize(element: Element, react: () => void): () => void {
-  if (typeof ResizeObserver !== "function") return () => undefined;
-  const observer = new ResizeObserver(() => react());
-  observer.observe(element);
-  return () => observer.disconnect();
+  return observeSize(element, () => react());
 }
 
 function sameFit(a: CanvasFit, b: CanvasFit): boolean {
@@ -209,8 +211,4 @@ function sameFit(a: CanvasFit, b: CanvasFit): boolean {
     a.cssWidth === b.cssWidth &&
     a.cssHeight === b.cssHeight
   );
-}
-
-function mediaMatches(query: string): boolean {
-  return typeof matchMedia === "function" && matchMedia(query).matches;
 }

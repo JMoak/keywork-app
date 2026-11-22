@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { shareDelegatedEvents } from "../surfaces/runtime/delegation.ts";
+import { openChild } from "../surfaces/runtime/testing.ts";
 import { copyWords } from "./fence.tsx";
 import { decodeEntities, externalLinkHint, Markdown } from "./markdown.tsx";
 import { type MarkdownHost, MarkdownHostProvider } from "./markdown-host.ts";
@@ -158,6 +160,17 @@ describe("Markdown task lists and footnotes", () => {
     expect(text).not.toContain("[^1]");
     fireEvent.click(reference as HTMLElement);
     expect(document.activeElement).toBe(footnote);
+  });
+
+  it("jumps to the footnote in the page the reply stands in when its pane is outside", () => {
+    const { container } = html("Claim with a source[^1].\n\n[^1]: The source itself.");
+    const child = openChild();
+    const stopSharing = shareDelegatedEvents(child.document);
+    child.document.body.append(container);
+    fireEvent.click(container.querySelector(".kw-footnote-ref a") as HTMLElement);
+    expect(child.document.activeElement).toBe(container.querySelector(".kw-footnote"));
+    stopSharing();
+    child.close();
   });
 });
 

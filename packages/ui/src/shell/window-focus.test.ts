@@ -1,6 +1,8 @@
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
-import { type FocusableWindow, windowFocus } from "./window-focus.ts";
+import { openChild } from "../surfaces/runtime/testing.ts";
+import { admitWindow } from "../surfaces/runtime/windows.ts";
+import { anyWindowFocus, type FocusableWindow, windowFocus } from "./window-focus.ts";
 
 describe("window focus as the shell sees it", () => {
   it("starts from the document's own answer and follows the window's blur and focus", () => {
@@ -29,6 +31,50 @@ describe("window focus as the shell sees it", () => {
   it("reads as focused where there is no window to ask", () => {
     createRoot(() => {
       expect(windowFocus(undefined)()).toBe(true);
+    });
+  });
+});
+
+describe("focus anywhere among the console and its panes outside", () => {
+  it("holds while the keeper moves between the app's windows, and lets go when they leave them all", () => {
+    const child = openChild();
+    const dismiss = admitWindow(child);
+    const consoleFocus = document.hasFocus;
+    const holding = (page: Document, held: boolean): void => {
+      page.hasFocus = () => held;
+    };
+    try {
+      holding(document, true);
+      holding(child.document, false);
+      createRoot((dispose) => {
+        const focused = anyWindowFocus();
+        expect(focused()).toBe(true);
+        holding(document, false);
+        holding(child.document, true);
+        window.dispatchEvent(new Event("blur"));
+        expect(focused()).toBe(true);
+        holding(child.document, false);
+        child.dispatchEvent(new Event("blur"));
+        expect(focused()).toBe(false);
+        child.dispatchEvent(new Event("focus"));
+        expect(focused()).toBe(true);
+        dispose();
+      });
+    } finally {
+      document.hasFocus = consoleFocus;
+      dismiss();
+      child.close();
+    }
+  });
+
+  it("follows the console alone exactly as before when no pane is outside", () => {
+    createRoot((dispose) => {
+      const focused = anyWindowFocus();
+      window.dispatchEvent(new Event("blur"));
+      expect(focused()).toBe(false);
+      window.dispatchEvent(new Event("focus"));
+      expect(focused()).toBe(true);
+      dispose();
     });
   });
 });

@@ -157,7 +157,10 @@ export function tierOf(visible: boolean, focused: boolean): PowerTier {
 
 export function showEventsIn(batch: readonly BusEnvelope[]): BusEnvelope[] {
   return batch.filter(
-    (envelope) => envelope.type === "show.proposed" || envelope.type === "show.settled",
+    (envelope) =>
+      envelope.type === "show.proposed" ||
+      envelope.type === "show.changed" ||
+      envelope.type === "show.settled",
   );
 }
 

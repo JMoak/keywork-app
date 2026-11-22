@@ -4,6 +4,7 @@ import type {
   Direction,
   DockSide,
   DropZone,
+  OutsidePlacer,
   PaneId,
   Rect,
   Scene,
@@ -18,6 +19,7 @@ import {
   type PaneSpec,
   parsePaneSpec,
 } from "../panes/index.ts";
+import type { ScreenRect, SurfaceMover } from "../surfaces/port.ts";
 
 export type { PaneKind, PaneSpec } from "../panes/index.ts";
 
@@ -39,14 +41,27 @@ export interface ShelfEntry {
   readonly spawnRank: number;
 }
 
+export interface OutsideEntry {
+  readonly id: PaneId;
+  readonly spec: PaneSpec;
+  readonly rect: ScreenRect | undefined;
+  readonly follows: boolean;
+  readonly by: OutsidePlacer | undefined;
+  readonly focused: boolean;
+  readonly spawnRank: number;
+}
+
 export interface Tiler {
   readonly version: () => number;
+  readonly placements: () => number;
   readonly layout: Layout;
   panes(): readonly PaneId[];
   spec(id: PaneId): PaneSpec | undefined;
   findPane(matches: (spec: PaneSpec) => boolean): PaneId | undefined;
   slots(screen: Screen): PaneSlot[];
   shelf(screen: Screen): ShelfEntry[];
+  outside(): OutsideEntry[];
+  isOutside(id: PaneId): boolean;
   scene(screen: Screen): Scene;
   emptyMain(screen: Screen): Rect | undefined;
   focused(): PaneId | undefined;
@@ -54,6 +69,7 @@ export interface Tiler {
   lastFocusedOf(kind: PaneKind): PaneId | undefined;
   zoomed(): PaneId | undefined;
   open(spec: PaneSpec, screen: Screen): Verdict;
+  openOutside(spec: PaneSpec, screen: Screen): PaneId | undefined;
   summon(spec: PaneSpec, screen: Screen, argument?: string): Verdict;
   crowds(spec: PaneSpec, screen: Screen, argument?: string): boolean;
   bind(id: PaneId, spec: PaneSpec): void;
@@ -71,6 +87,10 @@ export interface Tiler {
   shelve(): Verdict;
   returnFromShelf(screen: Screen): Verdict;
   pin(): Verdict;
+  sendOutside(id: PaneId): Verdict;
+  placeOutside(id: PaneId, rect: ScreenRect, by: SurfaceMover, placer?: OutsidePlacer): Verdict;
+  bringInside(id: PaneId, screen: Screen): Verdict;
+  bringAllInside(screen: Screen): Verdict;
   rotate(screen: Screen): Verdict;
   cycle(screen: Screen): Verdict;
   dock(side: DockSide, screen: Screen): Verdict;
@@ -96,6 +116,7 @@ export function createTiler(
   const specs = new Map<PaneId, PaneSpec>();
   const ids = new PaneIds();
   const [version, setVersion] = createSignal(0);
+  const [placements, setPlacements] = createSignal(0);
   if (restored !== undefined) revive(layout, specs, restored);
   for (const id of specs.keys()) ids.adopt(id);
 
@@ -132,6 +153,18 @@ export function createTiler(
       specs.set(id, spec);
       return verdict;
     });
+
+  const openOutside = (spec: PaneSpec, screen: Screen): PaneId | undefined => {
+    const id = ids.mint(spec.kind);
+    const home = definitions(spec.kind).home;
+    const beside = home === "main" ? mainAnchor(layout) : undefined;
+    const verdict = layout.openOutside(id, screen, home, beside);
+    if (!verdict.ok) return undefined;
+    ids.adopt(id);
+    specs.set(id, spec);
+    touched(verdict);
+    return id;
+  };
 
   const bind = (id: PaneId, spec: PaneSpec): void => {
     if (specs.get(id)?.kind !== spec.kind) return;
@@ -177,8 +210,14 @@ export function createTiler(
       : layout.hasRoomBeside(screen, beside);
   };
 
+  const placedOutside = (verdict: Verdict): Verdict => {
+    if (verdict.ok) setPlacements((at) => at + 1);
+    return verdict;
+  };
+
   return {
     version,
+    placements,
     layout,
     panes: () => layout.panes(),
     spec: (id) => {
@@ -218,6 +257,21 @@ export function createTiler(
         return [{ id, spec, why, pinned: layout.isPinned(id), spawnRank: layout.spawnRank(id) }];
       });
     },
+    outside: () => {
+      version();
+      placements();
+      const focused = layout.focused();
+      return layout.outside().flatMap(({ id, rect, follows, by }) => {
+        const spec = specs.get(id);
+        if (spec === undefined) return [];
+        const spawnRank = layout.spawnRank(id);
+        return [{ id, spec, rect, follows, by, focused: id === focused, spawnRank }];
+      });
+    },
+    isOutside: (id) => {
+      version();
+      return layout.isOutside(id);
+    },
     scene: (screen) => {
       version();
       return layout.scene(screen);
@@ -244,6 +298,7 @@ export function createTiler(
       return lastFocusedOf(kind);
     },
     open,
+    openOutside,
     summon: (spec, screen, argument) => {
       const existing = summoned(spec, argument);
       if (existing === undefined) return open(spec, screen);
@@ -297,6 +352,11 @@ export function createTiler(
         notice: layout.isPinned(id) ? shelfNotices.pinned : shelfNotices.unpinned,
       };
     },
+    sendOutside: (id) => touched(layout.sendOutside(id)),
+    placeOutside: (id, rect, by, placer) =>
+      placedOutside(layout.placeOutside(id, rect, by, placer)),
+    bringInside: (id, screen) => seated(screen, () => layout.bringInside(id)),
+    bringAllInside: (screen) => seated(screen, () => layout.bringAllInside()),
     rotate: (screen) => touched(layout.rotate(screen)),
     cycle: (screen) => seated(screen, () => layout.cycleFocused(screen)),
     dock: (side, screen) => seated(screen, () => layout.dockFocused(side)),
@@ -366,7 +426,7 @@ export const shelfNotices = {
     `no room for every pane · ${count === 1 ? "one waits" : `${count} wait`} on the shelf`,
   lastPaneStays: "the last pane on the stage stays",
   empty: "the shelf is empty",
-  nothingFloats: "no pane is floating",
+  nothingFloats: "no pane is floating or outside the window",
   pinned: "pinned · the last to leave when room runs out",
   unpinned: "unpinned",
 };

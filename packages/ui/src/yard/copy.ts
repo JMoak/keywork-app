@@ -1,4 +1,4 @@
-import type { KeeperShowOutcome, Rung, Setting, SettingKind } from "@keywork-app/protocol";
+import type { KeeperShowOutcome, Rung, SettingKind } from "@keywork-app/protocol";
 
 export const railLabel = "the yard's rail";
 
@@ -77,15 +77,36 @@ export function awayLine(heldBack: number, folded: readonly string[]): string {
   return `while you were away · ${parts.join(" · ")}`;
 }
 
+export const bandHint = "← → · enter · esc";
+
+export function countedLine(more: number): string {
+  return `+${more}`;
+}
+
 export function foldedLine(below: number, above = 0): string {
   if (above === 0) return `${below} more below · j reaches them`;
   if (below === 0) return `${above} more above · k reaches them`;
   return `${above} above · ${below} below · j k reach them`;
 }
 
-export function setOutLine(setting: Pick<Setting, "creature" | "what">, owner: string): string {
+export interface SetOutBy {
+  readonly creature: string | null;
+  readonly what: { readonly kind: SettingKind };
+  readonly agent?: { readonly name?: string | undefined } | undefined;
+}
+
+export function setOutLine(setting: SetOutBy, owner: string): string {
   const what = kindWords[setting.what.kind];
+  if (setting.agent !== undefined) return `${agentCalled(setting.agent)} showed ${what}`;
   return setting.creature === null ? `${what} from ${owner}` : `${owner} showed ${what}`;
+}
+
+export function agentCalled(agent: { readonly name?: string | undefined }): string {
+  return agent.name ?? "an agent";
+}
+
+export function agentMarkLabel(agent: { readonly name?: string | undefined }): string {
+  return agent.name === undefined ? "set out by an agent" : `set out by ${agent.name}, an agent`;
 }
 
 export function arrivedLine(lines: readonly string[], railChord: string): string {

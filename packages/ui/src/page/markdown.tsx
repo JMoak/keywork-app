@@ -11,6 +11,7 @@ import {
   useContext,
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import { documentOf } from "../surfaces/runtime/realm.ts";
 import { Fence } from "./fence.tsx";
 import { useMarkdownHost } from "./markdown-host.ts";
 import {
@@ -265,9 +266,9 @@ function Link(props: { link: Tokens.Link }) {
 
 function FootnoteReference(props: { label: string }) {
   const footnoteId = useContext(FootnoteScope);
-  const jump = (event: MouseEvent): void => {
+  const jump = (event: MouseEvent & { currentTarget: HTMLAnchorElement }): void => {
     event.preventDefault();
-    const footnote = document.getElementById(footnoteId(props.label));
+    const footnote = documentOf(event.currentTarget).getElementById(footnoteId(props.label));
     footnote?.focus({ preventScroll: true });
     footnote?.scrollIntoView({ block: "nearest" });
   };

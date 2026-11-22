@@ -1,3 +1,5 @@
+import { focusedIn, isPageBody } from "../surfaces/runtime/realm.ts";
+
 export interface KeyboardOwnership {
   ownsKeyboard(scope: string | undefined): boolean;
 }
@@ -16,6 +18,10 @@ export function keyFocusOf(
   const owned = keymap.ownsKeyboard(focusedKind);
   if (owned && !focusInside) return { scope: undefined, typing: isTextField(target) };
   return { scope: focusedKind, typing: isTextField(target) && !owned };
+}
+
+export function keyTargetOf(event: Pick<Event, "target">): EventTarget | null {
+  return isPageBody(event.target) ? focusedIn(event.target) : event.target;
 }
 
 export function isTextField(target: EventTarget | null): boolean {

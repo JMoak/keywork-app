@@ -1,4 +1,4 @@
-import type { Setting } from "@keywork-app/protocol";
+import type { Setting, SettingKind } from "@keywork-app/protocol";
 import type { PaneSpec } from "../panes/index.ts";
 
 export type Satellite =
@@ -6,7 +6,17 @@ export type Satellite =
   | { readonly kind: "note"; readonly text: string }
   | { readonly kind: "link"; readonly url: string };
 
-export function satelliteOf(setting: Setting): Satellite {
+export interface Shown {
+  readonly what: {
+    readonly kind: SettingKind;
+    readonly ref: string;
+    readonly title?: string | undefined;
+  };
+  readonly sessionId: string;
+  readonly creature: string | null;
+}
+
+export function satelliteOf(setting: Shown): Satellite {
   const { kind, ref } = setting.what;
   switch (kind) {
     case "file":
@@ -38,13 +48,13 @@ export function satellitePaneId(setting: Pick<Setting, "id">): string {
   return `yard:${setting.id}`;
 }
 
-export function titleOfSetting(setting: Setting): string {
+export function titleOfSetting(setting: Pick<Shown, "what">): string {
   return setting.what.title ?? shortRef(setting.what.ref);
 }
 
 export const wholeSessionScope = "every change in the session";
 
-export function panelTitleOf(setting: Setting): string {
+export function panelTitleOf(setting: Shown): string {
   const title = titleOfSetting(setting);
   const shown = satelliteOf(setting);
   const wholeSession = shown.kind === "pane" && shown.spec.kind === "diff" && !shown.spec.path;
@@ -59,7 +69,7 @@ function diffSpecOf(sessionId: string, ref: string): PaneSpec {
   return namesAPath(ref) ? { kind: "diff", sessionId, path: ref } : { kind: "diff", sessionId };
 }
 
-export function showsSubject(setting: Setting, spec: PaneSpec): boolean {
+export function showsSubject(setting: Shown, spec: PaneSpec): boolean {
   const satellite = satelliteOf(setting);
   if (satellite.kind !== "pane" || satellite.spec.kind !== spec.kind) return false;
   return JSON.stringify(subjectOf(satellite.spec)) === JSON.stringify(subjectOf(spec));

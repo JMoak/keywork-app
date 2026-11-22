@@ -93,6 +93,72 @@ describe("the yard's layout", () => {
   });
 });
 
+describe("the yard's layout where the conversation cannot keep its reading width beside the rail", () => {
+  const narrow: Rect = { x: 0, y: 0, width: 504, height: 1016 };
+  const notes = (count: number, shown: "card" | "unfold" = "card") =>
+    Array.from({ length: count }, (_, index) =>
+      aYardSetting({ id: `set-${index}`, depth: index, shown, what: { kind: "note", ref: "n" } }),
+    );
+
+  it("lays the rail along the top as one slim row and gives the conversation the full width beneath", () => {
+    const layout = yardLayout({ viewport: narrow, settings: notes(6), railWanted: false, prefs });
+    const rail = layout.rail;
+    expect(rail?.band).toBe(true);
+    expect(layout.hub).toEqual({ x: 0, y: 56, width: 504, height: 960 });
+    expect(rail?.region).toEqual({ x: 16, y: 8, width: 472, height: 32 });
+    expect(rail?.head).toEqual({ x: 16, y: 8, width: 144, height: 32 });
+    expect(rail?.cards.map((card) => [card.id, card.rect])).toEqual([
+      ["set-5", { x: 172, y: 8, width: 124, height: 32 }],
+      ["set-4", { x: 308, y: 8, width: 124, height: 32 }],
+    ]);
+    expect(rail?.fold).toEqual({ x: 444, y: 8, width: 44, height: 32 });
+    expect(rail?.folded).toBe(4);
+    expect(layout.selectable.map((setting) => setting.id)).toEqual(
+      [5, 4, 3, 2, 1, 0].map((index) => `set-${index}`),
+    );
+  });
+
+  it("keeps what would unfold as a card in the band, since nothing can stand beside the conversation", () => {
+    const layout = yardLayout({
+      viewport: narrow,
+      settings: notes(2, "unfold"),
+      railWanted: false,
+      prefs,
+    });
+    expect(layout.satellites).toEqual([]);
+    expect(layout.hub.width).toBe(504);
+    expect(layout.rail?.cards).toHaveLength(2);
+  });
+
+  it("opens an empty band when the keeper asks for the rail, and none while nothing is set out", () => {
+    const asked = yardLayout({ viewport: narrow, settings: [], railWanted: true, prefs });
+    expect(asked.rail).toMatchObject({ band: true, cards: [], head: { x: 16, y: 8, width: 144 } });
+    expect(asked.hub.y).toBe(56);
+    const idle = yardLayout({ viewport: narrow, settings: [], railWanted: false, prefs });
+    expect(idle).toEqual({ hub: narrow, rail: undefined, satellites: [], selectable: [] });
+  });
+
+  it("stands the rail as a column again from the width that holds the conversation beside it", () => {
+    const { margin, gap, rail, hub } = yardMetrics;
+    const least = hub.min + margin + rail.width + gap;
+    const beside = yardLayout({
+      viewport: { ...narrow, width: least },
+      settings: notes(2),
+      railWanted: false,
+      prefs,
+    });
+    expect(beside.rail?.band).toBe(false);
+    expect(beside.hub).toEqual({ x: 0, y: 0, width: hub.min, height: 1016 });
+    const below = yardLayout({
+      viewport: { ...narrow, width: least - 1 },
+      settings: notes(2),
+      railWanted: false,
+      prefs,
+    });
+    expect(below.rail?.band).toBe(true);
+  });
+});
+
 function overlaps(a: Rect | undefined, b: Rect): boolean {
   if (a === undefined) return true;
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;

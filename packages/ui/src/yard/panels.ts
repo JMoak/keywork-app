@@ -2,6 +2,7 @@ import type { YardSetting } from "@keywork-app/habitat";
 import { type Accessor, createSignal } from "solid-js";
 import type { PaneKind } from "../panes/index.ts";
 import type { PaneActionHandler } from "../panes/registry.ts";
+import { focusedIn, isElement, isNode, restsOnPage } from "../surfaces/runtime/realm.ts";
 
 export type DrawnAs = "panel" | "card";
 
@@ -88,7 +89,7 @@ export function createYardPanels(): YardPanels {
     },
     focusWithin: (id, within, target) => {
       if (within && id !== awaited) awaited = undefined;
-      if (within && target instanceof HTMLElement) lastFocused.set(id, target);
+      if (within && isElement(target)) lastFocused.set(id, target as HTMLElement);
       setInside((held) => (within ? id : held === id ? undefined : held));
     },
     kindAt: (target) => {
@@ -113,7 +114,7 @@ export function createYardPanels(): YardPanels {
 }
 
 export function keptByThePanel(panel: Element, next: EventTarget | null): boolean {
-  if (!(next instanceof Element)) return false;
+  if (!isElement(next)) return false;
   return panel.contains(next) || next.closest(overlaySelector) !== null;
 }
 
@@ -130,17 +131,15 @@ export function followFocusOut(panel: HTMLElement, event: FocusEvent, seams: Foc
 
 function afterRemovalSettles(panel: HTMLElement, lost: EventTarget | null, seams: FocusLeaving) {
   queueMicrotask(() => {
-    const page = panel.ownerDocument;
-    if (panel.contains(page.activeElement)) return;
-    const removedUnderFocus = lost instanceof Node && !lost.isConnected;
-    const nowhere = page.activeElement === null || page.activeElement === page.body;
-    if (removedUnderFocus && nowhere && panel.isConnected && seams.refocus()) return;
+    if (panel.contains(focusedIn(panel))) return;
+    const removedUnderFocus = isNode(lost) && !lost.isConnected;
+    if (removedUnderFocus && restsOnPage(panel) && panel.isConnected && seams.refocus()) return;
     seams.leave();
   });
 }
 
 export function panelIdAt(target: EventTarget | null): string | undefined {
-  if (!(target instanceof Element)) return undefined;
+  if (!isElement(target)) return undefined;
   return target.closest<HTMLElement>(panelSelector)?.dataset.setting;
 }
 

@@ -10,6 +10,7 @@ import {
 import { Compartment, EditorSelection, type Extension, type Text } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import type { WidthTier } from "../../page/tiers.ts";
+import { followWindow } from "../../surfaces/runtime/editor.ts";
 import { codeHighlighting, codeTheme, readOnlyCode } from "../../theme/code.ts";
 import { dressInLanguage } from "../../theme/languages.ts";
 
@@ -142,6 +143,7 @@ function unifiedView(host: HTMLElement, sides: MergeSides): MergeMount {
     parent: host,
   });
   const languageLoaded = dressInLanguage(view, language, sides.path);
+  const unfollow = followWindow(view);
   const chunks = (): readonly Chunk[] => getChunks(view.state)?.chunks ?? [];
   return {
     layout: "unified",
@@ -154,7 +156,10 @@ function unifiedView(host: HTMLElement, sides: MergeSides): MergeMount {
     previousHunk: () => goToPreviousChunk({ state: view.state, dispatch: view.dispatch }),
     ...scrolling(view.scrollDOM, () => view.defaultLineHeight),
     languageLoaded: () => languageLoaded,
-    destroy: () => view.destroy(),
+    destroy: () => {
+      unfollow();
+      view.destroy();
+    },
   };
 }
 
@@ -173,6 +178,7 @@ function splitView(host: HTMLElement, sides: MergeSides): MergeMount {
     dressInLanguage(view.a, before, sides.path),
     dressInLanguage(view.b, after, sides.path),
   ]).then(() => undefined);
+  const unfollow = [followWindow(view.a), followWindow(view.b)];
   const chunks = (): readonly Chunk[] => getChunks(view.b.state)?.chunks ?? [];
   return {
     layout: "split",
@@ -185,7 +191,10 @@ function splitView(host: HTMLElement, sides: MergeSides): MergeMount {
     previousHunk: () => goToPreviousChunk({ state: view.b.state, dispatch: view.b.dispatch }),
     ...scrolling(view.dom, () => view.b.defaultLineHeight),
     languageLoaded: () => languageLoaded,
-    destroy: () => view.destroy(),
+    destroy: () => {
+      for (const stop of unfollow) stop();
+      view.destroy();
+    },
   };
 }
 

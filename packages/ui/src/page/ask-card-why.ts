@@ -1,5 +1,6 @@
 import type { DenyReason } from "@keywork-app/protocol";
 import { createEffect, createSignal, onCleanup } from "solid-js";
+import { listenInEveryWindow } from "../surfaces/runtime/windows.ts";
 
 export interface ReasonOffer {
   readonly reason: DenyReason;
@@ -68,8 +69,7 @@ const [askedWhy, setAskedWhy] = createSignal<string>();
 const wordsKey = reasonOffers.find((offer) => offer.reason === "other")?.key;
 
 function listenAheadOfTheKeymap(onKey: (event: KeyboardEvent) => void): () => void {
-  window.addEventListener("keydown", onKey, true);
-  return () => window.removeEventListener("keydown", onKey, true);
+  return listenInEveryWindow("keydown", onKey, true);
 }
 
 function claim(event: KeyboardEvent, act: () => void): void {

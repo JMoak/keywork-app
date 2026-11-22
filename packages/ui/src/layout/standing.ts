@@ -1,3 +1,4 @@
+import type { ScreenRect, SurfaceMover } from "../surfaces/port.ts";
 import { type Arrangement, panesOf, without } from "./arrangement.ts";
 import type { Direction, Rect, Screen } from "./geometry.ts";
 import { holds } from "./scene.ts";
@@ -10,9 +11,20 @@ export interface UnitRect {
   readonly height: number;
 }
 
+export const outsidePlacers = ["creature", "keeper", "console"] as const;
+
+export type OutsidePlacer = (typeof outsidePlacers)[number];
+
+export interface OutsidePlace {
+  readonly rect?: ScreenRect | undefined;
+  readonly follows: boolean;
+  readonly by?: OutsidePlacer | undefined;
+}
+
 export const floatStep = 0.05;
 export const floatShareBounds = { min: 0.2, max: 1 } as const;
 export const floatLiftShare = { width: 0.5, height: 0.6 } as const;
+export const newlyOutside: OutsidePlace = { follows: true };
 
 export function tuckedFor(
   arrangement: Arrangement,
@@ -77,12 +89,27 @@ export function scaled(unit: UnitRect, delta: number): UnitRect {
 }
 
 export function sameUnitRect(one: UnitRect, other: UnitRect): boolean {
-  return (
-    one.x === other.x &&
-    one.y === other.y &&
-    one.width === other.width &&
-    one.height === other.height
-  );
+  return sameRect(one, other);
+}
+
+export function placedOutside(
+  held: OutsidePlace,
+  rect: ScreenRect,
+  by: SurfaceMover,
+  placer: OutsidePlacer | undefined = held.by,
+): OutsidePlace {
+  const { x, y, width, height } = rect;
+  return {
+    rect: { x, y, width, height },
+    follows: held.follows && by === "host",
+    ...(placer !== undefined && { by: placer }),
+  };
+}
+
+export function sameOutsidePlace(one: OutsidePlace, other: OutsidePlace): boolean {
+  if (one.follows !== other.follows || one.by !== other.by) return false;
+  if (one.rect === undefined || other.rect === undefined) return one.rect === other.rect;
+  return sameRect(one.rect, other.rect);
 }
 
 function tuckedUntilItHolds(
@@ -115,6 +142,15 @@ function returnedWhereRoomAllows(
 
 function leaving(arrangement: Arrangement, gone: readonly PaneId[]): Arrangement {
   return without(arrangement, (id) => gone.includes(id));
+}
+
+function sameRect(one: Rect, other: Rect): boolean {
+  return (
+    one.x === other.x &&
+    one.y === other.y &&
+    one.width === other.width &&
+    one.height === other.height
+  );
 }
 
 function spanOn(room: number, wanted: number, floor: number): number {

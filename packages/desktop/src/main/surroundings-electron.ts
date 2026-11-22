@@ -58,6 +58,7 @@ export function wireSurroundings(seams: SurroundingsWiringSeams): SurroundingsWi
 }
 
 function followWindow(window: BrowserWindow, push: () => void): void {
+  if (window.getParentWindow() !== null) return;
   window.on("enter-full-screen", push);
   window.on("leave-full-screen", push);
   window.on("enter-html-full-screen", push);

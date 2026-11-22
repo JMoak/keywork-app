@@ -1,4 +1,6 @@
 import { type Accessor, createSignal } from "solid-js";
+import { isElement, isPageBody } from "../surfaces/runtime/realm.ts";
+import { focusedWindow } from "../surfaces/runtime/windows.ts";
 import { yardToggleActionId } from "./actions.ts";
 import { nowShownLine, tilesShownLine, trailShownLine, yardShownLine } from "./copy.ts";
 
@@ -57,13 +59,13 @@ export function createYardControl(options: YardControlOptions): YardControl {
       options.say(next === "trail" ? trailShownLine : nowShownLine);
     },
     focusRail: (at) => {
-      if (!railActive()) returnTo = activeElementOf(document);
+      if (!railActive()) returnTo = activeElementOf(focusedWindow().document);
       setRailAt(at);
       setRailActive(true);
     },
     leaveRail,
     railLeftFor: (next) => {
-      if (!(next instanceof HTMLElement)) return leaveRail();
+      if (!isElement(next)) return leaveRail();
       returnTo = undefined;
       setRailActive(false);
     },
@@ -72,5 +74,5 @@ export function createYardControl(options: YardControlOptions): YardControl {
 
 function activeElementOf(page: Document): HTMLElement | undefined {
   const active = page.activeElement;
-  return active instanceof HTMLElement && active !== page.body ? active : undefined;
+  return isElement(active) && !isPageBody(active) ? (active as HTMLElement) : undefined;
 }

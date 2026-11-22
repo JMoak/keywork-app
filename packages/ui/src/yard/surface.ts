@@ -9,7 +9,7 @@ import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { HostPort } from "../host/port.ts";
 import type { PaneSpec, ShellSeams } from "../panes/index.ts";
 import { reducedMotionActive, reducedMotionQuery, watchMedia } from "../panes/stead/painter.ts";
-import { windowFocus } from "../shell/window-focus.ts";
+import { anyWindowFocus } from "../shell/window-focus.ts";
 import { type TrailStep, yardRailActionId } from "./actions.ts";
 import { createAttentionReports } from "./attention.ts";
 import { createYardControl, type YardControl } from "./control.ts";
@@ -44,6 +44,7 @@ export interface YardSurfaceOptions {
   readonly chord: (action: string) => string;
   readonly say: (line: string) => void;
   readonly returnHome: () => void;
+  readonly leavesTheYard?: ((setting: YardSetting) => boolean) | undefined;
   readonly now?: (() => number) | undefined;
 }
 
@@ -59,6 +60,7 @@ export interface YardSurface {
   card(): YardCard;
   withdrawn(id: string): boolean;
   ownerOf(setting: YardSetting): string;
+  shellOf(setting: YardSetting): ShellSeams;
   enter(setting: YardSetting, way: PanelWay): void;
   answer(setting: YardSetting, outcome: KeeperShowOutcome): void;
   open(from: YardSetting, what: SettingSubject): void;
@@ -75,7 +77,7 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
   const control = createYardControl(options);
   const panels = createYardPanels();
   const reducedMotion = createReducedMotion();
-  const windowFocused = windowFocus();
+  const windowFocused = anyWindowFocus();
   const signals = createKeeperSignals({
     focusedThread: options.focusedThread,
     railFocused: control.railActive,
@@ -132,7 +134,8 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     if (control.on()) return;
     const arrived = proposedByTheModel(batch).flatMap((id) => {
       const setting = settingOf(id);
-      return setting === undefined ? [] : [setOutLine(setting, model.ownerOf(setting))];
+      const drawnHere = setting !== undefined && options.leavesTheYard?.(setting) !== true;
+      return drawnHere ? [setOutLine(setting, model.ownerOf(setting))] : [];
     });
     if (arrived.length > 0) options.say(arrivedLine(arrived, railChord()));
   };
@@ -191,6 +194,7 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
     card: model.card,
     withdrawn: model.withdrawn,
     ownerOf: model.ownerOf,
+    shellOf: model.shellOf,
     enter: (setting, way) => {
       if (way === "focus" && panels.focus(setting.id)) return;
       if (way === "tile") openAsTile(setting);

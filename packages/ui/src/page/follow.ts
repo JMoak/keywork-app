@@ -1,3 +1,5 @@
+import { observeSize } from "../surfaces/runtime/realm.ts";
+
 export interface TailFollow {
   resume(): void;
   dispose(): void;
@@ -23,13 +25,9 @@ export function followTail(
   };
   const onScroll = (): void => follow(atTail());
   scroller.addEventListener("scroll", onScroll, { passive: true });
-  const observer =
-    typeof ResizeObserver === "function"
-      ? new ResizeObserver(() => {
-          if (following) toTail();
-        })
-      : undefined;
-  observer?.observe(content);
+  const stopObserving = observeSize(content, () => {
+    if (following) toTail();
+  });
   return {
     resume: () => {
       follow(true);
@@ -37,7 +35,7 @@ export function followTail(
     },
     dispose: () => {
       scroller.removeEventListener("scroll", onScroll);
-      observer?.disconnect();
+      stopObserving();
     },
   };
 }

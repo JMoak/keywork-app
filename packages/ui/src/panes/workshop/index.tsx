@@ -22,7 +22,7 @@ import { keepKeyboardHome } from "../keyboard-home.ts";
 import { ChoiceLine, DraftLine, NoticeLine } from "../overview/rows.tsx";
 import { definePane, type KeyHints, type PaneProps } from "../registry.ts";
 import { InCreatureHome } from "../stead/creature-home.tsx";
-import { houseOffsetMinutes } from "../stead/habitat.ts";
+import { clockOffsetMinutes } from "../stead/habitat.ts";
 import {
   displayDarkLine,
   elsewhereHeading,
@@ -243,7 +243,7 @@ function WorkshopPane(props: PaneProps<WorkshopSpec>) {
     () => props.focused,
   );
   const port = workshopPortOf(props.shell.host, props.shell.workspace);
-  const offsetMinutes = houseOffsetMinutes();
+  const offsetMinutes = clockOffsetMinutes();
   const [yard, setYard] = createSignal<Yard>({ kind: "reading" });
   const [healths, setHealths] = createStore<Record<string, WorkshopHealth>>({});
   const [details, setDetails] = createStore<Record<string, WorkshopDetailRecord>>({});

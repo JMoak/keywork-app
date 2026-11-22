@@ -1,10 +1,11 @@
 import { isKeyboardHome } from "../shell/keyboard-claim.ts";
+import { focusedIn } from "../surfaces/runtime/realm.ts";
 
 export function keepTabWithin(root: HTMLElement): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== "Tab" || event.defaultPrevented || hasCommandModifier(event)) return;
     const step = event.shiftKey ? -1 : 1;
-    const from = event.target instanceof Element ? event.target : document.activeElement;
+    const from = event.target instanceof Element ? event.target : focusedIn(root);
     const next = stopBeside(tabStopsIn(root), from, step) ?? landingPast(root, step);
     if (next === undefined) return;
     event.preventDefault();

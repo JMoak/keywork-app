@@ -15,7 +15,7 @@ export function CourtyardPortrait(props: CourtyardPortraitProps) {
   const paint = (): void => {
     const held = portrait();
     if (held === undefined || canvas === undefined) return;
-    const dpr = devicePixelRatioOf();
+    const dpr = devicePixelRatioOf(canvas);
     const scale = scaleFor(dpr, 1);
     const width = held.skin.cell.width * scale;
     const height = held.skin.cell.height * scale;
@@ -28,7 +28,7 @@ export function CourtyardPortrait(props: CourtyardPortraitProps) {
     context.imageSmoothingEnabled = false;
     const palette = resolvePalette(paletteSourceOf(canvas), {
       hueStop: props.hueStop,
-      forcedColors: forcedColorsActive(),
+      forcedColors: forcedColorsActive(canvas),
     });
     held
       .render({ clip: portraitClip, frame: 0, facing: "right" }, palette, { scale })

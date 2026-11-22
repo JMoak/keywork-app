@@ -7,6 +7,12 @@ import type { AskPick } from "../page/ask-card.tsx";
 import { keyboardOwners, type PaneKind, paneActions } from "../panes/index.ts";
 import type { ActionCommand } from "../panes/registry.ts";
 import {
+  consoleRoomAction,
+  consoleRoomActionId,
+  type OutsideHandlers,
+  outsideActions,
+} from "../surfaces/actions.ts";
+import {
   type TrailStep,
   yardLeafwardAction,
   yardLeafwardActionId,
@@ -23,7 +29,7 @@ import { type BindingSpec, everyPane } from "./keymap.ts";
 
 export type FocusContext = "pane" | "composer" | "overlay";
 
-export interface ActionTarget {
+export interface ActionTarget extends OutsideHandlers {
   requestOnboarding(): void;
   toggleCompanion(): void;
   switchCompanion(creature: string | undefined): void;
@@ -33,6 +39,7 @@ export interface ActionTarget {
   shelvePane(): void;
   returnFromShelf(): void;
   pinPane(): void;
+  toggleConsoleRoom(): void;
   focusAcrossLayers(): void;
   rotatePane(): void;
   focusToward(direction: Direction): void;
@@ -103,6 +110,8 @@ export const coreActions: Record<string, AppAction> = {
       aliases: ["lift", "settle"],
     },
   },
+  ...outsideActions((target) => target),
+  [consoleRoomActionId]: consoleRoomAction,
   "focus.layer": {
     chords: "leader tab",
     help: "step between the tiling and what floats",

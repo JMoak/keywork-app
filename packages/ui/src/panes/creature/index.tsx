@@ -32,7 +32,7 @@ import { ChoiceLine, createCursor, DraftLine, NoticeLine, OverviewRow } from "..
 import { definePane, type PaneLocalAction, type PaneProps, type ShellSeams } from "../registry.ts";
 import { timeWord, whatAreYouDoing } from "../stead/copy.ts";
 import { creatureHomeShell, InCreatureHome } from "../stead/creature-home.tsx";
-import { createHabitatState, houseOffsetMinutes } from "../stead/habitat.ts";
+import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "../stead/habitat.ts";
 import { skinIds } from "../stead/habitat-render.ts";
 import { coatOf } from "../stead/herd.ts";
 import {
@@ -315,7 +315,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     ranch: shell.client,
   });
   const slug = (): string | undefined => props.spec.slug ?? slugFor(shell, undefined).slug;
-  const offsetMinutes = houseOffsetMinutes();
+  const offsetMinutes = clockOffsetMinutes();
   const [now, setNow] = createSignal(Date.now());
   const ticking = setInterval(() => setNow(Date.now()), minuteMs);
   onCleanup(() => clearInterval(ticking));
@@ -326,7 +326,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     creatures: () => shell.client.creatures(),
     feed: shell.feed,
     now: Date.now,
-    offsetMinutes,
+    offsetMinutes: houseOffsetMinutes(),
   });
 
   const [detail, { refetch: refetchDetail }] = createResource(slug, (slug) => client.read(slug));

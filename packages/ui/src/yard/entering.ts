@@ -10,12 +10,17 @@ export interface EnterSight {
   readonly yardOn: boolean;
   drawnAsPanel(id: string): boolean;
   roomBeside(setting: YardSetting): boolean;
+  readonly opensOutside?: boolean | undefined;
 }
 
 export function wayInto(setting: YardSetting, sight: EnterSight): EnterWay {
   if (sight.yardOn && sight.drawnAsPanel(setting.id)) return "focus";
-  if (sight.yardOn && sight.roomBeside(setting)) return "unfold";
+  if (sight.yardOn && hasSomewhereToUnfold(setting, sight)) return "unfold";
   return satelliteOf(setting).kind === "note" ? "read" : "tile";
+}
+
+function hasSomewhereToUnfold(setting: YardSetting, sight: EnterSight): boolean {
+  return sight.opensOutside === true || sight.roomBeside(setting);
 }
 
 export function raisedByHand(setting: YardSetting): YardSetting {

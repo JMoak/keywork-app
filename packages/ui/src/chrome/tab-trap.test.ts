@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { markKeyboardHome } from "../shell/keyboard-claim.ts";
+import { openChild } from "../surfaces/runtime/testing.ts";
 import { keepTabWithin } from "./tab-trap.ts";
 
 afterEach(() => {
@@ -37,6 +38,23 @@ describe("tab through a pane and on to the next", () => {
     last?.focus();
     tab(last);
     expect(document.activeElement).toBe(first);
+  });
+
+  it("keeps tab inside a pane that stands outside the window, in its own page", () => {
+    const child = openChild();
+    const [inside, outside] = workspace([
+      ["button", "home"],
+      ["button", "button"],
+    ]);
+    child.document.body.append(outside?.body as HTMLElement);
+    const [first, last] = outside?.stops ?? [];
+    last?.focus();
+    tab(last);
+    expect(child.document.activeElement).toBe(first);
+    inside?.stops[1]?.focus();
+    tab(inside?.stops[1]);
+    expect(document.activeElement).toBe(inside?.stops[0]);
+    child.close();
   });
 });
 

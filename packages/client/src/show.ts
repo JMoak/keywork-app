@@ -1,5 +1,6 @@
 import type {
   KeeperShowOutcome,
+  PlacementsReport,
   ServedRefusal,
   Setting,
   ShowAnswer,
@@ -13,12 +14,14 @@ export interface ShowClient {
   settings(): Promise<readonly Setting[] | ServedRefusal>;
   answerSetting(id: string, outcome: KeeperShowOutcome): Promise<ServedRefusal | undefined>;
   openSetting(opening: ShowOpening): Promise<Setting | ServedRefusal>;
+  reportPlacements(sessionId: string, report: PlacementsReport): Promise<ServedRefusal | undefined>;
 }
 
 export const showOperations = {
   settings: "listSettings",
   answerSetting: "answerSetting",
   openSetting: "openSetting",
+  reportPlacements: "reportPlacements",
 } as const satisfies Record<keyof ShowClient, string>;
 
 export function showRoutes(request: RanchRequest): ShowClient {
@@ -37,5 +40,13 @@ export function showRoutes(request: RanchRequest): ShowClient {
       const response = await request("POST", "/show", opening);
       return (await servedRefusalOf(response)) ?? ((await response.json()) as ShowOpened).setting;
     },
+    reportPlacements: async (sessionId, report) =>
+      servedRefusalOf(
+        await request(
+          "PUT",
+          `/sessions/${encodeURIComponent(sessionId)}/settings/placements`,
+          report,
+        ),
+      ),
   };
 }

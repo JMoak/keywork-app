@@ -20,6 +20,7 @@ import {
 import { z } from "zod";
 import type { HostPort } from "../../host/port.ts";
 import { tierOf, type WidthTier } from "../../page/tiers.ts";
+import { observeSize } from "../../surfaces/runtime/realm.ts";
 import { ControlRow } from "../conversation/control-row.tsx";
 import { EmptyState } from "../empty-state.tsx";
 import { landFileAt } from "../file/landing.ts";
@@ -472,7 +473,11 @@ function FileLevel(props: LevelProps & { path: string }) {
       { defer: true },
     ),
   );
-  rereadOnReturn(() => props.focused, reread);
+  rereadOnReturn(
+    () => props.focused,
+    reread,
+    () => root,
+  );
   reread();
 
   onMount(() => {
@@ -483,10 +488,9 @@ function FileLevel(props: LevelProps & { path: string }) {
       }
     };
     measure();
-    if (typeof ResizeObserver !== "function") return;
-    const observer = new ResizeObserver(measure);
-    for (const element of [host, root]) if (element !== undefined) observer.observe(element);
-    onCleanup(() => observer.disconnect());
+    for (const element of [host, root]) {
+      if (element !== undefined) onCleanup(observeSize(element, measure));
+    }
   });
 
   createEffect(() => {

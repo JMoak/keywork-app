@@ -1,4 +1,10 @@
-import type { AskScope, PermissionDecision } from "@keywork-app/protocol";
+import {
+  type AskScope,
+  arrangementRelations,
+  arrangementShapes,
+  moods,
+  type PermissionDecision,
+} from "@keywork-app/protocol";
 import { recallText } from "./decisions.ts";
 import type { ToolRun } from "./types.ts";
 
@@ -73,7 +79,7 @@ export function compactJson(value: unknown): string {
 export function toolSubject(args: unknown): string {
   if (typeof args !== "object" || args === null) return "";
   const record = args as Record<string, unknown>;
-  const shown = shownSubject(record.what);
+  const shown = shownSubject(record.what) ?? arrangedSubject(record);
   if (shown !== undefined) return clippedSubject(shown);
   const key =
     favoredSubjectKeys.find((candidate) => typeof record[candidate] === "string") ??
@@ -103,6 +109,23 @@ function shownSubject(what: unknown): string | undefined {
   if (typeof kind !== "string") return undefined;
   const named = typeof title === "string" && title.trim() !== "" ? title : ref;
   return typeof named === "string" ? `${kind} · ${lineMarked(named)}` : kind;
+}
+
+function arrangedSubject(asked: Record<string, unknown>): string | undefined {
+  const arranged = whatWasArranged(asked);
+  if (arranged === undefined) return undefined;
+  return isOneOf(moods, asked.mood) ? `${arranged} · ${asked.mood}` : arranged;
+}
+
+function whatWasArranged({ seats, shape, relation }: Record<string, unknown>): string | undefined {
+  if (Array.isArray(seats))
+    return `${seats.length === 1 ? "1 pane" : `${seats.length} panes`} by hand`;
+  if (isOneOf(arrangementShapes, shape)) return shape;
+  return isOneOf(arrangementRelations, relation) ? `as ${relation}` : undefined;
+}
+
+function isOneOf<Name extends string>(names: readonly Name[], value: unknown): value is Name {
+  return typeof value === "string" && (names as readonly string[]).includes(value);
 }
 
 const favoredSubjectKeys = [

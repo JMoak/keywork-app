@@ -1,5 +1,6 @@
 import type { Lane, Pose, PowerTier } from "@keywork-app/habitat";
 import { type SchedulerHost, tierScheduler } from "../../companion/tier-scheduler.ts";
+import { requestFrame } from "../../surfaces/runtime/realm.ts";
 
 export interface FieldSense {
   hidden(): boolean;
@@ -102,16 +103,18 @@ export function steadField(host: SchedulerHost, sense: FieldSense, drawAt: DrawF
   };
 }
 
-export function browserFieldHost(): SchedulerHost {
+export function browserFieldHost(pane: () => Node | undefined = () => undefined): SchedulerHost {
   const timeout = (handle: unknown) => handle as ReturnType<typeof setTimeout>;
   return {
     now: () => Date.now(),
     setTimeout: (fn, ms) => setTimeout(fn, ms),
     clearTimeout: (handle) => clearTimeout(timeout(handle)),
-    requestAnimationFrame: (fn) =>
-      displayFrames() ? requestAnimationFrame(fn) : setTimeout(() => fn(Date.now()), activeFrameMs),
-    cancelAnimationFrame: (handle) =>
-      displayFrames() ? cancelAnimationFrame(handle as number) : clearTimeout(timeout(handle)),
+    requestAnimationFrame: (fn) => {
+      if (displayFrames()) return requestFrame(pane() ?? document, fn);
+      const timer = setTimeout(() => fn(Date.now()), activeFrameMs);
+      return () => clearTimeout(timer);
+    },
+    cancelAnimationFrame: (cancel) => (cancel as () => void)(),
     random: () => Math.random(),
   };
 }

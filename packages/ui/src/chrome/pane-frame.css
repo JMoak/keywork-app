@@ -155,6 +155,35 @@
   color: var(--kw-pane-hue);
 }
 
+.kw-frame-agent {
+  flex: none;
+  margin-right: 1ch;
+}
+
+.kw-agent-mark {
+  color: var(--kw-terminal-cyan);
+}
+.kw-agent-mark[data-color="magenta"] {
+  color: var(--kw-terminal-magenta);
+}
+.kw-agent-mark[data-color="green"] {
+  color: var(--kw-terminal-green);
+}
+.kw-agent-mark[data-color="yellow"] {
+  color: var(--kw-terminal-yellow);
+}
+.kw-agent-mark[data-color="blue"] {
+  color: var(--kw-terminal-blue);
+}
+
+.kw-frame-tag {
+  flex: none;
+  margin-left: 1ch;
+  padding: 0 1ch;
+  color: var(--kw-background);
+  background: var(--kw-pane-hue);
+}
+
 .kw-frame-pin {
   flex: none;
   margin-right: 1ch;

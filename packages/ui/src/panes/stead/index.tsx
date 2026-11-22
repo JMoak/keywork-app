@@ -53,7 +53,13 @@ import {
 } from "../../shell/needs-you.ts";
 import { needsYouCount } from "../../shell/needs-you-ledger.ts";
 import { decidedAmong, overturnStanding } from "../../shell/overturn.ts";
-import { windowFocus } from "../../shell/window-focus.ts";
+import {
+  documentOf,
+  inWindowOf,
+  nothing,
+  whenWindowChanges,
+} from "../../surfaces/runtime/realm.ts";
+import { windowFocusOf } from "../../surfaces/runtime/window-focus.ts";
 import { choresOverFetch } from "../chores/port.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { definitionOf, parsePaneSpec } from "../index.ts";
@@ -90,7 +96,7 @@ import { CourtyardOverview } from "./courtyards/index.tsx";
 import { HomeOpening } from "./creature-home.tsx";
 import { type PlacedMember, steadDrawer } from "./draw.ts";
 import { browserFieldHost, type FieldPicture, steadField } from "./field.ts";
-import { createHabitatState, houseOffsetMinutes } from "./habitat.ts";
+import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "./habitat.ts";
 import {
   figureAt,
   hotspotAt,
@@ -400,7 +406,8 @@ function Stead(props: PaneProps<SteadSpec>) {
     () => onboarding.card() ?? root,
     () => props.focused,
   );
-  const offsetMinutes = houseOffsetMinutes();
+  const houseOffset = houseOffsetMinutes();
+  const offsetMinutes = clockOffsetMinutes();
   const world = createHabitatState({
     rows: () => props.shell.store.state.summaries,
     bots: () => props.shell.store.surfaces.state.bots,
@@ -412,7 +419,7 @@ function Stead(props: PaneProps<SteadSpec>) {
     creatures: () => props.shell.client.creatures(),
     feed: props.shell.feed,
     now: Date.now,
-    offsetMinutes,
+    offsetMinutes: houseOffset,
   });
   const [herd, setHerd] = createSignal<Herd>(emptyHerd);
   const [preference, setPreference] = createSignal(props.spec);
@@ -538,7 +545,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
 
   const baseContext = (tier: PowerTier): Omit<StepContext, "pointer" | "gestures"> => ({
-    visible: !documentHidden() && !courts.overview(),
+    visible: !documentHidden(stage) && !courts.overview(),
     focused: props.focused,
     fullscreen: false,
     doNotDisturb: false,
@@ -595,11 +602,11 @@ function Stead(props: PaneProps<SteadSpec>) {
     });
     return drawing.picture;
   };
-  const windowFocused = windowFocus();
+  const windowFocused = windowFocusOf(() => stage);
   const loop = steadField(
-    browserFieldHost(),
+    browserFieldHost(() => stage),
     {
-      hidden: () => documentHidden() || courts.overview(),
+      hidden: () => documentHidden(stage) || courts.overview(),
       resting: () => !props.focused || !windowFocused(),
       lastInputAt: () => lastInputAt,
     },
@@ -884,12 +891,12 @@ function Stead(props: PaneProps<SteadSpec>) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = (): void => {
         clearTimeout(timer);
-        if (documentHidden()) return;
+        if (documentHidden(stage)) return;
         const at = Date.now();
         setOverviewTime(at);
         timer = setTimeout(tick, 60_000 - (at % 60_000));
       };
-      const stop = listen(document, "visibilitychange", tick);
+      const stop = watchVisibility(stage, tick);
       tick();
       onCleanup(() => {
         clearTimeout(timer);
@@ -916,11 +923,12 @@ function Stead(props: PaneProps<SteadSpec>) {
   onMount(() => {
     loop.redraw();
     const stops = [
-      watchTheme(requestDraw),
-      watchMedia(forcedColorsQuery, requestDraw),
-      watchMedia(reducedMotionQuery, requestDraw),
-      stage === undefined ? () => undefined : watchSize(stage, requestDraw),
-      listen(document, "visibilitychange", requestDraw),
+      watchTheme(requestDraw, stage),
+      watchMedia(forcedColorsQuery, requestDraw, stage),
+      watchMedia(reducedMotionQuery, requestDraw, stage),
+      stage === undefined ? nothing : watchSize(stage, requestDraw),
+      stage === undefined ? nothing : whenWindowChanges(stage, requestDraw),
+      watchVisibility(stage, requestDraw),
     ];
     onCleanup(() => {
       for (const stop of stops) stop();
@@ -976,7 +984,7 @@ function Stead(props: PaneProps<SteadSpec>) {
       creatures: residents().length,
       needYou: needYou(),
       working: working(),
-      phase: skyAt(now(), offsetMinutes).phase,
+      phase: skyAt(now(), houseOffset).phase,
       clock: clockWord(now(), offsetMinutes),
       floating: members().find((member) => member.slug === props.shell.companion?.floating())?.name,
     });
@@ -1366,13 +1374,17 @@ function slugOf(target: EventTarget | null): string | undefined {
   return target.closest<HTMLElement>("[data-slug]")?.dataset.slug;
 }
 
-function documentHidden(): boolean {
-  return typeof document !== "undefined" && document.visibilityState === "hidden";
+function documentHidden(pane: Node | undefined): boolean {
+  return (
+    typeof document !== "undefined" && documentOf(pane ?? document).visibilityState === "hidden"
+  );
 }
 
-function listen(target: Document, type: string, react: () => void): () => void {
-  target.addEventListener(type, react);
-  return () => target.removeEventListener(type, react);
+function watchVisibility(pane: Node | undefined, react: () => void): () => void {
+  return inWindowOf(pane ?? document, (realm) => {
+    realm.document.addEventListener("visibilitychange", react);
+    return () => realm.document.removeEventListener("visibilitychange", react);
+  });
 }
 
 function steadAction(

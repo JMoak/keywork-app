@@ -100,7 +100,37 @@ describe("the rail", () => {
   });
 });
 
-function rail(initiallyActive: boolean, heldBack = 0) {
+describe("the rail lying along the top as a band", () => {
+  it("steps with left and right as well as j and k, and counts what is folded", () => {
+    const run = rail(true, 0, true);
+    expect(run.list().hasAttribute("data-band")).toBe(true);
+    key(run.list(), "ArrowRight");
+    expect(run.cursor()).toBe("first");
+    key(run.list(), "j");
+    expect(run.cursor()).toBe("second");
+    key(run.list(), "ArrowLeft");
+    key(run.list(), "k");
+    expect(run.cursor()).toBe("open");
+    expect(run.container.querySelector(".kw-yard-folded")?.textContent).toBe("+3");
+    expect(run.container.querySelector(".kw-yard-rail-head")?.textContent).toBe(
+      "← → · enter · esc",
+    );
+  });
+
+  it("leaves left and right alone while it stands as a column", () => {
+    const run = rail(true);
+    const pressed = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    });
+    run.list().dispatchEvent(pressed);
+    expect(pressed.defaultPrevented).toBe(false);
+    expect(run.cursor()).toBe("open");
+  });
+});
+
+function rail(initiallyActive: boolean, heldBack = 0, band = false) {
   const [active, setActive] = createSignal(initiallyActive);
   const [cursor, setCursor] = createSignal<string>();
   const entered: string[] = [];
@@ -114,6 +144,7 @@ function rail(initiallyActive: boolean, heldBack = 0) {
       fold={fold}
       folded={3}
       heldBack={heldBack}
+      band={band}
       active={active()}
       cursor={cursor()}
       onCursor={setCursor}

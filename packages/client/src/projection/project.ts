@@ -136,7 +136,9 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "mesh.walked":
     case "mesh.peers":
     case "show.proposed":
+    case "show.changed":
     case "show.settled":
+    case "show.arranged":
       return state;
     case "model.fallback":
       return replay ? state : notice(state, "info", fallbackLine(envelope.payload));
@@ -754,6 +756,18 @@ function newRun(
   };
 }
 
+const settingTools = { show: "show", withdraw: "withdraw" } as const;
+
+function namedForWhatItTakesBack(state: SessionProjection, run: ToolRun): ToolRun {
+  if (run.name !== settingTools.withdraw || run.subject === "") return run;
+  const answeredWithItsId = (entry: TranscriptEntry): boolean =>
+    entry.kind === "tool" &&
+    entry.run.name === settingTools.show &&
+    entry.run.detail?.some((line) => line.includes(run.subject)) === true;
+  const shown = state.entries.findLast(answeredWithItsId);
+  return shown?.kind === "tool" ? { ...run, subject: shown.run.subject } : run;
+}
+
 function childMarkOf(args: Record<string, unknown>): ChildMark {
   const named = typeof args.title === "string" ? flatTitle(args.title) : "";
   return {
@@ -774,7 +788,8 @@ function flatTitle(raw: string): string {
 
 const titleLimit = 60;
 
-function appendRun(state: SessionProjection, run: ToolRun): SessionProjection {
+function appendRun(state: SessionProjection, started: ToolRun): SessionProjection {
+  const run = namedForWhatItTakesBack(state, started);
   const entry: ToolEntry = { kind: "tool", run };
   return {
     ...state,

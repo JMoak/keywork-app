@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { openChild } from "../surfaces/runtime/testing.ts";
 import { createKeyboardScope, paneIdOf } from "./keyboard-claim.ts";
 
 afterEach(() => {
@@ -51,6 +52,26 @@ describe("the keyboard claim", () => {
     expect(keyboard.claimant()).toBeUndefined();
     expect(keyboard.restore()).toBe(false);
     release();
+  });
+
+  it("restores a claimant standing outside the window in its own page, and finds its home there", () => {
+    const keyboard = createKeyboardScope();
+    const child = openChild();
+    const card = paneWith("stead", "aside");
+    const composer = paneWith("thread", "textarea");
+    child.document.body.append(card.parentElement as HTMLElement);
+    const routed: Array<string | undefined> = [];
+    keyboard.routeToPanes((owner) => routed.push(paneIdOf(owner)));
+    keyboard.claim(card);
+    keyboard.addHome({ element: () => card, homeward: () => true });
+    composer.focus();
+    expect(keyboard.claimant()).toBe(card);
+    expect(keyboard.restore()).toBe(true);
+    expect(child.document.activeElement).toBe(card);
+    expect(document.activeElement).toBe(composer);
+    expect(routed).toEqual(["stead"]);
+    expect(keyboard.homeOf("stead")).toBe(card);
+    child.close();
   });
 });
 

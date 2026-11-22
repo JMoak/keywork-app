@@ -1,3 +1,5 @@
+import { observeSize } from "../surfaces/runtime/realm.ts";
+
 export const telemetryFits = ["full", "compact", "hidden"] as const;
 export type TelemetryFit = (typeof telemetryFits)[number];
 
@@ -6,12 +8,11 @@ export function keepNameReadable(header: HTMLElement): () => void {
     fitTelemetry(header);
   };
   refit();
-  const resized = typeof ResizeObserver === "function" ? new ResizeObserver(refit) : undefined;
-  resized?.observe(header);
+  const stopResizing = observeSize(header, refit);
   const rewritten = new MutationObserver(refit);
   rewritten.observe(header, { childList: true, characterData: true, subtree: true });
   return () => {
-    resized?.disconnect();
+    stopResizing();
     rewritten.disconnect();
   };
 }

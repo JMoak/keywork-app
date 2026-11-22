@@ -67,6 +67,26 @@ describe("PaneShelf", () => {
     expect(container.querySelector(".kw-shelf-hint")).toBeNull();
   });
 
+  it("counts its panes once there are several, and keeps every one in a single row of its own", () => {
+    const waiting = Array.from({ length: 10 }, (_, at) => ({
+      ...conversation,
+      id: `setting-${at}`,
+      name: `a note with a long name ${at}`,
+      ordinal: at + 1,
+      pinned: false,
+    }));
+    const { container } = render(() => (
+      <PaneShelf items={waiting} hint="ctrl+k =" onReturn={() => undefined} />
+    ));
+    expect(container.querySelector(".kw-shelf-count")?.textContent).toBe(" · 10");
+    expect(container.querySelectorAll(".kw-shelf-panes > .kw-shelf-pane")).toHaveLength(10);
+    cleanup();
+    const few = render(() => (
+      <PaneShelf items={[terminal, conversation]} hint={undefined} onReturn={() => undefined} />
+    ));
+    expect(few.container.querySelector(".kw-shelf-count")).toBeNull();
+  });
+
   it("hands the pane's id back when its entry is activated", () => {
     const returned: string[] = [];
     const { container } = render(() => (

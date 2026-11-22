@@ -1,12 +1,16 @@
 import { yardIds } from "@keywork-app/habitat";
 import type { KeeperShowOutcome, Rung } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, type JSX, on, Show } from "solid-js";
+import { agentMark, tagTitle } from "../chrome/title-row.tsx";
 import type { Rect } from "../layout/index.ts";
+import { focusedIn } from "../surfaces/runtime/realm.ts";
 import type { TrailStep } from "./actions.ts";
 import { pinAnswer } from "./answers.ts";
 import type { RailView } from "./control.ts";
 import {
   awayLine,
+  bandHint,
+  countedLine,
   decisionsHead,
   emptyRail,
   foldedLine,
@@ -26,6 +30,9 @@ export interface RailEntry {
   readonly shown: Rung;
   readonly pinned: boolean;
   readonly withdrawn?: boolean | undefined;
+  readonly agent?: string | undefined;
+  readonly agentColor?: string | undefined;
+  readonly tag?: string | undefined;
   readonly grouped?: number | undefined;
   readonly plot?: number | undefined;
   readonly level?: number | undefined;
@@ -58,6 +65,7 @@ export interface RailProps {
   card?: YardCardView | undefined;
   reading?: RailReading | undefined;
   log?: Rect | undefined;
+  band?: boolean | undefined;
   active: boolean;
   view?: RailView | undefined;
   cursor: string | undefined;
@@ -105,8 +113,10 @@ export function Rail(props: RailProps) {
   const keyed: Readonly<Record<string, () => void>> = {
     j: () => step(1),
     ArrowDown: () => step(1),
+    ArrowRight: () => step(1),
     k: () => step(-1),
     ArrowUp: () => step(-1),
+    ArrowLeft: () => step(-1),
     Enter: enter,
     x: withCurrent((entry) => props.onAnswer(entry, "dismissed")),
     p: withCurrent((entry) => props.onAnswer(entry, pinAnswer(entry.pinned))),
@@ -124,7 +134,7 @@ export function Rail(props: RailProps) {
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const act = (props.reading === undefined ? keyed : whileReading)[event.key];
-    if (act === undefined) return;
+    if (act === undefined || (props.band !== true && sideways.has(event.key))) return;
     event.preventDefault();
     event.stopPropagation();
     act();
@@ -134,7 +144,7 @@ export function Rail(props: RailProps) {
       () => props.active,
       (active) => {
         if (!active) setLogOpen(false);
-        if (active && list !== undefined && !list.contains(document.activeElement)) {
+        if (active && list !== undefined && !list.contains(focusedIn(list))) {
           list.focus({ preventScroll: true });
         }
       },
@@ -149,6 +159,7 @@ export function Rail(props: RailProps) {
       tabIndex={-1}
       aria-label={railLabel}
       data-view={props.view ?? "now"}
+      data-band={props.band === true ? "" : undefined}
       aria-activedescendant={
         props.active && props.reading === undefined && (onHead() || current() !== undefined)
           ? railEntryId(onHead() ? yardIds.card : current()?.id)
@@ -222,7 +233,9 @@ export function Rail(props: RailProps) {
       </For>
       <Show when={!covered() && props.fold !== undefined && props.folded + (props.above ?? 0) > 0}>
         <p class="kw-yard-folded" style={rectStyle(props.fold)}>
-          {foldedLine(props.folded, props.above)}
+          {props.band === true
+            ? countedLine(props.folded + (props.above ?? 0))
+            : foldedLine(props.folded, props.above)}
         </p>
       </Show>
     </div>
@@ -232,12 +245,15 @@ export function Rail(props: RailProps) {
 function headLine(props: RailProps, onHead: boolean, logOpen: boolean): string {
   if (props.reading !== undefined) return readingHead(props.reading.title);
   if (logOpen) return decisionsHead;
+  if (props.active && !onHead && props.band === true) return bandHint;
   if (props.active && !onHead) return props.view === "trail" ? trailHint : railHint;
   const folded = props.foldedAway ?? [];
   if (props.heldBack > 0 || folded.length > 0) return awayLine(props.heldBack, folded);
   if (props.card !== undefined) return props.card.line;
   return props.entries.length === 0 ? emptyRail : railLabel;
 }
+
+const sideways: ReadonlySet<string> = new Set(["ArrowLeft", "ArrowRight"]);
 
 export function railEntryId(id: string | undefined): string {
   return `kw-yard-entry-${id ?? ""}`;
@@ -269,13 +285,39 @@ function RailCardView(props: RailCardViewProps) {
       style={rectStyle(props.rect)}
       onClick={() => props.onPick()}
     >
-      <span class="kw-yard-card-title">{props.entry.title}</span>
+      <span class="kw-yard-card-title" data-more={moreInTheGroup(props.entry.grouped)}>
+        <Show when={props.entry.agent}>
+          {(label) => (
+            <span
+              class="kw-yard-card-agent kw-agent-mark"
+              data-color={props.entry.agentColor}
+              role="img"
+              aria-label={label()}
+              title={label()}
+            >
+              {agentMark}
+            </span>
+          )}
+        </Show>
+        {props.entry.title}
+        <Show when={props.entry.tag}>
+          {(tag) => (
+            <span class="kw-yard-card-tag" title={tagTitle(tag())}>
+              {tag()}
+            </span>
+          )}
+        </Show>
+      </span>
       <span class="kw-yard-card-by">{props.entry.by}</span>
       <Show when={props.entry.why !== ""}>
         <span class="kw-yard-card-why">{props.entry.why}</span>
       </Show>
     </button>
   );
+}
+
+function moreInTheGroup(grouped: number | undefined): number | undefined {
+  return grouped !== undefined && grouped > 1 ? grouped - 1 : undefined;
 }
 
 export function rectStyle(rect: Rect | undefined): JSX.CSSProperties | undefined {

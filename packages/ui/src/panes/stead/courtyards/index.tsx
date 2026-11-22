@@ -9,6 +9,7 @@ import {
 } from "@keywork-app/habitat";
 import type { GardenKind } from "@keywork-app/habitat/render";
 import { createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
+import { inWindowOf } from "../../../surfaces/runtime/realm.ts";
 import { stateLabels } from "../copy.ts";
 import { defaultSkinId } from "../habitat-render.ts";
 import { coatOf } from "../herd.ts";
@@ -45,13 +46,14 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
       ),
   );
   const [appearance, setAppearance] = createSignal(0);
+  let overview: HTMLElement | undefined;
 
   onMount(() => {
     const repaint = (): void => void setAppearance((version) => version + 1);
     const stops = [
-      watchTheme(repaint),
-      watchMedia(forcedColorsQuery, repaint),
-      watchPixelRatio(repaint),
+      watchTheme(repaint, overview),
+      watchMedia(forcedColorsQuery, repaint, overview),
+      watchPixelRatio(repaint, overview ?? document),
     ];
     onCleanup(() => {
       for (const stop of stops) stop();
@@ -60,6 +62,7 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
 
   return (
     <section
+      ref={overview}
       class="kw-courtyards"
       aria-label="Courtyard overview"
       data-alignment={props.alignment ?? "roomy"}
@@ -127,19 +130,21 @@ export function CourtyardOverview(props: CourtyardOverviewProps) {
   );
 }
 
-function watchPixelRatio(repaint: () => void): () => void {
-  let stop = (): void => undefined;
-  const changed = (): void => {
-    stop();
-    stop = watchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`, changed);
-    repaint();
-  };
-  changed();
-  window.addEventListener("resize", changed);
-  return () => {
-    stop();
-    window.removeEventListener("resize", changed);
-  };
+function watchPixelRatio(repaint: () => void, pane: Node): () => void {
+  return inWindowOf(pane, (realm) => {
+    let stop = (): void => undefined;
+    const changed = (): void => {
+      stop();
+      stop = watchMedia(`(resolution: ${devicePixelRatioOf(pane)}dppx)`, changed, pane);
+      repaint();
+    };
+    changed();
+    realm.addEventListener("resize", changed);
+    return () => {
+      stop();
+      realm.removeEventListener("resize", changed);
+    };
+  });
 }
 
 function occupied(court: ReturnType<typeof courtyardsOf>[number]): Courtyard | undefined {

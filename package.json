@@ -32,6 +32,8 @@
     "screenshots": "bun run --cwd packages/ui screenshots",
     "compare:shots": "bun scripts/compare-shots.ts",
     "perf:screen": "bun scripts/textures/perf-screen.ts",
+    "perf:panes-outside": "node packages/desktop/e2e/surfaces/perf.mjs",
+    "check:panes-flicker": "node packages/desktop/e2e/surfaces/flicker.mjs",
     "smoke:first-light": "node packages/desktop/e2e/first-light/smoke.mjs"
   },
   "trustedDependencies": [

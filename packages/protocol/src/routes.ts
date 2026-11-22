@@ -15,13 +15,13 @@ import { modelRoutes } from "./models.ts";
 import { permissionRoutes } from "./permissions.ts";
 import { routineFileBody, routineRoutes } from "./routines.ts";
 import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
-import { showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
+import { placementsReportBody, showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workRoutes } from "./work.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.7.0";
 
-export const contractVersion = "1.32";
+export const contractVersion = "1.33";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -61,6 +61,7 @@ export const requestBodies: Readonly<Record<string, readonly string[]>> = {
   sendCreatureMessage: creatureMessageBody,
   answerSetting: showAnswerBody,
   openSetting: showOpeningBody,
+  reportPlacements: placementsReportBody,
 };
 
 export const routes = [

@@ -16,6 +16,7 @@ import { type ChunkQueue, chunkQueue } from "../shared/chunk-queue.ts";
 import { servesRendererPage } from "../shared/renderer-page.ts";
 import { companionHostPort } from "./companion-host.ts";
 import { isScreenSenderWindow, screenPort, startScreenSender } from "./screen.ts";
+import { surfacesPort } from "./surfaces.ts";
 import { pushWornTheme } from "./worn-theme.ts";
 
 const streams = new Map<number, ChunkQueue>();
@@ -193,6 +194,7 @@ else if (servesRendererPage(process.argv, location.href)) {
     ...consoleHost(),
     companion: companionHostPort(ipcRenderer),
     screen: screenPort(ipcRenderer),
+    surfaces: surfacesPort(ipcRenderer),
   });
   pushWornTheme(ipcRenderer);
 }

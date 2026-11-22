@@ -1,4 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { listenInEveryDocument } from "../surfaces/runtime/windows.ts";
 import { type CommandSpec, fuzzyScore } from "./commands.ts";
 import { matchRuns } from "./palette.tsx";
 import "./pane-tray.css";
@@ -51,8 +52,7 @@ export function PaneTray(props: PaneTrayProps) {
     const dismissOutside = (event: PointerEvent): void => {
       if (tray !== undefined && !tray.contains(event.target as Node)) props.onDismiss();
     };
-    document.addEventListener("pointerdown", dismissOutside, true);
-    onCleanup(() => document.removeEventListener("pointerdown", dismissOutside, true));
+    onCleanup(listenInEveryDocument("pointerdown", dismissOutside, true));
   });
   return (
     <div class="kw-tray" ref={tray} role="dialog" aria-label={`${props.paneName} commands`}>

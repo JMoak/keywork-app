@@ -4,6 +4,7 @@ import { redoLastUndo } from "../composer/undoable.ts";
 import { isTextField } from "../keys/typing.ts";
 import { type AskPick, askChoiceFor } from "../page/ask-card.tsx";
 import { askWhy, stopAskingWhy } from "../page/ask-card-why.ts";
+import { focusedWindow } from "../surfaces/runtime/windows.ts";
 import type { SessionStore } from "./session-store.ts";
 
 export interface HeldAsk {
@@ -62,5 +63,6 @@ export function onceOnlyNotice(approveKey: string): string {
 }
 
 function redoWhileTyping(): boolean {
-  return isTextField(document.activeElement) && redoLastUndo();
+  const page = focusedWindow().document;
+  return isTextField(page.activeElement) && redoLastUndo(page);
 }

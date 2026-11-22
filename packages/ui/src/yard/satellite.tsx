@@ -1,15 +1,16 @@
 import type { Placement, YardSetting } from "@keywork-app/habitat";
 import type { SettingSubject } from "@keywork-app/protocol";
-import { createMemo, createSignal, Match, onCleanup, onMount, Switch } from "solid-js";
-import { Dynamic } from "solid-js/web";
+import { createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { PaneFrame } from "../chrome/pane-frame.tsx";
 import type { Rect } from "../layout/index.ts";
-import { definitionOf, type PaneSpec, type ShellSeams } from "../panes/index.ts";
+import type { PaneSpec, ShellSeams } from "../panes/index.ts";
 import { watchInteractions } from "./attention.ts";
+import { agentMarkLabel } from "./copy.ts";
 import { linkOpened, panelShell } from "./openings.ts";
 import { followFocusOut, type YardPanels } from "./panels.ts";
 import { railEntryId, rectStyle } from "./rail.tsx";
 import { panelTitleOf, satelliteOf, satellitePaneId } from "./satellites.ts";
+import { SettingBody } from "./setting-body.tsx";
 
 export interface SatelliteSlotProps {
   placement: Placement;
@@ -95,41 +96,19 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
         focused={props.cursor || holdsFocus()}
         spawnRank={0}
         ribbon={props.by}
+        agent={props.setting.agent === undefined ? undefined : agentMarkLabel(props.setting.agent)}
+        agentColor={props.setting.agent?.color}
+        tag={props.setting.mark}
       >
-        <Switch>
-          <Match when={paneSpec()}>
-            {(spec) => (
-              <Dynamic
-                component={definitionOf(spec().kind).component}
-                id={paneId()}
-                spec={spec()}
-                focused={holdsFocus()}
-                shell={shell()}
-                onAction={(handler) => onCleanup(props.panels.handle(props.setting.id, handler))}
-              />
-            )}
-          </Match>
-          <Match when={satellite().kind === "note"}>
-            <p class="kw-yard-note" tabIndex={-1}>
-              {props.setting.what.ref}
-            </p>
-          </Match>
-          <Match when={satellite().kind === "link"}>
-            <p class="kw-yard-note" tabIndex={-1}>
-              <a
-                href={props.setting.what.ref}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(event) => {
-                  event.preventDefault();
-                  void props.shell.host.openExternal(props.setting.what.ref);
-                }}
-              >
-                {props.setting.what.ref}
-              </a>
-            </p>
-          </Match>
-        </Switch>
+        <SettingBody
+          paneId={paneId()}
+          setting={props.setting}
+          shown={satellite().kind}
+          pane={paneSpec()}
+          focused={holdsFocus()}
+          shell={shell()}
+          onAction={(handler) => onCleanup(props.panels.handle(props.setting.id, handler))}
+        />
       </PaneFrame>
     </div>
   );

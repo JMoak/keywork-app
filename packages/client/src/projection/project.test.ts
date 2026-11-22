@@ -427,6 +427,26 @@ describe("project", () => {
   });
 });
 
+describe("a setting taken back", () => {
+  it("is named by the title show gave it, not by its id", () => {
+    const id = "b445d1c2-0f6e-4a55-9a0e-1c2d3e4f5a6b";
+    const asked = (callId: string, name: string, args: Record<string, unknown>) =>
+      at("tool.started", { call: { type: "tool-call", callId, name, arguments: args } });
+    const answer = `Set out as a card.
+To set out what grows from it, name ${id} as from.`;
+    const state = projectAll(emptyProjection, [
+      asked("s1", "show", { what: { kind: "note", ref: "n1", title: "One more thing" } }),
+      at("tool.finished", { callId: "s1", output: answer, isError: false }),
+      asked("w1", "withdraw", { id }),
+      asked("w2", "withdraw", { id: "some-other-id" }),
+    ]);
+    const subjects = state.entries.flatMap((entry) =>
+      entry.kind === "tool" ? [entry.run.subject] : [],
+    );
+    expect(subjects).toEqual(["note · One more thing", "note · One more thing", "some-other-id"]);
+  });
+});
+
 describe("coalesceEnvelopes", () => {
   it("projects to the same transcript whether deltas arrive one by one or merged per frame", () => {
     const stream = [

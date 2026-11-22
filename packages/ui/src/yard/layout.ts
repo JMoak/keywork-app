@@ -2,12 +2,16 @@ import {
   defaultHub,
   foldedOf,
   hiddenInPlots,
+  holdsARailBeside,
+  hubBeneathTheBand,
   type MotionPrefs,
   overlaps,
   type Placement,
   type PlotCard,
   placeYard,
   plotCardsOf,
+  type RailRects,
+  railAlongTheTop,
   rankOf,
   stillShown,
   type YardSetting,
@@ -40,6 +44,7 @@ export interface RailLayout {
   readonly cards: readonly Placement[];
   readonly fold: Rect | undefined;
   readonly folded: number;
+  readonly band: boolean;
 }
 
 export function yardLayout(input: YardLayoutInput): YardLayout {
@@ -48,7 +53,9 @@ export function yardLayout(input: YardLayoutInput): YardLayout {
     (setting) => onTheLadder(setting) && !hidden.has(setting.id),
   );
   const plots = plotCardsOf(input.settings);
-  const hub = hubFor(input.viewport, ladder, plots.length > 0 || input.railWanted);
+  const railShows = ladder.length > 0 || plots.length > 0 || input.railWanted;
+  const hub = hubFor(input.viewport, ladder, railShows);
+  const band = railShows ? railAlongTheTop(input.viewport, hub) : undefined;
   const placements = placeYard({
     viewport: input.viewport,
     hub,
@@ -69,7 +76,7 @@ export function yardLayout(input: YardLayoutInput): YardLayout {
   const folded = foldedOf(placements, input.settings);
   return {
     hub: placements.find((placement) => placement.id === yardIds.hub)?.rect ?? hub,
-    rail: railOf(placements, cards, folded.length, hub, input.railWanted),
+    rail: railOf(placements, cards, folded.length, input.railWanted, { hub, band }),
     satellites,
     selectable: [...placed, ...folded],
   };
@@ -112,10 +119,13 @@ export function onTheLadder(setting: YardSetting): boolean {
   return stillShown(setting) && reaches(setting.shown, "card");
 }
 
-function hubFor(viewport: Rect, ladder: readonly YardSetting[], railWanted: boolean): Rect {
+function hubFor(viewport: Rect, ladder: readonly YardSetting[], railShows: boolean): Rect {
+  if (railShows && !holdsARailBeside(viewport)) {
+    const beneath = hubBeneathTheBand(viewport);
+    if (railAlongTheTop(viewport, beneath) !== undefined) return beneath;
+  }
   if (ladder.some((setting) => reaches(setting.shown, "unfold"))) return defaultHub(viewport);
-  if (ladder.length > 0 || railWanted) return besideTheRail(viewport);
-  return viewport;
+  return railShows ? besideTheRail(viewport) : viewport;
 }
 
 function besideTheRail(viewport: Rect): Rect {
@@ -123,24 +133,32 @@ function besideTheRail(viewport: Rect): Rect {
   return { ...viewport, width: Math.max(0, viewport.width - margin - rail.width - gap) };
 }
 
+interface RailRoom {
+  readonly hub: Rect;
+  readonly band: RailRects | undefined;
+}
+
 function railOf(
   placements: readonly Placement[],
   cards: readonly Placement[],
   folded: number,
-  hub: Rect,
   railWanted: boolean,
+  { hub, band }: RailRoom,
 ): RailLayout | undefined {
   const head = placements.find((placement) => placement.id === yardIds.card)?.rect;
   const fold = placements.find((placement) => placement.id === yardIds.fold)?.rect;
-  if (head === undefined) return railWanted ? emptyRailBeside(hub) : undefined;
+  if (head === undefined) return railWanted ? emptyRail(hub, band) : undefined;
   const parts = [head, ...cards.map((card) => card.rect), ...(fold === undefined ? [] : [fold])];
-  return { region: boundsOf(parts), head, cards, fold, folded };
+  const region = band?.region ?? boundsOf(parts);
+  return { region, head, cards, fold, folded, band: band !== undefined };
 }
 
-function emptyRailBeside(hub: Rect): RailLayout {
+function emptyRail(hub: Rect, band: RailRects | undefined): RailLayout {
   const { gap, rail } = yardMetrics;
-  const head = { x: hub.x + hub.width + gap, y: hub.y, width: rail.width, height: rail.head };
-  return { region: head, head, cards: [], fold: undefined, folded: 0 };
+  const beside = { x: hub.x + hub.width + gap, y: hub.y, width: rail.width, height: rail.head };
+  const head = band?.head ?? beside;
+  const region = band?.region ?? beside;
+  return { region, head, cards: [], fold: undefined, folded: 0, band: band !== undefined };
 }
 
 function boundsOf(rects: readonly Rect[]): Rect {

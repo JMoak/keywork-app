@@ -43,6 +43,9 @@ export interface TitleRowProps {
   pinned?: boolean | undefined;
   quiet?: boolean | undefined;
   ribbon?: string | undefined;
+  agent?: string | undefined;
+  agentColor?: string | undefined;
+  tag?: string | undefined;
   themeMark?: ThemeMark | undefined;
   instruments?: InstrumentTier | undefined;
   onGauge?: (() => void) | undefined;
@@ -52,6 +55,12 @@ export const focusMark = "▎";
 export const paneMark = "▣";
 export const quietMark = "»";
 export const pinMark = "◆";
+
+export const agentMark = "■";
+
+export function tagTitle(tag: string): string {
+  return `marked ${tag}`;
+}
 
 export function titleZones(tier: WidthTier, focused: boolean): ReadonlySet<TitleZone> {
   switch (tier) {
@@ -113,9 +122,29 @@ export function TitleRow(props: TitleRowProps) {
           {pinMark}
         </span>
       </Show>
+      <Show when={props.agent}>
+        {(label) => (
+          <span
+            class="kw-frame-agent kw-agent-mark"
+            data-color={props.agentColor}
+            role="img"
+            aria-label={label()}
+            title={label()}
+          >
+            {agentMark}
+          </span>
+        )}
+      </Show>
       <h2 class="kw-frame-name" title={props.name} data-state={props.state}>
         {props.name}
       </h2>
+      <Show when={props.tag}>
+        {(tag) => (
+          <span class="kw-frame-tag" title={tagTitle(tag())}>
+            {tag()}
+          </span>
+        )}
+      </Show>
       <Show when={shown("arc", props.arc)}>{(slug) => <ArcTag slug={slug()} />}</Show>
       <span class="kw-frame-detail">
         <Show when={shown("bot", props.bot)}>{(bot) => <BotIdentity bot={bot()} />}</Show>

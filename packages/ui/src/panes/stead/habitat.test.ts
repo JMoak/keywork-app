@@ -1,4 +1,10 @@
-import { creatureReading, type HabitatState, type Thread } from "@keywork-app/habitat";
+import {
+  creatureReading,
+  type HabitatState,
+  localTime,
+  skyAt,
+  type Thread,
+} from "@keywork-app/habitat";
 import type {
   BotSummary,
   BusEnvelope,
@@ -10,8 +16,16 @@ import type {
 import { type Accessor, createRoot, createSignal } from "solid-js";
 import { createStore, reconcile, type SetStoreFunction } from "solid-js/store";
 import { describe, expect, it } from "vitest";
+import { clockWord } from "../../chrome/clock-word.ts";
 import { residents } from "../../companion/feed.ts";
-import { createHabitatState, readEveryField, seatCreatures, withQueuedAsks } from "./habitat.ts";
+import {
+  clockOffsetMinutes,
+  createHabitatState,
+  houseOffsetMinutes,
+  readEveryField,
+  seatCreatures,
+  withQueuedAsks,
+} from "./habitat.ts";
 
 const now = Date.parse("2026-11-06T06:23:10.000Z");
 
@@ -311,3 +325,14 @@ function gatePermission(id: number, callId: string): BusEnvelope {
     },
   } as BusEnvelope;
 }
+
+describe("the house's clock", () => {
+  it("puts an afternoon in New York in daylight for the sky, the world and the printed clock alike", () => {
+    const newYork = { getTimezoneOffset: () => 300 } as Date;
+    const afternoon = Date.parse("2026-11-20T19:30:00.000Z");
+    const house = houseOffsetMinutes(newYork);
+    expect(skyAt(afternoon, house).phase).toBe("day");
+    expect(localTime(afternoon, house)).toMatchObject({ dayKey: "2026-11-20", hour: 14.5 });
+    expect(clockWord(afternoon, clockOffsetMinutes(newYork))).toBe("14:30");
+  });
+});

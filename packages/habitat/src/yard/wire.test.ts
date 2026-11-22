@@ -56,6 +56,26 @@ describe("show settings in the habitat", () => {
     expect(Object.keys(yardOf(state).settings)).toEqual(["b"]);
   });
 
+  it("changes a setting's mark in place, keeping the rung it shows, and ignores one it never saw", () => {
+    const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
+      a: { shown: "card", depth: 2 },
+    });
+    const changed = (state: HabitatState, setting: Setting): HabitatState =>
+      project(state, {
+        id: 2,
+        ts: later,
+        sessionId: setting.sessionId,
+        type: "show.changed",
+        payload: { setting },
+      });
+
+    const marked = changed(decided, aSetting({ id: "a", mark: "chosen" }));
+    expect(yardOf(marked).settings.a).toMatchObject({ shown: "card", depth: 2, mark: "chosen" });
+    expect(yardOf(changed(marked, aSetting({ id: "a" }))).settings.a).not.toHaveProperty("mark");
+    const unseen = changed(decided, aSetting({ id: "b", mark: "chosen" }));
+    expect(yardOf(unseen).settings).toEqual(yardOf(decided).settings);
+  });
+
   it("keeps the rung a setting shows when its proposal is replayed", () => {
     const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
       a: { shown: "card", depth: 2 },
