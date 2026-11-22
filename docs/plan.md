@@ -2488,17 +2488,22 @@ the camera (quarter turns, corner rests, level and raised eyes), a draw-list bui
 world into ordered quads with affine matrices, the sky backdrop and the drifting night lights, hit
 testing, stable workshop slots, sketch-ordered roads with caller-given grades, project buildings
 that stack and grow floors, and `scene.ts`, a pure function from habitat state to a world. Kits
-own shapes and colours: `kits/sketch/` holds the construction the three sketch styles share and
-`kits/neon`, `kits/lantern` and `kits/terrace` each add a style and one colour module; art stays
-indexed, and only the pane ground comes from the app theme. `raster.ts` is a software rasteriser
+own shapes and colours: `kits/sketch/` holds the construction the sketch styles share and
+`kits/neon`, `kits/lantern`, `kits/terrace` and `kits/deco` each add a style and one colour module;
+art stays indexed, and only the pane ground comes from the app theme. `raster.ts` is a software rasteriser
 whose alpha blending matches Chrome's canvas, so stills compare pixel for pixel with the sketch.
 `packages/ui/src/panes/stead/block/` paints the same draw list with Canvas 2D under the stead's
 power tiers, turns on the pane's left and right keys, and reports what is under the pointer.
 `VITE_STEAD_BLOCK_WORLD=1` at build or dev time shows it in place of the strip; unset, nothing
 differs. `BLOCK_SHOTS=update bun run test` writes stills to `artifacts/shots/block-world/stills`.
 
-An idle or napping creature rests by its own door; one in four, by seed, stands on the green's five
-fixed spots, which never overlap. Each directory a creature has worked in is a project building on
+The creatures in the town are the sketch's six generated figures (folio, tessera, cairn, purl, hush,
+knot, about 26 by 22) and its hand-made kid, held as indexed rows in `block/figure-art.ts` and drawn in
+the creature's own ramp (`hue.d` to `hue.h`, with `paper` and `ink`). Every skin the app has names its
+figure in `figureOfSkin`: kid, tessera and cairn their own, carter, joiner and placeholder the neutral
+figure, as is any skin the app does not know; a skin named for one of the six draws that figure.
+An idle or napping creature rests by its own door; one in four, by seed, stands on the green's four
+fixed spots, which never overlap, beside the well and the monument where the sketch puts them. Each directory a creature has worked in is a project building on
 its plot: a conversation belongs to a creature by its session's `bot`, and its directory is the
 `cwd` of its session detail, read once per conversation (`block/places.ts`) because the session
 list does not carry it. Floors double: one for one or two conversations, one more per doubling, at
@@ -2516,11 +2521,51 @@ profile and threads at the shelf, and its chores at the board; a project buildin
 pane at its directory when that lies in the workspace, and says so when it does not; the house,
 storehouse and mill open the desk, the sessions and the mills.
 
-Not done: walkers and roads between creatures need the engine's counts of who works with whom (the
-scene takes them as input); decorations have no earning rule; the map of machines; a fourth kit
-authored outside the sketch; the tracked-file count is not drawn. A creature has seven building
-spots, so its eighth directory onward has no building. Server lane: `cwd` on the session list
-would replace one detail read per conversation.
+Roads come from real hand-offs (contract 1.36, engine 0.10.0, built and not yet released). The app
+reads `GET /creature-handoffs` once when the stead opens and follows `creature.handoff` after it
+(`block/handoffs.ts` in the stead; `listCreatureHandoffs` on the client); a change that arrives
+before the cold start answers is applied on top of it, and one older than the row held is ignored.
+Each pair's two directions are added together: a trodden path from 1, a cart track from 5, a paved
+road with lamps from 20 (`handoffsFor` in `habitat/src/block/handoffs.ts`, the one place those
+numbers live; not yet ruled on). Every workshop keeps its path to the porch, and a creature walking
+home with a crate takes its busiest road. When the engine drops a pair (it does so only when a
+creature is removed), the road between them is taken up: a stretch only that road used goes back to
+grass, a stretch it shared falls to the best road still using it (the porch paths stay trodden), and
+its lamps go where no other paved road meets (`droppedPairTakesItsRoadUp` in the same module is the one
+switch for this; not yet ruled on). The removed creature's workshop stays, boarded, with its own path
+to the porch. Switched off, the stead never asks for the tally.
+
+Art Deco is a fourth kit, chosen by the same kit buttons as the other three: jade stone walls with
+brass pilasters and columns of amber windows, a fanned door, a blade sign by the door in the
+creature's colour, a chevron cornice under a stepped crown with a sunburst and a pennant finial, an
+attic lit while a child thread runs, a brass inlay and stepped lamps on paved roads, a fountain and
+a tree in a planter, brass mill blades and the sun's rays. A style is a set of parts with fixed
+jobs; the kit interface grew so any kit can supply them: `Kit.project` builds a project stage,
+an `Annex` names what it is (the awning, the blade sign, the porch, a lantern), `KitColours.orbRays`
+asks the sky for rays, and the sketch construction takes the style flags `roof: "step"`, `piers`,
+`stone`, `blade` and `inlay` with the `trim` colour family. Neon and Terrace still have no place
+for a child at work, as the sheet says. Deco's reward gold is the gold every kit shares (the kit
+test holds it the same everywhere), not the brighter gold the sheet gives Deco by night.
+
+The six project stages (shack, shed, house, tower, high-rise, skyscraper) are built by every kit
+(`kits/sketch/projects.ts`; Deco adds a chevron cornice at each setback and its sunburst crown)
+and drawn in stills as the sheet's ladder, from the front and from a corner
+(`ladderWorld` in `block/testing.ts`). They are assets only: no stage stands in the town and none is
+connected to real data, because where a project stands is not designed yet.
+
+Compared pixel for pixel with the refreshed sketch in a headless Chromium (the sketch's own
+renderer at 1008 by 580): Neon and Terrace match 38 of 40 town views by night and by day and Lantern
+33 of 40, as before; every kit's ladder matches from the front. Deco matches 15 of 42 by day: every
+level view but five in the towns of 9 and 16, where the sketch lights an idle creature's attic from
+its random cast and the app only while a child thread runs. Its raised views differ only along the brass rim of each
+crown's top and the road inlay: tops are drawn at half resolution so every pixel rests whole, and
+the sheet draws those lines half a pixel thin. By night Deco differs as well on every gold pixel; with
+the sheet's own gold it matches as by day. Lantern towns of 9 and 16 differ by one gable window for
+the same loft reason, a town of one by under 72 pixels, and corner views along rotated face edges.
+
+Not done: decorations have no earning rule; the map of machines; the tracked-file count is not drawn. A creature has seven building spots, so its eighth
+directory onward has no building. Four of the six figures (folio, purl, hush, knot) have no skin in
+the app yet. Server lane: `cwd` on the session list would replace one detail read per conversation.
 
 ## What is deliberately not in this plan
 

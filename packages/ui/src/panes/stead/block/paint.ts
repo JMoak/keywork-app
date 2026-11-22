@@ -68,8 +68,10 @@ export function paintPicture(
     const colour = palette.colourOf(rect.role, undefined);
     if (colour === undefined) continue;
     context.fillStyle = rect.dither ? (dither(context, colour, view.scale) ?? colour) : colour;
+    context.globalAlpha = rect.alpha ?? 1;
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
+  context.globalAlpha = 1;
   for (const quad of picture.list.quads) {
     context.setTransform(...deviceMatrix(quad, view.scale, picture.list.atRest));
     if ("fill" in quad.paint) {

@@ -1,5 +1,6 @@
 import type { Kit } from "../../kit.ts";
 import { sketchKit } from "../sketch/kit.ts";
+import { plainStyle } from "../sketch/style.ts";
 import { terraceColours } from "./colours.ts";
 
 export const terraceKit: Kit = sketchKit(
@@ -14,6 +15,7 @@ export const terraceKit: Kit = sketchKit(
     antenna: false,
     awning: true,
     plants: true,
+    ...plainStyle,
   },
   terraceColours,
 );

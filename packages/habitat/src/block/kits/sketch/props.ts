@@ -2,25 +2,31 @@ import type { Construction, PropSpec, SpriteArt } from "../../kit.ts";
 import type { Part } from "../../model.ts";
 import type { Role } from "../../texture.ts";
 import { anchored, box, filled, type Paint, placed, sameSides, spriteOf } from "./shapes.ts";
+import type { SketchStyle } from "./style.ts";
 
 export const sailSteps = 8;
 export const driftTicks = 8;
 
-export function propOf(spec: PropSpec): Construction {
-  switch (spec.kind) {
-    case "crate":
-      return { parts: [crate(0, 0)], reach: 0 };
-    case "monument":
-      return spec.tier === 0
-        ? { parts: [], reach: 0 }
-        : { parts: [placed(spec.tier === 1 ? stone() : statue(), 0, 0, 0)], reach: 0 };
-    case "tree":
-      return { parts: [placed(tree(), 0, 0, 0)], reach: 0 };
-    case "well":
-      return { parts: [placed(well(), 0, 0, 0)], reach: 0 };
-    case "road-lamp":
-      return { parts: [placed(roadLamp(spec.lit), 0, 0, 0)], reach: 0 };
-  }
+export function propsOf(style: SketchStyle): (spec: PropSpec) => Construction {
+  return (spec) => {
+    switch (spec.kind) {
+      case "crate":
+        return { parts: [crate(0, 0)], reach: 0 };
+      case "monument":
+        return spec.tier === 0
+          ? { parts: [], reach: 0 }
+          : { parts: [placed(spec.tier === 1 ? stone() : statue(), 0, 0, 0)], reach: 0 };
+      case "tree":
+        return { parts: [placed(style.piers ? planter() : tree(), 0, 0, 0)], reach: 0 };
+      case "well":
+        return { parts: [placed(style.piers ? fountain() : well(), 0, 0, 0)], reach: 0 };
+      case "road-lamp":
+        return {
+          parts: [placed(style.piers ? steppedLamp(spec.lit) : roadLamp(spec.lit), 0, 0, 0)],
+          reach: 0,
+        };
+    }
+  };
 }
 
 export function crate(x: number, z: number): Part {
@@ -189,23 +195,74 @@ export function well(): SpriteArt {
   ]);
 }
 
-export function sails(turning: "still" | "drift" | "quick"): SpriteArt {
+export function planter(): SpriteArt {
+  return spriteOf([
+    anchored("planter", -6, -31, 12, 31, (put) => {
+      put(-4, -4, 8, 4, "stone");
+      put(-4, -5, 8, 1, "trim");
+      put(-1, -3, 2, 1, "trim");
+      put(0, -13, 1, 8, "woodDk");
+      put(-3, -31, 6, 3, "leafHi");
+      put(-5, -28, 10, 5, "leafHi");
+      put(-6, -23, 12, 6, "leaf");
+      put(-5, -17, 10, 4, "leafLo");
+      put(-3, -26, 2, 2, "leaf");
+      put(2, -21, 2, 2, "leafHi");
+    }),
+  ]);
+}
+
+export function fountain(): SpriteArt {
+  return spriteOf(
+    [0, 1].map((spray) =>
+      anchored(`fountain|${spray}`, -7, -15, 14, 15, (put) => {
+        put(-7, -3, 14, 3, "stone");
+        put(-7, -4, 14, 1, "trim");
+        put(-6, -3, 12, 1, "glint");
+        put(-1, -9, 2, 6, "stone");
+        put(-3, -10, 6, 1, "trim");
+        put(-2, -11, 4, 1, "stone");
+        put(0, -14, 1, 3, "trim");
+        put(-1, -15, 3, 1, "trim");
+        put(-4, -9 + spray, 1, 2, "glint");
+        put(3, -8 - spray, 1, 2, "glint");
+      }),
+    ),
+    [0, 0, 0, 0, 1, 1, 1, 1],
+  );
+}
+
+export function steppedLamp(lit: boolean): SpriteArt {
+  return spriteOf([
+    anchored(`stepped-lamp|${lit}`, -2, -17, 5, 17, (put) => {
+      put(-1, -1, 3, 1, "trim");
+      put(0, -11, 1, 10, "trimLo");
+      put(-2, -11, 5, 1, "trim");
+      put(-1, -15, 3, 4, lit ? "lamp" : "glint");
+      put(-2, -16, 5, 1, "trim");
+      put(-1, -17, 3, 1, "trim");
+      if (lit) put(0, -14, 1, 2, "lampHi");
+    }),
+  ]);
+}
+
+export function sails(turning: "still" | "drift" | "quick", cloth: Role = "plaster"): SpriteArt {
   const steps = turning === "still" ? 1 : sailSteps;
   const frames = Array.from({ length: steps }, (_, step) =>
-    anchored(`sails|${step}`, -22, -22, 45, 45, (put) => {
+    anchored(`sails|${cloth}|${step}`, -22, -22, 45, 45, (put) => {
       const angle = (step * Math.PI) / 16;
       for (let arm = 0; arm < 4; arm += 1) {
         const theta = angle + (arm * Math.PI) / 2;
         const c = Math.cos(theta);
         const s = Math.sin(theta);
         for (let reach = 5; reach <= 18; reach += 1) {
-          for (let cloth = 1; cloth <= 3; cloth += 1) {
+          for (let across = 1; across <= 3; across += 1) {
             put(
-              Math.round(c * reach - s * cloth),
-              Math.round(s * reach + c * cloth),
+              Math.round(c * reach - s * across),
+              Math.round(s * reach + c * across),
               1,
               1,
-              "plaster",
+              cloth,
             );
           }
         }

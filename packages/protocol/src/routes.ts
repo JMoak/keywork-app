@@ -19,9 +19,9 @@ import { placementsReportBody, showAnswerBody, showOpeningBody, showRoutes } fro
 import { workRoutes } from "./work.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.9.0";
+export const protocolVersion = "0.10.0";
 
-export const contractVersion = "1.35";
+export const contractVersion = "1.36";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);

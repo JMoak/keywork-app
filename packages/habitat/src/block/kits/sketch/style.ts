@@ -1,7 +1,7 @@
 import { sketchRandom, truncated } from "./shapes.ts";
 
 export interface SketchStyle {
-  readonly roof: "gable" | "flat";
+  readonly roof: "gable" | "flat" | "step";
   readonly frames: boolean;
   readonly ribbon: boolean;
   readonly ownLight: boolean;
@@ -9,7 +9,18 @@ export interface SketchStyle {
   readonly antenna: boolean;
   readonly awning: boolean;
   readonly plants: boolean;
+  readonly piers: boolean;
+  readonly stone: boolean;
+  readonly blade: boolean;
+  readonly inlay: boolean;
 }
+
+export const plainStyle = {
+  piers: false,
+  stone: false,
+  blade: false,
+  inlay: false,
+} as const satisfies Partial<SketchStyle>;
 
 export interface Bearing {
   readonly seed: number;

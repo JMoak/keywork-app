@@ -1,3 +1,4 @@
+import { type FigureArt, figureArts, neutralFigure } from "./figure-art.ts";
 import type { Part, Sprite } from "./model.ts";
 import {
   type IndexedTexture,
@@ -7,183 +8,22 @@ import {
   textureMemo,
 } from "./texture.ts";
 
-export interface FigureArt {
-  readonly name: string;
-  readonly rows: readonly string[];
-  readonly hover: number;
-}
-
-export const neutralFigure: FigureArt = {
-  name: "neutral",
-  hover: 0,
-  rows: [
-    "...ooooo...",
-    "..obbblllo.",
-    ".obbbbbbllo",
-    ".obbbbbbbbo",
-    "obbebbbbebo",
-    "obbbbbbbbbo",
-    "obbbbbbbbbo",
-    "odbbbbbbbdo",
-    ".odbbbbbdo.",
-    "..odddddo..",
-    "..oo...oo..",
-  ],
-};
-
-export const figureArts: Readonly<Record<string, FigureArt>> = {
-  kid: {
-    name: "kid",
-    hover: 0,
-    rows: [
-      "o...........o",
-      "oo.........oo",
-      ".oo.......oo.",
-      "..ooooooooo..",
-      ".obbbbbbbbbo.",
-      "obbbbbbbbbblo",
-      "obbebbbbebblo",
-      "obbbbllbbbbbo",
-      ".obbbllbbbbo.",
-      "..ooooooooo..",
-      "...okkkkko...",
-      "..obkkkkkbo..",
-      "..obkkkkkbo..",
-      "...okkkkko...",
-      "...ob...bo...",
-      "...oo...oo...",
-    ],
-  },
-  cairn: {
-    name: "cairn",
-    hover: 2,
-    rows: [
-      "....ooooo....",
-      "...ollgbbo...",
-      "....oobbo....",
-      ".....ooo.....",
-      "..ooooooooo..",
-      ".olllbbbbbbo.",
-      ".olboooobbdo.",
-      ".obbo...obdo.",
-      ".obboooobddo.",
-      ".odbbbbbbddo.",
-      "..ooooooooo..",
-      ".....ooo.....",
-      "....obbbo....",
-      "....oddo.....",
-      ".....oo......",
-    ],
-  },
-  tessera: {
-    name: "tessera",
-    hover: 0,
-    rows: [
-      "....ooooooo....",
-      "..oollllllboo..",
-      ".olllbblbbbbbo.",
-      "olllbbbobbbbbbo",
-      "olbbhhbobbhhbbo",
-      "obbbhhbobbhhbdo",
-      "obbbbbbobbbbddo",
-      "oodddddddddddoo",
-      ".ooeobbbbboeoo.",
-      ".o.oo.....oo.o.",
-      ".o..o.....o..o.",
-    ],
-  },
-  folio: {
-    name: "folio",
-    hover: 0,
-    rows: [
-      ".....o.....",
-      "....olo....",
-      "...ollho...",
-      "..olllhho..",
-      ".ollldhhho.",
-      ".ollldhhho.",
-      "olllbdbhhho",
-      "ollbbdbbhho",
-      "olbebdbebho",
-      "obbbbdbbbbo",
-      ".obbbdbbbo.",
-      "..obbdbbo..",
-      "...oodoo...",
-      "....odo....",
-      "...oo.oo...",
-      "...o...o...",
-    ],
-  },
-  purl: {
-    name: "purl",
-    hover: 0,
-    rows: [
-      "...ooooooo...",
-      "..obbbblllo..",
-      ".obllbbbbllo.",
-      "obbbbllbbbblo",
-      "obbebbbbbebbo",
-      "obbbbbbbbbbbo",
-      "odbbllbbllbdo",
-      ".oodbbbbbdoo.",
-      ".obo.obo.obo.",
-      ".obo.obo.obo.",
-      ".odo.odo.odo.",
-      "..o...o...o..",
-    ],
-  },
-  hush: {
-    name: "hush",
-    hover: 3,
-    rows: [
-      "...oooooo...",
-      "..obbllbbo..",
-      ".obboooolbo.",
-      "obboccccoblo",
-      "oboccccccobo",
-      "oboccacccobo",
-      "obocccaccobo",
-      "obboccccobbo",
-      ".obboooobbo.",
-      "..obbbbbbo..",
-      "...oooooo...",
-    ],
-  },
-  knot: {
-    name: "knot",
-    hover: 2,
-    rows: [
-      "...oooooo...",
-      "..obbllllo..",
-      ".obboooobbo.",
-      ".obo....obo.",
-      ".obo....obo.",
-      ".obbo..obbo.",
-      "..obboobbo..",
-      "...obbbbo...",
-      "..obboobbo..",
-      ".obbo..obbo.",
-      "obbo....obbo",
-      "ooo......ooo",
-    ],
-  },
-};
+export { type FigureArt, figureArts, neutralFigure };
 
 export const figureOfSkin: Readonly<Record<string, string>> = {
   kid: "kid",
-  cairn: "cairn",
   tessera: "tessera",
-  folio: "folio",
-  purl: "purl",
-  hush: "hush",
-  knot: "knot",
+  cairn: "cairn",
+  carter: neutralFigure.name,
+  joiner: neutralFigure.name,
+  placeholder: neutralFigure.name,
 };
 
 export type Doing = "work" | "porch" | "walk" | "nap" | "idle" | "blocked" | "sit";
 
 export function figureFor(skin: string | undefined): FigureArt {
-  const name = skin === undefined ? undefined : figureOfSkin[skin];
-  return (name === undefined ? undefined : figureArts[name]) ?? neutralFigure;
+  const name = skin === undefined ? undefined : (ownEntry(figureOfSkin, skin) ?? skin);
+  return (name === undefined ? undefined : ownEntry(figureArts, name)) ?? neutralFigure;
 }
 
 export function critterParts(figure: FigureArt, doing: Doing, order: number): Part[] {
@@ -202,9 +42,11 @@ const figureLegend: Readonly<Record<string, string>> = {
   o: "ink",
   e: "ink",
   d: "hue.d",
+  m: "hue.m",
   b: "hue.b",
   l: "hue.l",
   h: "hue.h",
+  w: "paper",
   k: "wood",
   c: "slateDk",
   a: "lamp",
@@ -371,4 +213,8 @@ function spark(figure: FigureArt, order: number): Sprite {
     phase: 0,
     rest: 0,
   };
+}
+
+function ownEntry<T>(record: Readonly<Record<string, T>>, key: string): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
 }

@@ -1,9 +1,11 @@
 import type {
+  Annex,
   Construction,
   Crowning,
   Glow,
   HouseSpec,
   MillSpec,
+  ProjectSpec,
   ShedSpec,
   StorehouseSpec,
   WallMeaning,
@@ -12,6 +14,8 @@ import type {
 } from "../../kit.ts";
 import { along, type Footprint, type Part, type Side } from "../../model.ts";
 import { mixedRole, type Role } from "../../texture.ts";
+import { bladeSign, corniceHeight, finial, steppedCap, sunburst } from "./deco.ts";
+import { project } from "./projects.ts";
 import { antenna, bell, chimneyPaint, flag, sails, smoke, star, vane } from "./props.ts";
 import { roofParts, stepHeight } from "./roofs.ts";
 import {
@@ -30,6 +34,7 @@ import { type DoorRoles, faces, type Wall, wallKey, wallPaint } from "./walls.ts
 
 export const storeyHeight = 18;
 export const towerFloor = 8;
+export const houseFinialOrder = 5;
 
 export interface Builders {
   workshop(spec: WorkshopSpec): WorkshopConstruction;
@@ -37,6 +42,7 @@ export interface Builders {
   storehouse(spec: StorehouseSpec): Construction;
   mill(spec: MillSpec): Construction;
   shed(spec: ShedSpec): Construction;
+  project(spec: ProjectSpec): Construction;
 }
 
 export function buildersOf(style: SketchStyle): Builders {
@@ -46,10 +52,22 @@ export function buildersOf(style: SketchStyle): Builders {
     storehouse: (spec) => storehouse(style, spec),
     mill: (spec) => mill(style, spec),
     shed: (spec) => shed(style, spec),
+    project: (spec) => project(style, spec),
   };
 }
 
-const identityDoor: DoorRoles = { fill: "hue.b", light: "hue.l", shadow: "hue.d" };
+const identityDoor: DoorRoles = {
+  fill: "hue.b",
+  light: "hue.l",
+  shadow: "hue.d",
+  fan: "hue.l",
+  fanLit: "hue.h",
+};
+
+const slateFan = {
+  fan: mixedRole("slate", "paper", 0.3),
+  fanLit: mixedRole("slate", "paper", 0.62),
+} as const;
 
 const meaningFaces: Readonly<Record<WallMeaning, number>> = {
   door: faces.door,
@@ -62,11 +80,12 @@ function plainWall(style: SketchStyle): Omit<Wall, "face"> {
   return {
     base: "plaster",
     plank: undefined,
-    frame: "timber",
+    frame: framed(style, "timber"),
     foot: "timberDk",
-    sill: "timberDk",
+    sill: style.piers ? "trim" : "timberDk",
     frames: style.frames,
     ribbon: style.ribbon,
+    piers: style.piers,
     storeys: 1,
     storeyHeight,
     lit: false,
@@ -84,6 +103,16 @@ function plainWall(style: SketchStyle): Omit<Wall, "face"> {
     garland: false,
     banner: 0,
   };
+}
+
+function framed(style: SketchStyle, frame: Role): Role {
+  return style.piers ? "trimLo" : frame;
+}
+
+function walled(style: SketchStyle, wood: boolean): { base: Role; plank: Role | undefined } {
+  return wood && !style.stone
+    ? { base: "wood", plank: "woodDk" }
+    : { base: "plaster", plank: undefined };
 }
 
 function lightOf(style: SketchStyle, own: boolean): { colour: Role; high: Role } {
@@ -131,6 +160,11 @@ function workshop(style: SketchStyle, spec: WorkshopSpec): WorkshopConstruction 
     parts.push(flat.slab);
     crown = flat.crown;
     top = height + 20;
+  } else if (style.roof === "step") {
+    const stepped = steppedRoof(footprint, height, spec);
+    parts.push(...stepped.parts);
+    crown = stepped.crown;
+    top = stepped.top;
   } else {
     const steps = roofParts({
       x0: x0 - 2,
@@ -157,7 +191,10 @@ function workshop(style: SketchStyle, spec: WorkshopSpec): WorkshopConstruction 
     if (spec.star) parts.push(placed(star(), bearing.roof === "hip" ? 4 : 0, top, 0));
     top += 10;
   }
-  const annexes = style.awning ? [awning(footprint, spec.door)] : [];
+  const annexes = [
+    ...(style.awning ? [awning(footprint, spec.door)] : []),
+    ...(style.blade ? [bladeSign(footprint, spec.door, height, spec.lit)] : []),
+  ];
   const glow: Glow[] = spec.lit
     ? [
         glowBetween(
@@ -250,6 +287,47 @@ function flatRoof(
   return { slab, crown };
 }
 
+function steppedRoof(
+  footprint: Footprint,
+  height: number,
+  spec: WorkshopSpec,
+): { parts: Part[]; crown: Crowning[]; top: number } {
+  const { x0, x1, z0, z1 } = footprint;
+  const cap = steppedCap({ x0, x1, z0, z1, y: height, steps: 1, attic: spec.loft });
+  const front = fanSpot(footprint, spec.door);
+  const crown: Crowning[] = [
+    ...sunburst(front.x, front.z, cap.top, 7, front.axis, spec.lit),
+    { x: 0, z: 0, part: placed(finial(spec.order), 0, cap.top, 0) },
+  ];
+  if (spec.lit) {
+    crown.push({
+      x: x1 - 9,
+      z: z0 + 9,
+      part: placed(smoke(), x1 - 9, cap.top, z0 + 9, spec.order * 5),
+    });
+  }
+  if (spec.star) {
+    crown.push({ x: x0 + 9, z: z0 + 9, part: placed(star(), x0 + 9, cap.top, z0 + 9) });
+  }
+  return { parts: cap.parts, crown, top: cap.top + 22 };
+}
+
+function fanSpot(
+  footprint: Footprint,
+  door: Side,
+): { readonly x: number; readonly z: number; readonly axis: "x" | "z" } {
+  switch (door) {
+    case "pz":
+      return { x: 0, z: footprint.z1 - 5, axis: "x" };
+    case "nz":
+      return { x: 0, z: footprint.z0 + 5, axis: "x" };
+    case "px":
+      return { x: footprint.x1 - 5, z: 0, axis: "z" };
+    case "nx":
+      return { x: footprint.x0 + 5, z: 0, axis: "z" };
+  }
+}
+
 function signBoard(door: Side, footprint: Footprint): Footprint {
   const { x0, x1, z0, z1 } = footprint;
   switch (door) {
@@ -264,7 +342,7 @@ function signBoard(door: Side, footprint: Footprint): Footprint {
   }
 }
 
-function awning(footprint: Footprint, door: Side): { x: number; z: number; parts: Part[] } {
+function awning(footprint: Footprint, door: Side): Annex {
   const a = along(footprint, door, 2, 0);
   const b = along(footprint, door, 16, 4);
   const x0 = Math.min(a.x, b.x);
@@ -278,6 +356,7 @@ function awning(footprint: Footprint, door: Side): { x: number; z: number; parts
     }
   };
   return {
+    what: "awning",
     x: (a.x + b.x) / 2,
     z: (a.z + b.z) / 2,
     parts: [
@@ -296,12 +375,12 @@ function house(style: SketchStyle, spec: HouseSpec): Construction {
   const z1 = 12;
   const height = 36;
   const flat = style.roof === "flat";
+  const stepped = style.roof === "step";
   const wallFor = (side: Side): Wall => ({
     ...plainWall(style),
     face: side === "pz" ? faces.houseFront : faces.houseSide,
-    base: "wood",
-    plank: "woodDk",
-    frame: "timberDk",
+    ...walled(style, true),
+    frame: framed(style, "timberDk"),
     storeys: 2,
     lit: spec.lit,
     seed: 5,
@@ -309,13 +388,18 @@ function house(style: SketchStyle, spec: HouseSpec): Construction {
       fill: "accent",
       light: mixedRole("accent", "paper", 0.3),
       shadow: mixedRole("accent", "ink", 0.42),
+      ...slateFan,
     },
   });
   const parts: Part[] = [
     box(x0, x1, 0, height, z0, z1, { sides: wallSides(wallFor), top: filled("timberDk") }),
   ];
   let top: number;
-  if (flat) {
+  if (stepped) {
+    const cap = steppedCap({ x0, x1, z0, z1, y: height, steps: 2, attic: spec.lit });
+    parts.push(...cap.parts);
+    top = cap.top;
+  } else if (flat) {
     parts.push(
       box(x0 - 2, x1 + 2, height, height + 3, z0 - 2, z1 + 2, {
         sides: sameSides(slabPaint("accent"), "slab|accent"),
@@ -345,9 +429,17 @@ function house(style: SketchStyle, spec: HouseSpec): Construction {
     parts.push(...steps);
     top = height + steps.length * stepHeight;
   }
-  parts.push(chimney(x1 - 10, -6, top - 4, top + 6));
-  if (spec.smoke) parts.push(placed(smoke(), x1 - 8, top + 6, -4, 15));
-  if (spec.vane) parts.push(placed(vane(), x0 + 4, flat ? height + 3 : top, -4));
+  if (!stepped) {
+    parts.push(chimney(x1 - 10, -6, top - 4, top + 6));
+    if (spec.smoke) parts.push(placed(smoke(), x1 - 8, top + 6, -4, 15));
+  }
+  if (spec.vane) {
+    parts.push(
+      stepped
+        ? placed(finial(houseFinialOrder), -4, top, -4, 0, "accent")
+        : placed(vane(), x0 + 4, flat ? height + 3 : top, -4),
+    );
+  }
   const deck: Paint = (brush, width, tall) => {
     brush.rect(0, 0, width, tall, "wood");
     brush.rect(0, 0, width, 1, "woodHi");
@@ -369,8 +461,8 @@ function house(style: SketchStyle, spec: HouseSpec): Construction {
   ];
   return {
     parts,
-    annexes: [{ x: -4, z: z1 + 5, parts: porch }],
-    reach: top + 10,
+    annexes: [{ what: "porch", x: -4, z: z1 + 5, parts: porch }],
+    reach: top + (stepped ? 18 : 10),
     foot: { x0, x1, z0, z1: z1 + 8 },
     glow: [
       glowBetween({ x: -10, z: z1 + 8 }, { x: 2, z: z1 + 16 }, "lamp", 0.18),
@@ -394,18 +486,25 @@ function storehouse(style: SketchStyle, spec: StorehouseSpec): Construction {
   const wallFor = (side: Side): Wall => ({
     ...plainWall(style),
     face: facing[side],
-    base: "wood",
-    plank: "woodDk",
-    frame: "timberDk",
+    ...walled(style, true),
+    frame: framed(style, "timberDk"),
     storeyHeight: 16,
     seed: 9,
     crates: spec.shelves,
-    door: { fill: "timber", light: "wood", shadow: "timberDk" },
+    door: { fill: "timber", light: "wood", shadow: "timberDk", ...slateFan },
   });
   const parts: Part[] = [
     box(x0, x1, 0, height, z0, z1, { sides: wallSides(wallFor), top: filled("timberDk") }),
   ];
-  if (style.roof === "flat") {
+  if (style.roof === "step") {
+    const cap = steppedCap({ x0, x1, z0, z1, y: height, steps: 0 });
+    parts.push(...cap.parts);
+    parts.push(
+      ...sunburst(0, z1 - 1, height + corniceHeight, 6, "x", false, "slate").map(
+        (crowned) => crowned.part,
+      ),
+    );
+  } else if (style.roof === "flat") {
     parts.push(
       box(x0 - 2, x1 + 2, height, height + 3, z0 - 2, z1 + 2, {
         sides: sameSides(slabPaint("hue.b"), "slab|hue.b"),
@@ -442,32 +541,36 @@ function mill(style: SketchStyle, spec: MillSpec): Construction {
       sides: wallSides((side) => ({
         ...plainWall(style),
         face: side === "pz" ? front : front === faces.storeDoor ? faces.highWindow : front,
-        frame: "timber",
+        frame: framed(style, "timber"),
         foot: "timber",
         ribbon: false,
         storeyHeight: y1 - y0,
         lit: spec.busy,
         seed: 21 + reach,
-        door: { fill: "wood", light: "woodHi", shadow: "woodDk" },
+        door: { fill: "wood", light: "woodHi", shadow: "woodDk", ...slateFan },
       })),
       top: filled("timberDk"),
       ramp: "slate",
     }),
   );
-  parts.push(
-    ...roofParts({
-      x0: -10,
-      x1: 10,
-      z0: -10,
-      z1: 10,
-      y: 46,
-      kind: "hip",
-      tread: 2,
-      gable: "plaster",
-      ramp: "slate",
-    }),
-  );
-  parts.push(placed(sails(spec.turning), 0, 40, 0));
+  if (style.roof === "step") {
+    parts.push(...steppedCap({ x0: -8, x1: 8, z0: -8, z1: 8, y: 46, steps: 1 }).parts);
+  } else {
+    parts.push(
+      ...roofParts({
+        x0: -10,
+        x1: 10,
+        z0: -10,
+        z1: 10,
+        y: 46,
+        kind: "hip",
+        tread: 2,
+        gable: "plaster",
+        ramp: "slate",
+      }),
+    );
+  }
+  parts.push(placed(sails(spec.turning, style.piers ? "trim" : "plaster"), 0, 40, 0));
   return { parts, reach: 62, foot: { x0: -12, x1: 12, z0: -12, z1: 12 } };
 }
 
@@ -482,9 +585,8 @@ function shed(style: SketchStyle, spec: ShedSpec): Construction {
   const wallFor = (side: Side): Wall => ({
     ...plainWall(style),
     face: side === spot.door ? (y0 > 0 ? faces.highWindow : faces.shedDoor) : faces.plain,
-    base: tall ? "plaster" : "wood",
-    plank: tall ? undefined : "woodDk",
-    frame: "timberDk",
+    ...walled(style, !tall),
+    frame: framed(style, "timberDk"),
     storeyHeight: spot.height,
     lit: spec.lit,
     lightColour: light.colour,
@@ -499,7 +601,7 @@ function shed(style: SketchStyle, spec: ShedSpec): Construction {
     }),
   ];
   if (spec.roofed) {
-    if (style.roof === "flat" || floors >= 3) {
+    if (style.roof !== "gable" || floors >= 3) {
       parts.push(
         box(spot.x0, spot.x1, y1, y1 + 2, spot.z0, spot.z1, {
           sides: sameSides(slabPaint("hue.b"), "slab|hue.b"),

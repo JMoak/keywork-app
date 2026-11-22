@@ -23,10 +23,12 @@ export interface SketchColours {
   readonly leaf: string;
   readonly chalk: string;
   readonly smoke: string;
+  readonly trim?: string;
   readonly hues: readonly string[];
   readonly sky: readonly string[];
   readonly orb: string | undefined;
   readonly orbSlit?: boolean;
+  readonly orbRays?: boolean;
   readonly pool: string | undefined;
   readonly haze: number;
   readonly shadow: number;
@@ -35,6 +37,7 @@ export interface SketchColours {
 export function derived(base: SketchColours, night: boolean): KitColours {
   const toward = (from: string, to: string, share: number): string => mixHex(from, to, share);
   const { ink, paper } = base;
+  const trim = base.trim ?? base.timber;
   const roles: Record<string, string> = {
     ink,
     paper,
@@ -49,6 +52,7 @@ export function derived(base: SketchColours, night: boolean): KitColours {
     pathLo: toward(base.path, ink, 0.2),
     cobble: base.cobble,
     cobbleLo: toward(base.cobble, ink, 0.24),
+    cobbleInlay: trim,
     plaster: base.plaster,
     plasterHi: toward(base.plaster, paper, 0.3),
     timber: base.timber,
@@ -70,6 +74,9 @@ export function derived(base: SketchColours, night: boolean): KitColours {
     leafLo: toward(base.leaf, ink, 0.22),
     chalk: base.chalk,
     smoke: base.smoke,
+    trim,
+    trimHi: toward(trim, paper, 0.4),
+    trimLo: toward(trim, ink, 0.42),
     gold: night ? gold.night : gold.day,
     goldHi: toward(night ? gold.night : gold.day, paper, 0.55),
     goldDk: toward(night ? gold.night : gold.day, ink, 0.38),
@@ -84,6 +91,7 @@ export function derived(base: SketchColours, night: boolean): KitColours {
     sky: base.sky,
     orb: base.orb,
     orbSlit: base.orbSlit === true,
+    orbRays: base.orbRays === true,
     star: base.star,
     pool: base.pool,
     haze: base.haze,

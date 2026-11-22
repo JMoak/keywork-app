@@ -10,6 +10,7 @@ export interface Backdrop {
   readonly height: number;
   readonly role: Role;
   readonly dither: boolean;
+  readonly alpha?: number;
 }
 
 export interface Light {
@@ -20,6 +21,10 @@ export interface Light {
 }
 
 export const orbRadius = 14;
+export const rayReach = 36;
+export const rayClearance = 3;
+export const rayCount = 24;
+export const rayAlpha = { night: 0.13, day: 0.3 } as const;
 export const starCount = 40;
 export const fireflyCount = 10;
 
@@ -51,6 +56,10 @@ export function backdropOf(colours: KitColours, view: View): Backdrop[] {
   if (colours.orb !== undefined) {
     const ox = Math.round((w * 0.27) / s);
     const oy = Math.round((h * 0.2) / s);
+    if (colours.orbRays) {
+      const alpha = colours.night ? rayAlpha.night : rayAlpha.day;
+      for (const ray of raysAround(ox, oy)) rects.push({ ...scaled(ray, s), role: "orb", alpha });
+    }
     for (let d = -orbRadius; d < orbRadius; d += 1) {
       if (colours.orbSlit && d > 1 && d % 4 >= 2) continue;
       const half = Math.round(Math.sqrt(orbRadius * orbRadius - (d + 0.5) * (d + 0.5)));
@@ -74,6 +83,43 @@ export function backdropOf(colours: KitColours, view: View): Backdrop[] {
     }
   }
   return rects;
+}
+
+interface Run {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+}
+
+function raysAround(ox: number, oy: number): Run[] {
+  const runs: Run[] = [];
+  const inner = (orbRadius + rayClearance) ** 2;
+  const sector = Math.PI / (rayCount / 2);
+  const inRay = (x: number, y: number): boolean => {
+    const reach = x * x + y * y;
+    return (
+      x < rayReach &&
+      reach < rayReach * rayReach &&
+      reach > inner &&
+      Math.floor((Math.atan2(y + 0.5, x + 0.5) + Math.PI) / sector) % 2 === 0
+    );
+  };
+  for (let y = -rayReach; y < rayReach; y += 1) {
+    let start: number | undefined;
+    for (let x = -rayReach; x <= rayReach; x += 1) {
+      const lit = inRay(x, y);
+      if (lit && start === undefined) start = x;
+      else if (!lit && start !== undefined) {
+        runs.push({ x: ox + start, y: oy + y, width: x - start });
+        start = undefined;
+      }
+    }
+  }
+  return runs;
+}
+
+function scaled(run: Run, s: number): Omit<Backdrop, "role" | "alpha"> {
+  return { x: run.x * s, y: run.y * s, width: run.width * s, height: s, dither: false };
 }
 
 export function firefliesOf(

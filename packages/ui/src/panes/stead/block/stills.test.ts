@@ -21,6 +21,8 @@ import {
   viewOf,
 } from "@keywork-app/habitat/block";
 import {
+  ladderFraming,
+  ladderWorld,
   noon,
   plotProjects,
   sketchDecorations,
@@ -82,6 +84,13 @@ describe("block world stills", () => {
         ]).toEqual([]);
       });
 
+      it(`${kit.id} by ${appearance}: the six project stages, from the front and from a corner`, () => {
+        expect([
+          ...compare(`${kit.id}-ladder-front-${appearance}.png`, ladder(kit, appearance, false)),
+          ...compare(`${kit.id}-ladder-corner-${appearance}.png`, ladder(kit, appearance, true)),
+        ]).toEqual([]);
+      });
+
       it(`${kit.id} by ${appearance}: under forced colours, in a light and a dark system scheme`, () => {
         const findings = Object.entries(forcedSchemes).flatMap(([scheme, system]) =>
           compare(
@@ -126,6 +135,24 @@ function still(
     forced === undefined
       ? resolveBlockPalette(kit, appearance, theme.read("--kw-background"))
       : forcedBlockPalette(kit, appearance, forced),
+  );
+}
+
+function ladder(kit: Kit, appearance: Appearance, corner: boolean): Raster {
+  const world = ladderWorld(kit, appearance);
+  const eye = corner ? raisedEye : levelEye;
+  const view = viewOf(
+    world,
+    stillWidth,
+    stillHeight,
+    eye,
+    corner ? { slab: ladderFraming.slab } : ladderFraming,
+  );
+  const list = drawList(world, restCamera(0, eye, corner), view, 0, kit.colours[appearance].haze);
+  const theme = sourceOfTheme(appearance === "night" ? keyworkNight : keyworkDay);
+  return rasterizePicture(
+    { list, backdrop: [], lights: [] },
+    resolveBlockPalette(kit, appearance, theme.read("--kw-background")),
   );
 }
 

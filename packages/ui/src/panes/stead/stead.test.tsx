@@ -64,6 +64,34 @@ describe("the stead pane", () => {
     expect(creatureButton(container, "reviewer").dataset.clip).toBe("idle");
   });
 
+  it("asks for no hand-off tally while the block world is switched off, and draws none it hears", async () => {
+    const stead = steadHarness({});
+    const { container } = mount(stead);
+    await settle();
+    const before = creatureLabels(container);
+    stead.emit([
+      {
+        id: 90,
+        ts: "2026-11-22T09:00:00.000Z",
+        sessionId: "",
+        type: "creature.handoff",
+        payload: {
+          change: "counted",
+          handoff: {
+            from: "reviewer",
+            to: "scribe",
+            count: 20,
+            lastAt: "2026-11-22T09:00:00.000Z",
+          },
+        },
+      },
+    ]);
+    await settle();
+    expect(stead.handoffReads()).toBe(0);
+    expect(container.querySelector(".kw-stead-block")).toBeNull();
+    expect(creatureLabels(container)).toEqual(before);
+  });
+
   it("seats no plain bot: a bot the node lists without creature.json stays off the stead", async () => {
     const stead = steadHarness({ bots: [bot("reviewer"), bot("scribe")], creatures: [] });
     const { container } = mount(stead);
@@ -498,6 +526,7 @@ function steadHarness(staging: Staging) {
     const answered: Answered[] = [];
     const overturned: string[] = [];
     const dismissed: string[] = [];
+    let handoffReads = 0;
     const [items, setWaiting] = createSignal<readonly NeedsYouItem[]>(staging.waiting ?? []);
     const base = overviewShell({ summaries: summaries() }).shell;
     const store = {
@@ -546,6 +575,10 @@ function steadHarness(staging: Staging) {
         overturned.push(`${slug}/${recordId}`);
         return { overturned: true, recordId, ruleClass: "shell.read", demoted: [] };
       },
+      creatureHandoffs: async () => {
+        handoffReads += 1;
+        return [];
+      },
     } as unknown as ShellSeams["client"];
     const companion = createCompanionController();
     const shell: ShellSeams = {
@@ -588,6 +621,7 @@ function steadHarness(staging: Staging) {
       emit,
       setWaiting,
       setSummaries,
+      handoffReads: () => handoffReads,
     };
   });
 }

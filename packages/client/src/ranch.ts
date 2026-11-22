@@ -2,6 +2,8 @@ import {
   type BegunPairing,
   type CreatureDetail,
   type CreatureDraft,
+  type CreatureHandoff,
+  type CreatureHandoffs,
   type CreatureMessageDraft,
   type CreatureMessageSent,
   type CreaturePatch,
@@ -68,6 +70,7 @@ export interface RanchClient {
     slug: string,
     choice?: CreatureRemovalChoice,
   ): Promise<CreatureRemovalOutcome | ServedRefusal>;
+  creatureHandoffs(): Promise<readonly CreatureHandoff[] | ServedRefusal>;
   routines(creature: string): Promise<readonly RoutineView[] | ServedRefusal>;
   routine(creature: string, id: string): Promise<RoutineView | ServedRefusal>;
   putRoutine(creature: string, id: string, file: RoutineFile): Promise<RoutinePut | ServedRefusal>;
@@ -168,6 +171,7 @@ export const ranchOperations = {
   pauseCreature: "pauseCreature",
   resumeCreature: "resumeCreature",
   removeCreature: "removeCreature",
+  creatureHandoffs: "listCreatureHandoffs",
   routines: "listRoutines",
   routine: "readRoutine",
   putRoutine: "putRoutine",
@@ -260,6 +264,8 @@ export function ranchRoutes(request: RanchRequest): RanchClient {
       }
       return answered(response);
     },
+    creatureHandoffs: async () =>
+      picked(await request("GET", "/creature-handoffs"), (body: CreatureHandoffs) => body.handoffs),
     routines: async (slug) =>
       picked(
         await request("GET", creature(slug, "/routines")),

@@ -166,7 +166,7 @@ describe("the block world as a reading of the habitat", () => {
     expect(greenStanding(built).map((spot) => spot.at)).toEqual(greenSpots.slice(0, 2));
   });
 
-  it("rests every idle creature by its own door but one in four by seed, on five green spots that never overlap", () => {
+  it("rests every idle creature by its own door but one in four by seed, on four green spots that never overlap", () => {
     const town = sketchTown(28);
     const built = scene({ ...town, threads: {}, gates: {} }, noon).world;
     const seeds = Array.from({ length: 28 }, (_, index) => index);

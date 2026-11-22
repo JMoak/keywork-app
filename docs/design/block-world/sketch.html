@@ -30,15 +30,46 @@ p{margin:0;max-width:66ch}
 canvas{display:block;width:100%}
 #hero{height:clamp(320px,58vw,580px)}
 #hero:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.mode{display:flex;justify-content:space-between;align-items:flex-end;gap:14px 24px;flex-wrap:wrap;border:1px solid var(--line);padding:14px}
+.work{display:flex;flex-direction:column;gap:9px;flex:1 1 220px;min-width:0;align-self:flex-start;font:500 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.work span{display:block;height:8px;background:var(--panel);border-radius:2px}
+.work span:nth-child(2){width:86%} .work span:nth-child(3){width:64%} .work span:nth-child(4){width:92%} .work span:nth-child(5){width:48%} .work span:nth-child(6){width:72%}
+.pet{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:0;max-width:100%}
+.bubble{max-width:340px;border:1px solid var(--line);padding:8px 10px;font-size:.875rem;line-height:1.4;color:var(--fg)}
+.bubble.asks{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+.bubble b{display:block;font:500 .6875rem/1.2 var(--mono);color:var(--dim);margin-bottom:2px}
+.bubble .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.bubble .acts span{font:500 .75rem/1 var(--mono);border:1px solid var(--line);padding:6px 8px;border-radius:3px}
+.petRow{display:flex;align-items:flex-end;gap:12px;max-width:100%}
+.team{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:0;overflow-x:auto}
+#team{height:46px;width:auto;cursor:pointer;flex:none}
+.teamNote{font:400 .6875rem/1.2 var(--mono);color:var(--dim);white-space:nowrap}
+#petArt{width:168px;height:140px;flex:none}
+.petActs{display:flex;gap:6px}
+kbd{font:500 .6875rem/1 var(--mono);border:1px solid currentColor;border-radius:2px;padding:1px 4px;margin-left:4px;opacity:.8}
 .deck{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);gap:10px;align-items:stretch}
+.deck[hidden]{display:none}
 .flank{display:flex;flex-direction:column;gap:10px;min-width:0}
 .panel{border:1px solid var(--line);min-width:0;display:flex;flex-direction:column}
 .panel.lead{border-top:2px solid var(--accent)}
 .panel.asks{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
 .ptitle{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);font:500 .75rem/1.2 var(--mono);color:var(--dim)}
 .ptitle b{color:var(--fg);font-weight:500}
-#whoArt{height:150px}
-#whoLine{padding:8px 10px;font-size:.875rem;line-height:1.45;color:var(--mid);max-width:none}
+.panel[hidden]{display:none}
+.whoTop{display:grid;grid-template-columns:116px minmax(0,1fr);gap:10px;align-items:center;padding:8px 10px}
+#whoArt{height:100px}
+#whoSum{font-size:.875rem;line-height:1.45;color:var(--mid);max-width:none}
+#ledger{list-style:none;margin:0;padding:0}
+#ledger button{display:grid;grid-template-columns:1.1em minmax(0,1fr) auto;gap:8px;align-items:baseline;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);border-radius:0;padding:7px 10px;font:400 .8125rem/1.35 var(--body);color:var(--mid)}
+#ledger button:hover{background:var(--panel)}
+#ledger button[aria-pressed="true"]{background:var(--panel);color:var(--fg)}
+#ledger .g{font:500 .8125rem/1.35 var(--mono)}
+#ledger .k-ask{color:var(--fg)} #ledger .k-ask .g{color:var(--amber)}
+#ledger .k-run .g{color:var(--accent)}
+#ledger .meta{font:400 .6875rem/1.35 var(--mono);color:var(--dim);white-space:nowrap}
+#askLines{padding:10px;display:flex;flex-direction:column;gap:9px;font-size:.875rem;line-height:1.45}
+.askEnd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 10px 10px;font:400 .6875rem/1.3 var(--mono);color:var(--dim)}
+.askEnd button{padding:6px 9px}
 #talkLines{padding:10px;display:flex;flex-direction:column;gap:9px;font-size:.875rem;line-height:1.45;flex:1}
 .say b{display:block;font:500 .6875rem/1.2 var(--mono);color:var(--dim);margin-bottom:2px}
 .say.me{color:var(--dim)}
@@ -64,6 +95,11 @@ button.set,button.setworld{align-self:flex-start;padding:7px 10px}
 .close{display:grid;gap:22px 28px;grid-template-columns:minmax(0,1fr) minmax(0,3fr);align-items:start}
 .close img,img.wide{display:block;width:100%;image-rendering:pixelated;border:1px solid var(--line)}
 img.wide{max-width:988px}
+.scroll{overflow-x:auto}
+.slots{width:100%;min-width:520px;border-collapse:collapse;font-size:.875rem;line-height:1.45}
+.slots th,.slots td{text-align:left;vertical-align:top;padding:7px 14px 7px 0;border-top:1px solid var(--line);color:var(--mid)}
+.slots th{font:500 .6875rem/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);border-top:0}
+.slots td:first-child{color:var(--fg)}
 .clips{display:flex;flex-wrap:wrap;gap:14px 26px}
 .clips figure{align-items:center;gap:6px}
 .clips canvas{width:170px;height:180px}
@@ -104,10 +140,22 @@ ol.steps b{font-weight:600}
 </header>
 
 <section aria-label="Live sketch">
-  <div class="deck">
+  <div class="mode" id="mode">
+    <div class="work" aria-hidden="true"><b>your work</b><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="pet">
+      <div class="bubble" id="petSay"></div>
+      <div class="petRow">
+        <div class="team"><canvas id="team" aria-label="The team. Press a creature to choose it."></canvas><span class="teamNote" id="teamNote"></span></div>
+        <canvas id="petArt" aria-hidden="true"></canvas>
+      </div>
+      <div class="petActs"><button type="button" id="petTalk">Talk</button><button type="button" id="petStead" aria-pressed="true">Stead <kbd>M</kbd></button></div>
+    </div>
+  </div>
+  <div class="deck" id="deck">
     <div class="panel lead"><div class="ptitle"><b>stead</b><span>press a workshop, a creature or the house</span></div><canvas id="hero" tabindex="0" aria-label="A live sketch of the stead. Left and right arrow keys turn it. Press a workshop to choose its creature."></canvas></div>
     <div class="flank">
-      <div class="panel" id="who"><div class="ptitle"><b id="whoName">a creature</b><span id="whoState"></span></div><canvas id="whoArt" aria-hidden="true"></canvas><p id="whoLine"></p></div>
+      <div class="panel" id="who"><div class="ptitle"><b id="whoName">a creature</b><span id="whoState"></span></div><div class="whoTop"><canvas id="whoArt" aria-hidden="true"></canvas><p id="whoSum"></p></div><ul id="ledger" aria-label="Ledger: questions first, then tasks"></ul></div>
+      <div class="panel" id="ask" hidden><div class="ptitle"><b id="askKind">question</b><span id="askMeta"></span></div><div id="askLines"></div><div class="composer" id="askBox"></div><div class="askEnd"><span id="askNote"></span><button type="button" id="askClose">Close</button></div></div>
       <div class="panel" id="talk"><div class="ptitle"><b>conversation</b><span id="talkWith"></span></div><div id="talkLines"></div><div class="composer" id="talkBox"></div></div>
     </div>
   </div>
@@ -117,9 +165,9 @@ ol.steps b{font-weight:600}
     <div class="grp"><button id="less" type="button" aria-label="One creature fewer">−</button><output id="count" for="less more">5 creatures · a hamlet</output><button id="more" type="button" aria-label="One creature more">+</button></div>
     <div class="grp"><button id="eyeLevel" type="button" aria-pressed="false">Level eye</button><button id="eyeRaised" type="button" aria-pressed="true">Raised eye</button><button id="corner" type="button" aria-pressed="false">Rest on corners</button></div>
     <div class="grp"><button id="alive" type="button" aria-pressed="true">Moving</button><button id="nextWho" type="button">Next creature</button></div>
-    <div class="grp" id="themes"><button type="button" data-world="lantern" aria-pressed="true">Lantern</button><button type="button" data-world="neon" aria-pressed="false">Neon</button><button type="button" data-world="terrace" aria-pressed="false">Terrace</button></div>
+    <div class="grp" id="themes"><button type="button" data-world="lantern" aria-pressed="true">Lantern</button><button type="button" data-world="neon" aria-pressed="false">Neon</button><button type="button" data-world="terrace" aria-pressed="false">Terrace</button><button type="button" data-world="deco" aria-pressed="false">Deco</button></div>
   </div>
-  <p class="note">The three panels work together: press a workshop or a creature in the stead and the creature and conversation panels follow it; press the storehouse or the mill and a window opens for it. All of it runs in the page, on plain canvas. Lantern, Neon and Terrace are three themes, each a building style with its own colours. Switch the page between dark and light to see night and day. The drawing is a stand-in for scale, light and structure; the real art pass is the first step below. With the picture focused, the arrow keys turn it.</p>
+  <p class="note">Main mode is the companion: the creature you last chose floats over your work, and the small team strip beside it picks another. Talk opens its conversation; Stead, or the M key, reveals the stead below to press things in. The panels work together. Press a workshop or a creature in the stead and the creature panel shows its summary and its ledger, questions first. Press a row in the ledger and that question or task opens in a short conversation of its own, beside the main one. Press the house for everything waiting on you. All of it runs in the page, on plain canvas. Lantern, Neon, Terrace and Deco are four themes, each a building style with its own colours. Switch the page between dark and light to see night and day. The drawing is a stand-in for scale, light and structure; the real art pass is the first step below. With the picture focused, the arrow keys turn it.</p>
 </section>
 
 <section class="today">
@@ -160,6 +208,40 @@ ol.steps b{font-weight:600}
     <figure><canvas class="still" style="height:300px" data-world="town" data-n="5" data-eye="raised" data-theme="terrace"></canvas><figcaption><b>Terrace.</b> Whitewashed blocks, roof gardens, striped awnings.</figcaption><button type="button" class="setworld" data-world="terrace">Show it above</button></figure>
   </div>
   <p>Every theme has a night and a day. All three now carry drawn light: pools under lamps and at lit doors, soft shadows, a glow in the sky, and haze with distance.</p>
+</section>
+
+<section>
+  <h2>A second architecture: Art Deco</h2>
+  <p>Deco is a whole way of building, not a recolour: jade stone, brass piers, amber windows, chevron cornices, stepped crowns and sunbursts. It is made of the same blocks and fills the same places as the other three, so everything the stead shows has somewhere to show.</p>
+  <figure><canvas class="still" style="height:clamp(300px,56vw,520px)" data-world="town" data-n="7" data-eye="raised" data-theme="deco"></canvas><figcaption><b>A Deco hamlet.</b> Each workshop carries its creature's colour on the door fan, the sign by the door, the sunburst on its crown and its pennant. The windows stay amber.</figcaption><button type="button" class="setworld" data-world="deco">Show it above</button></figure>
+  <div class="row">
+    <figure><canvas class="still" style="height:300px" data-world="town" data-n="7" data-eye="raised" data-q="2" data-theme="deco"></canvas><figcaption><b>From the back.</b> Every side is built, as in the other styles.</figcaption></figure>
+    <figure><canvas class="still" style="height:300px" data-world="town" data-n="3" data-eye="raised" data-corner="1" data-theme="deco"></canvas><figcaption><b>From a corner.</b></figcaption></figure>
+  </div>
+  <figure><canvas class="still" style="height:clamp(300px,62vw,620px)" data-world="ladder" data-eye="level" data-theme="deco"></canvas><figcaption><b>The six project stages in Deco.</b> The same shack, shed, house, tower, high-rise and skyscraper, with a cornice at every setback and the creature's sunburst on top.</figcaption></figure>
+  <div class="row">
+    <figure><img alt="Six Art Deco buildings in a row, from a tiny hut to a skyscraper with a sunburst crown and a spire, in jade and brass with amber windows." src="__DECO_STAGES_PNG__"><figcaption><b>The stages as designed</b>, drawn with Codex.</figcaption></figure>
+    <figure><img alt="An Art Deco workshop, keeper's house, storehouse and mill above a row of small props: a lamp, a bench, a flag, a statue, a fountain, a tree in a planter, a crate and a lantern." src="__DECO_KIT_PNG__"><figcaption><b>The town's buildings and props as designed</b>, drawn with Codex. The blocks above follow these two sheets.</figcaption></figure>
+  </div>
+  <h3>What every architecture supplies</h3>
+  <p>A style is a set of parts with fixed jobs. A new one is added by supplying these parts; the town, the roads, the growth and the signals do not change.</p>
+  <div class="scroll"><table class="slots">
+    <thead><tr><th>What the stead shows</th><th>The part that shows it</th><th>In Deco</th></tr></thead>
+    <tbody>
+      <tr><td>A creature is at work</td><td>Lit windows, a light at its door, something rising from the roof</td><td>Amber lights between the piers, the door fan and the sign lit, smoke from the crown</td></tr>
+      <tr><td>Whose workshop it is</td><td>Door, sign and roof in the creature's colour</td><td>Door fan, sign by the door, sunburst, pennant</td></tr>
+      <tr><td>How much it has kept</td><td>Storeys, and crates on the shelf wall</td><td>Storeys of window columns</td></tr>
+      <tr><td>Its chores</td><td>Lines on the board on a side wall</td><td>The same board in a brass frame</td></tr>
+      <tr><td>A child at work</td><td>A lit loft</td><td>A lit attic under the sunburst</td></tr>
+      <tr><td>What it has earned</td><td>Eave lights, a banner, a roof star</td><td>The same three. Reward gold is brighter than the brass</td></tr>
+      <tr><td>Who works with whom</td><td>A path, a track, a paved road with lamps</td><td>Paved roads gain a brass inlay and stepped lamps</td></tr>
+      <tr><td>A project's size</td><td>Six stages</td><td>Six stages with a chevron cornice at each setback</td></tr>
+      <tr><td>A project in use</td><td>Lit floors</td><td>Amber floors, and a lit sunburst</td></tr>
+      <tr><td>Something needs you</td><td>The bell on the keeper's porch</td><td>The same bell</td></tr>
+      <tr><td>The mills are running</td><td>Turning sails</td><td>Brass fan blades</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">One gap this turned up: Neon and Terrace have no place for a child at work. Their roof hut lights for the creature's own work.</p>
 </section>
 
 <section>
@@ -326,6 +408,7 @@ function fill(p){
  var d=function(k,src,to,t){ if(!p[k]) p[k]=mixH(p[src],p[to],t); };
  d('grassHi','grass','paper',.18); d('grassLo','grass','ink',.22); d('soilLo','soil','ink',.2); d('rockLo','rock','ink',.22); d('pathLo','path','ink',.2); d('cobbleLo','cobble','ink',.24);
  d('plasterHi','plaster','paper',.3); d('timberDk','timber','ink',.3); d('woodHi','wood','paper',.25); d('woodDk','wood','ink',.28); d('slateDk','slate','ink',.5); d('glint','glass','paper',.3); d('lampHi','lamp','paper',.6); d('leafHi','leaf','paper',.25); d('leafLo','leaf','ink',.22);
+ if(!p.trim) p.trim=p.timber; d('trimHi','trim','paper',.4); d('trimLo','trim','ink',.42);
  if(!p.gold) p.gold=p.night?'#ffd166':'#e6a817'; d('goldHi','gold','paper',.55); d('goldDk','gold','ink',.38);
  return p;
 }
@@ -367,7 +450,19 @@ var THEMES={
    plaster:'#fffaf0',timber:'#b89a84',wood:'#d9a878',slate:'#e07a52',stone:'#cdbfae',
    glass:'#3f78b8',lamp:'#ffb02e',accent:'#8a63d2',err:'#e0446a',leaf:'#5fae4c',chalk:'#ffffff',smoke:'#d8d2c8',
    hues:['#7c5cff','#2f6fed','#1aa3c9','#12a594','#6aa329','#e2632a','#e0457b','#d6a21e'],
-   sky:['#e6ebf5','#deeaf7','#d3e6f8'],orb:'#fff1b8',pool:null,haze:.12,shadow:.18}}
+   sky:['#e6ebf5','#deeaf7','#d3e6f8'],orb:'#fff1b8',pool:null,haze:.12,shadow:.18}},
+ deco:{name:'Deco',style:{roof:'step',frames:false,ribbon:false,litHue:false,piers:true,blade:true,stone:true,inlay:true},
+  night:{key:'dn',night:true,bg:'#1a1b26',ink:'#070d0c',paper:'#fff3d6',star:'#8d8662',
+   grass:'#17393a',soil:'#2b2a3c',rock:'#1b2130',path:'#5a5648',cobble:'#65727c',
+   plaster:'#27463f',timber:'#14251f',wood:'#7a5a3c',slate:'#2f8a80',stone:'#62757a',
+   glass:'#0b1719',lamp:'#ff9a3c',accent:'#bb9af7',err:'#ff6b8a',leaf:'#3f8f74',chalk:'#fff3d6',smoke:'#7f8c8c',trim:'#c9a04e',gold:'#ffe07a',
+   hues:HN,sky:['#171d30','#1b2a3a','#213a42','#2a4a46'],orb:'#ffd98a',orbRays:true,pool:'#ff9a3c',haze:.2,shadow:.3},
+  day:{key:'dd',night:false,bg:'#e9ebf3',ink:'#22302e',paper:'#ffffff',star:null,
+   grass:'#a9d6b4',soil:'#c9ab86',rock:'#a39a8a',path:'#eadbb6',cobble:'#dfe1e6',
+   plaster:'#f4ecd8',timber:'#3f6a62',wood:'#b98a5c',slate:'#2f9a8f',stone:'#c6c0b0',
+   glass:'#2f6f78',lamp:'#ff9a2e',accent:'#8a63d2',err:'#e0446a',leaf:'#4fae6c',chalk:'#ffffff',smoke:'#d2d0c6',trim:'#b98a3a',
+   hues:['#8b5cf6','#3b7bf0','#12a5dd','#10b3a0','#62b02c','#f47b2a','#ec4f93','#e0a81e'],
+   sky:['#e8ecf3','#e7efe8','#eaf0dc'],orb:'#ffe9a8',orbRays:true,pool:null,haze:.12,shadow:.16}}
 };
 var themeId='neon', P=null, ST=null, epoch=0, memo=new Map();
 function usePalette(id){ var t=THEMES[id]||THEMES.lantern; P=t[isDark()?'night':'day']; ST=t.style; }
@@ -422,22 +517,31 @@ function critter(cr,x,z,state){
 }
 
 /* ---------- wall and roof paints ---------- */
-function win(g,x,y,lit,o){ g.r(x,y,7,8,o.frame); g.r(x+1,y+1,5,6,lit?(o.litCol||P.lamp):P.glass); if(lit) g.r(x+1,y+1,2,2,o.litHi||P.lampHi); else g.r(x+1,y+1,1,1,o.glint); g.r(x+3,y+1,1,6,o.frame); g.r(x+1,y+3,5,1,o.frame); g.r(x-1,y+8,9,1,o.sill); }
-function door(g,x,y,o){ g.r(x,y,9,13,o.frame); g.r(x+1,y+1,7,12,o.doorCol); g.r(x+1,y+1,7,1,o.doorHi); g.r(x+4,y+2,1,11,o.doorLo); g.r(x+6,y+7,1,1,P.lampHi); }
+function win(g,x,y,lit,o){ if(o.piers){ var c=lit?(o.litCol||P.lamp):P.glass; g.r(x,y-1,7,10,o.frame); g.r(x+1,y,2,8,c); g.r(x+4,y,2,8,c); if(lit){ g.r(x+1,y,2,1,o.litHi||P.lampHi); g.r(x+4,y,2,1,o.litHi||P.lampHi); } else g.r(x+1,y,1,1,o.glint); g.r(x+1,y+4,5,1,o.frame); g.r(x-1,y+9,9,1,o.sill); return; } g.r(x,y,7,8,o.frame); g.r(x+1,y+1,5,6,lit?(o.litCol||P.lamp):P.glass); if(lit) g.r(x+1,y+1,2,2,o.litHi||P.lampHi); else g.r(x+1,y+1,1,1,o.glint); g.r(x+3,y+1,1,6,o.frame); g.r(x+1,y+3,5,1,o.frame); g.r(x-1,y+8,9,1,o.sill); }
+function door(g,x,y,o){ if(o.piers){ var f=o.lit?o.hue.h:o.hue.l; g.r(x,y+2,9,11,o.frame); g.r(x+1,y+3,7,10,o.doorCol); g.r(x+1,y+3,7,1,o.doorHi); g.r(x+4,y+4,1,9,o.doorLo); g.r(x+3,y+8,1,2,o.trim); g.r(x+5,y+8,1,2,o.trim); g.r(x+3,y-1,3,1,o.trim); g.r(x+1,y,7,1,f); g.r(x,y+1,9,1,f); g.r(x+1,y,1,1,o.trim); g.r(x+4,y,1,1,o.trim); g.r(x+7,y,1,1,o.trim); for(var q=0;q<9;q+=2) g.r(x+q,y+1,1,1,o.trim); return; } g.r(x,y,9,13,o.frame); g.r(x+1,y+1,7,12,o.doorCol); g.r(x+1,y+1,7,1,o.doorHi); g.r(x+4,y+2,1,11,o.doorLo); g.r(x+6,y+7,1,1,P.lampHi); }
 function sign(g,x,y,o){ g.r(x,y,5,1,P.ink); g.r(x,y+1,5,5,o.hue.l); g.r(x,y+5,5,1,o.hue.d); for(var i=0;i<3;i++) if((o.glyph>>i)&1) g.r(x+1+i,y+2+((o.glyph>>(i+3))&1),1,2,P.ink); }
 function bench(g,x,y,o){ g.r(x,y,15,9,o.frame); g.r(x+1,y+1,13,7,o.lit?(o.litCol||P.lamp):P.glass); if(o.lit){ g.r(x+1,y+1,13,2,o.litHi||P.lampHi); g.r(x+3,y+4,4,1,P.ink); g.r(x+4,y+5,2,3,P.ink); g.r(x+9,y+5,3,3,P.ink); } g.r(x+5,y+1,1,7,o.frame); g.r(x+10,y+1,1,7,o.frame); g.r(x-1,y+9,17,2,o.sill); }
 function shelf(g,x,y,o){ g.r(x,y,17,12,o.frame); g.r(x+1,y+1,15,10,P.ink); g.r(x+1,y+5,15,1,o.frame); for(var i=0;i<6&&i<o.crates;i++){ var cx=x+2+(i%3)*5, cy=y+(i<3?7:1); g.r(cx,cy,4,4,P.wood); g.r(cx,cy,4,1,P.woodHi); } }
 function board(g,x,y,o){ g.r(x,y,13,10,o.frame); g.r(x+1,y+1,11,8,P.slateDk); for(var i=0;i<o.chores&&i<3;i++) g.r(x+2,y+2+i*2,4+(((o.seed>>(i*2))&3)*2),1,P.chalk); }
 function ivy(g,w,h,o){ var r=rng(o.seed*13+5+o.role), n=o.ivy*10; for(var i=0;i<n;i++){ var t=r(), y=h-3-((t*t*h*0.85)|0), x=(r()*Math.max(3,w*0.5*(1-t*0.6)))|0; g.r(x,y,2,2,r()<.5?P.leaf:P.leafHi); } }
+function decoCols(w){ var n=Math.max(1,Math.floor((w-6)/5)), span=n*5-3; return {n:n,off:Math.floor((w-span)/2)}; }
+function decoWall(g,w,h,o){
+ var c=decoCols(w),i;
+ if(!o.tower) for(i=0;i<c.n-1;i++) g.r(c.off+3+i*5,2,1,h-4,o.pier);
+ g.r(0,0,3,h,o.pil); g.r(1,2,1,h-4,o.pilLo); g.r(w-3,0,3,h,o.pil); g.r(w-2,2,1,h-4,o.pilLo);
+ g.r(0,0,w,1,o.trim); g.r(0,1,4,1,o.trim); g.r(w-4,1,4,1,o.trim); g.r(0,h-3,4,1,o.trim); g.r(w-4,h-3,4,1,o.trim);
+}
+function decoLights(g,y,w,o){ var c=decoCols(w),i,x,col=o.lit?o.litCol:P.glass; for(i=0;i<c.n;i++){ x=c.off+i*5; g.r(x,y,2,10,col); if(o.lit) g.r(x,y,2,1,o.litHi); else g.r(x,y,1,1,o.glint); g.r(x,y+5,2,1,o.base); } }
 function wallPaint(o){ return function(g,w,h){
   var s,y,i,y0=h-2;
   g.r(0,0,w,h,o.base);
   if(o.planks){ for(y=3;y<h;y+=4) g.r(0,y,w,1,o.plank); }
-  if(o.frames!==false){ g.r(0,0,2,h,o.frame); g.r(w-2,0,2,h,o.frame); g.r(0,0,w,1,o.frame); for(s=1;s<o.storeys;s++) g.r(0,h-s*o.sh-1,w,2,o.frame); }
+  if(o.piers) decoWall(g,w,h,o);
+  else if(o.frames!==false){ g.r(0,0,2,h,o.frame); g.r(w-2,0,2,h,o.frame); g.r(0,0,w,1,o.frame); for(s=1;s<o.storeys;s++) g.r(0,h-s*o.sh-1,w,2,o.frame); }
   else { g.r(0,0,w,1,o.rim); g.r(w-1,1,1,h-1,o.band); for(s=1;s<o.storeys;s++) g.r(0,h-s*o.sh,w,1,o.band); }
   g.r(0,y0,w,2,o.foot);
   if(o.tower){ for(var f=0;f<o.tower-1;f++){ var ty=2+f*8; g.r(0,ty+7,w,1,o.band||o.frame); for(var tx=2;tx+2<=w-2;tx+=4){ var on=o.lit&&(((o.seed>>((f*3+tx)%11))&1)===1); g.r(tx,ty+1,2,4,on?o.litCol:P.glass); } } }
-  for(s=1;s<o.storeys;s++){ y=h-(s+1)*o.sh+5; if(o.ribbon) ribbon(g,4,y+1,w-8,o); else { win(g,5,y,o.lit,o); if(w>=30) win(g,w-12,y,o.lit,o); } }
+  for(s=1;s<o.storeys;s++){ y=h-(s+1)*o.sh+5; if(o.piers) decoLights(g,y-1,w,o); else if(o.ribbon) ribbon(g,4,y+1,w-8,o); else { win(g,5,y,o.lit,o); if(w>=30) win(g,w-12,y,o.lit,o); } }
   if(o.role===0){ door(g,5,y0-13,o); sign(g,16,y0-13,o); win(g,w-10,y0-12,o.lit,o); for(i=0;i<o.lamps;i++){ g.r(17+i*4,2,2,1,P.ink); g.r(17+i*4,3,2,2,P.lamp); } }
   else if(o.role===1){ bench(g,(w>>1)-7,y0-13,o); }
   else if(o.role===2){ shelf(g,(w>>1)-8,y0-13,o); }
@@ -476,9 +580,35 @@ function cratePaint(g,w,h){ g.r(0,0,w,h,P.wood); g.r(0,0,w,1,P.woodHi); g.r(0,h-
 function plankPaint(g,w,h){ g.r(0,0,w,h,P.woodDk); g.r(0,0,w,1,P.wood); }
 function plankTop(g,w,h){ g.r(0,0,w,h,P.wood); for(var x=0;x<w;x+=6) g.r(x,0,2,h,P.woodDk); }
 function ribbon(g,x,y,w,o){ g.r(x,y,w,6,o.frame); g.r(x+1,y+1,w-2,4,o.lit?o.litCol:P.glass); if(o.lit) g.r(x+1,y+1,w-2,1,o.litHi); else g.r(x+1,y+1,3,1,o.glint); for(var i=x+5;i<x+w-1;i+=5) g.r(i,y+1,1,4,o.frame); }
-function styled(o,hue,own){ o.frames=ST.frames; o.ribbon=ST.ribbon; o.rim=mixH(o.base,P.paper,.3); o.band=mixH(o.base,P.ink,.22); o.litCol=(own&&ST.litHue)?hue.l:P.lamp; o.litHi=(own&&ST.litHue)?hue.h:P.lampHi; return o; }
+function styled(o,hue,own){ if(ST.stone){ o.base=P.plaster; o.planks=false; } if(ST.piers){ o.piers=true; o.frame=P.trimLo; o.sill=P.trim; o.trim=P.trim; o.pier=mixH(o.base,P.trim,.4); o.pil=mixH(o.base,P.paper,.16); o.pilLo=mixH(o.base,P.ink,.25); } o.frames=ST.frames; o.ribbon=ST.ribbon; o.rim=mixH(o.base,P.paper,.3); o.band=mixH(o.base,P.ink,.22); o.litCol=(own&&ST.litHue)?hue.l:P.lamp; o.litHi=(own&&ST.litHue)?hue.h:P.lampHi; return o; }
 function slabPaint(hue){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(0,0,w,1,hue.b); }; }
 function slabTop(hue,plants){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(2,2,w-4,h-4,hue.d); g.r(4,4,w-8,h-8,hue.m); if(plants){ for(var x=4;x<w-6;x+=8){ g.r(x,2,2,2,P.leafHi); g.r(x+4,h-4,2,2,P.leaf); } } }; }
+/* Art Deco: a cornice with a chevron band, setbacks above it, a sunburst and a finial. */
+function chevPaint(){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(0,0,w,1,P.trim); var a=h-2; for(var x=0;x<w;x++){ var k=x%4, yy=a>=3?(k===0?3:k===2?1:2):a===2?1+(x&1):1; if(a>1||!(x&1)) g.r(x,yy,1,1,P.trim); } g.r(0,h-1,w,1,P.trimLo); }; }
+function decoTop(col){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(1,1,w-2,h-2,P.trimLo); g.r(2,2,w-4,h-4,col||P.timberDk); }; }
+function stepPaint(lit,lc){ return function(g,w,h){ g.r(0,0,w,h,P.plaster); g.r(0,0,w,1,P.trim); g.r(0,1,1,h-1,P.trimLo); g.r(w-1,1,1,h-1,P.trimLo); if(lit!==undefined){ for(var x=2;x+2<=w-2;x+=4) g.r(x,2,2,h-3,lit?lc:P.glass); } }; }
+function decoCap(parts,x0,x1,z0,z1,y,steps,lit,lc){
+ var cp=chevPaint(), i, a, sp, hh;
+ parts.push({b:box(x0-1,x1+1,y,y+5,z0-1,z1+1,{pz:cp,nz:cp,px:cp,nx:cp,top:decoTop()})}); y+=5;
+ for(i=0;i<steps;i++){ a=4*(i+1); if(x1-x0-2*a<6||z1-z0-2*a<6) break; hh=i?4:6; sp=stepPaint(i===0?lit:undefined,lc); parts.push({b:box(x0+a,x1-a,y,y+hh,z0+a,z1-a,{pz:sp,nz:sp,px:sp,nx:sp,top:decoTop()})}); y+=hh; }
+ return y;
+}
+function fanSlab(hue,lit,r0){ return function(g,w,h){ if(w<4){ g.r(0,0,w,h,P.trim); return; } for(var yy=0;yy<h;yy++){ var r=r0+(h-1-yy); for(var x=0;x<w;x++){ var sec=Math.floor(Math.atan2(r+.5,x+.5-w/2)/(Math.PI/9)); g.r(x,yy,1,1,(sec%2)?(lit?hue.l:hue.m):P.trim); } } }; }
+function fanParts(X,Z,y,half,axis,hue,lit){
+ var out=[];
+ [[half,3,0],[half-2,2,3],[half-4,2,5]].forEach(function(r){ if(r[0]<2) return; var fp=fanSlab(hue,lit,r[2]), b=axis==='x'?box(X-r[0],X+r[0],y+r[2],y+r[2]+r[1],Z-1,Z+1):box(X-1,X+1,y+r[2],y+r[2]+r[1],Z-r[0],Z+r[0]); b.p={pz:fp,nz:fp,px:fp,nx:fp,top:P.trim}; out.push({x:X,z:Z,b:b}); });
+ return out;
+}
+function sFinial(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ var f=((t>>1)+i)%2; g.r(-2,-1,5,1,P.trim); g.r(-1,-3,3,2,P.trimLo); g.r(0,-14,1,11,P.trim); g.r(1,-12+f,3,2,hue.b); g.r(4,-11-f,1,2,hue.b); g.r(1,-12+f,3,1,hue.l); g.r(-1,-16,3,2,(((t>>2)+i)%2)?P.lampHi:P.lamp); }}; }
+function decoRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z){
+ var top=[], door=cr.door, y=decoCap(grp.parts,x0,x1,z0,z1,H,1,!!cr.child,P.lamp), fx=X, fz=Z, axis='x';
+ if(door==='pz') fz=z1-5; else if(door==='nz') fz=z0+5; else if(door==='px'){ fx=x1-5; axis='z'; } else { fx=x0+5; axis='z'; }
+ fanParts(fx,fz,y,7,axis,hue,cr.lit).forEach(function(f){ top.push(f); });
+ top.push({x:X,z:Z,s:sFinial(X,y,Z,hue,cr.i)});
+ if(cr.lit) top.push({x:x1-9,z:z0+9,s:sSmoke(x1-9,y,z0+9,cr.i)});
+ if(cr.star) top.push({x:x0+9,z:z0+9,s:sStar(x0+9,y,z0+9)});
+ grp.top=top; return y+22;
+}
 function flatRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z){
  var sp=slabPaint(hue), top=[], lit=cr.lit, lc=ST.litHue?hue.l:P.lamp, door=cr.door, sb;
  grp.parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(hue,ST.plants)})});
@@ -504,10 +634,10 @@ function sStone(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-2,-9,4,9,P.ston
 function sStatue(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-4,-4,8,4,P.stone); g.r(-4,-5,8,1,P.ink); g.r(-4,-4,8,1,P.plasterHi); g.r(-2,-12,4,7,P.gold); g.r(-1,-14,2,2,P.gold); g.r(-3,-11,1,3,P.gold); g.r(2,-12,1,2,P.gold); g.r(2,-15,1,3,P.goldDk); g.r(-1,-14,1,1,P.goldHi); g.r(-2,-12,1,6,P.goldHi); g.r(1,-8,1,3,P.goldDk); }}; }
 function sVane(x,y,z){ return {x:x,y:y,z:z,draw:function(g){ g.r(0,-7,1,7,P.ink); g.r(-3,-6,7,1,P.ink); g.r(2,-7,1,3,P.ink); }}; }
 function sBell(x,y,z,ring){ return {x:x,y:y,z:z,draw:function(g,t){ var sw=ring&&t?(((t>>1)%2)?1:-1):0, c=ring?P.accent:P.lamp; g.r(0,0,1,2,P.ink); g.r(-1+sw,1,3,1,c); g.r(-2+sw,2,5,4,c); g.r(-2+sw,6,5,1,P.ink); g.r(sw,7,1,1,P.ink); }}; }
-function sTree(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-1,-14,3,14,P.wood); g.r(1,-14,1,14,P.woodDk); g.r(-4,-34,8,2,P.leafHi); g.r(-6,-32,12,6,P.leafHi); g.r(-6,-26,12,8,P.leaf); g.r(-5,-18,10,4,P.leafLo); g.r(-4,-29,2,2,P.leaf); g.r(1,-24,3,2,P.leafHi); g.r(-5,-21,2,2,P.leafLo); g.r(2,-30,2,2,P.leaf); }}; }
-function sLamp(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(0,-11,1,11,P.ink); g.r(-1,-14,3,3,P.night?P.lamp:P.glint); g.r(-1,-15,3,1,P.ink); if(P.night) g.r(0,-13,1,1,P.lampHi); }}; }
-function sWell(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-5,-5,10,5,P.stone); g.r(-5,-6,10,1,P.ink); g.r(-5,-1,10,1,P.slateDk); g.r(-5,-14,1,8,P.woodDk); g.r(4,-14,1,8,P.woodDk); g.r(-6,-16,12,2,P.wood); g.r(-6,-16,12,1,P.woodHi); g.r(0,-14,1,5,P.ink); }}; }
-function sSails(x,y,z,busy){ return {x:x,y:y,z:z,draw:function(g,t){ var ang=(busy?t:0)*Math.PI/16; for(var a=0;a<4;a++){ var th=ang+a*Math.PI/2, c=Math.cos(th), s=Math.sin(th); for(var r=5;r<=18;r++){ for(var o=1;o<=3;o++) g.r(Math.round(c*r-s*o),Math.round(s*r+c*o),1,1,P.plaster); } for(r=2;r<=19;r++) g.r(Math.round(c*r),Math.round(s*r),1,1,P.ink); } g.r(-1,-1,3,3,P.ink); }}; }
+function sTree(x,z){ return {x:x,y:0,z:z,draw:function(g){ if(ST.piers){ g.r(-4,-4,8,4,P.stone); g.r(-4,-5,8,1,P.trim); g.r(-1,-3,2,1,P.trim); g.r(0,-13,1,8,P.woodDk); g.r(-3,-31,6,3,P.leafHi); g.r(-5,-28,10,5,P.leafHi); g.r(-6,-23,12,6,P.leaf); g.r(-5,-17,10,4,P.leafLo); g.r(-3,-26,2,2,P.leaf); g.r(2,-21,2,2,P.leafHi); return; } g.r(-1,-14,3,14,P.wood); g.r(1,-14,1,14,P.woodDk); g.r(-4,-34,8,2,P.leafHi); g.r(-6,-32,12,6,P.leafHi); g.r(-6,-26,12,8,P.leaf); g.r(-5,-18,10,4,P.leafLo); g.r(-4,-29,2,2,P.leaf); g.r(1,-24,3,2,P.leafHi); g.r(-5,-21,2,2,P.leafLo); g.r(2,-30,2,2,P.leaf); }}; }
+function sLamp(x,z){ return {x:x,y:0,z:z,draw:function(g){ if(ST.piers){ g.r(-1,-1,3,1,P.trim); g.r(0,-11,1,10,P.trimLo); g.r(-2,-11,5,1,P.trim); g.r(-1,-15,3,4,P.night?P.lamp:P.glint); g.r(-2,-16,5,1,P.trim); g.r(-1,-17,3,1,P.trim); if(P.night) g.r(0,-14,1,2,P.lampHi); return; } g.r(0,-11,1,11,P.ink); g.r(-1,-14,3,3,P.night?P.lamp:P.glint); g.r(-1,-15,3,1,P.ink); if(P.night) g.r(0,-13,1,1,P.lampHi); }}; }
+function sWell(x,z){ return {x:x,y:0,z:z,draw:function(g,t){ if(ST.piers){ var f=t?((t>>2)%2):0; g.r(-7,-3,14,3,P.stone); g.r(-7,-4,14,1,P.trim); g.r(-6,-3,12,1,P.glint); g.r(-1,-9,2,6,P.stone); g.r(-3,-10,6,1,P.trim); g.r(-2,-11,4,1,P.stone); g.r(0,-14,1,3,P.trim); g.r(-1,-15,3,1,P.trim); g.r(-4,-9+f,1,2,P.glint); g.r(3,-8-f,1,2,P.glint); return; } g.r(-5,-5,10,5,P.stone); g.r(-5,-6,10,1,P.ink); g.r(-5,-1,10,1,P.slateDk); g.r(-5,-14,1,8,P.woodDk); g.r(4,-14,1,8,P.woodDk); g.r(-6,-16,12,2,P.wood); g.r(-6,-16,12,1,P.woodHi); g.r(0,-14,1,5,P.ink); }}; }
+function sSails(x,y,z,busy){ return {x:x,y:y,z:z,draw:function(g,t){ var ang=(busy?t:0)*Math.PI/16; for(var a=0;a<4;a++){ var th=ang+a*Math.PI/2, c=Math.cos(th), s=Math.sin(th); for(var r=5;r<=18;r++){ for(var o=1;o<=3;o++) g.r(Math.round(c*r-s*o),Math.round(s*r+c*o),1,1,ST.piers?P.trim:P.plaster); } for(r=2;r<=19;r++) g.r(Math.round(c*r),Math.round(s*r),1,1,P.ink); } g.r(-1,-1,3,3,P.ink); }}; }
 
 /* ---------- the world ---------- */
 function World(){ this.cells=new Map(); this.list=[]; this.segs=new Map(); this.walkers=[]; this.hmax=30; }
@@ -548,14 +678,14 @@ function topPaint(w,cell){ return function(g){
     var R=function(a,b,aw,bh,col){ if(side==='N') g.r(8+a,b,aw,bh,col); else if(side==='S') g.r(8+a,56-b-bh,aw,bh,col); else if(side==='W') g.r(b,8+a,bh,aw,col); else g.r(56-b-bh,8+a,bh,aw,col); };
     if(gr===1){ for(a=2;a<40;a+=8) R(a,0,4,2,P.path); }
     else if(gr===2){ R(0,0,40,4,P.path); for(a=4;a<40;a+=10) R(a,2,2,2,P.pathLo); }
-    else { R(0,0,40,6,P.cobble); R(0,6,40,2,P.cobbleLo); for(a=0;a<40;a+=4) R(a,((a/4)%3)*2,2,2,P.cobbleLo); }
+    else { R(0,0,40,6,P.cobble); R(0,6,40,2,P.cobbleLo); for(a=0;a<40;a+=4) R(a,((a/4)%3)*2,2,2,P.cobbleLo); if(ST.inlay) R(0,0,40,1,P.trim); }
   })(sides[i][0],sides[i][1]); }
   var corners=[[0,0,w.node(cx,cz)],[1,0,w.node(cx+1,cz)],[0,1,w.node(cx,cz+1)],[1,1,w.node(cx+1,cz+1)]];
   for(i=0;i<4;i++){ (function(ex,ey,ng){ if(!ng) return;
     var C=function(a,b,ww,hh,col){ g.r(ex?56-a-ww:a, ey?56-b-hh:b, ww,hh,col); };
     if(ng===1){ C(0,0,2,2,P.path); }
     else if(ng===2){ C(0,0,8,4,P.path); C(0,0,4,8,P.path); }
-    else { C(0,0,8,8,P.cobble); C(6,6,2,2,P.cobbleLo); C(2,2,2,2,P.cobbleLo); C(6,0,2,2,P.cobbleLo); C(0,6,2,2,P.cobbleLo); }
+    else { C(0,0,8,8,P.cobble); C(6,6,2,2,P.cobbleLo); C(2,2,2,2,P.cobbleLo); C(6,0,2,2,P.cobbleLo); C(0,6,2,2,P.cobbleLo); if(ST.inlay){ C(0,0,8,1,P.trim); C(0,0,1,8,P.trim); } }
   })(corners[i][0],corners[i][1],corners[i][2]); }
   if(cell.foot){ var f=cell.foot, sa=P.shadow; g.a(f.x0+26,f.z0+26,f.x1-f.x0+4,f.z1-f.z0+4,P.ink,sa*.55); g.a(f.x1+28,f.z0+32,6,f.z1-f.z0+2,P.ink,sa); g.a(f.x0+32,f.z1+28,f.x1-f.x0-4,6,P.ink,sa); }
   if(P.pool){
@@ -588,6 +718,7 @@ function addWorkshop(w,cell,cr){
  for(i=0;i<4;i++){ var o={},k; for(k in base) o[k]=base[k]; o.role=(i-di+4)%4; p[sides[i]]=wallPaint(o); }
  var grp={t:'grp',x:X,z:Z,parts:[{b:box(x0,x1,0,H,z0,z1,p)}],pick:{kind:'workshop',cr:cr}}, parts=grp.parts;
  if(ST.roof==='flat') top=flatRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z);
+ else if(ST.roof==='step') top=decoRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z);
  else {
   var steps=roof(x0-2,x1+2,z0-2,z1+2,H,cr.roof,2,hue,P.plaster,{loftAt:2,loftLit:cr.child});
   steps.forEach(function(b){ parts.push({b:b}); });
@@ -611,6 +742,10 @@ function addWorkshop(w,cell,cr){
   var a0=along(b,2,0), a1=along(b,16,4), aw=function(g,w,h){ for(var q=0;q<w;q+=4){ g.r(q,0,2,h,hue.b); g.r(q+2,0,2,h,P.paper); } };
   cell.items.push({t:'box',x:(a0[0]+a1[0])/2,z:(a0[1]+a1[1])/2,b:box(Math.min(a0[0],a1[0]),Math.max(a0[0],a1[0]),14,16,Math.min(a0[1],a1[1]),Math.max(a0[1],a1[1]),{pz:aw,nz:aw,px:aw,nx:aw,top:aw})});
  }
+ if(ST.blade){
+  var s0=along(b,0,0), s1=along(b,4,2), on=cr.lit, bl=function(g,w,h){ g.r(0,0,w,h,P.trim); if(w>=3){ g.r(1,1,w-2,h-2,on?hue.b:hue.d); for(var q=2;q<h-2;q+=3) g.r(1,q,w-2,1,on?hue.h:hue.m); } };
+  cell.items.push({t:'box',x:(s0[0]+s1[0])/2,z:(s0[1]+s1[1])/2,b:box(Math.min(s0[0],s1[0]),Math.max(s0[0],s1[0]),7,Math.min(H-1,31),Math.min(s0[1],s1[1]),Math.max(s0[1],s1[1]),{pz:bl,nz:bl,px:bl,nx:bl,top:P.trim})});
+ }
  if(cr.lit&&P.pool) cell.glow={col:base.litCol,r:[[along(b,4,0),along(b,14,8)],[along(b,6,0),along(b,12,4)]]};
  w.hmax=Math.max(w.hmax,top);
  cr.b=b; cr.cell=cell; return b;
@@ -621,11 +756,12 @@ function addHouse(w,cell,ring){
  var p={top:P.timberDk}, roles={pz:5,px:6,nz:6,nx:6};
  ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=roles[sd]; p[sd]=wallPaint(o); });
  var parts=[{b:box(x0,x1,0,H,z0,z1,p)}];
- if(flat){ var sp=slabPaint(ac); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,ST.plants)})}); top=H+7; }
+ var deco=ST.roof==='step';
+ if(deco) top=decoCap(parts,x0,x1,z0,z1,H,2,!!P.night,P.lamp);
+ else if(flat){ var sp=slabPaint(ac); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,ST.plants)})}); top=H+7; }
  else { var steps=roof(x0-2,x1+2,z0-2,z1+2,H,'gx',2,sl,P.wood,{loftAt:3,loftLit:P.night}); steps.forEach(function(b){ parts.push({b:b}); }); top=H+steps.length*2; }
- parts.push({b:box(x1-10,x1-6,top-4,top+6,Z-6,Z-2,{pz:chimPaint,nz:chimPaint,px:chimPaint,nx:chimPaint,top:P.ink})});
- if(P.night) parts.push({s:sSmoke(x1-8,top+6,Z-4,3)});
- parts.push({s:sVane(x0+4,flat?H+3:top,Z-4)});
+ if(!deco){ parts.push({b:box(x1-10,x1-6,top-4,top+6,Z-6,Z-2,{pz:chimPaint,nz:chimPaint,px:chimPaint,nx:chimPaint,top:P.ink})}); if(P.night) parts.push({s:sSmoke(x1-8,top+6,Z-4,3)}); }
+ parts.push({s:deco?sFinial(X-4,top,Z-4,ac,5):sVane(x0+4,flat?H+3:top,Z-4)});
  cell.items.push({t:'grp',x:X-4,z:Z-4,parts:parts,pick:{kind:'house'}});
  var deck=function(g,w,h){ g.r(0,0,w,h,P.wood); g.r(0,0,w,1,P.woodHi); };
  var post={pz:P.timberDk,nz:P.timberDk,px:P.timberDk,nx:P.timberDk};
@@ -638,7 +774,7 @@ function addHouse(w,cell,ring){
  cell.items.push({t:'spr',x:X+18,z:Z-2,s:sTree(X+18,Z-2)});
  cell.foot={x0:x0-X,x1:x1-X,z0:z0-Z,z1:z1+8-Z};
  if(P.pool) cell.glow={col:P.lamp,r:[[[X-10,z1+8],[X+2,z1+16]],[[X-8,z1+8],[X,z1+12]]]};
- w.hmax=Math.max(w.hmax,top+10);
+ w.hmax=Math.max(w.hmax,top+(deco?18:10));
  return {cx:cell.cx,cz:cell.cz,door:'pz',x0:x0,x1:x1,z0:z0,z1:z1+8};
 }
 function addStore(w,cell,count){
@@ -647,7 +783,8 @@ function addStore(w,cell,count){
  var p={top:P.timberDk}, roles={pz:7,px:8,nz:8,nx:9};
  ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=roles[sd]; p[sd]=wallPaint(o); });
  var parts=[{b:box(x0,x1,0,H,z0,z1,p)}];
- if(ST.roof==='flat'){ var sp=slabPaint(sl); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,false)})}); }
+ if(ST.roof==='step'){ decoCap(parts,x0,x1,z0,z1,H,0); fanParts(X,z1-1,H+5,6,'x',sl,false).forEach(function(f){ parts.push({b:f.b}); }); }
+ else if(ST.roof==='flat'){ var sp=slabPaint(sl); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,false)})}); }
  else roof(x0-2,x1+2,z0-2,z1+2,H,'gx',4,sl,P.wood,null).forEach(function(b){ parts.push({b:b}); });
  cell.items.push({t:'grp',x:X,z:Z,parts:parts,pick:{kind:'store'}});
  cell.foot={x0:x0-X,x1:x1-X,z0:z0-Z,z1:z1-Z};
@@ -661,7 +798,8 @@ function addMill(w,cell,busy){
   ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=(sd==='pz'?t[3]:(t[3]===9?10:t[3])); p[sd]=wallPaint(o); });
   parts.push({b:box(X-t[0],X+t[0],t[1],t[2],Z-t[0],Z+t[0],p)});
  });
- roof(X-10,X+10,Z-10,Z+10,46,'hip',2,sl,P.plaster,null).forEach(function(b){ parts.push({b:b}); });
+ if(ST.roof==='step') decoCap(parts,X-8,X+8,Z-8,Z+8,46,1);
+ else roof(X-10,X+10,Z-10,Z+10,46,'hip',2,sl,P.plaster,null).forEach(function(b){ parts.push({b:b}); });
  parts.push({s:sSails(X,40,Z,busy)});
  cell.items.push({t:'grp',x:X,z:Z,parts:parts,pick:{kind:'mill'}});
  cell.foot={x0:-12,x1:12,z0:-12,z1:12};
@@ -733,7 +871,7 @@ function addShed(w,cell,cr,s,lit,roofed,floors){
  ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=(sd===s.door?(y0?10:11):8); p[sd]=wallPaint(o); });
  var grp={t:'grp',x:(x0+x1)/2,z:(z0+z1)/2,parts:[{b:box(x0,x1,y0,y1,z0,z1,p)}]};
  if(roofed){
-  if(ST.roof==='flat'||floors>=3){ var sp=slabPaint(hue); grp.parts.push({b:box(x0,x1,y1,y1+2,z0,z1,{pz:sp,nz:sp,px:sp,nx:sp,top:hue.m})}); if(floors>=6) grp.parts.push({s:sAntenna((x0+x1)/2,y1+2,(z0+z1)/2,hue,3)}); }
+  if(ST.roof!=='gable'||floors>=3){ var sp=slabPaint(hue); grp.parts.push({b:box(x0,x1,y1,y1+2,z0,z1,{pz:sp,nz:sp,px:sp,nx:sp,top:hue.m})}); if(floors>=6) grp.parts.push({s:sAntenna((x0+x1)/2,y1+2,(z0+z1)/2,hue,3)}); }
   else roof(x0,x1,z0,z1,y1,s.ridge,2,hue,P.wood,null).forEach(function(b){ grp.parts.push({b:b}); });
  }
  cell.items.push(grp);
@@ -771,7 +909,28 @@ var STAGES=[
  {name:'high-rise',tiers:[[22,16,11],[16,12,3]],sign:true,ant:true},
  {name:'skyscraper',tiers:[[28,20,14],[22,16,5],[14,10,3]],crown:true,spire:true}
 ];
+function tierCols(w){ var n=Math.max(1,Math.floor((w+1)/5)), span=n*5-3, off=Math.floor((w-span)/2); if(off<2&&n>1){ n--; span=n*5-3; off=Math.floor((w-span)/2); } return {n:n,off:off}; }
+function decoTier(g,w,h,o){
+ var c=tierCols(w), r=rng(o.seed), upper=o.ground?o.floors-1:o.floors, i,k,x,y,m=w>>1, on;
+ g.r(0,0,w,h,o.base);
+ for(k=0;k<c.n-1;k++) g.r(c.off+3+k*5,1,1,h-1,o.pier);
+ for(i=0;i<upper;i++){ y=2+i*6; for(k=0;k<c.n;k++){ on=r()<o.lit; x=c.off+k*5; g.r(x,y,2,4,on?o.litCol:P.glass); if(on) g.r(x,y,2,1,o.litHi); } }
+ if(o.ground){ y=h-8; on=o.lit>.5;
+  for(k=0;k<c.n;k++){ x=c.off+k*5; if(o.door&&x+2>m-4&&x<m+4) continue; g.r(x,y,2,6,on?o.litCol:P.glass); }
+  if(o.door){ g.r(m-3,h-9,6,9,o.base); g.r(m-2,h-6,4,6,P.trimLo); g.r(m-1,h-5,2,5,o.hue.d); g.r(m-1,h-9,2,1,P.trim); g.r(m-2,h-8,4,1,on?o.hue.l:o.hue.m); g.r(m-3,h-7,6,1,on?o.hue.l:o.hue.m); g.r(m-3,h-7,1,1,P.trim); g.r(m-1,h-7,2,1,P.trim); g.r(m+2,h-7,1,1,P.trim); }
+  g.r(0,h-1,w,1,P.trimLo); }
+ g.r(0,0,1,h,P.trim); g.r(w-1,0,1,h,P.trim); g.r(0,0,w,1,P.trim);
+}
+function decoCrown(parts,top,X,Z,y,lw,ld,stage,hue,lit,cr){
+ var steps=stage>=5?2:stage>=3?1:0, a=0, i, sp;
+ for(i=0;i<steps;i++){ if(lw-2*(a+3)<6||ld-2*(a+3)<6) break; a+=3; sp=stepPaint(lit,P.lamp); parts.push({b:box(X-lw/2+a,X+lw/2-a,y,y+5,Z-ld/2+a,Z+ld/2-a,{pz:sp,nz:sp,px:sp,nx:sp,top:decoTop()})}); y+=5; }
+ var half=Math.min(stage>=5?6:stage>=3?5:stage>=2?4:0,Math.floor((lw-2*a)/2)-1);
+ if(half>=3) fanParts(X,Z+ld/2-a-1,y,half,'x',hue,lit).forEach(function(f){ top.push(f); });
+ if(stage>=5) top.push({x:X,z:Z,s:sSpire(X,y,Z,hue,cr.i)}); else if(stage>=3) top.push({x:X,z:Z,s:sFinial(X,y,Z,hue,cr.i+stage)});
+ return y+(half>=3?7:0);
+}
 function tierPaint(o){ return function(g,w,h){
+  if(o.piers){ decoTier(g,w,h,o); return; }
   var i,x,y,r=rng(o.seed), upper=o.ground?o.floors-1:o.floors;
   g.r(0,0,w,h,o.base); g.r(0,0,1,h,o.band); g.r(w-1,0,1,h,o.band); g.r(0,0,w,1,o.hue.b);
   if(o.frames){ for(i=1;i<=upper;i++) g.r(0,i*6,w,1,o.band); }
@@ -779,7 +938,7 @@ function tierPaint(o){ return function(g,w,h){
   if(o.ground){ y=h-7; if(o.door){ g.r((w>>1)-2,h-7,4,7,o.band); g.r((w>>1)-1,h-6,2,6,o.hue.d); g.r(2,y,(w>>1)-5,3,o.lit?o.hue.l:P.glass); g.r((w>>1)+3,y,w-(w>>1)-5,3,o.lit?o.hue.l:P.glass); } else g.r(2,y,w-4,3,o.lit>.5?o.hue.l:P.glass); g.r(0,h-1,w,1,o.band); }
 }; }
 function sLantern(x,z,hue){ return {x:x,y:0,z:z,draw:function(g){ g.r(0,-6,1,6,P.ink); g.r(-1,-9,3,1,P.ink); g.r(-1,-8,3,3,hue.l); g.r(0,-7,1,1,hue.h); }}; }
-function sSpire(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ g.r(0,-18,1,18,P.ink); g.r(-1,-6,3,1,P.ink); g.r(-1,-12,3,1,P.ink); g.r(-1,-21,3,3,(((t>>2)+i)%2)?hue.h:hue.l); }}; }
+function sSpire(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ var mc=ST.piers?P.trim:P.ink; g.r(0,-18,1,18,mc); g.r(-1,-6,3,1,mc); g.r(-1,-12,3,1,mc); g.r(-1,-21,3,3,(((t>>2)+i)%2)?hue.h:hue.l); }}; }
 function addProject(w,cell,cr,stage,px,pz,lit){
  var X=cell.cx*U+px, Z=cell.cz*U+pz, hue=ramp(P.hues[cr.hue]), st=STAGES[stage], sides=['pz','px','nz','nx'], parts=[], top=[], y=0;
  var roofTop=function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(2,2,w-4,h-4,hue.d); };
@@ -787,26 +946,37 @@ function addProject(w,cell,cr,stage,px,pz,lit){
   var wall=function(door){ return function(g,w,h){ g.r(0,0,w,h,P.wood); for(var q=2;q<h;q+=3) g.r(0,q,w,1,P.woodDk); g.r(0,0,1,h,P.woodDk); g.r(w-1,0,1,h,P.woodDk); if(door){ g.r((w>>1)-1,h-5,3,5,P.ink); g.r((w>>1),h-4,1,4,hue.d); } }; };
   var roofSide=function(g,w,h){ g.r(0,0,w,h,P.slateDk); g.r(0,0,w,1,hue.d); };
   var patched=function(g,w,h){ g.r(0,0,w,h,P.slateDk); g.r(2,0,2,2,P.woodHi); };
+  if(ST.piers){
+   var dw=function(door){ return function(g,w,h){ g.r(0,0,w,h,P.plaster); g.r(0,0,1,h,P.trim); g.r(w-1,0,1,h,P.trim); if(door){ g.r((w>>1)-1,h-5,3,5,P.trimLo); g.r((w>>1),h-4,1,4,hue.d); } else g.r((w>>1)-1,2,2,2,lit?P.lamp:P.glass); }; }, cap=function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(0,0,w,1,P.trim); };
+   parts.push({b:box(X-4,X+4,0,6,Z-4,Z+4,{pz:dw(true),nz:dw(false),px:dw(false),nx:dw(false),top:P.timberDk})});
+   parts.push({b:box(X-5,X+5,6,8,Z-5,Z+5,{pz:cap,nz:cap,px:cap,nx:cap,top:decoTop()})});
+   cell.items.push({t:'grp',x:X,z:Z,parts:parts,top:fanParts(X,Z+3,8,3,'x',hue,lit)});
+  } else {
   parts.push({b:box(X-4,X+4,0,6,Z-4,Z+4,{pz:wall(true),nz:wall(false),px:wall(false),nx:wall(false),top:P.woodDk})});
   parts.push({b:box(X-4,X+4,6,7,Z-4,Z+4,{pz:roofSide,nz:roofSide,px:roofSide,nx:roofSide,top:patched})});
   parts.push({b:box(X-4,X+4,7,9,Z-4,Z,{pz:roofSide,nz:roofSide,px:roofSide,nx:roofSide,top:P.slateDk})});
   cell.items.push({t:'grp',x:X,z:Z,parts:parts});
+  }
   cell.items.push({t:'spr',x:X+6,z:Z+6,s:sLantern(X+6,Z+6,hue)});
   w.hmax=Math.max(w.hmax,14); return;
  }
  st.tiers.forEach(function(t,n){
   var W=t[0],D=t[1],floors=t[2],ground=n===0,h=ground?(floors-1)*6+10:floors*6+2,p={top:roofTop};
-  sides.forEach(function(sd,k){ p[sd]=tierPaint({floors:floors,ground:ground,door:ground&&sd==='pz',lit:lit?0.8:0.15,hue:hue,seed:cr.seed+stage*31+n*7+k,base:P.plaster,band:mixH(P.plaster,P.ink,.3),frames:ST.frames}); });
+  sides.forEach(function(sd,k){ p[sd]=tierPaint({floors:floors,ground:ground,door:ground&&sd==='pz',lit:lit?0.8:0.15,hue:hue,seed:cr.seed+stage*31+n*7+k,base:P.plaster,band:mixH(P.plaster,P.ink,.3),frames:ST.frames,piers:ST.piers,pier:mixH(P.plaster,P.trim,.4),litCol:P.lamp,litHi:P.lampHi}); });
   parts.push({b:box(X-W/2,X+W/2,y,y+h,Z-D/2,Z+D/2,p)}); y+=h;
+  if(ST.piers){ var cp=chevPaint(); parts.push({b:box(X-W/2-1,X+W/2+1,y,y+4,Z-D/2-1,Z+D/2+1,{pz:cp,nz:cp,px:cp,nx:cp,top:decoTop()})}); y+=4; }
  });
  var last=st.tiers[st.tiers.length-1], lw=last[0], ld=last[1];
+ if(ST.piers) y=decoCrown(parts,top,X,Z,y,lw,ld,stage,hue,lit,cr);
+ else {
  if(st.unit){ var up=function(g,w,h){ g.r(0,0,w,h,P.plaster); g.r(0,0,w,1,P.plasterHi); }; top.push({x:X-lw/2+4,z:Z-ld/2+4,b:box(X-lw/2+2,X-lw/2+6,y,y+3,Z-ld/2+2,Z-ld/2+6,{pz:up,nz:up,px:up,nx:up,top:P.plasterHi})}); }
  if(st.sign){ var sg=function(g,w,h){ g.r(0,0,w,h,lit?hue.b:hue.d); g.r(1,1,w-2,1,lit?hue.h:hue.m); g.r(1,h-2,w-2,1,lit?hue.h:hue.m); }; top.push({x:X,z:Z+ld/2-1,b:box(X-4,X+4,y+2,y+7,Z+ld/2-2,Z+ld/2,{pz:sg,nz:sg,px:sg,nx:sg,top:hue.h})}); }
  if(st.crown){ var cw=function(g,w,h){ g.r(0,0,w,h,lit?hue.l:hue.d); g.r(0,0,w,1,hue.h); for(var q=1;q<w;q+=2) g.r(q,1,1,h-1,P.timberDk); }; parts.push({b:box(X-4,X+4,y,y+8,Z-4,Z+4,{pz:cw,nz:cw,px:cw,nx:cw,top:hue.b})}); y+=8; }
  if(st.spire) top.push({x:X,z:Z,s:sSpire(X,y,Z,hue,cr.i)});
  else if(st.ant) top.push({x:X+lw/2-3,z:Z-ld/2+3,s:sAntenna(X+lw/2-3,y,Z-ld/2+3,hue,cr.i+stage)});
+ }
  cell.items.push({t:'grp',x:X,z:Z,parts:parts,top:top});
- w.hmax=Math.max(w.hmax,y+(st.spire?24:14));
+ w.hmax=Math.max(w.hmax,y+(st.spire?24:ST.piers?18:14));
 }
 function ladderWorld(){
  var w=new World(), cr=creature(5); cr.hue=5; cr.form='folio';
@@ -845,6 +1015,9 @@ function drawSky(ctx,W,H,S){
  var oval=function(rx,ry,style){ ctx.fillStyle=style; for(var yy=Math.ceil((hy-ry)/S)*S;yy<hy+ry;yy+=S){ var dy=(yy+S/2-hy)/ry; if(dy<=-1||dy>=1) continue; var hw=Math.round(rx*Math.sqrt(1-dy*dy)/S)*S; if(hw>0) ctx.fillRect(hx-hw,yy,hw*2,S); } };
  for(i=0;i<n;i++){ var f=1-i/(n+0.8), rx=W*0.44*f, ry=H*0.42*f; oval(rx*1.07,ry*1.09,dither(ctx,P.sky[i],S)); oval(rx,ry,P.sky[i]); }
  if(P.orb){ var R=14, ox=Math.round(W*0.27/S), oy=Math.round(H*0.2/S); ctx.fillStyle=P.orb;
+  if(P.orbRays){ var R2=36, ry, rx, run, dd, inr; ctx.globalAlpha=P.night?.13:.3;
+   for(ry=-R2;ry<R2;ry++){ run=null; for(rx=-R2;rx<=R2;rx++){ dd=rx*rx+ry*ry; inr=rx<R2&&dd<R2*R2&&dd>(R+3)*(R+3)&&(Math.floor((Math.atan2(ry+.5,rx+.5)+Math.PI)/(Math.PI/12))%2===0); if(inr&&run===null) run=rx; else if(!inr&&run!==null){ ctx.fillRect((ox+run)*S,(oy+ry)*S,(rx-run)*S,S); run=null; } } }
+   ctx.globalAlpha=1; }
   for(var d=-R;d<R;d++){ if(P.orbSlit&&d>1&&(d%4)>=2) continue; var w2=Math.round(Math.sqrt(R*R-(d+.5)*(d+.5))); ctx.fillRect((ox-w2)*S,(oy+d)*S,w2*2*S,S); } }
 }
 View.prototype.fit=function(){
@@ -972,33 +1145,69 @@ var ACT={work:[8,8,9,9,8,8,9,9,0,0],walk:[4,5,6,7],porch:[0,10,10,0,10,10,0,0],n
 function nameOf(cr){ return GIVEN[cr.i%GIVEN.length]; }
 function el(id){ return document.getElementById(id); }
 function sayLine(who,text,acts,me){ var d=document.createElement('div'); d.className='say'+(me?' me':''); var b=document.createElement('b'); b.textContent=who; d.appendChild(b); d.appendChild(document.createTextNode(text)); if(acts){ var a=document.createElement('div'); a.className='acts'; acts.forEach(function(t){ var sp=document.createElement('span'); sp.textContent=t; a.appendChild(sp); }); d.appendChild(a); } return d; }
+var PROJECTS=['keywork-app','stead-site','engine','docs','notes'];
+var QUESTIONS=[['May I push this branch to main?',['Allow once','Not yet']],['Two names fit the new route. Which do you want?',['handoffs','pairs']],['The build failed three times. Pin the older version?',['Pin it','Keep trying']],['This needs a key for the mail service. Shall I ask you for it when I get there?',['Yes','Skip it']]];
+var DOING=['Running the checks on the branch','Drafting the release notes','Sorting the largest docs','Wiring the new route'];
+var DONE=['Renamed the route helpers','Listed the largest docs','Fixed the flaky serve test','Tidied the old fixtures','Wrote the migration note'];
+function ledgerOf(cr){
+ var r=rng(cr.seed+17), rows=[], p1=PROJECTS[cr.i%5], p2=PROJECTS[(cr.i+2)%5], i;
+ if(cr.state==='porch') rows.push({k:'ask',q:0,project:p1,age:'2m'});
+ if(cr.state==='blocked') rows.push({k:'ask',q:2,project:p1,age:'9m'});
+ if(cr.i%3===1) rows.push({k:'ask',q:cr.i%2?1:3,project:p2,age:'14m'});
+ if(cr.state==='work'||cr.state==='walk') rows.push({k:'run',title:DOING[cr.i%4],project:p1,age:'now'});
+ if(cr.i%2===0) rows.push({k:'back',title:DONE[(cr.i+1)%5],project:p2,age:'1h'});
+ for(i=0;i<2;i++) rows.push({k:'done',title:DONE[(cr.i+2+i*2)%5],project:r()<.5?p1:p2,age:i?'yesterday':'3h'});
+ rows.forEach(function(x){ if(x.k==='ask') x.title=QUESTIONS[x.q][0]; });
+ return {rows:rows,projects:p1===p2?[p1]:[p1,p2]};
+}
+var GLYPH={ask:'?',run:'▸',back:'●',done:'✓'};
+function rowButton(row,who,onPress){
+ var li=document.createElement('li'), b=document.createElement('button'), g=document.createElement('span'), t=document.createElement('span'), m=document.createElement('span');
+ b.type='button'; b.className='k-'+row.k; b.setAttribute('aria-pressed','false'); g.className='g'; g.textContent=GLYPH[row.k]; t.textContent=(who?who+': ':'')+row.title; m.className='meta'; m.textContent=row.project+' · '+row.age;
+ b.appendChild(g); b.appendChild(t); b.appendChild(m); b.onclick=function(){ var all=el('ledger').querySelectorAll('button'); for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed',String(all[i]===b)); onPress(); };
+ li.appendChild(b); return li;
+}
+function openRow(cr,row){
+ var nm=nameOf(cr), lines=el('askLines'), ask=el('ask'); lines.textContent=''; ask.hidden=false;
+ if(row.k==='ask'){
+  ask.className='panel asks'; el('askKind').textContent='question'; el('askMeta').textContent=row.project+' · from '+nm;
+  lines.appendChild(sayLine(nm,row.title,QUESTIONS[row.q][1]));
+  el('askBox').textContent='Answer, or ask '+nm+' back'; el('askNote').textContent='ends when answered';
+ } else {
+  ask.className='panel'; el('askKind').textContent=row.k==='run'?'task · running':row.k==='back'?'task · finished, not yet looked at':'task · done'; el('askMeta').textContent=row.project+' · '+row.age;
+  lines.appendChild(sayLine(nm,row.title+'.'));
+  el('askBox').textContent='Ask '+nm+' about this task'; el('askNote').textContent='a question here is its own short conversation';
+ }
+}
 function panels(){
- var sel=view.sel, cast=view.world.cast||[], lines=el('talkLines'), talk=el('talk'); lines.textContent=''; talk.className='panel';
+ var sel=view.sel, cast=view.world.cast||[], lines=el('talkLines'), list=el('ledger'), who=el('who'); lines.textContent=''; list.textContent=''; who.className='panel'; el('ask').hidden=true;
  if(sel&&typeof sel==='object'){
-  var say=SAY[sel.state]||SAY.idle, nm=nameOf(sel);
-  el('whoName').textContent=nm+' · a '+sel.form; el('whoState').textContent=say[0];
-  el('whoLine').textContent=say[1]+' Its workshop has '+sel.storeys+(sel.storeys===1?' floor':' floors')+' for the work it has delivered.';
+  var nm=nameOf(sel), led=ledgerOf(sel), asks=led.rows.filter(function(x){ return x.k==='ask'; }).length, run=led.rows.filter(function(x){ return x.k==='run'; })[0];
+  el('whoName').textContent=nm+' · a '+sel.form; el('whoState').textContent=asks?asks+(asks===1?' question':' questions'):'nothing waiting';
+  var sum='On '+led.projects.join(' and ')+'. '+(asks?(asks===1?'One question is':asks+' questions are')+' waiting on you. ':'')+(run?run.title+'.':'Nothing running.');
+  el('whoSum').textContent=sum;
+  led.rows.forEach(function(row){ list.appendChild(rowButton(row,null,function(){ openRow(sel,row); })); });
+  if(asks){ who.className='panel asks'; var firstAsk=list.querySelector('button'); if(firstAsk) firstAsk.click(); }
   el('talkWith').textContent='with '+nm;
-  lines.appendChild(sayLine('you','How is it going?',null,true));
-  var asks=sel.state==='porch'||sel.state==='blocked';
-  lines.appendChild(sayLine(nm,say[2],asks?(sel.state==='porch'?['Allow once','Not yet']:['Pin it','Keep trying']):null));
-  if(sel.state==='work'&&sel.child) lines.appendChild(sayLine(nm+' · a second thread','Reading the release notes alongside.'));
-  if(asks) talk.className='panel asks';
+  lines.appendChild(sayLine('you','Where are we?',null,true));
+  lines.appendChild(sayLine(nm,sum));
   el('talkBox').textContent='Write to '+nm;
  } else if(sel==='house'){
-  var waiting=cast.filter(function(c){ return c.state==='porch'||c.state==='blocked'; });
-  el('whoName').textContent='the porch'; el('whoState').textContent=waiting.length?waiting.length+' waiting':'nobody waiting';
-  el('whoLine').textContent='Where creatures bring finished work and wait when they need you.';
-  el('talkWith').textContent='what needs you';
-  if(!waiting.length) lines.appendChild(sayLine('the porch','Nothing needs you right now.'));
-  waiting.forEach(function(c){ lines.appendChild(sayLine(nameOf(c),(SAY[c.state]||SAY.idle)[2])); });
-  if(waiting.length) talk.className='panel asks';
-  el('talkBox').textContent='Answer whoever is first';
+  var total=0;
+  el('whoName').textContent='the porch'; el('whoSum').textContent='Everything waiting on you, from every creature, oldest first.';
+  cast.forEach(function(c){ ledgerOf(c).rows.forEach(function(row){ if(row.k!=='ask') return; total++; list.appendChild(rowButton(row,nameOf(c),function(){ openRow(c,row); })); }); });
+  el('whoState').textContent=total?total+' waiting':'nobody waiting';
+  if(total) who.className='panel asks';
+  el('talkWith').textContent='nobody chosen';
+  lines.appendChild(sayLine('the porch',total?'Press a question to answer it.':'Nothing needs you right now.'));
+  el('talkBox').textContent='Choose a creature to write to it';
  }
+ petSays();
  drawWho(tick);
+ try{ localStorage.setItem('stead-world-chosen',String(hero.selKind?-1:hero.sel)); }catch(e){}
 }
-function drawWho(t){
- var cv=el('whoArt'), sel=view&&view.sel; if(!cv) return;
+function drawLarge(id,t,cap){
+ var cv=el(id), sel=view&&view.sel; if(!cv) return;
  var dpr=window.devicePixelRatio||1, W=Math.round(cv.clientWidth*dpr), H=Math.round(cv.clientHeight*dpr); if(!W) return;
  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
  var ctx=cv.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H);
@@ -1008,6 +1217,38 @@ function drawWho(t){
  var seq=ACT[sel.state]||ACT.idle, fr=set.frames[seq[(t>>1)%seq.length]], S=Math.max(1,Math.floor(Math.min(W/set.w,(H-6)/set.h)));
  var map={o:P.ink,d:hue.d,m:hue.m,b:hue.b,l:hue.l,h:hue.h,w:P.paper}, ox=Math.floor((W-set.w*S)/2), oy=H-set.h*S-3;
  for(var y=0;y<set.h;y++){ var row=fr[y]; for(var x=0;x<set.w;x++){ var ch=row[x]; if(ch==='.') continue; ctx.fillStyle=map[ch]||set.fixed[ch]||hue.m; ctx.fillRect(ox+x*S,oy+y*S,S,S); } }
+}
+var TEAMCELL=30;
+function drawTeam(t){
+ var cv=el('team'), cast=(view&&view.world.cast)||[]; if(!cv) return;
+ var dpr=window.devicePixelRatio||1, S=Math.max(1,Math.round(dpr)), W=cast.length*TEAMCELL*S, H=46*S;
+ if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; cv.style.width=(W/dpr)+'px'; }
+ var ctx=cv.getContext('2d'), g=G(ctx); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H);
+ ctx.fillStyle=P.rock; ctx.fillRect(0,(46-4)*S,W,S);
+ cast.forEach(function(c,i){
+  var a=ART[c.form], asks=ledgerOf(c).rows.filter(function(x){ return x.k==='ask'; }).length, bob=(c.state==='nap'||!t)?0:(((t+i*3)>>2)%2), chosen=view.sel===c;
+  ctx.setTransform(S,0,0,S,(i*TEAMCELL+15)*S,(42-(chosen?2:0))*S);
+  drawArt(g,a,-(a.w>>1),-a.h-bob,artMap(ramp(P.hues[c.hue])));
+  if(asks){ g.r(-2,-a.h-bob-8,4,1,P.gold); g.r(1,-a.h-bob-7,1,2,P.gold); g.r(0,-a.h-bob-5,1,1,P.gold); g.r(0,-a.h-bob-3,1,1,P.gold); }
+  else if(c.state==='work'||c.state==='walk'){ g.r(-1,-a.h-bob-5,2,2,P.lamp); }
+  if(chosen){ g.r(-12,3,24,1,P.accent); g.r(-12,1,1,2,P.accent); g.r(11,1,1,2,P.accent); }
+ });
+ ctx.setTransform(1,0,0,1,0,0);
+}
+function drawWho(t){ drawLarge('whoArt',t); drawLarge('petArt',t); drawTeam(t); }
+function petSays(){
+ var sel=view.sel, box=el('petSay'), cast=view.world.cast||[]; box.textContent=''; box.className='bubble';
+ if(!sel||typeof sel!=='object'){ var b0=document.createElement('b'); b0.textContent='the porch'; box.appendChild(b0); box.appendChild(document.createTextNode('Choose a creature from the team.')); el('teamNote').textContent=cast.length+' on the team'; return; }
+ var nm=nameOf(sel), led=ledgerOf(sel), ask=led.rows.filter(function(x){ return x.k==='ask'; })[0], run=led.rows.filter(function(x){ return x.k==='run'; })[0], b=document.createElement('b');
+ b.textContent=nm+(ask?' asks':''); box.appendChild(b);
+ if(ask){ box.className='bubble asks'; box.appendChild(document.createTextNode(ask.title)); var acts=document.createElement('div'); acts.className='acts'; QUESTIONS[ask.q][1].forEach(function(tx){ var sp=document.createElement('span'); sp.textContent=tx; acts.appendChild(sp); }); box.appendChild(acts); }
+ else box.appendChild(document.createTextNode(run?run.title+'.':'Nothing is waiting. Say the word.'));
+ var waiting=cast.filter(function(c){ return ledgerOf(c).rows.some(function(x){ return x.k==='ask'; }); }).length;
+ el('teamNote').textContent=cast.length+' on the team'+(waiting?' · '+waiting+' with a question':'');
+}
+function toggleStead(show){
+ var deck=el('deck'), on=show===undefined?deck.hidden:show; deck.hidden=!on; el('petStead').setAttribute('aria-pressed',String(on));
+ if(on){ view.fit(); kick(); }
 }
 function reselect(){
  var cast=view.world.cast||[], i;
@@ -1047,12 +1288,19 @@ function init(){
  for(i=0;i<who.length;i++) who[i].onclick=function(){ poseName=this.getAttribute('data-who'); for(var k=0;k<who.length;k++) who[k].setAttribute('aria-pressed',String(who[k]===this)); drawPoses(tick); };
  var sets=document.querySelectorAll('button.set');
  for(i=0;i<sets.length;i++) sets[i].onclick=function(){ hero.eyeAuto=true; setN(+this.getAttribute('data-set')); heroC.scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'}); };
+ try{ var kept=+localStorage.getItem('stead-world-chosen'); if(kept>=0&&kept<hero.n){ hero.sel=kept; reselect(); kick(); } }catch(e){}
+ el('team').addEventListener('click',function(e){ var r=this.getBoundingClientRect(), i=Math.floor((e.clientX-r.left)/TEAMCELL), cast=view.world.cast||[]; if(i<0||i>=cast.length) return; hero.selKind=null; hero.sel=i; reselect(); kick(); });
+ el('team').addEventListener('dblclick',function(){ toggleStead(true); el('deck').scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); });
+ el('petTalk').onclick=function(){ toggleStead(true); el('talk').scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'}); };
+ el('petStead').onclick=function(){ toggleStead(); };
+ document.addEventListener('keydown',function(e){ if(e.key!=='m'&&e.key!=='M') return; if(e.ctrlKey||e.metaKey||e.altKey) return; var tg=e.target, tag=tg&&tg.tagName; if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(tg&&tg.isContentEditable)) return; toggleStead(); });
+ el('askClose').onclick=function(){ el('ask').hidden=true; var all=el('ledger').querySelectorAll('button'); for(var k=0;k<all.length;k++) all[k].setAttribute('aria-pressed','false'); };
  heroC.addEventListener('click',function(e){ var pick=hitAt(e); if(pick) choose(pick); });
  heroC.addEventListener('mousemove',function(e){ heroC.style.cursor=hitAt(e)?'pointer':'default'; });
  document.getElementById('nextWho').onclick=function(){ var cast=view.world.cast||[]; if(!cast.length) return; hero.selKind=null; hero.sel=(hero.sel+1)%cast.length; reselect(); kick(); };
  document.getElementById('alive').onclick=function(){ hero.moving=!hero.moving; label(); kick(); };
  heroC.addEventListener('keydown',function(e){ if(e.key==='ArrowLeft'){ e.preventDefault(); turn(-1); } else if(e.key==='ArrowRight'){ e.preventDefault(); turn(1); } });
- setInterval(function(){ if(hero.moving&&!document.hidden){ tick++; if(seen){ kick(); drawWho(tick); } drawPoses(tick); } },125);
+ setInterval(function(){ if(hero.moving&&!document.hidden){ tick++; if(seen) kick(); drawWho(tick); drawPoses(tick); } },125);
  if('IntersectionObserver' in window) new IntersectionObserver(function(en){ seen=en[0].isIntersecting; }).observe(heroC);
  var redo=0, again=function(){ if(redo) return; redo=requestAnimationFrame(function(){ redo=0; if(view.fit()) view.render(tick); stills.forEach(function(s){ if(s.v.fit()) s.v.render(0); }); drawForms(); drawPoses(tick); }); };
  window.addEventListener('resize',again);

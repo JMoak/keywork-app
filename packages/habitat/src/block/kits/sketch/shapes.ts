@@ -128,8 +128,15 @@ export function spriteOf(
   };
 }
 
-export function placed(art: SpriteArt, x: number, y: number, z: number, phase = 0): Part {
-  const sprite: Sprite = { x, y, z, ...art, phase };
+export function placed(
+  art: SpriteArt,
+  x: number,
+  y: number,
+  z: number,
+  phase = 0,
+  ramp?: RampKey,
+): Part {
+  const sprite: Sprite = { x, y, z, ...art, phase, ...(ramp === undefined ? {} : { ramp }) };
   return { sprite };
 }
 

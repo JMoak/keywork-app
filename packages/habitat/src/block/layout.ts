@@ -67,8 +67,8 @@ export function shedSpot(
 
 export const porchSpot: Point = { x: 8, z: 25 };
 export const treeSpot: Point = { x: 18, z: -2 };
-export const wellSpot: Point = { x: -14, z: 4 };
-export const monumentSpot: Point = { x: 10, z: 22 };
+export const wellSpot: Point = { x: -20, z: 2 };
+export const monumentSpot: Point = { x: 18, z: 22 };
 
 export const stoneFrom = 3;
 export const statueFrom = 8;
@@ -78,11 +78,10 @@ export function monumentFor(creatures: number): MonumentTier {
 }
 
 export const greenSpots: readonly Point[] = [
-  { x: -18, z: -14 },
-  { x: -2, z: -10 },
-  { x: 16, z: -14 },
-  { x: -18, z: 18 },
-  { x: -2, z: 14 },
+  { x: -16, z: -16 },
+  { x: 15, z: -14 },
+  { x: 1, z: 6 },
+  { x: -17, z: 22 },
 ];
 
 export const outOnTheGreenEvery = 4;

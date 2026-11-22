@@ -263,6 +263,21 @@ describe("the block world on the stead", () => {
     expect(stage.dataset.kit).toBe("lantern");
   });
 
+  it("offers Deco beside the other three kits, chosen the same way", () => {
+    stubCanvas();
+    const { container, getByText } = render(() => (
+      <BlockWorld world={sketchTown(5)} focused={true} hidden={false} />
+    ));
+    const stage = container.querySelector<HTMLElement>(".kw-stead-block");
+    const buttons = [...container.querySelectorAll(".kw-stead-block-controls button")].map(
+      (button) => button.textContent,
+    );
+    expect(buttons.slice(0, 4)).toEqual(["Neon", "Lantern", "Terrace", "Deco"]);
+    fireEvent.click(getByText("Deco"));
+    expect(stage?.dataset.kit).toBe("deco");
+    expect(getByText("Deco").getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("paints once and then sleeps under reduced motion, however lively the town", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("matchMedia", (query: string) => ({

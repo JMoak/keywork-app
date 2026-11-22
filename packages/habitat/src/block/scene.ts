@@ -330,7 +330,7 @@ class SceneBuilder {
     for (const annex of built.annexes ?? []) {
       this.place(
         resident.cell,
-        "awning",
+        annex.what,
         { parts: annex.parts, reach: 0 },
         { ramp, anchor: { x: annex.x, z: annex.z } },
       );
@@ -559,7 +559,7 @@ class SceneBuilder {
     });
     for (const annex of built.annexes ?? []) {
       draft.items.push({
-        what: `${what} porch`,
+        what: `${what} ${annex.what}`,
         x: dx + annex.x,
         z: dz + annex.z,
         parts: moved(annex.parts),

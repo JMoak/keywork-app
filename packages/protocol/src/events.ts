@@ -1,6 +1,6 @@
 import type { ChildFinished, ChildStarted } from "./children.ts";
 import type { CacheMiss, SendBehavior, SessionState } from "./controls.ts";
-import type { CreatureChanged, PromptOrigin } from "./creatures.ts";
+import type { CreatureChanged, CreatureHandoffChange, PromptOrigin } from "./creatures.ts";
 import type { MemoryDecision } from "./decisions.ts";
 import type {
   MeshGrantChange,
@@ -58,6 +58,7 @@ export const serverEventTypes = [
   "session.restored",
   "session.settled",
   "creature.changed",
+  "creature.handoff",
   "routine.fired",
   "routine.finished",
   "routine.needs",
@@ -112,6 +113,7 @@ export interface ServerPayloads {
   "session.restored": SessionRemoval;
   "session.settled": SessionSettlement;
   "creature.changed": CreatureChanged;
+  "creature.handoff": CreatureHandoffChange;
   "routine.fired": RoutineFired;
   "routine.finished": RoutineFinished;
   "routine.needs": RoutineNeeds;

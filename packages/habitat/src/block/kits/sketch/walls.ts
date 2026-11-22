@@ -11,6 +11,7 @@ export interface Wall {
   readonly sill: Role;
   readonly frames: boolean;
   readonly ribbon: boolean;
+  readonly piers: boolean;
   readonly storeys: number;
   readonly storeyHeight: number;
   readonly lit: boolean;
@@ -33,7 +34,11 @@ export interface DoorRoles {
   readonly fill: Role;
   readonly light: Role;
   readonly shadow: Role;
+  readonly fan: Role;
+  readonly fanLit: Role;
 }
+
+export const pierColumn = 5;
 
 export const faces = {
   door: 0,
@@ -71,7 +76,8 @@ function paintWall(brush: Brush, wall: Wall, w: number, h: number): void {
   const band = bandOf(wall.base);
   r(0, 0, w, h, wall.base);
   if (wall.plank !== undefined) for (let y = 3; y < h; y += 4) r(0, y, w, 1, wall.plank);
-  if (wall.frames) {
+  if (wall.piers) pilasters(brush, wall, w, h);
+  else if (wall.frames) {
     r(0, 0, 2, h, wall.frame);
     r(w - 2, 0, 2, h, wall.frame);
     r(0, 0, w, 1, wall.frame);
@@ -89,7 +95,8 @@ function paintWall(brush: Brush, wall: Wall, w: number, h: number): void {
   if (wall.tower > 0) tower(brush, wall, w, band);
   for (let storey = 1; storey < wall.storeys; storey += 1) {
     const y = h - (storey + 1) * wall.storeyHeight + 5;
-    if (wall.ribbon) ribbon(brush, wall, 4, y + 1, w - 8);
+    if (wall.piers) lightColumns(brush, wall, y - 1, w);
+    else if (wall.ribbon) ribbon(brush, wall, 4, y + 1, w - 8);
     else {
       window(brush, wall, 5, y);
       if (w >= 30) window(brush, wall, w - 12, y);
@@ -159,6 +166,10 @@ function face(brush: Brush, wall: Wall, w: number, h: number, floor: number): vo
 }
 
 function window(brush: Brush, wall: Wall, x: number, y: number): void {
+  if (wall.piers) {
+    pierWindow(brush, wall, x, y);
+    return;
+  }
   const r = brush.rect;
   r(x, y, 7, 8, wall.frame);
   r(x + 1, y + 1, 5, 6, wall.lit ? wall.lightColour : "glass");
@@ -171,11 +182,14 @@ function window(brush: Brush, wall: Wall, x: number, y: number): void {
 
 function door(brush: Brush, wall: Wall, x: number, y: number): void {
   const r = brush.rect;
-  r(x, y, 9, 13, wall.frame);
-  r(x + 1, y + 1, 7, 12, wall.door.fill);
-  r(x + 1, y + 1, 7, 1, wall.door.light);
-  r(x + 4, y + 2, 1, 11, wall.door.shadow);
-  r(x + 6, y + 7, 1, 1, "lampHi");
+  if (wall.piers) fannedDoor(brush, wall, x, y);
+  else {
+    r(x, y, 9, 13, wall.frame);
+    r(x + 1, y + 1, 7, 12, wall.door.fill);
+    r(x + 1, y + 1, 7, 1, wall.door.light);
+    r(x + 4, y + 2, 1, 11, wall.door.shadow);
+    r(x + 6, y + 7, 1, 1, "lampHi");
+  }
   if (!wall.boarded) return;
   for (const row of [y + 3, y + 8]) {
     r(x - 1, row, 11, 2, "woodHi");
@@ -286,4 +300,74 @@ function ivy(brush: Brush, wall: Wall, w: number, h: number): void {
     const x = truncated(random() * Math.max(3, w * 0.5 * (1 - climb * 0.6)));
     brush.rect(x, y, 2, 2, random() < 0.5 ? "leaf" : "leafHi");
   }
+}
+
+export function columnsOf(width: number): { readonly count: number; readonly offset: number } {
+  const count = Math.max(1, Math.floor((width - 6) / pierColumn));
+  const span = count * pierColumn - 3;
+  return { count, offset: Math.floor((width - span) / 2) };
+}
+
+function pilasters(brush: Brush, wall: Wall, w: number, h: number): void {
+  const r = brush.rect;
+  const columns = columnsOf(w);
+  if (wall.tower === 0) {
+    for (let pier = 0; pier < columns.count - 1; pier += 1) {
+      r(columns.offset + 3 + pier * pierColumn, 2, 1, h - 4, mixedRole(wall.base, "trim", 0.4));
+    }
+  }
+  const face = mixedRole(wall.base, "paper", 0.16);
+  const shade = mixedRole(wall.base, "ink", 0.25);
+  r(0, 0, 3, h, face);
+  r(1, 2, 1, h - 4, shade);
+  r(w - 3, 0, 3, h, face);
+  r(w - 2, 2, 1, h - 4, shade);
+  r(0, 0, w, 1, "trim");
+  r(0, 1, 4, 1, "trim");
+  r(w - 4, 1, 4, 1, "trim");
+  r(0, h - 3, 4, 1, "trim");
+  r(w - 4, h - 3, 4, 1, "trim");
+}
+
+function lightColumns(brush: Brush, wall: Wall, y: number, w: number): void {
+  const r = brush.rect;
+  const columns = columnsOf(w);
+  const glass = wall.lit ? wall.lightColour : "glass";
+  for (let column = 0; column < columns.count; column += 1) {
+    const x = columns.offset + column * pierColumn;
+    r(x, y, 2, 10, glass);
+    if (wall.lit) r(x, y, 2, 1, wall.lightHigh);
+    else r(x, y, 1, 1, "glint");
+    r(x, y + 5, 2, 1, wall.base);
+  }
+}
+
+function pierWindow(brush: Brush, wall: Wall, x: number, y: number): void {
+  const r = brush.rect;
+  const glass = wall.lit ? wall.lightColour : "glass";
+  r(x, y - 1, 7, 10, wall.frame);
+  r(x + 1, y, 2, 8, glass);
+  r(x + 4, y, 2, 8, glass);
+  if (wall.lit) {
+    r(x + 1, y, 2, 1, wall.lightHigh);
+    r(x + 4, y, 2, 1, wall.lightHigh);
+  } else r(x + 1, y, 1, 1, "glint");
+  r(x + 1, y + 4, 5, 1, wall.frame);
+  r(x - 1, y + 9, 9, 1, wall.sill);
+}
+
+function fannedDoor(brush: Brush, wall: Wall, x: number, y: number): void {
+  const r = brush.rect;
+  const fan = wall.lit ? wall.door.fanLit : wall.door.fan;
+  r(x, y + 2, 9, 11, wall.frame);
+  r(x + 1, y + 3, 7, 10, wall.door.fill);
+  r(x + 1, y + 3, 7, 1, wall.door.light);
+  r(x + 4, y + 4, 1, 9, wall.door.shadow);
+  r(x + 3, y + 8, 1, 2, "trim");
+  r(x + 5, y + 8, 1, 2, "trim");
+  r(x + 3, y - 1, 3, 1, "trim");
+  r(x + 1, y, 7, 1, fan);
+  r(x, y + 1, 9, 1, fan);
+  for (const rib of [1, 4, 7]) r(x + rib, y, 1, 1, "trim");
+  for (let rib = 0; rib < 9; rib += 2) r(x + rib, y + 1, 1, 1, "trim");
 }

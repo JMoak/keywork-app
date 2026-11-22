@@ -15,6 +15,24 @@ export interface CreatureChanged {
   change: CreatureChange;
 }
 
+export interface CreatureHandoff {
+  from: string;
+  to: string;
+  count: number;
+  lastAt: string;
+}
+
+export type CreatureHandoffChangeKind = "counted" | "dropped";
+
+export interface CreatureHandoffChange {
+  change: CreatureHandoffChangeKind;
+  handoff: CreatureHandoff;
+}
+
+export interface CreatureHandoffs {
+  handoffs: CreatureHandoff[];
+}
+
 export interface ExternalOrigin {
   kind: "external";
   client: string;
@@ -280,6 +298,7 @@ export const creatureRoutes = [
   { method: "POST", path: "/creatures/{slug}/pause", operationId: "pauseCreature" },
   { method: "POST", path: "/creatures/{slug}/resume", operationId: "resumeCreature" },
   { method: "DELETE", path: "/creatures/{slug}", operationId: "removeCreature" },
+  { method: "GET", path: "/creature-handoffs", operationId: "listCreatureHandoffs" },
   { method: "POST", path: "/creatures/{slug}/mcp", operationId: "serveCreatureMcp" },
   {
     method: "POST",

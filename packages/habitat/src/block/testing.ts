@@ -10,9 +10,29 @@ import {
   type Shelf,
   type Thread,
 } from "../world/types.ts";
-import type { MonumentTier } from "./kit.ts";
+import { critterParts, figureFor } from "./figures.ts";
+import type { Appearance, Construction, Kit, MonumentTier, ProjectStage } from "./kit.ts";
+import { bearingOf } from "./kits/sketch/style.ts";
 import { monumentFor } from "./layout.ts";
-import type { Decoration, Partnership, ProjectSite } from "./scene.ts";
+import {
+  type BlockWorld,
+  type Box,
+  type Cell,
+  cellCenter,
+  cellPitch,
+  halfCell,
+  type Item,
+  identityRamp,
+  movedPart,
+  type Part,
+} from "./model.ts";
+import {
+  type Decoration,
+  heroSlab,
+  lowestReach,
+  type Partnership,
+  type ProjectSite,
+} from "./scene.ts";
 
 export const noon = Date.UTC(2026, 10, 22, 12, 0, 0);
 export const night = Date.UTC(2026, 10, 22, 23, 0, 0);
@@ -220,6 +240,134 @@ export function plotProjects(
 }
 
 export const pageGround = { night: "#1a1b26", day: "#e9ebf3" } as const;
+
+export interface LadderPlot {
+  readonly stage: ProjectStage;
+  readonly cell: readonly [number, number];
+  readonly at: readonly [number, number];
+}
+
+export const ladderCreature = 5;
+export const ladderFigureAt = { x: -14, z: 18 } as const;
+
+export const ladderPlots: readonly LadderPlot[] = [
+  { stage: "shack", cell: [0, 0], at: [4, 4] },
+  { stage: "shed", cell: [0, 0], at: [18, 2] },
+  { stage: "house", cell: [1, 0], at: [-14, 0] },
+  { stage: "tower", cell: [1, 0], at: [12, 0] },
+  { stage: "high-rise", cell: [2, 0], at: [0, 0] },
+  { stage: "skyscraper", cell: [3, 0], at: [0, 0] },
+];
+
+export const ladderFraming = { tight: 0, slab: 12 } as const;
+
+export function ladderWorld(kit: Kit, appearance: Appearance): BlockWorld {
+  const colours = kit.colours[appearance];
+  const ramp = identityRamp(ladderCreature);
+  const seed = bearingOf(ladderCreature).seed;
+  const items = new Map<string, Item[]>();
+  const into = (cx: number, cz: number, item: Item): void => {
+    items.set(`${cx},${cz}`, [...(items.get(`${cx},${cz}`) ?? []), item]);
+  };
+  let reach = lowestReach;
+  for (const plot of ladderPlots) {
+    const [cx, cz] = plot.cell;
+    const centre = cellCenter(cx, cz);
+    const dx = centre.x + plot.at[0];
+    const dz = centre.z + plot.at[1];
+    const built = kit.project({ stage: plot.stage, seed, order: ladderCreature, lit: true });
+    reach = Math.max(reach, built.reach);
+    into(cx, cz, placedItem("project", built, dx, dz, ramp));
+    for (const annex of built.annexes ?? []) {
+      into(cx, cz, {
+        what: annex.what,
+        x: dx + annex.x,
+        z: dz + annex.z,
+        parts: annex.parts.map((part) => movedPart(part, dx, dz)),
+        ramp,
+      });
+    }
+  }
+  into(0, 0, {
+    what: "creature",
+    x: ladderFigureAt.x,
+    z: ladderFigureAt.z,
+    parts: critterParts(figureFor("folio"), "idle", ladderCreature).map((part) =>
+      movedPart(part, ladderFigureAt.x, ladderFigureAt.z),
+    ),
+    ramp,
+  });
+  const cells: Cell[] = [0, 1, 2, 3].map((cx) => ({
+    cx,
+    cz: 0,
+    land: true,
+    fog: 0,
+    ground: kit
+      .ground({
+        cx,
+        cz: 0,
+        worn: undefined,
+        roads: noRoads,
+        glow: [],
+        night: colours.night,
+        pooled: colours.pool !== undefined,
+        shadow: colours.shadow,
+      })
+      .parts.flatMap((part): Box[] => {
+        const moved = movedPart(part, cx * cellPitch, 0);
+        return "box" in moved ? [moved.box] : [];
+      }),
+    items: items.get(`${cx},0`) ?? [],
+  }));
+  return {
+    cells,
+    walkers: [],
+    bounds: {
+      minX: -halfCell,
+      maxX: 3 * cellPitch + halfCell,
+      minZ: -halfCell,
+      maxZ: halfCell,
+      height: reach,
+      slab: heroSlab,
+    },
+  };
+}
+
+const noRoads = {
+  north: 0,
+  south: 0,
+  west: 0,
+  east: 0,
+  northWest: 0,
+  northEast: 0,
+  southWest: 0,
+  southEast: 0,
+} as const;
+
+function placedItem(what: string, built: Construction, dx: number, dz: number, ramp: string): Item {
+  const moved = (part: Part): Part => movedPart(part, dx, dz);
+  const first = built.parts.find((part) => "box" in part);
+  const anchor =
+    first !== undefined && "box" in first
+      ? { x: (first.box.x0 + first.box.x1) / 2, z: (first.box.z0 + first.box.z1) / 2 }
+      : { x: 0, z: 0 };
+  return {
+    what,
+    x: dx + anchor.x,
+    z: dz + anchor.z,
+    parts: built.parts.map(moved),
+    ...(built.crown === undefined
+      ? {}
+      : {
+          crown: built.crown.map((crowned) => ({
+            x: crowned.x + dx,
+            z: crowned.z + dz,
+            part: moved(crowned.part),
+          })),
+        }),
+    ramp,
+  };
+}
 
 function threadsFor(slug: string, traits: SketchCreature, at: number): Thread[] {
   const old = (id: string): Thread => ({

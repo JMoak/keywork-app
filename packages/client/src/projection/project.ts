@@ -123,6 +123,7 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "session.removed":
     case "session.restored":
     case "creature.changed":
+    case "creature.handoff":
     case "routine.fired":
     case "routine.finished":
     case "routine.needs":

@@ -1,5 +1,6 @@
 import type { Kit } from "../../kit.ts";
 import { sketchKit } from "../sketch/kit.ts";
+import { plainStyle } from "../sketch/style.ts";
 import { neonColours } from "./colours.ts";
 
 export const neonKit: Kit = sketchKit(
@@ -14,6 +15,7 @@ export const neonKit: Kit = sketchKit(
     antenna: true,
     awning: false,
     plants: false,
+    ...plainStyle,
   },
   neonColours,
 );

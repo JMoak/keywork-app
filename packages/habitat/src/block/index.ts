@@ -53,6 +53,17 @@ export {
   type SystemColours,
   systemColourNames,
 } from "./forced.ts";
+export {
+  droppedPairTakesItsRoadUp,
+  type HandoffTally,
+  handoffsFor,
+  noHandoffs,
+  type Pairing,
+  partnershipsOf,
+  roadGradeFor,
+  tallyAfter,
+  tallyOf,
+} from "./handoffs.ts";
 export { covers, hitAt, texelAt } from "./hit.ts";
 export {
   type Appearance,
@@ -65,7 +76,10 @@ export {
   type KitColours,
   type MillSpec,
   type MonumentTier,
+  type ProjectSpec,
+  type ProjectStage,
   type PropSpec,
+  projectStages,
   type RoadEdges,
   type RoadGrade,
   type ShedSpec,
@@ -76,7 +90,15 @@ export {
   type WorkshopConstruction,
   type WorkshopSpec,
 } from "./kit.ts";
-export { firstKit, kitNamed, kits, lanternKit, neonKit, terraceKit } from "./kits/index.ts";
+export {
+  decoKit,
+  firstKit,
+  kitNamed,
+  kits,
+  lanternKit,
+  neonKit,
+  terraceKit,
+} from "./kits/index.ts";
 export {
   type CellAddress,
   doorSideOf,

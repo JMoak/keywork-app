@@ -78,10 +78,18 @@ function paintRect(
   colour: Rgba,
   scale: number,
 ): void {
+  const opacity =
+    rect.alpha === undefined ? undefined : Math.round(Math.min(1, Math.max(0, rect.alpha)) * 255);
   for (let y = Math.max(0, rect.y); y < Math.min(height, rect.y + rect.height); y += 1) {
     for (let x = Math.max(0, rect.x); x < Math.min(width, rect.x + rect.width); x += 1) {
       if (rect.dither && Math.floor(x / scale) % 2 !== Math.floor(y / scale) % 2) continue;
-      rgba.set(colour, (y * width + x) * 4);
+      const at = (y * width + x) * 4;
+      if (opacity === undefined) rgba.set(colour, at);
+      else {
+        for (let channel = 0; channel < 3; channel += 1) {
+          rgba[at + channel] = overChannel(rgba[at + channel] ?? 0, colour[channel] ?? 0, opacity);
+        }
+      }
     }
   }
 }

@@ -18,6 +18,7 @@ import {
   levelEye,
   monumentFor,
   moves,
+  type Partnership,
   type Picture,
   type ProjectSite,
   type Quad,
@@ -61,6 +62,7 @@ export interface BlockWorldProps {
   readonly focused: boolean;
   readonly hidden: boolean;
   readonly projects?: Readonly<Record<string, readonly ProjectSite[]>> | undefined;
+  readonly partnerships?: readonly Partnership[] | undefined;
   readonly onPick?: ((hit: Hit) => void) | undefined;
   readonly onHover?: ((hit: Hit | undefined) => void) | undefined;
   readonly onControls?: ((controls: BlockWorldControls) => void) | undefined;
@@ -136,6 +138,7 @@ export function BlockWorld(props: BlockWorldProps) {
       appearance: appearance(),
       now: refreshedAt(),
       projects: props.projects,
+      partnerships: props.partnerships,
       monument: monumentFor(Object.keys(props.world.creatures).length),
     }),
   );

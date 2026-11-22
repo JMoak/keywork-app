@@ -12,6 +12,7 @@ export interface Kit {
   storehouse(spec: StorehouseSpec): Construction;
   mill(spec: MillSpec): Construction;
   shed(spec: ShedSpec): Construction;
+  project(spec: ProjectSpec): Construction;
   prop(spec: PropSpec): Construction;
 }
 
@@ -25,6 +26,7 @@ export interface KitColours {
   readonly sky: readonly string[];
   readonly orb: string | undefined;
   readonly orbSlit: boolean;
+  readonly orbRays: boolean;
   readonly star: string | undefined;
   readonly pool: string | undefined;
   readonly haze: number;
@@ -52,6 +54,7 @@ export interface Crowning {
 }
 
 export interface Annex {
+  readonly what: string;
   readonly x: number;
   readonly z: number;
   readonly parts: readonly Part[];
@@ -144,6 +147,24 @@ export interface ShedSpec {
   readonly lit: boolean;
   readonly roofed: boolean;
   readonly trackedFiles?: number | undefined;
+}
+
+export const projectStages = [
+  "shack",
+  "shed",
+  "house",
+  "tower",
+  "high-rise",
+  "skyscraper",
+] as const;
+
+export type ProjectStage = (typeof projectStages)[number];
+
+export interface ProjectSpec {
+  readonly stage: ProjectStage;
+  readonly seed: number;
+  readonly order: number;
+  readonly lit: boolean;
 }
 
 export interface ShedSpot extends Footprint {

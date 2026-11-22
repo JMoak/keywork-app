@@ -1,4 +1,9 @@
-import type { CreatureSummary, SessionDetail, SessionRow } from "@keywork-app/protocol";
+import type {
+  BusEnvelope,
+  CreatureSummary,
+  SessionDetail,
+  SessionRow,
+} from "@keywork-app/protocol";
 import { cleanup } from "@solidjs/testing-library";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { definitionOf } from "../../index.ts";
@@ -70,6 +75,54 @@ describe("the stead with the block world switched on", () => {
     expect(container.querySelector<HTMLElement>(".kw-stead-stage")?.hidden).toBe(true);
     expect(read).toEqual(["talk"]);
     expect(counted).toEqual(["C:/work/lamps"]);
+  });
+
+  it("reads the hand-off tally once for its roads and follows the stream after", async () => {
+    quietCanvas();
+    let reads = 0;
+    const listeners = new Set<(batch: readonly BusEnvelope[]) => void>();
+    const base = overviewShell({ summaries: rows }).shell;
+    const shell: ShellSeams = {
+      ...base,
+      feed: {
+        ...base.feed,
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      client: {
+        ...base.client,
+        creatures: async () => [creature("ada"), creature("bea")],
+        routines: async () => [],
+        session: async (id: string) => detail(id),
+        creatureHandoffs: async () => {
+          reads += 1;
+          return [{ from: "ada", to: "bea", count: 4, lastAt: at }];
+        },
+      } as unknown as ShellSeams["client"],
+    };
+    const { container } = mountPane(
+      steadPane.component,
+      steadPane.spec.parse({ kind: "stead" }),
+      shell,
+    );
+    await waitFor(() => reads > 0);
+    const lastAt = new Date().toISOString();
+    for (const listener of listeners) {
+      listener([
+        {
+          id: 1,
+          ts: lastAt,
+          sessionId: "",
+          type: "creature.handoff",
+          payload: { change: "counted", handoff: { from: "bea", to: "ada", count: 16, lastAt } },
+        },
+      ]);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(reads).toBe(1);
+    expect(container.querySelector(".kw-stead-block")).not.toBeNull();
   });
 });
 

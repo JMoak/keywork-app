@@ -74,6 +74,7 @@ import {
   type ShellSeams,
 } from "../registry.ts";
 import { BlockWorld, type BlockWorldControls } from "./block/block-world.tsx";
+import { createPartnerships, handoffSeamsOf } from "./block/handoffs.ts";
 import { createProjectSites, placeSeamsOf } from "./block/places.ts";
 import { pressedOn } from "./block/press.ts";
 import { blockWorldShown } from "./block/switch.ts";
@@ -511,6 +512,9 @@ function Stead(props: PaneProps<SteadSpec>) {
   let blockWorld: BlockWorldControls | undefined;
   const blockSites = blockWorldShown
     ? createProjectSites(placeSeamsOf(props.shell), world)
+    : undefined;
+  const blockPartnerships = blockWorldShown
+    ? createPartnerships(handoffSeamsOf(props.shell))
     : undefined;
 
   const members = (): readonly Member[] => herd().members;
@@ -1142,6 +1146,7 @@ function Stead(props: PaneProps<SteadSpec>) {
           focused={props.focused}
           hidden={courts.overview()}
           projects={blockSites?.()}
+          partnerships={blockPartnerships?.()}
           onPick={openHit}
           onControls={(controls) => {
             blockWorld = controls;
