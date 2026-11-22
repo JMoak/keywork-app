@@ -31,6 +31,20 @@ up. Nothing is written on a mismatch. `--all` fans every platform out into
 `protocolVersion`. At launch the app compares only `contractVersion` against `/doc`, so an engine of
 another release that speaks the same contract is accepted.
 
+## The pane mover pin
+
+On Windows the app also bundles `kw-panes-mover.exe`, the program that moves its panes outside the
+window together. It is an asset of a [Vignette](https://github.com/JMoak/vignette-mcp) release, and
+its version is `moverRelease.version` in `scripts/fetch-mover.ts`. `bun run fetch:mover` downloads
+`kw-panes-mover-windows-x64.exe` with its published `.sha256`, verifies the digest, and writes it
+beside the engine in `packages/desktop/sidecar/`. Nothing is written on a mismatch, and on any other
+system there is nothing to fetch.
+
+The app uses the bundled mover whenever it is there. `KEYWORK_PANES_MOVER` names another one by its
+path, and `off` turns it off; without a mover, panes are moved from JavaScript. The SDK's
+`build.json` records the mover version as `mover`, so a product that packages the SDK can ship the
+same one.
+
 ## Automatic releases
 
 Every merge or direct commit to `main` runs the shared Linux CI checks once.
@@ -83,7 +97,8 @@ workflow runs on main use the same conventional-commit planner. Release runs are
 ## npm desktop SDK
 
 `@jmoak/keywork-desktop` contains the compiled runtime and renderer, declarations, external runtime
-dependencies (including `node-pty`), and `build.json` with `{version, engine, contract, electron}`.
+dependencies (including `node-pty`), and `build.json` with
+`{version, engine, contract, electron, mover}`.
 Its package manifest records `gitHead` as the immutable source SHA. Consumers pin the exact npm
 version and lockfile integrity; the GitHub release tag identifies the same source independently
 of installer availability.

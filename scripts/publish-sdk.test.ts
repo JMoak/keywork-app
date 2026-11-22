@@ -12,9 +12,16 @@ const publication = {
   engine: "0.2.3",
   contract: "1.27",
   electron: "45.2.3",
+  mover: "0.1.0",
 };
 const manifest = { name: sdkPackage, version: publication.version, gitHead: publication.sourceSha };
-const build = { version: "0.3.1", engine: "0.2.3", contract: "1.27", electron: "45.2.3" };
+const build = {
+  version: "0.3.1",
+  engine: "0.2.3",
+  contract: "1.27",
+  electron: "45.2.3",
+  mover: "0.1.0",
+};
 const dist = {
   tarball: "https://registry.npmjs.org/@jmoak/keywork-desktop/-/keywork-desktop-0.3.1.tgz",
   integrity: `sha512-${"a".repeat(86)}==`,
@@ -41,7 +48,7 @@ describe("verified npm SDK identity", () => {
     expect(() => verifyRegistryIdentity({ ...manifest, dist, ...change }, publication)).toThrow();
   });
 
-  it.each(["version", "engine", "contract", "electron"] as const)(
+  it.each(["version", "engine", "contract", "electron", "mover"] as const)(
     "rejects a tarball with a different %s",
     (field) => {
       expect(() =>

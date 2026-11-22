@@ -143,6 +143,9 @@ jobs:
       - run: bun run check:types
       - name: fetch the pinned keywork sidecar and verify its SHA-256
         run: bun run fetch:sidecar
+      - name: fetch the pinned pane mover and verify its SHA-256
+        if: ${{ matrix.target == 'windows' }}
+        run: bun run fetch:mover
       - run: bun run --cwd packages/desktop build
       - name: signing is off until the certificate secrets exist
         if: ${{ matrix.target == 'macos' && env.MAC_CSC_LINK == '' }}

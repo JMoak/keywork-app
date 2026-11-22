@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/pro
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { contractVersion, protocolVersion } from "@keywork-app/protocol";
+import { moverRelease } from "./fetch-mover.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 
 export const sdkRepository = "JMoak/keywork-app";
@@ -18,6 +19,9 @@ export interface SdkBuild {
   engine: string;
   contract: string;
   electron: string;
+  // The version of Vignette's pane mover this build was made with. A product that packages the
+  // SDK ships that mover beside its engine, at `resources/sidecar/kw-panes-mover.exe` on Windows.
+  mover: string;
 }
 
 export interface SdkReleasePin extends SdkBuild {
@@ -103,6 +107,7 @@ export async function packDesktopSdk(output: string, expectedTag?: string): Prom
     engine: protocolVersion,
     contract: contractVersion,
     electron: manifest.devDependencies.electron,
+    mover: moverRelease.version,
   };
   await mkdir(output, { recursive: true });
   const stage = await mkdtemp(join(output, ".sdk-"));

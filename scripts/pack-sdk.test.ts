@@ -36,7 +36,13 @@ describe("the distributable desktop SDK", () => {
 describe("the SDK release asset", () => {
   const sha256 = "5c6025a66d5b606b7b87274d2ee0b680d76437e70262416f715aee8fa29a806a";
   const asset = "sdk-5c6025a66d5b.tgz";
-  const build = { version: "0.2.1", engine: "0.2.1", contract: "1.27", electron: "45.2.3" };
+  const build = {
+    version: "0.2.1",
+    engine: "0.2.1",
+    contract: "1.27",
+    electron: "45.2.3",
+    mover: "0.1.0",
+  };
 
   it("is named by its checksum beside a sha256sum-compatible checksum file", () => {
     expect(sdkAssetName(sha256)).toBe(asset);

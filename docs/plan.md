@@ -2378,6 +2378,17 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
     have not been run. Terminal and screen panes outside. A maximised pane comes back at
     its stored rectangle, not maximised. The pool opens windows with a synchronous
     `window.open` that holds the shared renderer for some 15 ms each.
+  - **The pane mover (2026-11-22, not yet released).** On Windows the console starts
+    `kw-panes-mover.exe`, a small program from Vignette (`JMoak/vignette-mcp`) that moves the
+    panes of one glide in a single batch each refresh. It is pinned and fetched like the engine
+    (`bun run fetch:mover`: nothing is written unless the download matches the release's
+    SHA-256), ships beside it in `sidecar/`, and is used whenever it is there.
+    `KEYWORK_PANES_MOVER` names another one by its absolute path, or turns it off with `off`;
+    without one, and on every other system, panes are moved from JavaScript as before. Measured
+    here with `perf:panes-outside`, sixteen panes gliding together, one run each on a 60 Hz
+    display: all sixteen moved inside one refresh in 52 of 52 frames with the mover against 20
+    of 60 from JavaScript, and the main process spent 18% of a core against 89%. Not yet done:
+    the SDK and Stead carrying the mover, and any system but Windows x64.
 - **Owed.** No screenshot stage covers a float or the shelf.
 
 ### Stock ledger (2026-11-12): the carter and the joiner

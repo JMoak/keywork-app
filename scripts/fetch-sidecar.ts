@@ -245,7 +245,7 @@ function minimalEnvironment(home: string): NodeJS.ProcessEnv {
   };
 }
 
-async function downloadBytes(url: string): Promise<Uint8Array> {
+export async function downloadBytes(url: string): Promise<Uint8Array> {
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText} fetching ${url}`);
   return new Uint8Array(await response.arrayBuffer());

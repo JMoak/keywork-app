@@ -28,6 +28,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "fetch:sidecar": "bun scripts/fetch-sidecar.ts",
+    "fetch:mover": "bun scripts/fetch-mover.ts",
     "pack:sdk": "bun run check:types && bun run --cwd packages/desktop build && bun scripts/pack-sdk.ts",
     "screenshots": "bun run --cwd packages/ui screenshots",
     "compare:shots": "bun scripts/compare-shots.ts",

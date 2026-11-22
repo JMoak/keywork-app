@@ -4,6 +4,7 @@ import { appendFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { contractVersion, protocolVersion } from "@keywork-app/protocol";
 import { gt, valid } from "semver";
+import { moverRelease } from "./fetch-mover.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 import type { DesktopManifest, SdkBuild } from "./pack-sdk.ts";
 import { versionOfTag } from "./release.ts";
@@ -55,7 +56,7 @@ export function verifySdkContents(
   ) {
     throw new Error("SDK archive does not match its immutable package identity");
   }
-  for (const field of ["version", "engine", "contract", "electron"] as const) {
+  for (const field of ["version", "engine", "contract", "electron", "mover"] as const) {
     if (!isRecord(build) || build[field] !== expected[field])
       throw new Error(`SDK archive has a different ${field}`);
   }
@@ -84,6 +85,7 @@ async function run(): Promise<void> {
     engine: protocolVersion,
     contract: contractVersion,
     electron: desktop.devDependencies.electron,
+    mover: moverRelease.version,
   };
   const directory = join(repoRoot, "dist", "sdk");
   const archives = (await readdir(directory)).filter((name) =>

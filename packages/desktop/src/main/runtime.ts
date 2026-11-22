@@ -8,12 +8,14 @@ export {
   steadProfile,
 } from "@keywork-app/product";
 
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { type ConsoleClient, keyworkClient } from "@keywork-app/client";
 import type { SessionRow } from "@keywork-app/protocol";
 import { keyworkNight } from "@keywork-app/ui/theme";
 import { app, BrowserWindow, dialog, protocol } from "electron";
+import { moverPathFor } from "../shared/sidecar.ts";
 import { startElectronCompanion, startForegroundFeed } from "./companion/index.ts";
 import {
   launchFrom,
@@ -73,7 +75,12 @@ export function startDesktop(profile: ProductProfile): void {
       platform: process.platform,
       sessionType: process.env.XDG_SESSION_TYPE,
       backdrop: keyworkNight.tokens.background,
-      moverPath: process.env.KEYWORK_PANES_MOVER,
+      moverPath: moverPathFor({
+        platform: process.platform,
+        resourcesPath: process.resourcesPath,
+        said: process.env.KEYWORK_PANES_MOVER,
+        exists: existsSync,
+      }),
     });
     guardEveryNavigation(surfaces.door);
     nameTheAppForToasts();
