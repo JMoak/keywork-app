@@ -1,4 +1,3 @@
-import type { SignalMessage } from "@keywork-app/screen";
 import { describe, expect, it } from "vitest";
 import type { ViewerEvent } from "./channels.ts";
 import {
@@ -292,18 +291,6 @@ describe("consent", () => {
 });
 
 describe("grant limits", () => {
-  it("keeps a session alive while the viewer sends keepalives", async () => {
-    const { time, fake, host, sessionId } = await viewing();
-    await connect(host, sessionId);
-    host.startTicking();
-    await time.advance(10 * minute);
-    expect(host.sharer.sessions()).toEqual([sessionId]);
-    const keepalives = fake.relay.traffic.filter(
-      (message: SignalMessage) => message.kind === "keepalive",
-    );
-    expect(keepalives).toHaveLength(40);
-  });
-
   it("ends as idle five minutes after keepalives stop arriving", async () => {
     const { time, fake, host, sessionId } = await viewing();
     await connect(host, sessionId);
@@ -423,13 +410,6 @@ describe("the viewer side", () => {
     expect(keeperOnSpark.user?.loginName).toBe("jordan@example.com");
     await host.viewer.stop(99, "session-0001");
     expect(fake.events).toEqual([]);
-  });
-
-  it("reads the session history back as summaries", async () => {
-    const { host, sessionId } = await viewing([1]);
-    expect(await host.history()).toMatchObject([
-      { sessionId, verdict: "denied", deniedBecause: "ignored" },
-    ]);
   });
 });
 

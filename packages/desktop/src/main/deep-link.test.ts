@@ -90,11 +90,6 @@ describe("requestFromArgv", () => {
     expect(requestFromArgv([electron, ".", "--inspect=9229"], true)).toBeUndefined();
   });
 
-  it("finds the app path after the switches of an instrumented launch", () => {
-    const argv = [electron, "--inspect=0", "--remote-debugging-port=0", script, "C:\\some\\dir"];
-    expect(requestFromArgv(argv, true)).toMatchObject({ ok: true, path: "C:\\some\\dir" });
-  });
-
   it("reads everything after -- as an operand", () => {
     expect(requestFromArgv([electron, ".", "--", "C:\\work\\app"], true)).toMatchObject({
       ok: true,
@@ -152,10 +147,6 @@ describe("protocolHandlerFor", () => {
     expect(protocolHandlerFor(launchFrom(["keywork.exe", "--updated"], false))).toEqual({
       kind: "untouched",
     });
-  });
-
-  it("leaves it alone when a dev launch names no app", () => {
-    expect(protocolHandlerFor(launchFrom([electron], true))).toEqual({ kind: "untouched" });
   });
 });
 

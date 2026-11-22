@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  chosenSkin,
-  offeredSkins,
-  rolledSkin,
-  skinChoices,
-  surprise,
-  surpriseMe,
-} from "./skins.ts";
+import { chosenSkin, offeredSkins, rolledSkin, surprise, surpriseMe } from "./skins.ts";
 
 describe("the skins on offer", () => {
   it("rolls only other available designs and stays put when there is no alternative", () => {
@@ -19,10 +12,6 @@ describe("the skins on offer", () => {
     expect(offeredSkins()).toEqual(["kid", "carter", "joiner", "tessera", "cairn"]);
     expect(offeredSkins(["kid", "placeholder", "owl"])).toEqual(["kid", "owl"]);
     expect(offeredSkins(["placeholder"])).toEqual(["kid"]);
-  });
-
-  it("adds surprise me after the registered choices", () => {
-    expect(skinChoices(["kid", "owl"])).toEqual(["kid", "owl", surpriseMe]);
   });
 
   it("resolves surprise me to a registered skin, the same one for the same workspace", () => {

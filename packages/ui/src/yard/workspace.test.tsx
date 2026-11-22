@@ -1,4 +1,4 @@
-import { keyworkProfile, steadProfile } from "@keywork-app/product";
+import { keyworkProfile } from "@keywork-app/product";
 import { cleanup, fireEvent, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -34,13 +34,6 @@ const note = aSetting({
   what: { kind: "note", ref: "the nightly chore found two stale branches" },
   why: "worth a glance when you have a minute",
 });
-const unowned = aSetting({
-  id: "unowned",
-  creature: null,
-  sessionId: conversationId,
-  what: { kind: "url", ref: "https://example.com/spec" },
-  why: "the spec this thread follows",
-});
 
 describe("the yard under the stead profile", () => {
   it("is the first frame, with the creature's stead and conversation as the hub", async () => {
@@ -75,37 +68,6 @@ describe("the yard under the stead profile", () => {
     yard.emit([proposed(2, note)]);
     await waitFor(() => cardCalled("the nightly chore found two stale branches"));
     expect(satelliteOf("delivery")).toBe(first);
-  });
-
-  it("holds unfolds past the budget back as cards and heads the rail with the budget, never with an absence", async () => {
-    const yard = await openYard();
-    yard.emit(
-      Array.from({ length: 7 }, (_, index) =>
-        proposed(
-          index + 1,
-          aSetting({
-            ...delivery,
-            id: `delivery-${index}`,
-            creature: `creature-${index}`,
-            what: { kind: "diff", ref: `change-${index}`, title: `change ${index}` },
-          }),
-        ),
-      ),
-    );
-    await screen.findByText(/^6 of 6 opened · next at /, {
-      selector: ".kw-yard-rail-head",
-    });
-    expect(screen.queryByText(/while you were away/)).toBeNull();
-  });
-
-  it("hangs a creature-less setting on its thread and answers it the same way", async () => {
-    const yard = await openYard();
-    yard.emit([proposed(1, unowned)]);
-    const card = await waitFor(() => cardCalled("https://example.com/spec"));
-    expect(card.querySelector(".kw-yard-card-by")?.textContent).toBe("a link from Wren at home");
-    pressLeader("y");
-    key("x");
-    await waitFor(() => expect(yard.answered).toEqual([["unowned", "dismissed"]]));
   });
 
   it("is keyboard-selectable, posts every keeper action to the wire, and folds what settles", async () => {
@@ -154,62 +116,6 @@ describe("the yard under the stead profile", () => {
     fireEvent.input(composer, { target: { value: "" } });
     await waitFor(() => expect(satelliteOf("delivery").dataset.rung).toBe("unfold"));
     expect(document.activeElement).toBe(composer);
-  });
-
-  it("keeps a delivery on the rail while the host says another application is fullscreen", async () => {
-    const elsewhere = { fullscreen: false, fullscreenElsewhere: true, displayShared: false };
-    const yard = await openYard(steadProfile, {
-      read: async () => elsewhere,
-      onChange: () => () => undefined,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    yard.emit([proposed(1, delivery)]);
-    await waitFor(() => cardCalled("the parser fix"));
-    expect(document.querySelector('.kw-yard-satellite[data-setting="delivery"]')).toBeNull();
-  });
-
-  it("keeps a pinned panel out and folds it once it is unpinned", async () => {
-    const yard = await openYard();
-    yard.emit([proposed(1, delivery)]);
-    await waitFor(() => satelliteOf("delivery"));
-    yard.emit([settled(2, delivery, "pinned")]);
-    await waitFor(() => expect(satelliteOf("delivery").querySelector(".kw-frame")).toBeTruthy());
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(satelliteOf("delivery")).toBeTruthy();
-    yard.emit([settled(3, delivery, "unpinned")]);
-    await waitFor(() => expect(document.querySelector('[data-setting="delivery"]')).toBeNull());
-    expect(cardTitled("the parser fix")).toBeUndefined();
-  });
-
-  it("opens a card from the rail beside the hub and takes the keyboard into it, marking nothing seen", async () => {
-    const yard = await openYard();
-    const child = aSetting({
-      id: "child",
-      sessionId: conversationId,
-      what: { kind: "thread", ref: "child-thread", title: "a split conversation" },
-      rung: "card",
-      why: "a separate thread for the migration",
-    });
-    yard.emit([proposed(1, child)]);
-    await waitFor(() => cardCalled("a split conversation"));
-    pressLeader("y");
-    key("Enter");
-    await waitFor(() => expect(satelliteOf("child").contains(document.activeElement)).toBe(true));
-    expect(yardField()?.dataset.mode).toBe("yard");
-    expect(yard.answered).toEqual([]);
-  });
-
-  it("marks a panel focused while the keyboard is inside it, so its own keys answer", async () => {
-    const yard = await openYard();
-    typing();
-    yard.emit([proposed(1, delivery)]);
-    const panel = await waitFor(() => satelliteOf("delivery"));
-    expect(panel.querySelector(".kw-frame")?.hasAttribute("data-focused")).toBe(false);
-    const inside = panel.querySelector<HTMLElement>(".kw-frame-body [tabindex]");
-    inside?.focus();
-    await waitFor(() =>
-      expect(panel.querySelector(".kw-frame")?.hasAttribute("data-focused")).toBe(true),
-    );
   });
 
   it("hangs a lantern on the pane already showing the thing", async () => {
@@ -306,16 +212,6 @@ describe("the yard under the keywork profile", () => {
     expect(hub.querySelectorAll(".kw-seam")).toHaveLength(0);
   });
 
-  it("keeps the focused conversation as the hub when the keeper focuses another tile", async () => {
-    await openYard(keyworkProfile);
-    pressLeader("Y", { shiftKey: true });
-    await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
-    pressLeader("h");
-    await waitFor(() => expect(hubNames()).toEqual(["Wren at home", "sessions"]));
-    pressLeader("h");
-    await waitFor(() => expect(hubNames()).toEqual(["Wren at home"]));
-  });
-
   it("makes a tile squeezed beside the conversation a tab in the hub, never a sliver", async () => {
     const stage = stageMeasuring(640, 868);
     await openYard(keyworkProfile);
@@ -333,20 +229,6 @@ describe("the yard under the keywork profile", () => {
     fireEvent.click(tabs[0] as HTMLElement);
     await waitFor(() => expect(screen.queryAllByRole("tab")).toEqual([]));
     expect(hubNames()).toEqual(["Wren at home"]);
-  });
-
-  it("reaches the rail in tiles without leaving tiles, and Esc gives the keyboard back", async () => {
-    const yard = await openYard(keyworkProfile);
-    const composer = typing();
-    yard.emit([proposed(1, note)]);
-    await waitFor(() => cardCalled("the nightly chore found two stale branches"));
-    pressLeader("y");
-    expect(document.activeElement).toBe(document.querySelector(".kw-yard-rail"));
-    expect(yardField()?.dataset.mode).toBe("tiles");
-    expect(frameNamed("sessions")).toBeTruthy();
-    key("Escape");
-    expect(document.activeElement).toBe(composer);
-    expect(yardField()?.dataset.mode).toBe("tiles");
   });
 
   it("opens a change from the rail as a tile, with the keyboard in it, and marks it seen", async () => {
@@ -376,24 +258,6 @@ describe("the yard under the keywork profile", () => {
     key("Escape");
     expect(screen.queryByRole("article")).toBeNull();
     expect(document.activeElement).toBe(document.querySelector(".kw-yard-rail"));
-  });
-
-  it("answers from the same rail with the same keys", async () => {
-    const yard = await openYard(keyworkProfile);
-    const composer = typing();
-    yard.emit([proposed(1, note)]);
-    pressLeader("y");
-    await waitFor(() => cardCalled("the nightly chore found two stale branches"));
-    key("p");
-    key("x");
-    await waitFor(() =>
-      expect(yard.answered).toEqual([
-        ["note", "pinned"],
-        ["note", "dismissed"],
-      ]),
-    );
-    key("Escape");
-    expect(document.activeElement).toBe(composer);
   });
 });
 

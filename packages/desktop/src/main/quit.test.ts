@@ -1,4 +1,3 @@
-import { steadProfile } from "@keywork-app/product";
 import type { SessionRow } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import {
@@ -22,10 +21,6 @@ describe("what quitting would interrupt", () => {
         row("   ", { waiting: { asks: 2, tools: ["bash"] } }),
       ]),
     ).toEqual({ workspace: "C:\\work\\app", working: ["fix the tests", "docs pass"], asks: 3 });
-  });
-
-  it("is nothing when every session is idle", () => {
-    expect(workInFlight("/w", [row("a"), row("b", { working: false })])).toBeUndefined();
   });
 
   it("asks only the workspaces given, skips any that answer late or not at all", async () => {
@@ -52,10 +47,6 @@ describe("the question before quitting", () => {
     { workspace: "/home/me/site", working: [], asks: 2 },
   ];
 
-  it("is never asked when nothing is in flight", () => {
-    expect(quitWarning([])).toBeUndefined();
-  });
-
   it("names each workspace's working sessions and waiting asks, and says what stops", () => {
     const warning = quitWarning(busy) as QuitWarning;
     expect(warning.title).toBe("Quit keywork");
@@ -74,17 +65,6 @@ describe("the question before quitting", () => {
     expect(warning.buttons[stopAndQuit]).toBe("Stop work and quit");
     expect(warning.defaultId).toBe(1);
     expect(warning.cancelId).toBe(1);
-  });
-
-  it("keeps a long list of working sessions short", () => {
-    const warning = quitWarning([
-      { workspace: "/w", working: ["a", "b", "c", "d", "e"], asks: 0 },
-    ]) as QuitWarning;
-    expect(warning.detail.split("\n\n")[0]).toBe("w\nworking: a, b, c and 2 more");
-  });
-
-  it("speaks with the product's own name", () => {
-    expect(quitWarning(busy, steadProfile)?.title).toBe("Quit stead");
   });
 });
 

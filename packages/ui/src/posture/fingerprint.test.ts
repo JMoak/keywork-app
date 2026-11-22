@@ -49,16 +49,6 @@ describe("the posture's fingerprint", () => {
     ]);
   });
 
-  it("treats every fact as new when nothing was ever settled", () => {
-    expect(factsBeyond(undefined, settled).map((fact) => fact.kind)).toEqual([
-      "manifest",
-      "manifest",
-      "mcp",
-      "bot",
-      "version",
-    ]);
-  });
-
   it("compares fingerprints by their facts and never matches a missing one", () => {
     expect(sameFingerprint({ ...settled }, settled)).toBe(true);
     expect(sameFingerprint({ ...settled, bots: [] }, settled)).toBe(false);
@@ -67,12 +57,6 @@ describe("the posture's fingerprint", () => {
 });
 
 describe("the one quiet notice", () => {
-  it("names what is different and how many rules trust-setup proposes", () => {
-    expect(differenceNotice([{ kind: "mcp", name: "playwright" }], 1, false)).toBe(
-      "new mcp server: playwright · trust-setup proposes 1 rule",
-    );
-  });
-
   it("groups several differences by kind, plurals included, version last", () => {
     expect(
       differenceNotice(

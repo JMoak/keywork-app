@@ -7,12 +7,6 @@ import { rereadOnReturn } from "./rereading.ts";
 afterEach(cleanup);
 
 describe("rereading when the keeper returns", () => {
-  it("rereads when the console window regains focus", () => {
-    const pane = rendered();
-    window.dispatchEvent(new Event("focus"));
-    expect(pane.rereads()).toBe(1);
-  });
-
   it("follows the window its pane stands in once the pane is outside", () => {
     const pane = rendered();
     const child = openChild();

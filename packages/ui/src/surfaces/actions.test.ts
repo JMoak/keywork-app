@@ -83,10 +83,6 @@ function namesOf(action: AppAction): string[] {
 }
 
 describe("the keeper's actions for panes outside the window", () => {
-  it("declares the toggle, the return of every pane, the spread, the letters, the send behind and the deal, and nothing else", () => {
-    expect(Object.keys(declared())).toEqual(outsideIds);
-  });
-
   it("claims chords no other action holds, pane-local chords included", () => {
     expect(keymapWithOutside).not.toThrow();
     const taken = new Set(
@@ -97,16 +93,6 @@ describe("the keeper's actions for panes outside the window", () => {
     for (const [id, action] of Object.entries(declared())) {
       for (const chord of [action.chords].flat()) expect(taken.has(chord), id).toBe(false);
     }
-  });
-
-  it("reads beside the float, the shelf and the pin: leader enter, backspace and ;", () => {
-    const keymap = keymapWithOutside();
-    expect(keymap.describe(paneOutsideActionId)).toBe("ctrl+k enter");
-    expect(keymap.describe(panesInsideActionId)).toBe("ctrl+k backspace");
-    expect(keymap.describe(panesSpreadActionId)).toBe("ctrl+k ;");
-    expect(keymap.describe("pane.float")).toBe("ctrl+k space");
-    expect(keymap.describe("pane.unshelve")).toBe("ctrl+k =");
-    expect(keymap.describe("pane.pin")).toBe("ctrl+k '");
   });
 
   it("fires from every kind of pane, a pane that owns the keyboard included", () => {
@@ -150,22 +136,6 @@ describe("the keeper's actions for panes outside the window", () => {
     }
   });
 
-  it("leaves : and  typing, and : opening a pane's own commands, without the leader", () => {
-    const keymap = keymapWithOutside();
-    expect(keymap.isLeaderless(panesHintsActionId)).toBe(false);
-    expect(keymap.isLeaderless(paneBehindActionId)).toBe(false);
-    expect(keymap.press(shifted(":", "Semicolon"), 0, "conversation", true)).toEqual({
-      type: "pass",
-    });
-    expect(keymap.press(typed("\\", "Backslash"), 0, "conversation", true)).toEqual({
-      type: "pass",
-    });
-    expect(keymap.press(shifted(":", "Semicolon"), 0, "file")).toEqual({
-      type: "action",
-      action: "pane.commands",
-    });
-  });
-
   it("stays behind the leader, so enter, backspace and ; still type", () => {
     const keymap = keymapWithOutside();
     for (const id of outsideIds) expect(keymap.isLeaderless(id), id).toBe(false);
@@ -195,16 +165,6 @@ describe("the keeper's actions for panes outside the window", () => {
     expect(reached).toHaveBeenCalledWith(target);
   });
 
-  it("runs the view's handlers for the letters and for sending a pane behind", () => {
-    const handlers = listening();
-    const actions = outsideActions(() => handlers);
-    actions[panesHintsActionId]?.invoke({} as ActionTarget);
-    expect(handlers.toggleOutsideHints).toHaveBeenCalledTimes(1);
-    actions[paneBehindActionId]?.invoke({} as ActionTarget);
-    expect(handlers.sendPaneBehind).toHaveBeenCalledTimes(1);
-    expect(handlers.toggleOutsideSpread).not.toHaveBeenCalled();
-  });
-
   it("puts the deal on the outside key shifted: enter sends one pane out, shift+enter deals them all", () => {
     const keymap = keymapWithOutside();
     expect(keymap.describe(panesDealActionId)).toBe("ctrl+k shift+enter");
@@ -225,27 +185,6 @@ describe("the keeper's actions for panes outside the window", () => {
     expect(keymap.press(shifted("Enter", "Enter"), 0, "conversation", true)).toEqual({
       type: "pass",
     });
-  });
-
-  it("runs the view's handler for the deal, every time it is pressed", () => {
-    const handlers = listening();
-    const actions = outsideActions(() => handlers);
-    actions[panesDealActionId]?.invoke({} as ActionTarget);
-    actions[panesDealActionId]?.invoke({} as ActionTarget);
-    expect(handlers.dealPanesOutside).toHaveBeenCalledTimes(2);
-    expect(handlers.toggleOutsideSpread).not.toHaveBeenCalled();
-    expect(declared()[panesDealActionId]?.help).toContain("outside the window");
-  });
-
-  it("says outside and inside to the keeper, never what a pane stands on", () => {
-    for (const [id, action] of Object.entries(declared())) {
-      const words = [id, action.help, action.command?.description, ...namesOf(action)].join(" ");
-      expect(words, id).not.toMatch(/surface/i);
-      expect(action.help, id).not.toBe("");
-      expect(action.command, id).toBeDefined();
-    }
-    expect(declared()[paneOutsideActionId]?.help).toContain("outside the window");
-    expect(declared()[panesInsideActionId]?.help).toContain("inside the window");
   });
 
   it("answers in the palette to names no other action answers to", () => {

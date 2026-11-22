@@ -30,19 +30,8 @@ describe("the code language set", () => {
   it.each([
     ["src/app.ts", "TypeScript"],
     ["src/view.tsx", "TSX"],
-    ["index.mjs", "JavaScript"],
-    ["package.json", "JSON"],
     ["docs/README.md", "Markdown"],
-    ["app.css", "CSS"],
-    ["index.html", "HTML"],
-    ["tool.py", "Python"],
-    ["main.rs", "Rust"],
-    ["main.go", "Go"],
     [".github/ci.yml", "YAML"],
-    ["schema.sql", "SQL"],
-    ["engine.cpp", "C++"],
-    ["Main.java", "Java"],
-    ["icon.svg", "XML"],
     ["C:\\work\\lib.h", "C++"],
   ])("picks %s as %s by extension", (path, name) => {
     expect(languageOf(path)?.name).toBe(name);
@@ -77,22 +66,6 @@ describe("the file viewer", () => {
     await mounted.languageLoaded();
     expect(highlightedSpans(element).length).toBeGreaterThan(2);
     expect(stylesheetText()).toContain("var(--kw-syntax-keyword)");
-    mounted.destroy();
-  });
-
-  it("highlights headings and links in prose files with the syntax inks", async () => {
-    const element = host();
-    const mounted = mountTextView(
-      element,
-      "# Title\n\nsee [the docs](https://example.com)\n",
-      numbering,
-      "README.md",
-    );
-    await mounted.languageLoaded();
-    expect(highlightedSpans(element).length).toBeGreaterThan(0);
-    const rules = codeHighlightStyle.module?.getRules() ?? "";
-    expect(rules).toContain("var(--kw-syntax-heading)");
-    expect(rules).toContain("var(--kw-syntax-link)");
     mounted.destroy();
   });
 

@@ -18,8 +18,6 @@ import {
   contextPane,
   flushedNotice,
   flushingNotice,
-  noSessionNotice,
-  unreadLine,
 } from "./index.tsx";
 
 const recordedReport = recordedAnswers.context.body as ContextReport;
@@ -166,24 +164,6 @@ describe("the context pane", () => {
     expect(grid.style.getPropertyValue("--kw-map-columns")).toBe("10");
   });
 
-  it("scales a 1M window to twenty squares a row, one per half percent", () => {
-    const { shell } = harness({ readings: { s1: pageGrammar({ window: 1_000_000 }) } });
-    const { container } = mount(shell);
-    expect(inks(container)).toHaveLength(200);
-    const grid = container.querySelector(".kw-context-map-grid") as HTMLElement;
-    expect(grid.style.getPropertyValue("--kw-map-columns")).toBe("20");
-  });
-
-  it("says in one dim line when the server's lines fall past the window", () => {
-    const past = pageGrammar({ thresholds: { flushAt: 226_724, compactAt: 234_916 } });
-    const { shell } = harness({ readings: { s1: past } });
-    const { container } = mount(shell);
-    expect(text(container, ".kw-context-map-finding")).toEqual([
-      "memory flush at 227k, compaction at 235k · past the window · the server measures the conversation only",
-    ]);
-    expect(inks(container).includes("compaction")).toBe(false);
-  });
-
   it("watches the session's readings, and the new session's when it is rebound", async () => {
     const { shell, recorded } = harness({ readings: { s1: pageGrammar(), s2: recordedReport } });
     const { container, setSpec } = mount(shell);
@@ -192,17 +172,6 @@ describe("the context pane", () => {
     await settle();
     expect(recorded.watched).toEqual(["s1", "s2"]);
     expect(text(container, ".kw-context-map-total")).toEqual(["1.9k of 200k · 1% estimated"]);
-  });
-
-  it("names the next step with no session and waits honestly for a first reading", () => {
-    const { shell } = harness({ readings: {} });
-    const empty = mount(shell, { kind: "context" });
-    expect(text(empty.container, ".kw-empty")).toEqual([
-      "no session to map · focus a session, or ctrl+k tree.summon picks one",
-    ]);
-    cleanup();
-    const unread = mount(shell);
-    expect(text(unread.container, ".kw-empty")).toEqual([unreadLine]);
   });
 });
 
@@ -255,30 +224,6 @@ describe("the context pane's keys", () => {
     expect(text(container, ".kw-ov-line")[0]).toBe("a turn is running · compact once it settles");
     expect(recorded.watched).toEqual(["s1"]);
   });
-
-  it("asks for a session before compacting", () => {
-    const { shell, recorded } = harness({ readings: {} });
-    const { container, act } = mount(shell, { kind: "context" });
-    act("context.compact");
-    expect(recorded.compacted).toEqual([]);
-    expect(text(container, ".kw-ov-line")[0]).toBe(noSessionNotice);
-  });
-
-  it("closes itself on escape", () => {
-    const { shell, recorded } = harness();
-    const { act } = mount(shell);
-    act("context.close");
-    expect(recorded.closed).toEqual(["context-1"]);
-  });
-
-  it("drops a notice when it follows another session", async () => {
-    const { shell } = harness({ readings: { s1: pageGrammar(), s2: recordedReport } });
-    const { container, act, setSpec } = mount(shell);
-    act("context.flush");
-    setSpec({ kind: "context", sessionId: "s2" });
-    await settle();
-    expect(text(container, ".kw-ov-line")).toEqual([contextHints]);
-  });
 });
 
 describe("the context pane follows focus", () => {
@@ -291,26 +236,9 @@ describe("the context pane follows focus", () => {
     setFocusedSession("s2");
     expect(recorded.rebound).toEqual([{ kind: "context", sessionId: "s2" }]);
   });
-
-  it("summons for the focused conversation's session", async () => {
-    const { shell, setFocusedSession } = harness();
-    setFocusedSession("s4");
-    expect(await contextPane.summon?.spec(shell)).toEqual({ kind: "context", sessionId: "s4" });
-    expect(contextPane.summon?.chords).toBe("leader shift+g");
-    expect(contextPane.summon?.command.name).toBe("context");
-    expect(contextPane.home).toBe("right");
-    expect(contextPane.attire).toBe("work");
-  });
 });
 
 describe("the context pane's title row", () => {
-  it("wears the session's gauge from the reading, parts and all", () => {
-    const { shell } = harness();
-    const level = contextPane.adornments?.({ kind: "context", sessionId: "s1" }, shell).context;
-    expect(level).toMatchObject({ used: 116_300, basis: "reported", declared: true });
-    expect(level?.parts?.conversation).toEqual({ tokens: 116_300, basis: "reported" });
-  });
-
   it("falls back to the live usage before the first reading arrives", () => {
     const projection: SessionProjection = {
       ...emptyProjection,

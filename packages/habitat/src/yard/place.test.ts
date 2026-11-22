@@ -34,23 +34,6 @@ function ids(placements: readonly Placement[]): string[] {
 }
 
 describe("placing the yard", () => {
-  it("places only the hub when nothing is set out past a lantern, or while the yard is hidden", () => {
-    const quiet = [
-      shown("l", "lantern", 3),
-      shown("g", "glyph", 3),
-      shown("d", "card", 3, { state: "dismissed" }),
-      shown("s", "card", 3, { state: "seen", until: "seen" }),
-    ];
-    expect(ids(place(quiet))).toEqual([yardIds.hub]);
-    const hidden = placeYard({
-      viewport: desktop,
-      hub: defaultHub(desktop),
-      settings: [shown("u", "unfold", 3)],
-      prefs: { reducedMotion: false, tier: "hidden" },
-    });
-    expect(ids(hidden)).toEqual([yardIds.hub]);
-  });
-
   it("opens an unfolded setting at readable size beside the hub, to the right first", () => {
     const hub = defaultHub(desktop);
     const [, unfolded] = place([shown("u", "unfold", 3)]);

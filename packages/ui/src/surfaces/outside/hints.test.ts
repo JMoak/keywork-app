@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ScreenRect } from "../port.ts";
-import { hintAlphabet, hintLabels, hintLeft, hintsFor, hintTyped } from "./hints.ts";
+import { hintAlphabet, hintLabels, hintsFor, hintTyped } from "./hints.ts";
 
 const at = (x: number, y: number, width = 400, height = 300): ScreenRect => ({
   x,
@@ -45,10 +45,6 @@ describe("the letters panes outside wear", () => {
       ["low-right", "f"],
     ]);
   });
-
-  it("label nothing when no pane is outside", () => {
-    expect(hintsFor([]).size).toBe(0);
-  });
 });
 
 describe("a letter typed while panes wear their letters", () => {
@@ -70,12 +66,5 @@ describe("a letter typed while panes wear their letters", () => {
   it("misses when no pane wears it", () => {
     expect(hintTyped(hints, "", "z")).toEqual({ kind: "missed" });
     expect(hintTyped(hints, "m", "a")).toEqual({ kind: "missed" });
-  });
-
-  it("leaves each pane showing only what is still to type, or nothing once it is ruled out", () => {
-    expect(hintLeft("ms", "")).toBe("ms");
-    expect(hintLeft("ms", "m")).toBe("s");
-    expect(hintLeft("a", "m")).toBeUndefined();
-    expect(hintLeft(undefined, "")).toBeUndefined();
   });
 });

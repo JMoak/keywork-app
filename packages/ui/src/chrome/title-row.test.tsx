@@ -32,22 +32,6 @@ function zonesShown(container: HTMLElement): string[] {
   );
 }
 
-describe("paneMark", () => {
-  it("is a glyph no stamp, voice, focus mark or sample bot sigil already wears", () => {
-    const taken = [...tileFill, ...Object.values(voiceGlyph), focusMark, "▛", "◆", "▸", "▾"];
-    expect(taken).not.toContain(paneMark);
-  });
-
-  it("stands apart from the bot sigil in the same title row", () => {
-    const { container } = render(() => (
-      <TitleRow {...busyTitle} tier="broadsheet" focused={false} weight="seams" marked />
-    ));
-    const mark = container.querySelector(".kw-frame-mark")?.textContent;
-    expect(mark).toBe(paneMark);
-    expect(container.querySelector(".kw-frame-sigil")?.textContent).not.toBe(mark);
-  });
-});
-
 describe("quietMark", () => {
   it("is a glyph no stamp, voice, focus mark, pane mark, theme row or sample bot sigil wears", () => {
     const taken = [
@@ -76,11 +60,6 @@ describe("quietMark", () => {
       expect(quiet?.nextElementSibling?.className).toBe("kw-frame-mark");
       unmount();
     }
-  });
-
-  it("is absent while the session listens", () => {
-    const { container } = renderRow("broadsheet", true);
-    expect(container.querySelector(".kw-frame-quiet")).toBeNull();
   });
 });
 
@@ -145,81 +124,12 @@ describe("TitleRow", () => {
     ]);
   });
 
-  it("gives the bot's sigil its own glyph and falls back to the bare name without one", () => {
-    const signed = renderRow("broadsheet", false).container;
-    expect(signed.querySelector(".kw-frame-bot .kw-frame-sigil")?.textContent).toBe("◆");
-    expect(signed.querySelector(".kw-frame-bot")?.textContent).toBe("◆ reviewer");
-    const bare = render(() => (
-      <TitleRow {...busyTitle} bot={{ name: "scribe" }} tier="column" focused weight="seams" />
-    )).container;
-    expect(bare.querySelector(".kw-frame-sigil")).toBeNull();
-    expect(bare.querySelector(".kw-frame-bot")?.textContent).toBe("scribe");
-  });
-
-  it("drops the inference words and the arc tag at the column tier", () => {
-    const { container } = renderRow("column", false);
-    expect(zonesShown(container)).toEqual(["stamp", "name", "bot", "mode", "telemetry"]);
-  });
-
-  it("keeps the mode word and sheds the bot at the clipping tier", () => {
-    const { container } = renderRow("clipping", false);
-    expect(zonesShown(container)).toEqual(["stamp", "name", "mode"]);
-  });
-
-  it("is only the stamp and the fitted name at the masthead tier", () => {
-    const { container } = renderRow("masthead", true);
-    expect(zonesShown(container)).toEqual(["stamp", "name"]);
-    expect(container.querySelector(".kw-frame-stamp")?.textContent).toBe("▌");
-  });
-
   it("leads with a density focus mark only in the borderless weight", () => {
     const focused = renderRow("column", true, "borderless").container;
     expect(focused.querySelector(".kw-frame-lead")?.textContent).toBe(focusMark);
     const resting = renderRow("column", false, "borderless").container;
     expect(resting.querySelector(".kw-frame-lead")?.textContent).toBe(" ");
     expect(renderRow("column", true, "seams").container.querySelector(".kw-frame-lead")).toBeNull();
-  });
-
-  it("ends the facts with the turn ribbon at the broadsheet tier and nowhere narrower", () => {
-    const ribboned = (tier: WidthTier) =>
-      render(() => (
-        <TitleRow
-          {...busyTitle}
-          ribbon="turn 12 · 3 files · $0.41"
-          themeMark={{ name: "whiplash", source: "pane" }}
-          tier={tier}
-          focused
-          weight="seams"
-        />
-      )).container;
-    const wide = ribboned("broadsheet");
-    const detail = [...(wide.querySelector(".kw-frame-detail")?.children ?? [])];
-    expect(detail.map((zone) => [zone.className, zone.textContent])).toEqual([
-      ["kw-frame-bot", "◆ reviewer"],
-      ["kw-frame-inference", "opus · high"],
-      ["kw-frame-mode", "plan"],
-      ["kw-frame-theme", "whiplash"],
-      ["kw-frame-turn", "turn 12 · 3 files · $0.41"],
-    ]);
-    for (const tier of ["column", "clipping", "masthead"] as const) {
-      expect(ribboned(tier).querySelector(".kw-frame-turn")).toBeNull();
-    }
-  });
-
-  it("keeps the telemetry slot for a lone gauge", () => {
-    const { container } = render(() => (
-      <TitleRow
-        name="quiet"
-        state="idle"
-        step={0}
-        focused={false}
-        tier="column"
-        weight="regular"
-        context={assumedContextLevel(1)}
-      />
-    ));
-    expect(container.querySelector(".kw-frame-telemetry .kw-gauge")).toBeTruthy();
-    expect(container.querySelector(".kw-frame-detail")?.textContent).toBe("");
   });
 
   it("makes the gauge a button that opens the context map only when given an opener", () => {
@@ -264,15 +174,6 @@ describe("a signal in the title row", () => {
       />
     ));
 
-  it("names the signal in plain words with its reason, and nothing to press without a way to clear it", () => {
-    const { container } = row();
-    const tag = container.querySelector(".kw-frame-signal") as HTMLElement;
-    expect(tag.tagName).toBe("SPAN");
-    expect(tag.textContent).toBe("critical");
-    expect(tag.dataset.signal).toBe("critical");
-    expect(tag.getAttribute("title")).toBe("critical · the release is half applied");
-  });
-
   it("clears the signal when pressed, by pointer or by key, given a way to clear it", () => {
     const cleared: string[] = [];
     const { container } = row(() => cleared.push("cleared"));
@@ -283,11 +184,6 @@ describe("a signal in the title row", () => {
     );
     button.click();
     expect(cleared).toEqual(["cleared"]);
-  });
-
-  it("is absent at rest", () => {
-    const { container } = renderRow("broadsheet", false);
-    expect(container.querySelector(".kw-frame-signal")).toBeNull();
   });
 });
 

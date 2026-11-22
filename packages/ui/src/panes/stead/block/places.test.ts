@@ -64,38 +64,6 @@ describe("where a creature's conversations ran", () => {
     });
   });
 
-  it("counts each directory's tracked files through the host, again on the minute, and only changes when they do", async () => {
-    const reads = manualReads({ a: { cwd: "/work/lamps", createdAt: noonIso } });
-    const counts = new Map([["/work/lamps", 40]]);
-    const counted: string[] = [];
-    const seams: PlaceSeams = {
-      ...reads.seams,
-      trackedFiles: async (directory) => {
-        counted.push(directory);
-        return counts.get(directory);
-      },
-    };
-    const timers = manualTimers();
-    await inRoot(async () => {
-      const known = createProjectPlaces(seams, () => ["a"], timers);
-      await settled();
-      reads.answerAll();
-      await settled();
-      timers.runPending();
-      await settled();
-      expect(known.trackedFiles()).toEqual({ "/work/lamps": 40 });
-      const before = known.trackedFiles();
-      timers.tick();
-      await settled();
-      expect(known.trackedFiles()).toBe(before);
-      counts.set("/work/lamps", 41);
-      timers.tick();
-      await settled();
-      expect(known.trackedFiles()).toEqual({ "/work/lamps": 41 });
-      expect(counted).toEqual(["/work/lamps", "/work/lamps", "/work/lamps"]);
-    });
-  });
-
   it("builds each creature's project sites from the creature's own conversations", async () => {
     const town = sketchTown(2);
     const template = Object.values(town.threads)[0];

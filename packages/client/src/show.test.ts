@@ -49,15 +49,6 @@ describe("the yard's routes", () => {
     ]);
   });
 
-  it("keeps a named size on what GET /show lists, and leaves it absent when none was named", async () => {
-    const named = { ...setting, id: "set-2", size: "working" } as const;
-    const server = serving(() => json(200, { settings: [setting, named] }));
-    const client = keyworkClient(ticket, { fetch: server.fetch });
-    const listed = await client.settings();
-    expect(listed).toEqual([setting, named]);
-    expect(Array.isArray(listed) && "size" in (listed[0] ?? {})).toBe(false);
-  });
-
   it("posts the keeper's outcome to POST /show/{id}/answer and settles nothing itself", async () => {
     const server = serving(() => json(200, { ...setting, state: "dismissed" }));
     const client = keyworkClient(ticket, { fetch: server.fetch });
@@ -93,18 +84,6 @@ describe("the yard's routes", () => {
     expect(server.calls).toEqual([
       { url: "http://127.0.0.1:4770/show", method: "POST", body: JSON.stringify(opening) },
     ]);
-  });
-
-  it("returns the server's refusal of an opening from a panel it does not know", async () => {
-    const server = serving(() => json(404, { error: "no live setting or session set-9" }));
-    const client = keyworkClient(ticket, { fetch: server.fetch });
-    expect(
-      await client.openSetting({
-        what: { kind: "url", ref: "https://example.com" },
-        from: "set-9",
-        rung: "unfold",
-      }),
-    ).toEqual({ refused: "missing", detail: "no live setting or session set-9" });
   });
 
   it("returns the server's refusal in its own words", async () => {

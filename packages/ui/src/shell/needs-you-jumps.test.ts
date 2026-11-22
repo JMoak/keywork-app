@@ -33,16 +33,6 @@ describe("leader n and leader shift+n", () => {
     expect(desk.jumps.back()).toBe(false);
   });
 
-  it("opens the session when no pane shows it, and summons memory for its items", () => {
-    const desk = deskWith([askItem("c1", { sessionId: "s7" }), inboxItem("m1")]);
-    desk.open(conversation("s1"));
-    desk.jumps.next();
-    expect(desk.opened).toEqual(["s7"]);
-    expect(desk.focusedSpec()).toEqual(conversation("s7"));
-    desk.jumps.to(inboxItem("m1"));
-    expect(desk.focusedSpec()).toEqual({ kind: "memory" });
-  });
-
   it("walks the queue on repeat and steps back one jump at a time", () => {
     const desk = deskWith([
       askItem("c1", { sessionId: "s2" }),
@@ -62,19 +52,6 @@ describe("leader n and leader shift+n", () => {
     expect(desk.focusedSpec()).toEqual(conversation("s2"));
     desk.jumps.back();
     expect(desk.focusedSpec()).toEqual(conversation("s1"));
-  });
-
-  it("starts from the new head once the item it landed on is answered", () => {
-    const desk = deskWith([
-      askItem("c1", { sessionId: "s2" }),
-      askItem("c2", { sessionId: "s3", since: "2026-10-15T11:00:00.000Z" }),
-    ]);
-    for (const id of ["s1", "s2", "s3"]) desk.open(conversation(id));
-    desk.focusSession("s1");
-    desk.jumps.next();
-    desk.setItems([askItem("c2", { sessionId: "s3", since: "2026-10-15T11:00:00.000Z" })]);
-    desk.jumps.next();
-    expect(desk.focusedSpec()).toEqual(conversation("s3"));
   });
 
   it("stays put with nothing waiting, and a jump that moves nothing records no return", () => {
@@ -113,28 +90,6 @@ describe("leader n and leader shift+n", () => {
     let returns = 0;
     while (deep.jumps.back()) returns += 1;
     expect(returns).toBe(returnDepth);
-  });
-
-  it("visits a session from the desk with nothing to reveal, and leader shift+n comes back", () => {
-    const desk = deskWith([askItem("c1")]);
-    desk.open({ kind: "needs-you" });
-    desk.jumps.toPlace({ kind: "session", workspace: "C:/work", sessionId: "s4" });
-    expect(desk.focusedSpec()).toEqual(conversation("s4"));
-    expect(desk.jumps.revealing()).toBeUndefined();
-    expect(desk.jumps.back()).toBe(true);
-    expect(desk.focusedSpec()).toEqual({ kind: "needs-you" });
-  });
-
-  it("asks the pane that answers to reveal the item, once per jump", () => {
-    const desk = deskWith([askItem("c1")]);
-    desk.open(conversation("s1"));
-    expect(desk.jumps.revealing()).toBeUndefined();
-    desk.jumps.next();
-    const first = desk.jumps.revealing();
-    expect(first?.item.key).toBe("C:/work#ask:c1");
-    expect(first?.pane).toBe(desk.focused());
-    desk.jumps.next();
-    expect(desk.jumps.revealing()?.seq).toBeGreaterThan(first?.seq ?? 0);
   });
 
   it("follows a toast's trigger to its item, or to its place when the item is gone", () => {

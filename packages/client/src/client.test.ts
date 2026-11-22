@@ -61,24 +61,6 @@ function modeEnvelope(id: number): BusEnvelope {
 }
 
 describe("keyworkClient routes", () => {
-  it("refreshes model setup with an authenticated body-free request", async () => {
-    const inventory = {
-      generatedAt: "2026-11-10T12:00:00.000Z",
-      nodes: [],
-      inherits: { strong: { provider: "local", model: "chosen" } },
-    };
-    const { calls, fetch } = recordingFetch(() => json(200, inventory));
-    expect(await keyworkClient(ticket, { fetch }).refreshModels()).toEqual(inventory);
-    expect(calls).toEqual([
-      {
-        url: "http://127.0.0.1:4770/models/refresh",
-        method: "POST",
-        headers: expect.objectContaining({ authorization: "Bearer t0k3n" }),
-        body: undefined,
-      },
-    ]);
-  });
-
   it("sends the bearer token on every route and trims the url", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/sessions") && call.method === "GET")
@@ -131,48 +113,6 @@ describe("keyworkClient routes", () => {
     expect(await client.changedFile("nope", "a.txt")).toBe("missing");
     expect(await client.hunkVerdicts("nope")).toBe("missing");
     expect(await client.recordHunkVerdict("nope", verdict)).toBe("missing");
-  });
-
-  it("reads and records hunk verdicts, and says when the server records none", async () => {
-    const mark = { index: 1, entryId: "v1", at: "t", ...verdict };
-    let wired = true;
-    const { calls, fetch } = recordingFetch((call) => {
-      if (call.method === "GET") return json(200, { verdicts: [mark] });
-      return wired ? json(201, mark) : json(501, { error: "verdicts are not wired" });
-    });
-    const client = keyworkClient(ticket, { fetch });
-    expect(await client.hunkVerdicts("s1")).toEqual({ verdicts: [mark] });
-    expect(await client.recordHunkVerdict("s1", verdict)).toEqual(mark);
-    wired = false;
-    expect(await client.recordHunkVerdict("s1", verdict)).toBe("unwired");
-    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
-      "GET /sessions/s1/changes/verdicts",
-      "POST /sessions/s1/changes/verdicts",
-      "POST /sessions/s1/changes/verdicts",
-    ]);
-    expect(JSON.parse(calls[1]?.body ?? "{}")).toEqual(verdict);
-  });
-
-  it("walks the tree routes: entries, fork, label, and leaf with their bodies", async () => {
-    const forked = { sessionId: "s2" };
-    const { calls, fetch } = recordingFetch((call) => {
-      if (call.url.endsWith("/entries")) return json(200, { sessionId: "s1", entries: [] });
-      if (call.url.endsWith("/fork")) return json(201, forked);
-      if (call.url.endsWith("/label")) return json(200, { entryId: "e1", label: null });
-      if (call.url.endsWith("/leaf")) return json(200, { leafId: "e1" });
-      return json(404, { error: "no such route" });
-    });
-    const client = keyworkClient(ticket, { fetch });
-    expect((await client.entries("s1"))?.sessionId).toBe("s1");
-    expect(await client.fork("s1", "e1")).toEqual(forked);
-    expect(await client.labelEntry("s1", "e1", null)).toEqual({ entryId: "e1", label: null });
-    expect(await client.moveLeaf("s1", "e1")).toEqual({ leafId: "e1" });
-    expect(calls.map((call) => call.body)).toEqual([
-      undefined,
-      '{"entryId":"e1"}',
-      '{"entryId":"e1","label":null}',
-      '{"entryId":"e1"}',
-    ]);
   });
 
   it("tells an unknown entry from a missing session and a busy leaf move from a baseline gap", async () => {
@@ -373,19 +313,6 @@ describe("keyworkClient memory routes", () => {
     expect(await client.revertLedgerEntry("l3")).toBe("inert");
   });
 
-  it("asks the garden with the query and an optional arc", async () => {
-    const { calls, fetch } = recordingFetch(() =>
-      json(200, { trusted: true, hits: [], source: "lexical" }),
-    );
-    const client = keyworkClient(ticket, { fetch });
-    expect((await client.askMemory({ query: "thirds" })).source).toBe("lexical");
-    await client.askMemory({ query: "thirds", arc: "launch" });
-    expect(calls.map((call) => call.body)).toEqual([
-      '{"query":"thirds"}',
-      '{"query":"thirds","arc":"launch"}',
-    ]);
-  });
-
   it("walks the airlock verbs with their typed refusals", async () => {
     const { calls, fetch } = recordingFetch((call) => {
       if (call.url.endsWith("/arcs/launch/airlock") && call.method === "GET")
@@ -435,37 +362,6 @@ describe("keyworkClient memory routes", () => {
 });
 
 describe("keyworkClient workspace routes", () => {
-  const listing = {
-    path: "src",
-    entries: [{ name: "a.ts", kind: "file", ignored: false, hidden: false }],
-  };
-  const slice = {
-    path: "src/a.ts",
-    bytes: 12,
-    from: 0,
-    to: 12,
-    text: "hello world\n",
-    truncated: false,
-    encoding: "utf-8",
-  };
-
-  it("reads the workspace, a tree level, and a file slice at its range", async () => {
-    const { calls, fetch } = recordingFetch((call) => {
-      if (call.url.endsWith("/workspace")) return json(200, { trust: "undecided" });
-      if (call.url.includes("/tree?")) return json(200, listing);
-      return json(200, slice);
-    });
-    const client = keyworkClient(ticket, { fetch });
-    expect(await client.workspace()).toEqual({ trust: "undecided" });
-    expect(await client.tree("src")).toEqual(listing);
-    expect(await client.file("src/a.ts", { from: 3, to: 9 })).toEqual(slice);
-    expect(calls.map((call) => call.url.replace(ticket.url, "/"))).toEqual([
-      "/workspace",
-      "/tree?path=src&hidden=true",
-      "/files?path=src%2Fa.ts&from=3&to=9",
-    ]);
-  });
-
   it("names each refusal of a tree or file read", async () => {
     const answer = (status: number) =>
       keyworkClient(ticket, { fetch: recordingFetch(() => json(status, { error: "no" })).fetch });

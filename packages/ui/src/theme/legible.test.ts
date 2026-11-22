@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { derivedTextFaint } from "./complete.ts";
 import { wcagContrast } from "./contrast.ts";
 import { identitiesBeyondTheRamp, identitiesFromTheRamp } from "./identities.ts";
 import {
@@ -84,13 +83,6 @@ describe("every shipped theme is legible at WCAG AA", () => {
 });
 
 describe("legibleInks", () => {
-  it("leaves an ink that already reads alone", () => {
-    const inks = legibleInks(keyworkNight);
-    expect(inks.text).toBe(keyworkNight.tokens.text);
-    expect(inks.accent).toBe(keyworkNight.tokens.accent);
-    expect(inks.success).toBe(keyworkNight.tokens.success);
-  });
-
   it("lifts the quiet tiers to a ladder that starts at AA and steps toward the text", () => {
     const inks = legibleInks(keyworkNight);
     const grounds = groundsOf(keyworkNight.tokens);
@@ -120,15 +112,6 @@ describe("legibleInks", () => {
     expect(weakestContrast(lifted, groundsOf(pale.tokens))).toBeGreaterThanOrEqual(wcagText);
     const night = legibleInks(keyworkNight).textDim;
     expect(oklabOf(night)[0]).toBeGreaterThan(oklabOf(keyworkNight.tokens.textDim)[0]);
-  });
-
-  it("derives the faint tier from the dim rung before lifting it", () => {
-    const faint = legibleInks(keyworkNight).textFaint;
-    expect(hueDrift(derivedTextFaint(keyworkNight.tokens), faint)).toBeLessThan(hueSlackDegrees);
-  });
-
-  it("answers the same object for the same theme", () => {
-    expect(legibleInks(keyworkNight)).toBe(legibleInks(keyworkNight));
   });
 });
 

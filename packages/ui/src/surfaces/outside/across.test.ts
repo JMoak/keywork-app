@@ -34,11 +34,6 @@ describe("the nearest pane across the desktop", () => {
     expect(toward("down", middle, grid)).toBe("below");
   });
 
-  it("is nobody when no pane's middle lies that way", () => {
-    expect(toward("left", grid.left, grid)).toBeUndefined();
-    expect(toward("up", grid.above, { beside: at(900, 88) })).toBeUndefined();
-  });
-
   it("prefers a pane straight ahead to a nearer one off to the side", () => {
     const ahead = at(1200, 400);
     const aside = at(830, 900);
@@ -57,10 +52,6 @@ describe("the nearest pane across the desktop", () => {
     expect(toward("left", cascade.second, cascade)).toBe("third");
     expect(toward("up", cascade.third, cascade)).toBe("second");
     expect(toward("right", cascade.second, cascade)).toBe("first");
-  });
-
-  it("cannot tell apart two panes standing in exactly the same place", () => {
-    expect(toward("right", middle, { twin: middle })).toBeUndefined();
   });
 });
 

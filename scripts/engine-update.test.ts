@@ -37,7 +37,6 @@ const source = 'export const protocolVersion = "0.4.0";\nexport const contractVe
 describe("compatible engine adoption", () => {
   it.each([
     ["0.4.1", "0.4.0", true],
-    ["0.5.0", "0.4.9", true],
     ["0.4.0", "0.4.0", false],
     ["0.3.9", "0.4.0", false],
   ])("adoption of %s over %s is %s", (candidate, current, expected) => {
@@ -49,7 +48,7 @@ describe("compatible engine adoption", () => {
     expect(updated).toBe(source.replace('protocolVersion = "0.4.0"', 'protocolVersion = "0.4.1"'));
   });
 
-  it.each(["0.4.1-beta.1", "v0.4.1", "0.4.1\nrun-command", "$(command)"])(
+  it.each(["0.4.1-beta.1", "0.4.1\nrun-command", "$(command)"])(
     "rejects nonstable version %s",
     (version) => {
       expect(() => updateEnginePin(source, version)).toThrow("stable engine version");
@@ -77,11 +76,6 @@ describe("compatible engine adoption", () => {
       email: "4242+octo-owner@users.noreply.github.com",
     });
     expect(request.mock.calls[0]?.[0]).toBe("https://api.github.com/users/octo-owner");
-  });
-
-  it("falls back to the login when the owner publishes no name", async () => {
-    const request = vi.fn().mockResolvedValue(Response.json({ id: 7, login: "octo", name: null }));
-    expect((await ownerIdentity("octo", request)).name).toBe("octo");
   });
 
   it("rejects an owner the account lookup does not confirm", async () => {

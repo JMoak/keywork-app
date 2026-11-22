@@ -36,16 +36,6 @@ describe("a diff set out for the keeper", () => {
 describe("one of the console's own panes set out for the keeper", () => {
   const paneOf = (ref: string) => satelliteOf(aSetting({ what: { kind: "pane", ref } }));
 
-  it("is the pane the keeper knows by that name", () => {
-    expect(paneOf("sessions")).toEqual({ kind: "pane", spec: { kind: "tree" } });
-    expect(paneOf("files")).toEqual({ kind: "pane", spec: { kind: "browser" } });
-    expect(paneOf("needs-you")).toEqual({ kind: "pane", spec: { kind: "needs-you" } });
-    expect(paneOf("context")).toEqual({
-      kind: "pane",
-      spec: { kind: "context", sessionId: "home-conversation" },
-    });
-  });
-
   it("opens a pane this console really has, for every name the engine may send", () => {
     for (const name of settingPanes) {
       const shown = paneOf(name);

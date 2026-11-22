@@ -101,17 +101,6 @@ describe("framePacer", () => {
     expect(ticks).toBe(before);
     expect(clock.deferred).toBe(deferred);
   });
-
-  it("may be stopped from inside a tick", () => {
-    const clock = loop();
-    let ticks = 0;
-    const stop = framePacer(clock, { frameMs: 8, timerLatenessMs: 16 })(() => {
-      ticks += 1;
-      stop();
-    });
-    clock.turns(200);
-    expect(ticks).toBe(1);
-  });
 });
 
 describe("timerLatenessOn", () => {

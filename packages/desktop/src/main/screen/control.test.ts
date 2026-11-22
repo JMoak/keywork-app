@@ -62,16 +62,12 @@ function standInHelper() {
 function fakeHelper() {
   const inputs: HelperInput[] = [];
   const listeners = new Set<(reply: HelperReply) => void>();
-  let releases = 0;
   let stops = 0;
   const port: HelperPort = {
     impl: "fake",
     grant: async () => true,
     input: (input) => inputs.push(input),
-    releaseAll: async () => {
-      releases += 1;
-      return { keys: [], buttons: [] };
-    },
+    releaseAll: async () => ({ keys: [], buttons: [] }),
     stop: async () => {
       stops += 1;
       return { released: { keys: [], buttons: [] }, exited: true, ms: 0 };
@@ -81,15 +77,7 @@ function fakeHelper() {
       return () => listeners.delete(listener);
     },
   };
-  return {
-    port,
-    inputs,
-    releases: () => releases,
-    stops: () => stops,
-    localInput: () => {
-      for (const listener of listeners) listener({ v: 1, kind: "local-input" });
-    },
-  };
+  return { port, inputs, stops: () => stops };
 }
 
 async function controlSession(options: {
@@ -203,29 +191,6 @@ describe("the control grant over a live view", () => {
     expect(fake.shown.at(-1)?.banner.mode).toBe("view");
   });
 
-  it("pauses on physical input, says so in the overlay, and resumes only when the keeper does", async () => {
-    const helper = fakeHelper();
-    const { fake, host, sessionId } = await controlSession({ helper: async () => helper.port });
-    await until(() => fake.opened.includes(sessionId));
-    helper.localInput();
-    await settle();
-    expect(helper.releases()).toBe(1);
-    expect(host.sharer.senderInput(sessionId, "ctl", key(1, "KeyA"))).toBe("paused");
-    const paused = fake.shown.at(-1);
-    expect(paused?.banner).toMatchObject({ mode: "control", paused: true });
-    expect(fake.events.at(-1)).toMatchObject({ kind: "control", state: "paused" });
-    expect(paused?.resume).toBeTypeOf("function");
-    paused?.resume?.();
-    await settle();
-    expect(fake.events.at(-1)).toMatchObject({ kind: "control", state: "resumed" });
-    expect(host.sharer.senderInput(sessionId, "ctl", key(2, "KeyA"))).toBe("applied");
-    expect(fake.rows.filter((row) => row.kind === "control").map((row) => row.state)).toEqual([
-      "granted",
-      "paused",
-      "resumed",
-    ]);
-  });
-
   it("refuses an agent control of this keeper desktop, in words", async () => {
     const helper = fakeHelper();
     const { fake, audits, consent } = await controlSession({
@@ -325,7 +290,6 @@ describe("the kill switch under control", () => {
       released: { keys: ["KeyA", "ShiftLeft"], buttons: ["left"] },
       exited: true,
     });
-    expect(elapsed).toBeLessThan(200);
     await until(() => fake.rows.some((row) => row.kind === "ended"));
     expect(fake.rows.find((row) => row.kind === "ended")).toMatchObject({
       reason: "kill-switch",

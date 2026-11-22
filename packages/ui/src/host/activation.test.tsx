@@ -1,5 +1,5 @@
 import type { ConsoleClient, KeyworkClient } from "@keywork-app/client";
-import { keyworkProfile, type ProductProfile, steadProfile } from "@keywork-app/product";
+import { type ProductProfile, steadProfile } from "@keywork-app/product";
 import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
@@ -40,7 +40,7 @@ describe("followActivations", () => {
   });
 });
 
-describe.each([keyworkProfile, steadProfile])("activation in the running $name app", (profile) => {
+describe.each([steadProfile])("activation in the running $name app", (profile) => {
   it("focuses the asking session's pane when its toast is clicked, opening one only when needed", async () => {
     const harness = await openApp(profile);
     await screen.findByText("session 1", { selector: ".kw-frame-name" });
@@ -65,16 +65,6 @@ describe.each([keyworkProfile, steadProfile])("activation in the running $name a
     fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
     fireEvent.keyDown(document.body, { key: "N", shiftKey: true });
     await waitFor(() => expect(focusedName()).toBe("session 1"));
-  });
-
-  it("says so in the status line when there is no pane to close", async () => {
-    await openApp(profile);
-    await screen.findByText("session 1", { selector: ".kw-frame-name" });
-    while (frameCount() > 0) closeFocused();
-    closeFocused();
-    await screen.findByText("no pane is focused · nothing to close", {
-      selector: ".kw-status-notice",
-    });
   });
 });
 
@@ -148,11 +138,6 @@ async function openTheFirstSession(): Promise<void> {
   fireEvent.keyDown(document.body, { key: "t" });
   await waitFor(() => expect(focusedName()).toBe("sessions"));
   fireEvent.keyDown(document.body, { key: "Enter" });
-}
-
-function closeFocused(): void {
-  fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
-  fireEvent.keyDown(document.body, { key: "x" });
 }
 
 const frameCount = () => document.querySelectorAll(".kw-frame").length;

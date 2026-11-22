@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findColorLiterals, styledPath } from "./check-colors.ts";
+import { findColorLiterals } from "./check-colors.ts";
 
 describe("check:colors", () => {
   it("finds hex and functional color literals with their line", () => {
@@ -12,13 +12,5 @@ describe("check:colors", () => {
     expect(findColorLiterals("background: var(--kw-background); color: var(--kw-text);")).toEqual(
       [],
     );
-  });
-
-  it("scans the renderer but not the theme mapping or tests", () => {
-    expect(styledPath("packages/ui/src/panes/conversation.tsx")).toBe(true);
-    expect(styledPath("packages/ui/src/app.css")).toBe(true);
-    expect(styledPath("packages/ui/src/theme/tokens.ts")).toBe(false);
-    expect(styledPath("packages/ui/src/app.test.tsx")).toBe(false);
-    expect(styledPath("packages/desktop/src/main/index.ts")).toBe(false);
   });
 });

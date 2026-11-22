@@ -26,16 +26,6 @@ describe("the signals the console reads for the yard", () => {
     dispose();
   });
 
-  it("knows a reply is arriving only in the focused thread", () => {
-    const { signals, focus, dispose } = signalsOver({
-      streaming: (sessionId) => sessionId === "talking",
-    });
-    expect(signals().streaming).toBe(false);
-    focus("talking");
-    expect(signals().streaming).toBe(true);
-    dispose();
-  });
-
   it("stamps the keeper's return when the console is shown again after hidden", () => {
     const page = fakePage();
     let clock = 1000;
@@ -64,21 +54,6 @@ describe("the signals the console reads for the yard", () => {
       fullscreenElsewhere: true,
       displayShared: false,
     });
-    dispose();
-  });
-
-  it("passes false for what no platform reports yet, and the rail's focus as it stands", () => {
-    const [rail, setRail] = createSignal(false);
-    const { signals, dispose } = signalsOver({ railFocused: rail });
-    expect(signals()).toMatchObject({
-      doNotDisturb: false,
-      quietHours: false,
-      fullscreenElsewhere: false,
-      displayShared: false,
-      railFocused: false,
-    });
-    setRail(true);
-    expect(signals().railFocused).toBe(true);
     dispose();
   });
 });

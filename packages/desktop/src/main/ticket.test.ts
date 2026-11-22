@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liveServerOf, probeTicket } from "./ticket.ts";
+import { probeTicket } from "./ticket.ts";
 
 const ticket = { url: "http://127.0.0.1:4770/", token: "secret" };
 
@@ -45,16 +45,5 @@ describe("probeTicket", () => {
     expect(
       await probeTicket(ticket, serverAnswering(200, { info: { title: "other" } }).transport),
     ).toBeUndefined();
-  });
-});
-
-describe("liveServerOf", () => {
-  it("reads the version and the workspace identity a keywork /doc carries, tolerating none", () => {
-    expect(liveServerOf({ info: { title: "keywork", version: "0.1.0" } })).toEqual({
-      version: "0.1.0",
-      identity: undefined,
-    });
-    expect(liveServerOf(null)).toBeUndefined();
-    expect(liveServerOf({ info: { title: "keywork" } })).toBeUndefined();
   });
 });

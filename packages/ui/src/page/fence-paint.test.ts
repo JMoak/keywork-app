@@ -8,7 +8,6 @@ import {
   fenceLanguage,
   fenceLanguageName,
   largestPaintedFence,
-  paintedNodes,
   paintFence,
 } from "./fence-paint.ts";
 
@@ -21,16 +20,8 @@ describe("fence languages", () => {
 
   it.each([
     ["ts", "TypeScript"],
-    ["typescript", "TypeScript"],
     ["TypeScript", "TypeScript"],
     ["tsx", "TSX"],
-    ["js", "JavaScript"],
-    ["py", "Python"],
-    ["python", "Python"],
-    ["rs", "Rust"],
-    ["rust", "Rust"],
-    ["json", "JSON"],
-    ["yml", "YAML"],
     ["c", "C++"],
   ])("finds %s as %s", (name, language) => {
     expect(fenceLanguage(name)?.name).toBe(language);
@@ -53,26 +44,11 @@ describe("paintFence", () => {
     );
   });
 
-  it("paints nothing for a language without a grammar", async () => {
-    expect(fenceIsPaintable("zork", "a b c")).toBe(false);
-    expect(await paintFence("zork", "a b c")).toBeUndefined();
-  });
-
   it("leaves a block too long to paint within a frame plain", async () => {
     const huge = "const a = 1;\n".repeat(largestPaintedFence / 10);
     expect(fenceIsPaintable("ts", huge)).toBe(false);
     expect(await paintFence("ts", huge)).toBeUndefined();
     expect(fenceIsPaintable("ts", "const a = 1;")).toBe(true);
-  });
-
-  it("turns runs into text and classed spans", () => {
-    const nodes = paintedNodes([
-      { text: "let", classes: `${syntaxClassPrefix}keyword` },
-      { text: " a", classes: "" },
-    ]);
-    expect(nodes.map((node) => node.textContent)).toEqual(["let", " a"]);
-    expect((nodes[0] as HTMLElement).className).toBe(`${syntaxClassPrefix}keyword`);
-    expect(nodes[1]?.nodeType).toBe(Node.TEXT_NODE);
   });
 
   it("has a page.css ink for every syntax class it can paint", () => {

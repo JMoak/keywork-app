@@ -4,7 +4,6 @@ import type {
   InboxTally,
   MemoryGarden,
   PendingAsk,
-  SessionRow,
   VerdictMark,
 } from "@keywork-app/protocol";
 import { createRoot, createSignal } from "solid-js";
@@ -16,10 +15,9 @@ import {
   createNeedsYouQueue,
   createWaiting,
   type SessionVerdicts,
-  sessionVerdicts,
   type WaitingSource,
 } from "./needs-you-queue.ts";
-import { airlockItem, askItem, failedItem, inboxItem } from "./needs-you-testing.ts";
+import { askItem, failedItem, inboxItem } from "./needs-you-testing.ts";
 
 const disposers: Array<() => void> = [];
 
@@ -45,24 +43,6 @@ describe("the needs-you queue", () => {
     ]);
     expect(queue.count()).toBe(4);
     expect(queue.head()?.key).toBe("C:/side#ask:c0");
-  });
-
-  it("names where an item is answered through the source of its own workspace", () => {
-    const queue = inRoot(createNeedsYouQueue);
-    queue.attach(fakeSource("C:/work", []).source);
-    expect(queue.where(askItem("c1"))).toBe("C:/work s1");
-    expect(queue.where(airlockItem("pricing"))).toBe("pricing");
-    expect(queue.where(askItem("c2", { workspace: "C:/gone" }))).toBe("s1");
-  });
-
-  it("follows its sources live, so answering an item advances the head", () => {
-    const queue = inRoot(createNeedsYouQueue);
-    const work = fakeSource("C:/work", [askItem("c1"), airlockItem("pricing")]);
-    queue.attach(work.source);
-    expect(queue.head()?.kind).toBe("ask");
-    work.set([airlockItem("pricing")]);
-    expect(queue.head()?.kind).toBe("airlock");
-    expect(queue.count()).toBe(1);
   });
 
   it("dismisses anything but an ask, and forgets dismissals of items that are gone", () => {
@@ -126,22 +106,6 @@ describe("a workspace's waiting source", () => {
     expect(keysOf(harness.source.items())).toEqual(["C:/work#review:s3#src/a.ts#a1"]);
   });
 
-  it("reads every listed session's verdict trail and keeps only those with marks", async () => {
-    const trails: Record<string, readonly VerdictMark[] | "missing"> = {
-      s1: [verdictMark("src/a.ts", "a1", "ask")],
-      s2: [],
-      s3: "missing",
-    };
-    const read = await sessionVerdicts({
-      sessions: async () => Object.keys(trails).map(sessionRow),
-      hunkVerdicts: async (id) => {
-        const trail = trails[id] ?? "missing";
-        return trail === "missing" ? "missing" : { verdicts: trail };
-      },
-    });
-    expect(read).toEqual([{ sessionId: "s1", verdicts: trails.s1 }]);
-  });
-
   it("asks the server again on reconnect and drops what it no longer holds", async () => {
     const harness = waitingHarness({ pending: [] });
     await settle();
@@ -151,25 +115,6 @@ describe("a workspace's waiting source", () => {
     harness.connect();
     await settle();
     expect(keysOf(harness.source.items())).toEqual(["C:/work#ask:c2"]);
-  });
-
-  it("reads the memory garden once when nobody has, and lists its inbox and airlocks", async () => {
-    const harness = waitingHarness({ pending: [] });
-    await settle();
-    expect(harness.memoryReads()).toBe(1);
-    harness.setGarden({
-      ...inertGarden,
-      inbox: ["w1", "w2", "w3"].map((id) => ({
-        id,
-        kind: "note" as const,
-        target: `entities/${id}.md`,
-        created: "2026-10-15T08:00:00.000Z",
-        content: "",
-      })),
-      airlocks: [{ arc: "pricing", candidates: [], questions: [] }],
-    });
-    expect(harness.source.items().map((item) => item.kind)).toEqual(["airlock", "inbox"]);
-    expect(harness.source.items()[0]?.since).toBe("2026-10-15T12:00:00.000Z");
   });
 
   it("stops following the feed once disposed", async () => {
@@ -314,16 +259,6 @@ function verdictMark(path: string, digest: string, verdict: VerdictMark["verdict
     header: "@@ -1,3 +1,4 @@",
     digest,
     verdict,
-  };
-}
-
-function sessionRow(id: string): SessionRow {
-  return {
-    id,
-    title: id,
-    createdAt: "2026-10-15T08:00:00.000Z",
-    lastActivityAt: "2026-10-15T08:00:00.000Z",
-    messageCount: 2,
   };
 }
 

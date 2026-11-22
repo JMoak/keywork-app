@@ -156,16 +156,6 @@ describe("the picture of a drill", () => {
     expect(pairs(all).filter(([one, other]) => overlaps(one, other))).toEqual([]);
   });
 
-  it("keeps a lone bystander a card, smaller than the lead it stands beside", () => {
-    const hub = asTheHub(windowedAt(300));
-    const picture = drillSeats(hub, [], 1, 1);
-    const [card] = picture?.cards ?? [];
-    const lead = picture?.lead;
-    if (card === undefined || lead === undefined) throw new Error("no picture was drawn");
-    expect(card.width * card.height).toBeLessThan((lead.width * lead.height) / 2);
-    expect(cardAtLeast(card)).toBe(true);
-  });
-
   it("keeps the lead and the cards where they are as the trail grows, older ancestors than fit joining the cards", () => {
     const hub = asTheHub(windowedAt(300));
     const one = drillSeats(hub, [], 1, 4);

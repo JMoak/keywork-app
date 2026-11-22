@@ -2,7 +2,7 @@ import type { SettingKind } from "@keywork-app/protocol";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { minute, second } from "../clock/clock.ts";
-import { byDepth, depthHalfLife, depthOf, kindWeights, pinnedDepth } from "./depth.ts";
+import { byDepth, depthHalfLife, depthOf } from "./depth.ts";
 import { askedIn, aYardSetting, calm, isoAt, noon } from "./testing.ts";
 import type { YardContext, YardSetting } from "./types.ts";
 
@@ -15,13 +15,6 @@ function depth(
 }
 
 describe("depth", () => {
-  it("weighs deliveries above links and notes when they arrive together", () => {
-    const kinds: readonly SettingKind[] = ["diff", "report", "chore", "url"];
-    const depths = kinds.map((kind) => depth({ what: { kind, ref: "r" } }));
-    expect(depths).toEqual([5, 4, 3, 2]);
-    expect(depths).toEqual(kinds.map((kind) => kindWeights[kind]));
-  });
-
   it("halves a setting's recency every ten minutes", () => {
     const diff = { what: { kind: "diff" as const, ref: "r" } };
     expect(depth(diff, {}, noon + depthHalfLife)).toBe(2.5);
@@ -35,17 +28,6 @@ describe("depth", () => {
     expect(depth({}, { focusedThread: "s1" }, later)).toBe(4.25);
     expect(depth({}, askedIn("s1", noon - 30 * second), later)).toBe(6.25);
     expect(depth({}, askedIn("s2", noon - 30 * second), later)).toBe(0.25);
-  });
-
-  it("keeps pinned settings on top of everything unpinned", () => {
-    const oldPinnedNote = depth({ state: "pinned" }, {}, noon + 10 * depthHalfLife);
-    const freshAskedDiff = depth(
-      { what: { kind: "diff", ref: "r" } },
-      askedIn("s1", noon - second),
-      noon,
-    );
-    expect(oldPinnedNote).toBeGreaterThan(freshAskedDiff);
-    expect(oldPinnedNote).toBeGreaterThanOrEqual(pinnedDepth);
   });
 
   it("lets dismissed, withdrawn and seen settings leave the reckoning", () => {

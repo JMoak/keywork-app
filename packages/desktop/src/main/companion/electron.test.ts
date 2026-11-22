@@ -27,12 +27,6 @@ describe("the companion page", () => {
       "ready to show and test",
     ]);
   });
-
-  it("overrides the root, html and body backgrounds whatever the console's stylesheet says", () => {
-    for (const selector of [":root", "html", "body"])
-      expect(transparentRootCss).toContain(selector);
-    expect(transparentRootCss).toContain("background: transparent !important");
-  });
 });
 
 function companionPage() {

@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { raisedEye, restCamera } from "./camera.ts";
 import { mixHex, overChannel, overHex } from "./colour.ts";
 import { drawList, viewOf } from "./draw-list.ts";
-import { identityCount, type Kit } from "./kit.ts";
+import type { Kit } from "./kit.ts";
 import { kits } from "./kits/index.ts";
 import { shedSpots } from "./layout.ts";
-import { type BlockWorld, type Box, identityRamp, type Part, topTexel } from "./model.ts";
+import { type BlockWorld, type Box, type Part, topTexel } from "./model.ts";
 import { resolveBlockPalette } from "./palette.ts";
 import { blockScene } from "./scene.ts";
 import { backdropOf, firefliesOf } from "./sky.ts";
@@ -92,18 +92,6 @@ describe("a kit", () => {
           ]),
         ]);
       }
-    });
-
-    it(`${kit.id}: has eight creature colours, a night and a day, and gold the same in both`, () => {
-      expect(identityCount(kit)).toBe(8);
-      expect(kit.colours.day.hues.length).toBe(8);
-      const night = resolveBlockPalette(kit, "night", pageGround.night);
-      const bases = Array.from({ length: 8 }, (_, identity) =>
-        night.colourOf("hue.b", identityRamp(identity)),
-      );
-      expect(new Set(bases).size).toBe(8);
-      expect(kit.colours.night.roles.gold).toBe(kits[0]?.colours.night.roles.gold);
-      expect(kit.colours.day.roles.gold).toBe(kits[0]?.colours.day.roles.gold);
     });
   }
 });

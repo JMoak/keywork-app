@@ -60,10 +60,6 @@ describe("windowStateBook", () => {
 });
 
 describe("windowStateKey", () => {
-  it("names the front door for a window with no workspace", () => {
-    expect(windowStateKey(undefined, "win32")).toBe(frontDoorKey);
-  });
-
   it("folds slashes and case on Windows, and only slashes elsewhere", () => {
     expect(windowStateKey("C:\\Work\\App\\", "win32")).toBe("c:/work/app");
     expect(windowStateKey("/home/Me/app/", "linux")).toBe("/home/Me/app");

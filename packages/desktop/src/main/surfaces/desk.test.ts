@@ -25,11 +25,6 @@ describe("deskOf", () => {
     });
   });
 
-  it("says when the console is maximised", () => {
-    const maximized = { ...consoleFrame, isMaximized: () => true };
-    expect(deskOf(maximized, screen).consoleMaximized).toBe(true);
-  });
-
   it("stands the cursor in the middle of the console where the desktop will not say", () => {
     const blind = { ...screen, cursor: () => undefined };
     expect(deskOf(consoleFrame, blind).cursor).toEqual({ x: 800, y: 485 });

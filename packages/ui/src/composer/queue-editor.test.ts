@@ -1,12 +1,7 @@
 import type { QueuedPrompt } from "@keywork-app/protocol";
 import { createRoot, createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
-import {
-  createQueueEditor,
-  type QueueDraft,
-  type QueueKeyEvent,
-  queueHint,
-} from "./queue-editor.ts";
+import { createQueueEditor, type QueueDraft, type QueueKeyEvent } from "./queue-editor.ts";
 
 describe("the queue editor", () => {
   it("takes the picked prompt out of the queue and into the draft on e", () => {
@@ -29,11 +24,6 @@ describe("the queue editor", () => {
     press("ArrowUp", { altKey: true });
     press("Delete");
     expect(queue().map((prompt) => prompt.id)).toEqual(["q1", "q2"]);
-  });
-
-  it("names the edit key in its hint", () => {
-    expect(queueHint).toContain("e edits it");
-    expect(queueHint).toContain("del drops it");
   });
 });
 

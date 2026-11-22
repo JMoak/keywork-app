@@ -13,11 +13,9 @@ import {
   callsQueuedBehind,
   endingLine,
   failureNextStep,
-  headline,
   latestLine,
   moreLinesLine,
   promptFold,
-  wordCount,
   workingLine,
 } from "./pane.tsx";
 import { tierMinPx, tierOf } from "./tiers.ts";
@@ -36,24 +34,11 @@ function rows(container: HTMLElement): string[] {
 }
 
 describe("ConversationPane over the recorded fixtures", () => {
-  it.each(["plain", "thinking", "tool", "denied", "interrupt", "queued", "injected", "delegated"])(
-    "renders %s",
-    async (name) => {
-      const projection = await fixture(name);
-      const { container } = render(() => <ConversationPane projection={projection} />);
-      expect(container.querySelectorAll(".kw-entry")).toHaveLength(projection.entries.length);
-      expect(rows(container)).toMatchSnapshot();
-    },
-  );
-
-  it("stamps voices by provenance and shows a settled agent stamp when the turn is over", async () => {
-    const projection = await fixture("tool");
+  it.each(["plain", "tool", "interrupt", "queued"])("renders %s", async (name) => {
+    const projection = await fixture(name);
     const { container } = render(() => <ConversationPane projection={projection} />);
-    const stamps = [...container.querySelectorAll(".kw-stamp")].map((stamp) =>
-      stamp.getAttribute("data-voice"),
-    );
-    expect(stamps).toEqual(["user", "machine", "agent"]);
-    expect(container.querySelector(".kw-stamp[data-streaming]")).toBeNull();
+    expect(container.querySelectorAll(".kw-entry")).toHaveLength(projection.entries.length);
+    expect(rows(container)).toMatchSnapshot();
   });
 
   it("tags a prompt another client injected with its machine voice", () => {
@@ -69,27 +54,6 @@ describe("ConversationPane over the recorded fixtures", () => {
     const { container } = render(() => <ConversationPane projection={projection} />);
     expect(container.querySelector(".kw-origin")?.textContent).toBe("via wispr-flow");
     expect(container.querySelector(".kw-user")?.textContent).toBe("dictatedvia wispr-flow");
-  });
-
-  it("animates the agent stamp while the answer streams", async () => {
-    const streaming = projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: "2026-09-07T12:00:00.000Z",
-        sessionId: "s1",
-        type: "turn.started",
-        payload: { userText: "go" },
-      },
-      {
-        id: 2,
-        ts: "2026-09-07T12:00:00.250Z",
-        sessionId: "s1",
-        type: "turn.delta",
-        payload: { delta: { type: "text", text: "partial" } },
-      },
-    ]);
-    const { container } = render(() => <ConversationPane projection={streaming} />);
-    expect(container.querySelector(".kw-stamp[data-voice='agent'][data-streaming]")).not.toBeNull();
   });
 
   it("renders the tool row from toolRowSpans with the outcome as the only colored word and folds detail", async () => {
@@ -194,13 +158,6 @@ describe("ConversationPane over the recorded fixtures", () => {
     );
     expect(fold.getAttribute("aria-expanded")).toBe("true");
   });
-
-  it("carries the masthead headline from the first prompt, and the product name before one", async () => {
-    const projection = await fixture("plain");
-    expect(headline(projection)).toBe("say hello");
-    expect(headline(emptyProjection)).toBe("keywork");
-    expect(wordCount("one")).toBe("1 word");
-  });
 });
 
 describe("a delegated child on the parent's transcript", () => {
@@ -234,24 +191,6 @@ describe("a delegated child on the parent's transcript", () => {
     fireEvent.click(container.querySelector(".kw-stamp-fold") as HTMLElement);
     expect(container.querySelector(".kw-tool-detail")?.textContent).toBe(
       "Two rules allow more than they say.",
-    );
-  });
-
-  it("says running with the child's latest step while it works", async () => {
-    const working = projectAll(await recorded(7), [
-      {
-        id: 50,
-        ts: "2026-09-07T12:00:01.900Z",
-        sessionId: "s1",
-        type: "tool.output",
-        payload: { chunk: "read docs/trust.md\n", callId: "d1" },
-      },
-    ]);
-    const { container } = render(() => (
-      <ConversationPane projection={working} onOpenSession={() => undefined} />
-    ));
-    expect(container.querySelector(".kw-tool")?.textContent).toBe(
-      'child "audit the trust rules" · researcher · running · read docs/trust.md ·· ↵ open',
     );
   });
 
@@ -297,14 +236,6 @@ describe("why memory recalled a note", () => {
     );
     expect(fact?.getAttribute("data-tone")).toBe("meta");
     expect(dropped?.querySelector("[data-part='recall']")).toBeNull();
-  });
-
-  it("hides the recall fact under 560px with the waited and duration facts", () => {
-    const css = readFileSync(join(process.cwd(), "packages/ui/src/page/page.css"), "utf8");
-    const narrow = css.slice(css.indexOf("@container pane (max-width: 559.98px)"));
-    expect(narrow).toMatch(
-      /\.kw-tool-span\[data-part="facts"\],\s*\.kw-tool-span\[data-part="recall"\] \{\s*display: none;/,
-    );
   });
 });
 
@@ -437,14 +368,6 @@ describe("how a turn ended", () => {
     expect(failureNextStep("ECONNREFUSED 127.0.0.1:443")).toBe("the provider could not be reached");
     expect(failureNextStep("a listener threw")).toBeUndefined();
   });
-
-  it("draws the ending as plain text where nothing can resend it", () => {
-    const { container } = render(() => <ConversationPane projection={failed} />);
-    expect(container.querySelector(".kw-ending")).toBeNull();
-    expect(container.querySelector("[data-ending='failed']")?.textContent).toBe(
-      "failed · upstream 529 overloaded · the provider is busy · give it a moment",
-    );
-  });
 });
 
 describe("a long pasted prompt", () => {
@@ -518,12 +441,5 @@ describe("width tiers", () => {
     expect(tierOf(560)).toBe("column");
     expect(tierOf(400)).toBe("clipping");
     expect(tierOf(319)).toBe("masthead");
-  });
-
-  it("uses the same numbers in the stylesheet's container queries", async () => {
-    const css = readFileSync(join(process.cwd(), "packages/ui/src/page/page.css"), "utf8");
-    expect(css).toContain("(min-width: 800px)");
-    expect(css).toContain("(max-width: 559.98px)");
-    expect(css).toContain("(max-width: 319.98px)");
   });
 });

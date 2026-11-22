@@ -7,7 +7,7 @@ import {
 } from "@keywork-app/habitat";
 import type { BusEnvelope, EventPayloads, EventType, Replayable } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { creatureSnapshot, residents, threadOfAsk, workToolOf } from "./feed.ts";
+import { creatureSnapshot, residents, threadOfAsk } from "./feed.ts";
 
 let nextId = 0;
 let clock = Date.parse("2026-11-05T12:00:00.000Z");
@@ -109,12 +109,5 @@ describe("the companion feed", () => {
       }),
     ]);
     expect(creatureSnapshot(back, pip, clock)).toMatchObject({ state: "back", finishedUnseen: 1 });
-  });
-
-  it("names only the tools the companion draws", () => {
-    expect(workToolOf("bash")).toBe("bash");
-    expect(workToolOf("write")).toBe("edit");
-    expect(workToolOf("web_fetch")).toBeUndefined();
-    expect(workToolOf(undefined)).toBeUndefined();
   });
 });

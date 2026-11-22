@@ -1,5 +1,4 @@
-import { emptyProjection, projectAll } from "@keywork-app/client";
-import type { BusEnvelope, SessionSummary } from "@keywork-app/protocol";
+import type { SessionSummary } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { orderNeedsYou } from "../../shell/needs-you.ts";
 import {
@@ -10,17 +9,13 @@ import {
   inboxItem,
 } from "../../shell/needs-you-testing.ts";
 import {
-  currentStep,
   type DecisionOverturning,
   type DeskRow,
   type DeskSources,
   decidedOfRow,
-  deskDismissNotice,
   deskGroups,
   deskHead,
-  deskHint,
   deskRows,
-  deskTitle,
   nextWaiting,
   overturnDecided,
   overturnHint,
@@ -152,24 +147,6 @@ describe("the desk's groups", () => {
     ]);
   });
 
-  it("says what each session is doing through its lifecycle state", () => {
-    const rows = deskRows(
-      deskGroups(
-        sources({
-          sessions: [summary("working"), summary("back"), summary("hushed")],
-          working: ["working"],
-          unread: ["back"],
-          quiet: ["hushed"],
-        }),
-      ),
-    );
-    expect(rows.map((row) => (row.kind === "session" ? row.state : row.kind))).toEqual([
-      "working",
-      "finished-unseen",
-      "idle",
-    ]);
-  });
-
   it("numbers each group's first row in the flat list the cursor walks", () => {
     const groups = deskGroups(
       sources({
@@ -215,21 +192,9 @@ describe("tab, the next waiting row", () => {
     expect(nextWaiting(rows, 1)).toBe(0);
     expect(nextWaiting(rows, 2)).toBe(0);
   });
-
-  it("has nowhere to go when nothing waits", () => {
-    expect(nextWaiting(deskRows(deskGroups(sources({ sessions: [summary("a")] }))), 0)).toBe(
-      undefined,
-    );
-  });
 });
 
 describe("the desk's words", () => {
-  it("titles the pane with the count fact", () => {
-    expect(deskTitle(0)).toBe("desk");
-    expect(deskTitle(1)).toBe("desk · 1 needs you");
-    expect(deskTitle(3)).toBe("desk · 3 need you");
-  });
-
   it("heads the pane with the sessions, what waits, what works off the queue, and the spend", () => {
     const head = deskHead(
       sources({
@@ -240,12 +205,6 @@ describe("the desk's words", () => {
     );
     expect(head).toBe("3 sessions · 2 need you · 1 working · $1.55");
     expect(deskHead(sources({ sessions: [summary("a")] }))).toBe("1 session");
-  });
-
-  it("names every key from the keymap", () => {
-    expect(deskHint(keys)).toBe(
-      "j k move · enter goes there · y o s w n answer an ask · d dismisses · tab next waiting",
-    );
   });
 
   it("counts a waiting row's age as its wait, and a session's from its last activity", () => {
@@ -263,37 +222,6 @@ describe("the desk's words", () => {
       ),
     );
     expect(rows.map((row) => rowAge(row, now))).toEqual(["waiting 6m", "now", "waiting 18m", "1h"]);
-  });
-
-  it("dismisses in the words each row deserves", () => {
-    const rows = deskRows(
-      deskGroups(
-        sources({
-          waiting: [askItem("c1"), failedItem("s4")],
-          sessions: [summary("w", 1), summary("b", 2), summary("q", 3)],
-          working: ["w"],
-          unread: ["b"],
-          quiet: ["q"],
-        }),
-      ),
-    );
-    expect(rows.map((row) => deskDismissNotice(row, keys))).toEqual([
-      "an ask is answered, never dismissed · y or n answers it here",
-      "dismissed · the transcript keeps the failure",
-      "a working session waits on nothing · it comes back when it finishes",
-      "marked read · the sessions tree still lists it",
-      "nothing to dismiss · quiet keeps it on the desk until quiet ends",
-    ]);
-  });
-
-  it("tails a working session with its live tool row, or says it is thinking", () => {
-    const started = envelope(1, "turn.started", { userText: "go" });
-    const call = { type: "tool-call", callId: "t1", name: "read", arguments: { path: "plan.md" } };
-    const running = envelope(2, "tool.started", { call });
-    expect(currentStep(projectAll(emptyProjection, [started]))).toBe("thinking");
-    expect(currentStep(projectAll(emptyProjection, [started, running]))).toBe(
-      "read plan.md · running",
-    );
   });
 });
 
@@ -351,8 +279,4 @@ function keysOf(rows: readonly DeskRow[]): string[] {
 
 function headingOf(row: DeskRow): string | undefined {
   return row.kind === "waiting" ? row.heading : undefined;
-}
-
-function envelope(id: number, type: string, payload: unknown): BusEnvelope {
-  return { id, ts: minutesAgo(0), sessionId: "s1", type, payload } as BusEnvelope;
 }

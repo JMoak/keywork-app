@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Axes, axesOf, levelEye, raisedEye, restCamera } from "./camera.ts";
-import { cellOrder, type DrawUnit, depthOf, drawUnits, itemOrder, viewOf } from "./draw-list.ts";
+import { cellOrder, type DrawUnit, depthOf, drawUnits, viewOf } from "./draw-list.ts";
 import { covers } from "./hit.ts";
 import { neonKit } from "./kits/index.ts";
 import type { BlockWorld, Cell, Part } from "./model.ts";
@@ -16,30 +16,6 @@ describe("draw order at the four rest positions", () => {
       const axes = axesOf(restCamera(quarter, raisedEye));
       const drawn = cellOrder(world.cells, axes).map(addressOf);
       expect(drawn, `quarter ${quarter}`).toEqual(sketchCellOrder(world.cells, quarter));
-    }
-  });
-
-  it("draws the items inside a cell far to near, each group as one unit", () => {
-    const world = worldOf(16);
-    for (const quarter of quarters) {
-      const axes = axesOf(restCamera(quarter, raisedEye));
-      for (const cell of world.cells) {
-        const depths = itemOrder(cell.items, axes).map((item) => depthOf(item, axes));
-        expect(depths, `cell ${addressOf(cell)} at quarter ${quarter}`).toEqual(
-          [...depths].sort((a, b) => a - b),
-        );
-      }
-      const units = drawUnits(
-        world,
-        restCamera(quarter, raisedEye),
-        viewOf(world, 1008, 580, raisedEye),
-      );
-      const positions = new Map(units.map((unit, index) => [unit, index]));
-      for (const unit of units) {
-        if (unit.item === undefined) continue;
-        expect(unit.quads.length, "a group draws all its parts together").toBeGreaterThan(0);
-        expect(positions.get(unit)).toBeDefined();
-      }
     }
   });
 

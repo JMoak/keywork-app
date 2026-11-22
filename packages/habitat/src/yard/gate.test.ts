@@ -30,21 +30,6 @@ function spentBudget(unfolds: number, at = noon): Budget {
 }
 
 describe("the show gate", () => {
-  it("plays a card or a lantern as proposed and keeps the whole decision", () => {
-    expect(decided({ rung: "card" })).toBe("play:card:as proposed");
-    expect(decided({ rung: "lantern" })).toBe("play:lantern:as proposed");
-    expect(decideShow(aYardSetting({ id: "d1", rung: "card" }), calm, emptyBudget, noon)).toEqual({
-      at: noon,
-      id: "d1",
-      creature: "bea",
-      kind: "note",
-      proposed: "card",
-      rung: "card",
-      verdict: "play",
-      reason: "as proposed",
-    });
-  });
-
   it("holds an unfold on the rail as a card unless the keeper asked", () => {
     expect(decided({ rung: "unfold" })).toBe("hold:card:a card unless you asked");
     expect(decided({ rung: "unfold", sessionId: "s2" }, asked)).toBe(

@@ -61,22 +61,6 @@ describe("windowRegistry", () => {
     registry.setNeedsYou(1, -3);
     expect(registry.needsYou()).toBe(0);
   });
-
-  it("announces every change once", () => {
-    const registry = windowRegistry();
-    let changes = 0;
-    const stop = registry.onChange(() => {
-      changes += 1;
-    });
-    registry.add(1);
-    registry.bind(1, "C:/a");
-    registry.setNeedsYou(1, 1);
-    registry.unbind(1);
-    registry.unbind(1);
-    stop();
-    registry.remove(1);
-    expect(changes).toBe(4);
-  });
 });
 
 describe("quitGate", () => {

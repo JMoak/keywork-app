@@ -4,24 +4,6 @@ import { isAccelerator, type MenuItemModel, menuModel, recentMenuLimit } from ".
 const base = { dev: false, recents: [], chords: {} } as const;
 
 describe("menuModel", () => {
-  it("lays out File, Edit, View, Window, Help on Windows with Quit under File", () => {
-    const menu = menuModel({ ...base, platform: "win32" });
-    expect(menu.map(labelOf)).toEqual(["File", "Edit", "View", "Window", "Help"]);
-    const file = itemsOf(menu[0]);
-    expect(file.at(-1)).toEqual({ kind: "action", label: "Quit", action: "quit" });
-    expect(itemsOf(menu[1]).map(roleOf)).toEqual([
-      "undo",
-      "redo",
-      "cut",
-      "copy",
-      "paste",
-      "selectAll",
-    ]);
-    expect(itemsOf(menu[4])).toEqual([
-      { kind: "action", label: "About keywork-app", action: "about" },
-    ]);
-  });
-
   it("adds the app menu on macOS and keeps Quit out of File", () => {
     const menu = menuModel({ ...base, platform: "darwin" });
     expect(menu.map(labelOf)).toEqual(["keywork", "File", "Edit", "View", "Window", "Help"]);
@@ -58,27 +40,6 @@ describe("menuModel", () => {
       label: "C:/w0",
       action: "open-recent",
       payload: "C:/w0",
-    });
-  });
-
-  it("attaches an accelerator for a native chord and names a leader chord in the label", () => {
-    const file = itemsOf(
-      menuModel({
-        ...base,
-        platform: "win32",
-        chords: { "open-folder": "CmdOrCtrl+O", "close-window": "leader q" },
-      })[0],
-    );
-    expect(file[0]).toEqual({
-      kind: "action",
-      label: "Open Folder…",
-      action: "open-folder",
-      accelerator: "CmdOrCtrl+O",
-    });
-    expect(file.find((item) => actionOf(item) === "close-window")).toEqual({
-      kind: "action",
-      label: "Close Window\tleader q",
-      action: "close-window",
     });
   });
 });

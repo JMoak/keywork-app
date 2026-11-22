@@ -9,23 +9,6 @@ import {
 } from "./preferences.ts";
 
 describe("companion preferences", () => {
-  it("default to opt-in off, floating, visible, full size, no shortcut", () => {
-    expect(defaultPreferences).toEqual({
-      version: 1,
-      enabled: false,
-      optInOffered: false,
-      mode: "floating",
-      hidden: false,
-      still: false,
-      quiet: false,
-      onlyWhileBusy: false,
-      size: 100,
-      shortcut: null,
-      motion: "system",
-      positions: {},
-    });
-  });
-
   it("justify every option in its describe()", () => {
     const shape = companionPreferencesSchema.shape;
     for (const [name, field] of Object.entries(shape)) {

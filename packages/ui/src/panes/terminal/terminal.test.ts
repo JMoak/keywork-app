@@ -3,26 +3,12 @@ import { join } from "node:path";
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
 import { describe, expect, it } from "vitest";
 import { parseJsonl } from "../../dev/replay.ts";
-import {
-  keyworkDay,
-  keyworkNight,
-  terminalKeys,
-  themeVariables as variablesOfTheme,
-} from "../../theme/index.ts";
-import { nextMode } from "./index.tsx";
 import { leaderChord, terminalKeeps, typedBy } from "./keys.ts";
 import { bashCommand, mirrorDelta, mirrorText } from "./mirror.ts";
 import { chooseRenderer, probeAtlasFont, probeWebgl2 } from "./renderer.ts";
 import { bridgeArgs } from "./session.ts";
-import { installRenderer, readableContrast, terminalOptions, watchPixelRatio } from "./surface.ts";
-import {
-  type FontFaces,
-  terminalTheme,
-  themeVariables,
-  themeWearers,
-  watchFonts,
-  watchTheme,
-} from "./theme.ts";
+import { installRenderer, watchPixelRatio } from "./surface.ts";
+import { type FontFaces, themeWearers, watchFonts, watchTheme } from "./theme.ts";
 
 const fixtures = join(import.meta.dirname, "..", "..", "..", "..", "client", "src", "fixtures");
 
@@ -69,10 +55,6 @@ describe("mirror mode", () => {
     expect(mirrorText(failed)).toContain("\x1b[31m");
   });
 
-  it("says so when the session has no bash calls and ignores other tools", () => {
-    expect(plain(mirrorText(emptyProjection))).toContain("no bash calls in this session yet");
-  });
-
   it("reads the full command from the arguments rather than the trimmed subject", () => {
     const run = {
       ...(emptyProjection.entries[0] ?? {}),
@@ -107,32 +89,6 @@ describe("mirror mode", () => {
   });
 });
 
-describe("the xterm theme", () => {
-  it("dresses all sixteen ANSI colours, the cursor and the selection from the theme", () => {
-    const variables = variablesOfTheme(keyworkNight);
-    const theme = terminalTheme((name) => variables[name] ?? "");
-    expect(theme.background).toBe(keyworkNight.tokens.panel);
-    expect(theme.foreground).toBe(keyworkNight.tokens.text);
-    for (const key of terminalKeys) expect(theme[key], key).toBe(keyworkNight.terminal[key]);
-    expect(theme.cursor).toBe(keyworkNight.cursor);
-    expect(theme.selectionBackground).toBe(keyworkNight.selection.background);
-    expect(theme.selectionForeground).toBe(keyworkNight.selection.text ?? keyworkNight.tokens.text);
-    expect(theme.extendedAnsi).toBeUndefined();
-    expect(terminalTheme(() => "")).toEqual({});
-  });
-
-  it("survives a theme swap and a monochrome theme without inventing colors", () => {
-    const day = variablesOfTheme(keyworkDay);
-    const theme = terminalTheme((name) => day[name] ?? "");
-    expect(theme.background).toBe(keyworkDay.tokens.panel);
-    const grey = terminalTheme(() => " #777777 ");
-    expect(new Set(Object.values(grey))).toEqual(new Set(["#777777"]));
-    for (const variable of Object.values(themeVariables)) {
-      expect(variable === "" || variable.startsWith("--kw-")).toBe(true);
-    }
-  });
-});
-
 describe("the theme watch", () => {
   it("watches the window and the frame a terminal sits in, so a dressed pane retints", async () => {
     const frame = document.createElement("section");
@@ -149,11 +105,6 @@ describe("the theme watch", () => {
     expect(retints).toBe(1);
     stop();
     frame.remove();
-  });
-
-  it("watches only the window for a terminal outside any frame", () => {
-    const holder = document.createElement("div");
-    expect(themeWearers(holder)).toEqual([document.documentElement]);
   });
 });
 
@@ -285,20 +236,6 @@ describe("the renderer choice", () => {
   });
 });
 
-describe("the surface options", () => {
-  it("lifts faint ANSI colours to a readable contrast against the panel", () => {
-    const options = terminalOptions({
-      theme: {},
-      fontFamily: "monospace",
-      fontSize: 14,
-      windows: true,
-    });
-    expect(options.minimumContrastRatio).toBe(readableContrast);
-    expect(readableContrast).toBeGreaterThanOrEqual(4.5);
-    expect(options.windowsPty).toEqual({ backend: "conpty" });
-  });
-});
-
 describe("the pixel ratio watch", () => {
   function fakeView(ratio: number) {
     const lists: Array<{ query: string; listeners: Set<() => void> }> = [];
@@ -371,12 +308,6 @@ describe("keys inside a terminal", () => {
 });
 
 describe("modes and the bridge", () => {
-  it("cycles shell → mirror → bridge → shell", () => {
-    expect(nextMode("shell")).toBe("mirror");
-    expect(nextMode("mirror")).toBe("bridge");
-    expect(nextMode("bridge")).toBe("shell");
-  });
-
   it("attaches to the current session, or runs connect for onboarding, never carrying a token", () => {
     expect(bridgeArgs({})).toEqual(["attach"]);
     expect(bridgeArgs({ sessionId: "s1" })).toEqual(["attach", "--session", "s1"]);

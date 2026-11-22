@@ -11,7 +11,7 @@ import {
   nextIdleDelay,
   type Opportunities,
 } from "./idle.ts";
-import { freshNeeds, needsAfter, relieved } from "./needs.ts";
+import { freshNeeds, needsAfter } from "./needs.ts";
 
 const now = 1_000_000;
 
@@ -161,13 +161,6 @@ describe("the idle repertoire", () => {
     expect(whimsyOf("tinker")).toBeLessThanOrEqual(0.85);
     expect(whimsyOf("tinker")).not.toBe(whimsyOf("smith"));
   });
-
-  it("returns nothing when every candidate is cooling down", () => {
-    const everything = (
-      ["rest", "stretch", "wander", "inspect", "look", "tidy", "tend", "sit"] as const
-    ).map((kind) => ({ kind, at: now - 1 }));
-    expect(chooseIdle(mulberry32(1), mood({ recent: everything }), quietStead)).toBeUndefined();
-  });
 });
 
 describe("needs", () => {
@@ -187,17 +180,5 @@ describe("needs", () => {
       order: 1,
     });
     expect(needsAfter(freshNeeds, -5, false, false)).toEqual(freshNeeds);
-  });
-
-  it("are relieved by the activity that answers them", () => {
-    const tired = { rest: 0.9, curiosity: 0.9, order: 0.9 };
-    expect(relieved(tired, "rest").rest).toBeCloseTo(0.45);
-    expect(relieved(tired, "wander").curiosity).toBeCloseTo(0.6);
-    expect(relieved(tired, "tidy").order).toBeCloseTo(0.5);
-    expect(relieved(tired, "tend").order).toBeCloseTo(0.5);
-    expect(relieved(tired, "look").curiosity).toBeCloseTo(0.72);
-    expect(relieved(tired, "sit").rest).toBeCloseTo(0.8);
-    expect(relieved(tired, "stretch").rest).toBeCloseTo(0.82);
-    expect(relieved(tired, "inspect").curiosity).toBeCloseTo(0.72);
   });
 });

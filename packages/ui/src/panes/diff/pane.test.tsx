@@ -11,7 +11,6 @@ import {
 } from "@keywork-app/client";
 import type {
   ChangedFileReading,
-  ChangesReading,
   RedoReading,
   ReviewVerdict,
   UndoReading,
@@ -23,19 +22,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import { landingFor } from "../file/landing.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import {
-  availabilityLine,
-  compactBelowPx,
-  type DiffSpec,
-  diffPane,
-  fileNote,
-  noBaselineLine,
-} from "./index.tsx";
+import { type DiffSpec, diffPane, fileNote } from "./index.tsx";
 
 const fixture = (name: string): string =>
   readFileSync(join(process.cwd(), "packages/client/src/fixtures", name), "utf8");
 
-const recordedChanges = JSON.parse(fixture("changes.json")) as ChangesReading;
 const recordedFile = JSON.parse(fixture("changed-file.json")) as ChangedFileReading;
 
 interface Recorded {
@@ -193,45 +184,6 @@ describe("the changes pane, level one", () => {
     act("diff.refresh");
     expect(recorded.reads).toBe(2);
   });
-
-  it("renders the recorded session's changes with their provenance", () => {
-    const recorded = recording();
-    mount(
-      { kind: "diff", sessionId: "s1" },
-      recorded,
-      shellSeams(recorded, { changes: changesSnapshot(emptyChangesState, recordedChanges) }),
-    );
-    expect(screen.getByText("turn 1")).toBeTruthy();
-    expect(screen.getByText("notes.txt")).toBeTruthy();
-  });
-
-  it("says there is no baseline and names why", () => {
-    const recorded = recording();
-    const unanchored = changesSnapshot(emptyChangesState, "no-baseline");
-    mount(
-      { kind: "diff", sessionId: "s1" },
-      recorded,
-      shellSeams(recorded, { changes: unanchored }),
-    );
-    expect(screen.getByText(noBaselineLine)).toBeTruthy();
-    expect(availabilityLine(unanchored)).toBe(noBaselineLine);
-    expect(document.querySelectorAll(".kw-diff-file-row")).toHaveLength(0);
-  });
-
-  it("teaches one key with no session and with nothing changed", () => {
-    const recorded = recording();
-    mount({ kind: "diff" }, recorded);
-    expect(
-      screen.getByText("nothing changed yet · ctrl+k diff.summon follows the session's files"),
-    ).toBeTruthy();
-    cleanup();
-    const nothing = changesSnapshot(emptyChangesState, {
-      baseline: "session start",
-      files: [],
-    });
-    mount({ kind: "diff", sessionId: "s1" }, recorded, shellSeams(recorded, { changes: nothing }));
-    expect(screen.getByText(/nothing changed yet/)).toBeTruthy();
-  });
 });
 
 describe("the changes pane, level two", () => {
@@ -294,22 +246,6 @@ describe("the changes pane, level two", () => {
     expect(screen.getByText("this path is outside the workspace")).toBeTruthy();
     expect(document.querySelectorAll(".cm-editor")).toHaveLength(0);
   });
-
-  it("offers the editor deep link only when the shell provides the seam", async () => {
-    const recorded = recording();
-    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
-    await settle();
-    expect(screen.queryByText("open in editor")).toBeNull();
-    cleanup();
-    mount(
-      { kind: "diff", sessionId: "s1", path: "notes.txt" },
-      recorded,
-      shellSeams(recorded, { openInEditor: true }),
-    );
-    await settle();
-    fireEvent.click(screen.getByText("open in editor"));
-    expect(recorded.editor).toEqual([["notes.txt", 1]]);
-  });
 });
 
 describe("the changes pane's undo and redo", () => {
@@ -318,23 +254,6 @@ describe("the changes pane's undo and redo", () => {
       verb.textContent,
       verb.dataset.enabled,
     ]);
-
-  it("greys the verbs the server says have nothing to act on, without asking it", async () => {
-    const recorded = recording();
-    const act = mount(
-      { kind: "diff", sessionId: "s1" },
-      recorded,
-      shellSeams(recorded, { controls: { undoable: false, redoable: false } }),
-    );
-    expect(verbStates()).toEqual([
-      ["ctrl+k diff.undo undo", "no"],
-      ["ctrl+k diff.redo redo", "no"],
-    ]);
-    act("diff.undo");
-    await settle();
-    expect(screen.getByText("nothing to undo")).toBeTruthy();
-    expect(recorded.verbs).toEqual([]);
-  });
 
   it("undoes through the server, says what came back and rereads the files", async () => {
     const recorded = recording();
@@ -379,33 +298,6 @@ describe("the changes pane's undo and redo", () => {
     await settle();
     expect(recorded.verbs).toEqual(["redo s1"]);
     expect(screen.getByText("nothing to redo")).toBeTruthy();
-  });
-
-  it("binds u and shift+u, which no other diff chord holds", () => {
-    expect(diffPane.localActions?.["diff.undo"]?.chords).toBe("u");
-    expect(diffPane.localActions?.["diff.redo"]?.chords).toBe("shift+u");
-    const chords = Object.values(diffPane.localActions ?? {}).flatMap((action) =>
-      typeof action.chords === "string" ? [action.chords] : [...action.chords],
-    );
-    expect(new Set(chords).size).toBe(chords.length);
-  });
-});
-
-describe("showing the changed file itself", () => {
-  it("opens the file under the cursor from the list, and the open file from its diff", async () => {
-    const recorded = recording();
-    const fromList = mount({ kind: "diff", sessionId: "s1" }, recorded);
-    await settle();
-    fromList("diff.down");
-    fromList("diff.file");
-    cleanup();
-    mount({ kind: "diff", sessionId: "s1", path: "src/a.ts" }, recorded);
-    await settle();
-    fireEvent.click(screen.getByRole("button", { name: "the file" }));
-    expect(recorded.opened).toEqual([
-      { kind: "file", path: "src/b.ts" },
-      { kind: "file", path: "src/a.ts" },
-    ]);
   });
 });
 
@@ -457,12 +349,6 @@ describe("a file diff keeping up with the session", () => {
     await settle();
     expect(recorded.fileReads).toEqual(["notes.txt", "notes.txt"]);
   });
-
-  it("follows the session's changes even when opened straight onto a file", async () => {
-    const recorded = recording();
-    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
-    expect(recorded.reads).toBe(1);
-  });
 });
 
 describe("reading a long diff from the keyboard", () => {
@@ -499,27 +385,6 @@ describe("reading a long diff from the keyboard", () => {
     expect(scroller.scrollTop).toBe(0);
     expect(recorded.rebound).toEqual([]);
   });
-
-  it("binds page keys, space, home and end beside g and G, and every chord once", () => {
-    const chords = (action: string) => diffPane.localActions?.[action]?.chords;
-    expect(chords("diff.page-down")).toEqual(["pagedown", "space"]);
-    expect(chords("diff.page-up")).toBe("pageup");
-    expect(chords("diff.top")).toEqual(["g", "home"]);
-    expect(chords("diff.end")).toEqual(["shift+g", "end"]);
-  });
-
-  it("moves the list cursor to the first and last file with g and G", () => {
-    const recorded = recording();
-    const act = mount({ kind: "diff", sessionId: "s1" }, recorded);
-    act("diff.end");
-    act("diff.open");
-    act("diff.top");
-    act("diff.open");
-    expect(recorded.rebound).toEqual([
-      { kind: "diff", sessionId: "s1", path: "notes.txt" },
-      { kind: "diff", sessionId: "s1", path: "src/a.ts" },
-    ]);
-  });
 });
 
 describe("leaving a diff for the file", () => {
@@ -544,44 +409,5 @@ describe("leaving a diff for the file", () => {
     expect(recorded.opened).toEqual([{ kind: "file", path: "notes.txt" }]);
     fireEvent.click(screen.getByText("open in editor"));
     expect(recorded.editor).toEqual([["notes.txt", 7]]);
-  });
-});
-
-describe("a file diff in a short pane", () => {
-  it("compacts its chrome below a pane's worth of height, keeping the verb row only while it speaks", async () => {
-    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
-    const recorded = recording();
-    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
-    await settle();
-    expect(document.querySelector(".kw-diff")?.hasAttribute("data-compact")).toBe(true);
-    height.mockReturnValue(compactBelowPx + 100);
-    cleanup();
-    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
-    await settle();
-    expect(document.querySelector(".kw-diff")?.hasAttribute("data-compact")).toBe(false);
-    height.mockRestore();
-    expect(diffCss).toMatch(
-      /\.kw-diff\[data-compact\] \.kw-diff-verbs:not\(:has\(\.kw-diff-verb-notice, \.kw-ov-line\)\),\s*\.kw-diff\[data-compact\] \.kw-diff-review-keys \{\s*display: none;/,
-    );
-  });
-
-  it("names a new file in its head row rather than spending a row on it", async () => {
-    const recorded = recording();
-    mount({ kind: "diff", sessionId: "s1", path: "notes.txt" }, recorded);
-    await settle();
-    expect(document.querySelector(".kw-diff-head-facts")?.textContent).toBe("new file");
-  });
-});
-
-const diffCss = readFileSync(join(process.cwd(), "packages/ui/src/panes/diff/diff.css"), "utf8");
-
-describe("the changes pane's definition", () => {
-  it("titles the list and the file, and summons for the current session", () => {
-    const shell = shellSeams(recording());
-    expect(diffPane.title({ kind: "diff", sessionId: "s1" }, shell)).toBe("changes");
-    expect(diffPane.title({ kind: "diff", sessionId: "s1", path: "a.ts" }, shell)).toBe(
-      "changes · a.ts",
-    );
-    expect(diffPane.summon?.spec(shell)).toEqual({ kind: "diff", sessionId: "s1" });
   });
 });

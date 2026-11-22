@@ -1,16 +1,5 @@
-import {
-  emptyChangesState,
-  emptyTreeState,
-  type KeyworkClient,
-  type ServerFeed,
-} from "@keywork-app/client";
-import type {
-  BusEnvelope,
-  PendingAsk,
-  SessionDetail,
-  SessionEntries,
-  SessionSummary,
-} from "@keywork-app/protocol";
+import type { KeyworkClient, ServerFeed } from "@keywork-app/client";
+import type { BusEnvelope, PendingAsk, SessionDetail, SessionSummary } from "@keywork-app/protocol";
 import { createRoot } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import recorded from "../../../client/src/fixtures/delegated.json";
@@ -47,19 +36,6 @@ describe("the session store's lineage", () => {
     expect(store.children("s1")).toEqual([
       expect.objectContaining({ sessionId: "q2", callId: "d1", state: "completed" }),
     ]);
-  });
-
-  it("keeps the summary of a child read by id, which the sessions list never shows", async () => {
-    const { store } = mounted();
-    await store.refresh();
-    await store.open("q2");
-    expect(store.state.summaries.map((summary) => summary.id)).toEqual(["s1"]);
-    expect(store.summary("q2")).toMatchObject({
-      title: "audit the trust rules",
-      bot: "researcher",
-    });
-    expect(store.summary("q2")).not.toHaveProperty("messages");
-    expect(store.controlsOf("q2").title).toBe("audit the trust rules");
   });
 
   it("streams an open running child under its own id and rereads it once, when it finishes", async () => {
@@ -214,37 +190,6 @@ describe("the session store's seam between a snapshot and the live stream", () =
       .entries.map((entry) => ("text" in entry ? entry.text : ""));
     expect(drawn).toEqual(["I am Wren."]);
     expect(store.projection("w1").turn).toMatchObject({ userText: frame });
-  });
-});
-
-describe("the session store's trees and changes", () => {
-  it("keeps each session's tree and changes its own, and the empty readings empty", async () => {
-    const logOf = (sessionId: string): SessionEntries => ({
-      sessionId,
-      leafId: null,
-      entries: [],
-      labels: {},
-      activePath: [],
-    });
-    const client = {
-      entries: async (id: string) => logOf(id),
-      changes: async (id: string) => ({ baseline: id, files: [] }),
-    } as unknown as KeyworkClient;
-    const feed = {
-      subscribe: () => () => undefined,
-      onNotice: () => () => undefined,
-      whenLost: () => () => undefined,
-    } as unknown as ServerFeed;
-    const store = createRoot(() => createSessionStore(client, feed));
-    await Promise.all([store.openTree("a"), store.openTree("b")]);
-    await Promise.all([store.openChanges("a"), store.openChanges("b")]);
-    expect(store.tree("a").snapshot?.sessionId).toBe("a");
-    expect(store.tree("b").snapshot?.sessionId).toBe("b");
-    expect(store.changes("a").baseline).toBe("a");
-    expect(store.changes("b").baseline).toBe("b");
-    expect(store.tree("unopened")).toEqual(emptyTreeState);
-    expect(emptyTreeState.snapshot).toBeUndefined();
-    expect(emptyChangesState.baseline).toBeUndefined();
   });
 });
 

@@ -191,24 +191,6 @@ describe("the door a pane leaves by", () => {
     );
     expect(child.calls).toEqual(["destroy"]);
   });
-
-  it("dresses the next window in the backdrop the page last showed a pane with", async () => {
-    const console = standIn(1);
-    const child = standIn(2);
-    const { door } = startElectronSurfaces(seams);
-    door.adopt(console.contents, child.native, "kw-surface:1");
-    await asked(surfaceChannels.show, fromThePageOf(console), {
-      id: "kw-surface:1",
-      bounds: { x: 10, y: 20, width: 400, height: 300 },
-      origin: "creature",
-      focus: true,
-      follows: false,
-      backdrop: "ink",
-      title: "notes",
-    });
-    expect(child.calls).toEqual(["showInactive"]);
-    expect(door.windowOptions(console.contents)).toMatchObject({ backgroundColor: "ink" });
-  });
 });
 
 describe("a pane window's own events", () => {
@@ -242,24 +224,6 @@ describe("a pane window's own events", () => {
     expect(moves()).toHaveLength(1);
   });
 
-  it("wait for the beat on macOS, where the same event comes with every step", () => {
-    const { child, moves } = adopted("darwin");
-    child.emit("will-move");
-    child.moveTo(300, 310);
-    child.emit("moved");
-    expect(moves()).toHaveLength(0);
-    vi.advanceTimersByTime(newsEveryMs);
-    expect(moves()).toHaveLength(1);
-  });
-
-  it("treat a resize by its edges like a drag", () => {
-    const { child, moves } = adopted();
-    child.emit("will-resize");
-    child.emit("resize");
-    child.emit("resized");
-    expect(moves()).toMatchObject([{ by: "keeper" }]);
-  });
-
   it("keep the window when the desktop asks to close it", () => {
     const { console, child } = adopted();
     const request = { preventDefault: vi.fn() };
@@ -267,16 +231,6 @@ describe("a pane window's own events", () => {
     expect(request.preventDefault).toHaveBeenCalledOnce();
     expect(child.calls).toEqual(["hide"]);
     expect(console.events().at(-1)).toEqual({ kind: "closed", id: "kw-surface:1" });
-  });
-
-  it("relay focus coming and going", () => {
-    const { console, child } = adopted();
-    child.emit("focus");
-    child.emit("blur");
-    expect(console.events().slice(1)).toEqual([
-      { kind: "focused", id: "kw-surface:1" },
-      { kind: "blurred", id: "kw-surface:1" },
-    ]);
   });
 
   it("close every pane when the console's page is replaced", () => {
@@ -364,13 +318,6 @@ describe("the helper that moves panes", () => {
     expect(started({ moverPath: "/opt/keywork/kw-panes-mover", platform: "linux" }).opened).toEqual(
       [],
     );
-  });
-
-  it("moves nothing until it has greeted this very process, and Electron places the pane meanwhile", async () => {
-    const { pipes, child, glide } = started();
-    await glide(0);
-    expect(pipes.written).toEqual([]);
-    expect(child.native.getBounds()).toEqual(there);
   });
 
   it("is handed a glide with each point as the screen gives it in pixels, and the window by its handle", () => {

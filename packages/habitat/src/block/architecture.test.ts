@@ -7,7 +7,7 @@ import {
   type RoadGrade,
   type WorkshopSpec,
 } from "./kit.ts";
-import { decoKit, kits } from "./kits/index.ts";
+import { kits } from "./kits/index.ts";
 import { type Part, topTexel } from "./model.ts";
 import { wallsAround } from "./scene.ts";
 
@@ -31,16 +31,8 @@ const plainWorkshop: WorkshopSpec = {
   star: false,
 };
 
-const noChildAtWork = new Set(["neon", "terrace"]);
-
 describe("what every architecture supplies", () => {
   for (const kit of kits) {
-    it(`${kit.id}: shows a creature at work in its windows, at its door and above its roof`, () => {
-      const working = kit.workshop({ ...plainWorkshop, lit: true });
-      expect(fingerprint(working)).not.toBe(fingerprint(kit.workshop(plainWorkshop)));
-      expect(rolesOf(working)).toContain(working.lightColour);
-    });
-
     it(`${kit.id}: paints the workshop in its creature's colour, kept, chores and earnings each in their own place`, () => {
       const plain = fingerprint(kit.workshop(plainWorkshop));
       expect(rolesOf(kit.workshop(plainWorkshop)).some((role) => role.startsWith("hue."))).toBe(
@@ -61,13 +53,6 @@ describe("what every architecture supplies", () => {
           JSON.stringify(change),
         ).not.toBe(plain);
       }
-    });
-
-    it(`${kit.id}: lights a child at work${noChildAtWork.has(kit.id) ? ", a gap the sheet names" : ""}`, () => {
-      const child = fingerprint(kit.workshop({ ...plainWorkshop, loft: true }));
-      const none = fingerprint(kit.workshop(plainWorkshop));
-      if (noChildAtWork.has(kit.id)) expect(child).toBe(none);
-      else expect(child).not.toBe(none);
     });
 
     it(`${kit.id}: grades its roads, lights a paved one, rings the bell and turns the sails`, () => {
@@ -101,27 +86,6 @@ describe("what every architecture supplies", () => {
       }
     });
   }
-
-  it("deco: carries the creature's colour on the door fan, the blade sign, the sunburst and the pennant, and smoke from its crown", () => {
-    const built = decoKit.workshop({ ...plainWorkshop, lit: true });
-    expect(spritesOf(built).length).toBe(spritesOf(decoKit.workshop(plainWorkshop)).length + 1);
-    expect(built.annexes?.map((annex) => annex.what)).toEqual(["blade"]);
-    expect(rolesOf({ parts: built.annexes?.[0]?.parts ?? [], reach: 0 })).toEqual(
-      expect.arrayContaining(["trim", "hue.b", "hue.h"]),
-    );
-    const crown = { parts: (built.crown ?? []).map((crowned) => crowned.part), reach: 0 };
-    expect(rolesOf(crown)).toEqual(expect.arrayContaining(["hue.l", "hue.b", "trim"]));
-  });
-
-  it("deco: lays a brass inlay into paved roads only, and builds each stage with a cornice at each setback", () => {
-    expect(rolesOf(decoKit.ground(groundWith(3)))).toContain("cobbleInlay");
-    expect(rolesOf(decoKit.ground(groundWith(2)))).not.toContain("cobbleInlay");
-    const skyscraper = decoKit.project(project("skyscraper", true));
-    const cornices = skyscraper.parts.filter(
-      (part) => "box" in part && part.box.y1 - part.box.y0 === 4,
-    );
-    expect(cornices).toHaveLength(3);
-  });
 });
 
 function project(stage: ProjectSpec["stage"], lit: boolean): ProjectSpec {

@@ -34,13 +34,11 @@ export interface FakeSurfaceWindow extends SurfaceWindowLike {
   title: string | undefined;
   zoom: number;
   keeperDragsTo(point: ScreenPoint): void;
-  keeperResizesTo(bounds: ScreenRect): void;
   keeperLetsGo(): void;
   keeperSnapsTo(bounds: ScreenRect): void;
   keeperMaximisesOver(workArea: ScreenRect): void;
   keeperRestores(): void;
   desktopMovesTo(point: ScreenPoint): void;
-  desktopShapesTo(frame: ScreenRect): void;
   desktopAsksToClose(): "kept" | "closed";
   emit(signal: SurfaceSignal): void;
 }
@@ -135,10 +133,6 @@ export function fakeSurfaceWindow(id: number): FakeSurfaceWindow {
       window.emit("grab");
       reshape({ ...bounds, ...point });
     },
-    keeperResizesTo: (next) => {
-      window.emit("grab");
-      reshape(next);
-    },
     keeperLetsGo: () => window.emit("release"),
     keeperSnapsTo: (next) => {
       window.emit("grab");
@@ -158,7 +152,6 @@ export function fakeSurfaceWindow(id: number): FakeSurfaceWindow {
       window.emit("unmaximize");
     },
     desktopMovesTo: (point) => reshape({ ...bounds, ...point }),
-    desktopShapesTo: (frame) => reshape(frame),
     desktopAsksToClose: () => {
       const request = closeRequest();
       for (const listener of closeListeners) listener(request);

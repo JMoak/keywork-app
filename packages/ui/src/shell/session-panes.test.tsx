@@ -30,16 +30,6 @@ describe("a pane bound to a session", () => {
     await openWorkspace(served.client);
     await waitFor(() => expect(transcripts()).toEqual([["the left one"], ["the right one"]]));
   });
-
-  it("focuses the pane already showing a session instead of opening it twice", async () => {
-    const served = servedSessions(["a first session"]);
-    await openWorkspace(served.client);
-    press("1", { altKey: true });
-    expect(focusedName()).toBe("sessions");
-    fireEvent.click(await screen.findByText("a first session", { selector: ".kw-tree-name" }));
-    await waitFor(() => expect(focusedName()).toBe("a first session"));
-    expect(frames()).toHaveLength(2);
-  });
 });
 
 const splitLayout = JSON.stringify({

@@ -23,13 +23,6 @@ const conversation: ShelfItem = {
 };
 
 describe("PaneShelf", () => {
-  it("renders nothing while every pane is on the stage", () => {
-    const { container } = render(() => (
-      <PaneShelf items={[]} hint="ctrl+k =" onReturn={() => undefined} />
-    ));
-    expect(container.querySelector(".kw-shelf")).toBeNull();
-  });
-
   it("lists each waiting pane by its ordinal and name, and says which wait for room", () => {
     const { container } = render(() => (
       <PaneShelf items={[terminal, conversation]} hint="ctrl+k =" onReturn={() => undefined} />
@@ -65,26 +58,6 @@ describe("PaneShelf", () => {
     );
     expect(shelfLabel(terminal)).toBe("terminal, pane 3, shelved");
     expect(container.querySelector(".kw-shelf-hint")).toBeNull();
-  });
-
-  it("counts its panes once there are several, and keeps every one in a single row of its own", () => {
-    const waiting = Array.from({ length: 10 }, (_, at) => ({
-      ...conversation,
-      id: `setting-${at}`,
-      name: `a note with a long name ${at}`,
-      ordinal: at + 1,
-      pinned: false,
-    }));
-    const { container } = render(() => (
-      <PaneShelf items={waiting} hint="ctrl+k =" onReturn={() => undefined} />
-    ));
-    expect(container.querySelector(".kw-shelf-count")?.textContent).toBe(" · 10");
-    expect(container.querySelectorAll(".kw-shelf-panes > .kw-shelf-pane")).toHaveLength(10);
-    cleanup();
-    const few = render(() => (
-      <PaneShelf items={[terminal, conversation]} hint={undefined} onReturn={() => undefined} />
-    ));
-    expect(few.container.querySelector(".kw-shelf-count")).toBeNull();
   });
 
   it("hands the pane's id back when its entry is activated", () => {

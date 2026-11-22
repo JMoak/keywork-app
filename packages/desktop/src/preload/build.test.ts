@@ -31,10 +31,6 @@ describe("the built preloads", () => {
     expect(files.map((file) => file.replaceAll("\\", "/")).sort()).toEqual(preloads);
   });
 
-  it.each(preloads)("%s requires no sibling file", async (name) => {
-    expect(await builtPreload(name)).not.toMatch(/require\(\s*["']\.{1,2}[/]/);
-  });
-
   it("expose the host port when loaded the way a sandboxed renderer loads them", async () => {
     expect([...loadSandboxed(await builtPreload("index.js")).keys()]).toEqual(["keyworkHost"]);
   });

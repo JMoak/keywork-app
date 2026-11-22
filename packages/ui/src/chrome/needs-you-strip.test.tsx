@@ -33,15 +33,6 @@ describe("the strip line", () => {
     });
   });
 
-  it("collapses to the count while the pane is open, since the pane is the detail", () => {
-    expect(stripLine({ ...inputs, paneOpen: true })).toEqual({ count: "3 need you" });
-  });
-
-  it("is absent when nothing waits or the person hid it", () => {
-    expect(stripLine({ ...inputs, count: 0, head: undefined })).toBeUndefined();
-    expect(stripLine({ ...inputs, shown: false })).toBeUndefined();
-  });
-
   it("names an airlock by its arc", () => {
     const line = stripLine({
       ...inputs,
@@ -62,19 +53,6 @@ describe("the strip", () => {
     expect(strip.dataset.detail).toBe("next");
     expect(strip.textContent).toBe("█3 need youask: rm -rf dist(refactor-permissions)ctrl+k n");
     expect(strip.querySelectorAll("button, a, input, [tabindex]")).toHaveLength(0);
-  });
-
-  it("shows the count alone when the pane holds the detail, and nothing when empty", () => {
-    const { container } = render(() => (
-      <>
-        <NeedsYouStrip line={stripLine({ ...inputs, paneOpen: true })} />
-        <NeedsYouStrip line={undefined} />
-      </>
-    ));
-    const strips = container.querySelectorAll<HTMLElement>(".kw-needs-you");
-    expect(strips).toHaveLength(1);
-    expect(strips[0]?.dataset.detail).toBe("count");
-    expect(strips[0]?.textContent).toBe("█3 need you");
   });
 
   it("keeps its live region mounted while nothing needs you, so the first ask is announced", () => {

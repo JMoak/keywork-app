@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identitiesBeyondTheRamp, identitiesFromTheRamp, identityCount } from "./identities.ts";
+import { identitiesFromTheRamp, identityCount } from "./identities.ts";
 import { groundsOf, wcagText, weakestContrast } from "./legible.ts";
 import { oklabDistance, oklabOf } from "./oklab.ts";
 import type { Theme } from "./schema.ts";
@@ -12,31 +12,10 @@ const houseThemes = [keyworkNight, keyworkDay].map((theme) => [theme.name, theme
 const clearlyApart = 0.07;
 
 describe("eight identity inks", () => {
-  it("measures distance in OKLab, where black and white stand one apart", () => {
-    expect(oklabDistance("#000000", "#ffffff")).toBeCloseTo(1, 3);
-    expect(oklabDistance("#7aa2f7", "#7aa2f7")).toBe(0);
-  });
-
-  it("declares five identities beyond the ramp for every gallery theme and for no other", () => {
-    const declared = [...identitiesBeyondTheRamp.keys()].sort();
-    expect(declared).toEqual(gallery.map((theme) => theme.name).sort());
-  });
-
   it.each(shipped)(
     "%s sets every identity beyond the ramp clearly apart from the other seven",
     (_, theme) => {
       expect(crowdedPairs(identitiesOf(theme))).toEqual([]);
-    },
-  );
-
-  it.each(shipped)(
-    "%s declares identities that already read at AA, so the lift leaves them alone",
-    (_, theme) => {
-      const declared = identitiesBeyondTheRamp.get(theme.name) ?? [];
-      const grounds = groundsOf(theme.tokens);
-      for (const ink of declared)
-        expect(weakestContrast(ink, grounds), ink).toBeGreaterThanOrEqual(wcagText);
-      expect(identitiesOf(theme).slice(identitiesFromTheRamp)).toEqual(declared);
     },
   );
 

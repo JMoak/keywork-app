@@ -1,33 +1,11 @@
-import type { McpServerStatus } from "@keywork-app/protocol";
 import { cleanup } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
-import { mcpPane, serverAside, serverDensity, serverMark, stateTally } from "./index.tsx";
+import { mcpPane } from "./index.tsx";
 
 afterEach(cleanup);
 
-const server = (extra: Partial<McpServerStatus>): McpServerStatus => ({
-  name: "fs",
-  state: "connected",
-  enabled: true,
-  toolCount: 2,
-  ...extra,
-});
-
 describe("the mcp pane", () => {
-  it("marks connected at full density, connecting with the tile fill, down with a missing tile", () => {
-    expect(serverMark(server({}), 0)).toBe("█");
-    expect(serverMark(server({ state: "connecting" }), 1)).toBe("▀");
-    expect(serverMark(server({ state: "down" }), 0)).toBe(" ");
-    expect(serverMark(server({ enabled: false, state: "down" }), 0)).toBe("·");
-    expect(serverDensity(server({}))).toBe("full");
-    expect(serverDensity(server({ enabled: false }))).toBe("light");
-    expect(serverAside(server({ transport: "stdio", toolCount: 1 }))).toBe("stdio · 1 tool");
-    expect(stateTally([server({}), server({ state: "down" })])).toBe(
-      "2 servers · 1 connected · 1 down",
-    );
-  });
-
   it("renders the fixture rows with the error line under the broken server", async () => {
     const harness = overviewShell();
     await harness.surfaces.load();
@@ -76,14 +54,6 @@ describe("the mcp pane", () => {
     await settle();
     expect(calls).toEqual(["tools:filesystem", "restart:filesystem", "enabled:filesystem:false"]);
     expect(container.textContent).toContain("filesystem disabled");
-    harness.dispose();
-  });
-
-  it("teaches from the empty state", async () => {
-    const harness = overviewShell({ empty: true });
-    await harness.surfaces.load();
-    const { container } = mountPane(mcpPane.component, { kind: "mcp" }, harness.shell);
-    expect(container.querySelector(".kw-empty")?.textContent).toContain("no mcp servers");
     harness.dispose();
   });
 });

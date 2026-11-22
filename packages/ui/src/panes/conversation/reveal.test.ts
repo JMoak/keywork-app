@@ -1,8 +1,8 @@
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reveal } from "../../shell/needs-you-jumps.ts";
-import { askItem, failedItem, inboxItem } from "../../shell/needs-you-testing.ts";
-import { revealWhatWaits, waitingElement } from "./reveal.ts";
+import { askItem } from "../../shell/needs-you-testing.ts";
+import { revealWhatWaits } from "./reveal.ts";
 
 const disposers: Array<() => void> = [];
 const nativeScroll = Element.prototype.scrollIntoView;
@@ -24,23 +24,6 @@ describe("revealing what waits in a conversation", () => {
     expect(document.activeElement).toBe(card);
   });
 
-  it("scrolls to the latest failure without taking focus", async () => {
-    const page = transcript();
-    const harness = revealing(page);
-    harness.reveal({ item: failedItem("s4"), pane: "p1", seq: 1 });
-    expect(harness.scrolled()).toEqual([page.querySelector("[data-latest]")]);
-    await Promise.resolve();
-    expect(document.activeElement).toBe(document.body);
-  });
-
-  it("leaves a jump that landed on another pane alone, and memory items too", () => {
-    const page = transcript();
-    const harness = revealing(page);
-    harness.reveal({ item: askItem("c2"), pane: "p2", seq: 1 });
-    harness.reveal({ item: inboxItem("m1"), pane: "p1", seq: 2 });
-    expect(harness.scrolled()).toEqual([]);
-  });
-
   it("waits for the card to be painted, then reveals each jump once", () => {
     const page = document.body.appendChild(document.createElement("div"));
     const harness = revealing(page);
@@ -52,10 +35,6 @@ describe("revealing what waits in a conversation", () => {
     expect(harness.scrolled()).toHaveLength(1);
     harness.reveal({ item: askItem("c1"), pane: "p1", seq: 2 });
     expect(harness.scrolled()).toHaveLength(2);
-  });
-
-  it("finds nothing without a page", () => {
-    expect(waitingElement(undefined, askItem("c1"))).toBeUndefined();
   });
 });
 

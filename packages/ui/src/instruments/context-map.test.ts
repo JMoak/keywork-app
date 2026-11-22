@@ -8,8 +8,6 @@ import {
   mapCells,
   mapColumns,
   mapHead,
-  mapReadout,
-  partsReadout,
   pastWindowLine,
 } from "./context-map.ts";
 
@@ -113,39 +111,12 @@ describe("the context map", () => {
     expect(fenceRows(recorded).map((row) => row.tokens)).toEqual(["at 177k", "at 185k"]);
   });
 
-  it("heads with everything the next request carries, not only the conversation", () => {
-    expect(mapHead(report())).toBe("100k of 200k · 50%");
-    expect(mapHead(report({ window: 1_000_000, conversation: 200_000 }))).toBe("240k of 1M · 24%");
-  });
-
   it("says what the parts rest on and where the window came from", () => {
     expect(basisLine(recorded)).toBe(
       "parts estimated from the text the server sends · window assumed by the server",
     );
     expect(basisLine(report({ conversationBasis: "reported", declared: true }))).toBe(
       "conversation from the usage the provider reported at the last turn · the rest estimated from the text the server sends · window declared in keywork.json",
-    );
-  });
-
-  it("names every reported part when the provider reports more than one", () => {
-    const reported = report({ conversationBasis: "reported" });
-    const withTools: ContextReport = {
-      ...reported,
-      parts: { ...reported.parts, tools: { tokens: 20_000, basis: "reported" } },
-    };
-    expect(basisLine(withTools)).toMatch(
-      /^tool schemas and conversation from the usage the provider reported/,
-    );
-    const everything: ContextReport = {
-      ...withTools,
-      parts: {
-        ...withTools.parts,
-        system: { tokens: 10_000, basis: "reported" },
-        injected: { tokens: 10_000, basis: "reported" },
-      },
-    };
-    expect(basisLine(everything)).toBe(
-      "parts from the usage the provider reported at the last turn · window assumed by the server",
     );
   });
 
@@ -157,12 +128,5 @@ describe("the context map", () => {
     expect(pastWindowLine(report({ flushAt: 226_724, compactAt: 234_916 }))).toBe(
       "memory flush at 227k, compaction at 235k · past the window · the server measures the conversation only",
     );
-  });
-
-  it("reads the parts aloud for the grid's label and the gauge's hover", () => {
-    expect(partsReadout(recorded.parts)).toBe(
-      "system prompt 137 · tool schemas 1.7k · memory and skills 0 · conversation 13 · free 198k · parts estimated from the text the server sends",
-    );
-    expect(mapReadout(recorded)).toMatch(/^context 1\.9k of 200k · 1% · system prompt 137/);
   });
 });

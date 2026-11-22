@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breachesOf, perCore, sampleLine, startCpuSampler, takeSample } from "./cpu-sampler.ts";
+import { breachesOf, perCore, sampleLine, takeSample } from "./cpu-sampler.ts";
 
 describe("sampleLine", () => {
   it("prints each tier against its budget and flags breaches", () => {
@@ -31,57 +31,6 @@ describe("sampleLine", () => {
         wakeupsPerSecond: undefined,
       }),
     ).toEqual([]);
-  });
-});
-
-describe("startCpuSampler", () => {
-  it("primes the counters, samples from one owner every period, and stops cleanly", () => {
-    const logs: string[] = [];
-    let beat: (() => void) | undefined;
-    let stopped = false;
-    let usageCalls = 0;
-    let wakeups = 120;
-    const stop = startCpuSampler(
-      {
-        every: (ms, fn) => {
-          expect(ms).toBe(10_000);
-          beat = fn;
-          return () => {
-            stopped = true;
-          };
-        },
-        mainUsage: () => {
-          usageCalls += 1;
-          return { percentCPUUsage: 0.2 };
-        },
-        metrics: () => [
-          {
-            pid: 7,
-            cpu: { percentCPUUsage: 0.3 },
-            memory: { workingSetSize: 60_000, privateBytes: 40_960 },
-          },
-        ],
-        logicalProcessors: () => 1,
-        rendererPid: () => 7,
-        tier: () => "ambient",
-        wakeupsSinceLast: () => {
-          const count = wakeups;
-          wakeups = 0;
-          return count;
-        },
-        log: (line) => {
-          logs.push(line);
-        },
-      },
-      10_000,
-    );
-    expect(usageCalls).toBe(1);
-    beat?.();
-    expect(logs).toEqual([
-      "companion ambient · cpu of one core: main 0.20%, renderer 0.30% of 1.00% · wakeups 12.0/s of 16.0/s · private 40 MB of 80 MB",
-    ]);
-    stop();
-    expect(stopped).toBe(true);
   });
 });
 

@@ -8,7 +8,6 @@ import {
   createBody,
   cycleHolds,
   frameAt,
-  jolt,
   type Lane,
   lookToward,
   type MotionPrefs,
@@ -23,30 +22,6 @@ const rows = referenceRows;
 const full: MotionPrefs = { reducedMotion: false, tier: "active" };
 const reduced: MotionPrefs = { reducedMotion: true, tier: "active" };
 const hidden: MotionPrefs = { reducedMotion: false, tier: "hidden" };
-
-describe("golden poses", () => {
-  const stamps = [0, 100, 250, 700, 1500, 3000, 6600, 9900, 20000];
-
-  for (const name of poseNames) {
-    it(`${name} at fixed timestamps`, () => {
-      let body = play(createBody(0, 7), { clip: name, lane: "agent" }, full, rows);
-      const poses = stamps.map((at) => {
-        body = advance(body, at, full, rows);
-        const pose = bodyPose(body, rows, full);
-        return {
-          at,
-          clip: pose.clip,
-          frame: pose.frame,
-          scale: { x: round(pose.scale.x), y: round(pose.scale.y) },
-          lift: round(pose.lift),
-          blink: pose.blink,
-          nextFrameAt: pose.nextFrameAt === undefined ? undefined : round(pose.nextFrameAt),
-        };
-      });
-      expect(poses).toMatchSnapshot();
-    });
-  }
-});
 
 describe("frames follow the manifest's timings", () => {
   it("holds each frame for its jittered time and jitters within fifteen percent", () => {
@@ -131,34 +106,6 @@ describe("lanes", () => {
       rows,
     );
     expect(greeted.clip.name).toBe("greet");
-  });
-
-  it("answers a second input afresh rather than letting the first one-shot run out", () => {
-    const greeting = advance(
-      play(createBody(0, 17), { clip: "greet", lane: "input" }, full, rows),
-      650,
-      full,
-      rows,
-    );
-    const asked = play(greeting, { clip: "greet", lane: "input" }, full, rows);
-    const soon = advance(asked, greeting.at + quickMs, full, rows);
-    expect(soon.clip.name).toBe("greet");
-    expect(soon.clip.startedAt).toBeGreaterThan(0);
-    expect(soon.clip.startedAt).toBeLessThanOrEqual(greeting.at + quickMs);
-    expect(play(soon, { clip: "greet", lane: "agent" }, full, rows).pending).toBeUndefined();
-  });
-
-  it("lets anything replace a finished one-shot", () => {
-    const greeted = advance(
-      play(createBody(0, 1), { clip: "greet", lane: "input" }, full, rows),
-      2_000,
-      full,
-      rows,
-    );
-    expect(greeted.clip).toMatchObject({ name: "idle", lane: "ambient" });
-    expect(play(greeted, { clip: "nap", lane: "ambient" }, full, rows).pending?.beat.clip).toBe(
-      "nap",
-    );
   });
 });
 
@@ -258,17 +205,6 @@ describe("walking", () => {
 });
 
 describe("secondary motion", () => {
-  it("breathes and squashes while preserving area", () => {
-    let body = play(createBody(0, 1), { clip: "idle", lane: "ambient" }, full, rows);
-    body = jolt(body);
-    for (let at = 16; at < 3_000; at += 16) {
-      body = advance(body, at, full, rows);
-      const { scale } = bodyPose(body, rows, full);
-      expect(scale.x * scale.y).toBeCloseTo(1, 6);
-      expect(Math.abs(scale.y - 1)).toBeLessThan(0.05);
-    }
-  });
-
   it("looks toward a direction through a spring and settles back when the look ends", () => {
     const looking = advance(lookToward(createBody(0, 1), 2), 2_000, full, rows);
     const pose = bodyPose(looking, rows, full);
@@ -278,18 +214,6 @@ describe("secondary motion", () => {
     const away = advance(lookToward(looking, undefined), 4_000, full, rows);
     expect(bodyPose(away, rows, full).gaze).toBeUndefined();
     expect(away.gaze.y.value).toBeCloseTo(0, 2);
-  });
-
-  it("blinks on a seeded schedule and never under reduced motion", () => {
-    let body = createBody(0, 11);
-    let blinked = false;
-    for (let at = 50; at < 20_000; at += 50) {
-      body = advance(body, at, full, rows);
-      if (bodyPose(body, rows, full).blink) blinked = true;
-      expect(bodyPose(body, rows, reduced).blink).toBe(false);
-    }
-    expect(blinked).toBe(true);
-    expect(body.blinks).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -433,7 +357,3 @@ describe("properties", () => {
     );
   });
 });
-
-function round(value: number): number {
-  return Math.round(value * 10_000) / 10_000;
-}

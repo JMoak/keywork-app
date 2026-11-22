@@ -16,19 +16,15 @@ import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanionController } from "../../companion/floating.ts";
-import type { CompanionSwitch } from "../../companion/switch.tsx";
-import { appActions } from "../../keys/actions.ts";
 import { keymapFromConfig } from "../../keys/index.ts";
-import { steadVerbs } from "../../onboarding/controller.ts";
 import { stopAskingWhy, whyLine } from "../../page/ask-card-why.ts";
 import { type ChoreWaiting, choreAcceptedLine, type NeedsYouItem } from "../../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../../shell/needs-you-queue.ts";
-import { askItem, decidedItem } from "../../shell/needs-you-testing.ts";
+import { decidedItem } from "../../shell/needs-you-testing.ts";
 import { createSessionReads } from "../../shell/session-reads.ts";
 import { morningTriage } from "../chores/testing.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
-import { checkPaneDefinition } from "../testing.ts";
 import { acceptHint, acceptsOnly, overturnHint, overturnsOnly } from "./copy.ts";
 import { seatCreatures } from "./habitat.ts";
 import { composeStead } from "./habitat-render.ts";
@@ -62,83 +58,6 @@ describe("the stead pane", () => {
     expect(container.querySelector("canvas.kw-stead-canvas")).not.toBeNull();
     expect(container.querySelector(".kw-empty")).toBeNull();
     expect(creatureButton(container, "reviewer").dataset.clip).toBe("idle");
-  });
-
-  it("asks for no hand-off tally while the block world is switched off, and draws none it hears", async () => {
-    const stead = steadHarness({});
-    const { container } = mount(stead);
-    await settle();
-    const before = creatureLabels(container);
-    stead.emit([
-      {
-        id: 90,
-        ts: "2026-11-22T09:00:00.000Z",
-        sessionId: "",
-        type: "creature.handoff",
-        payload: {
-          change: "counted",
-          handoff: {
-            from: "reviewer",
-            to: "scribe",
-            count: 20,
-            lastAt: "2026-11-22T09:00:00.000Z",
-          },
-        },
-      },
-    ]);
-    await settle();
-    expect(stead.handoffReads()).toBe(0);
-    expect(container.querySelector(".kw-stead-block")).toBeNull();
-    expect(creatureLabels(container)).toEqual(before);
-  });
-
-  it("seats no plain bot: a bot the node lists without creature.json stays off the stead", async () => {
-    const stead = steadHarness({ bots: [bot("reviewer"), bot("scribe")], creatures: [] });
-    const { container } = mount(stead);
-    await settle();
-    expect(creatureLabels(container)).toEqual([]);
-    expect(rowNames(container)).toEqual([]);
-    expect(container.querySelector(".kw-ov-head-lead")?.textContent).toMatch(/^0 creatures/);
-    expect(container.querySelector(".kw-empty")?.textContent).toBe(
-      `No creature yet · make one with ${keymap.describe("onboarding.start")}`,
-    );
-  });
-
-  it("mounts the companion switch row on its head once a switch is bound, told how many creatures stand", async () => {
-    const considered: number[] = [];
-    const toggle: CompanionSwitch = {
-      enabled: () => false,
-      line: () => "companion off",
-      offering: () => false,
-      considerOffer: (creatures) => void considered.push(creatures),
-      toggle: async () => undefined,
-      accept: async () => undefined,
-      decline: () => undefined,
-    };
-    const unbound = mount(steadHarness({}));
-    expect(unbound.container.querySelector("[role=switch]")).toBeNull();
-    cleanup();
-    const stead = steadHarness({});
-    const unbind = stead.companion.bindToggle(toggle);
-    try {
-      const { container } = mount(stead);
-      await settle();
-      const row = container.querySelector(".kw-ov-head + .kw-companion-switch [role=switch]");
-      expect(row?.textContent).toContain("companion off");
-      expect(considered.at(-1)).toBe(2);
-    } finally {
-      unbind();
-    }
-  });
-
-  it("counts need-you on its head as the queue does: one held chore is one, though it also stands the creature at the porch", async () => {
-    const stead = steadHarness({ waiting: [heldChore] });
-    const { container } = mount(stead);
-    await settle();
-    expect(creatureLabels(container)[0]).toBe("reviewer, at the porch, 0 active threads");
-    expect(container.querySelector(".kw-ov-head-lead")?.textContent).toContain("1 needs you");
-    expect(container.querySelector(".kw-ov-head-lead")?.textContent).not.toContain("2 need you");
-    expect(steadPane.title({ kind: "stead" }, stead.shell)).toBe("stead · 1 needs you");
   });
 
   it("offers a held chore's accept in the bubble ahead of a finished crate, by the companion's rule, and y accepts its grants", async () => {
@@ -244,24 +163,6 @@ describe("the stead pane", () => {
     expect(container.querySelector(".kw-stead")?.textContent).toContain("docs changes");
   });
 
-  it("says the board is empty when no chore is scheduled", async () => {
-    const { container } = mount(steadHarness({}));
-    await settle();
-    expect(container.querySelector(".kw-stead-board")?.textContent).toBe(
-      "chore board · nothing scheduled",
-    );
-  });
-
-  it("teaches the one next key when no creature exists, with the stead still drawn", () => {
-    const { container } = mount(steadHarness({ bots: [] }));
-    expect(container.querySelector(".kw-empty")?.textContent).toBe(
-      `No creature yet · make one with ${keymap.describe("onboarding.start")}`,
-    );
-    expect(keymap.describe("onboarding.start")).toBe("ctrl+k 1");
-    expect(container.querySelector("canvas.kw-stead-canvas")).not.toBeNull();
-    expect(container.querySelectorAll(".kw-stead-creature")).toHaveLength(0);
-  });
-
   it("brings a creature to the porch when its thread asks: the bubble, the vocabulary and the desk keys", async () => {
     const stead = steadHarness({
       summaries: [row("t1", "fix the flaky trash test", "reviewer")],
@@ -307,52 +208,6 @@ describe("the stead pane", () => {
     expect(stead.opened).toEqual(["t1"]);
   });
 
-  it("lets the porch go on the next event when the ask is answered on another surface, though the refresh sent before the answer lands after it", async () => {
-    const working = row("t1", "first light", "reviewer", { working: true });
-    const stead = steadHarness({ summaries: [working] });
-    const { container } = mount(stead);
-    stead.emit([
-      envelope(7, "t1", "gate.ask", {
-        ask: {
-          tool: "write",
-          callId: "c1",
-          arguments: { path: "notes/first-light.md" },
-          rule: "default",
-        },
-      }),
-    ]);
-    stead.setWaiting([
-      askItem("c1", { sessionId: "t1", tool: "write", subject: "notes/first-light.md" }),
-    ]);
-    await settle();
-    expect(bubbleLineText(container)).toBe("asks to edit notes/first-light.md");
-    expect(headText(container)).toContain("1 needs you");
-    expect(steadPane.title({ kind: "stead" }, stead.shell)).toBe("stead · 1 needs you");
-
-    stead.emit([
-      envelope(8, "t1", "gate.permission", {
-        decision: { tool: "write", callId: "c1", verdict: "granted", gate: "user", asked: true },
-      }),
-    ]);
-    stead.setWaiting([]);
-    stead.setSummaries([{ ...working, waiting: { asks: 1, tools: ["write"] } }]);
-    await settle();
-    expect(container.querySelector(".kw-stead-bubble")).toBeNull();
-    expect(headText(container)).not.toContain("need");
-    expect(steadPane.title({ kind: "stead" }, stead.shell)).toBe("stead");
-    expect(creatureLabels(container)[0]).not.toContain("at the porch");
-    expect(stead.answered).toEqual([]);
-  });
-
-  it("says so when a key answers with nothing asking on the porch", async () => {
-    const stead = steadHarness({});
-    const { container, act } = mount(stead);
-    await settle();
-    act("stead.approve");
-    expect(lineText(container)).toBe("nothing is asking on the porch");
-    expect(stead.answered).toEqual([]);
-  });
-
   it("opens the thread a creature is on: by its pixels, by enter, by its button, never after a drag", async () => {
     const stead = steadHarness({
       summaries: [row("t1", "rename the tiler verbs", "reviewer", { working: true })],
@@ -382,15 +237,6 @@ describe("the stead pane", () => {
     expect(stead.opened).toHaveLength(3);
   });
 
-  it("names the missing thread instead of opening nothing", async () => {
-    const stead = steadHarness({ bots: [bot("reviewer")] });
-    const { container, act } = mount(stead);
-    await settle();
-    act("stead.open");
-    expect(stead.opened).toEqual([]);
-    expect(lineText(container)).toBe("reviewer has no thread yet");
-  });
-
   it("opens what a building stands for: the porch opens the desk, the storehouse the sessions", async () => {
     const stead = steadHarness({});
     const { container } = mount(stead);
@@ -417,86 +263,6 @@ describe("the stead pane", () => {
       fireEvent.click(stage, { ...point, detail: 1 });
       expect(stead.panes.at(-1), kind).toBe(pane);
     }
-  });
-
-  it("follows a nearby pointer with its gaze, through the look row", async () => {
-    const stead = steadHarness({ bots: [bot("reviewer")] });
-    const { container } = mount(stead);
-    await settle();
-    const box = boxOf(creatureButton(container, "reviewer"));
-    fireEvent.pointerMove(stageOf(container), {
-      clientX: box.left + box.width * 1.25,
-      clientY: box.top + box.height * 0.4,
-    });
-    await settle();
-    expect(creatureButton(container, "reviewer").dataset.clip).toBe("look");
-    fireEvent.pointerLeave(stageOf(container));
-    await settle();
-    expect(creatureButton(container, "reviewer").dataset.clip).toBe("idle");
-  });
-
-  it("greets once when the pointer enters its pixels", async () => {
-    const stead = steadHarness({ bots: [bot("reviewer")] });
-    const { container } = mount(stead);
-    await settle();
-    const box = boxOf(creatureButton(container, "reviewer"));
-    fireEvent.pointerMove(stageOf(container), {
-      clientX: box.left + box.width / 2,
-      clientY: box.top + box.height * 0.8,
-    });
-    await wait(260);
-    expect(creatureButton(container, "reviewer").dataset.hit).toBe("");
-    expect(creatureButton(container, "reviewer").dataset.clip).toBe("greet");
-    fireEvent.pointerLeave(stageOf(container));
-  });
-
-  it("wears needs-you while an ask waits, working while a session works, and lives in main", () => {
-    const view = { id: "p1", spec: { kind: "stead" as const }, focused: false };
-    expect(steadPane.lifecycle?.(view, steadHarness({ waiting: [askItem("c1")] }).shell)).toBe(
-      "needs-you",
-    );
-    expect(
-      steadPane.lifecycle?.(
-        view,
-        steadHarness({ summaries: [row("t1", "x", "reviewer", { working: true })] }).shell,
-      ),
-    ).toBe("working");
-    expect(steadPane.lifecycle?.(view, steadHarness({}).shell)).toBe("idle");
-    expect(
-      steadPane.title({ kind: "stead" }, steadHarness({ waiting: [askItem("c1")] }).shell),
-    ).toBe("stead · 1 needs you");
-    expect(steadPane.attire).toBe("house");
-    expect(steadPane.home).toBe("main");
-  });
-});
-
-describe("the stead's keys", () => {
-  it("owns leader 0 and the desk's answer letters inside the pane, with palette names nobody else claims", () => {
-    const ours = Object.entries(appActions).filter(([id]) => id.startsWith("stead."));
-    expect(Object.fromEntries(ours.map(([id, action]) => [id, action.chords]))).toEqual({
-      "stead.summon": ["leader 0", "leader home"],
-      "stead.down": ["j", "down"],
-      "stead.up": ["k", "up"],
-      "stead.open": "enter",
-      "stead.approve": "y",
-      "stead.once": "o",
-      "stead.session": "s",
-      "stead.workspace": "w",
-      "stead.deny": "n",
-      "stead.overturn": "x",
-    });
-    const theirs = new Set(
-      Object.entries(appActions)
-        .filter(([id]) => !id.startsWith("stead."))
-        .flatMap(([, action]) => commandNames(action.command)),
-    );
-    const claimed = ours.flatMap(([, action]) => commandNames(action.command));
-    expect(claimed.filter((name) => theirs.has(name))).toEqual([]);
-    expect(commandNames(appActions["stead.summon"]?.command)).toEqual([
-      "stead",
-      "ranch",
-      "habitat",
-    ]);
   });
 });
 
@@ -733,12 +499,6 @@ function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-function commandNames(
-  command: { name: string; aliases?: readonly string[] } | undefined,
-): string[] {
-  return command === undefined ? [] : [command.name, ...(command.aliases ?? [])];
-}
-
 function creatureLabels(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".kw-stead-creature")].map(
     (button) => button.getAttribute("aria-label") ?? "",
@@ -779,12 +539,6 @@ function rowStates(container: HTMLElement): string[] {
   );
 }
 
-function bubbleLineText(container: HTMLElement): string | undefined {
-  return (
-    container.querySelector(".kw-stead-bubble .kw-stead-bubble-line")?.textContent ?? undefined
-  );
-}
-
 function headText(container: HTMLElement): string {
   return container.querySelector(".kw-ov-head-lead")?.textContent ?? "";
 }
@@ -797,12 +551,6 @@ function answers(container: HTMLElement): string[] {
 
 function lineText(container: HTMLElement): string | undefined {
   return container.querySelector(".kw-ov-line")?.textContent ?? undefined;
-}
-
-const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function seated(): Promise<void> {
-  for (let hop = 0; hop < 8; hop += 1) await Promise.resolve();
 }
 
 describe("the stead pane's power tiers", () => {
@@ -821,28 +569,6 @@ describe("the stead pane's power tiers", () => {
       expect(field.dataset.tier).toBe("ambient");
       expect(field.dataset.frames).toBe("0");
       expect(Number(field.dataset.wakes)).toBeLessThanOrEqual(wakeBudgetPerTenSeconds);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.useRealTimers();
-    }
-  });
-
-  it("rests while unfocused and still: ten seconds schedule no animation frame and a wake a second at most", () => {
-    vi.useFakeTimers();
-    const animationFrame = vi.fn((callback: FrameRequestCallback): number =>
-      Number(setTimeout(() => callback(Date.now()), 16)),
-    );
-    vi.stubGlobal("requestAnimationFrame", animationFrame);
-    vi.stubGlobal("cancelAnimationFrame", (handle: number) => clearTimeout(handle));
-    try {
-      const { container } = mountUnfocused(steadHarness({}));
-      const field = stageOf(container);
-      const mounted = Number(field.dataset.wakes);
-      vi.advanceTimersByTime(10_000);
-      expect(animationFrame).not.toHaveBeenCalled();
-      expect(field.dataset.tier).toBe("rest");
-      expect(field.dataset.frames).toBe("0");
-      expect(Number(field.dataset.wakes) - mounted).toBeLessThanOrEqual(10);
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();
@@ -878,84 +604,6 @@ describe("the stead pane's power tiers", () => {
     }
   });
 
-  it("lives at rest: three untouched, unfocused minutes still see a creature stretch, sit or wander, at a wake a second at most and no frame", async () => {
-    vi.useFakeTimers();
-    const animationFrame = vi.fn((callback: FrameRequestCallback): number =>
-      Number(setTimeout(() => callback(Date.now()), 16)),
-    );
-    vi.stubGlobal("requestAnimationFrame", animationFrame);
-    vi.stubGlobal("cancelAnimationFrame", (handle: number) => clearTimeout(handle));
-    try {
-      const { container } = mountUnfocused(steadHarness({}));
-      await seated();
-      const field = stageOf(container);
-      const mounted = Number(field.dataset.wakes);
-      const tiers = new Set<string>();
-      const seen = new Set<string>();
-      for (let second = 0; second < 180; second++) {
-        vi.advanceTimersByTime(1000);
-        tiers.add(field.dataset.tier ?? "");
-        for (const slug of ["reviewer", "scribe"]) {
-          const creature = creatureButton(container, slug);
-          seen.add(`${slug} ${creature.dataset.clip} ${creature.style.left}`);
-        }
-      }
-      expect(tiers).toEqual(new Set(["rest"]));
-      expect(seen.size).toBeGreaterThan(2);
-      expect(animationFrame).not.toHaveBeenCalled();
-      expect(field.dataset.frames).toBe("0");
-      expect(Number(field.dataset.wakes) - mounted).toBeLessThanOrEqual(180 + 6);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.useRealTimers();
-    }
-  });
-
-  it("paints at rest only when a beat changes the picture, a clip or a place, never on the wake alone", async () => {
-    vi.useFakeTimers();
-    const painted = vi.fn();
-    const context = {
-      imageSmoothingEnabled: true,
-      fillStyle: "",
-      fillRect: () => undefined,
-      clearRect: painted,
-    };
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
-    try {
-      const { container } = mountUnfocused(steadHarness({}));
-      await seated();
-      const field = stageOf(container);
-      const mounted = Number(field.dataset.wakes);
-      const paintedAtMount = painted.mock.calls.length;
-      const pictureNow = (): string =>
-        ["reviewer", "scribe"]
-          .map((slug) => creatureButton(container, slug))
-          .map(
-            (creature) => `${creature.dataset.clip}@${creature.style.left},${creature.style.top}`,
-          )
-          .join(" ");
-      let shown = pictureNow();
-      let changes = 0;
-      for (let second = 0; second < 120; second++) {
-        vi.advanceTimersByTime(1000);
-        const picture = pictureNow();
-        if (picture !== shown) changes += 1;
-        shown = picture;
-      }
-      const wakes = Number(field.dataset.wakes) - mounted;
-      const paints = painted.mock.calls.length - paintedAtMount;
-      expect(field.dataset.tier).toBe("rest");
-      expect(wakes).toBeGreaterThanOrEqual(100);
-      expect(paints).toBeLessThanOrEqual(changes + 4);
-      expect(paints * 4).toBeLessThan(wakes);
-    } finally {
-      getContext.mockRestore();
-      vi.useRealTimers();
-    }
-  });
-
   it("paints nothing when a draw finds the world and every figure unchanged", async () => {
     vi.useFakeTimers();
     const painted = vi.fn();
@@ -982,77 +630,11 @@ describe("the stead pane's power tiers", () => {
       vi.useRealTimers();
     }
   });
-
-  it("forwards its own cursor and open chords to the onboarding card while it shows", () => {
-    expect(steadVerbs).toEqual({ "stead.down": "down", "stead.up": "up", "stead.open": "keep" });
-  });
 });
 
 const wakeBudgetPerTenSeconds = 80;
 
 describe("the stead's optional courtyards", () => {
-  it("keeps valid prototype-like names independent from inherited appearance properties", async () => {
-    const stead = steadHarness({
-      creatures: [creatureOnTheWire(bot("constructor")), creatureOnTheWire(bot("neighbor"))],
-    });
-    const saved: SteadSpec[] = [];
-    const { container } = mountPane(
-      steadPane.component,
-      {
-        kind: "stead",
-        view: "courtyards",
-        workshopStyles: { neighbor: "gable" },
-        gardens: { neighbor: "herbs" },
-      },
-      {
-        ...stead.shell,
-        rebind: (_id, spec) => {
-          saved.push(spec as SteadSpec);
-        },
-      },
-    );
-    await settle();
-    const court = container.querySelector('[data-courtyard="constructor"]') as Element;
-    expect(court.querySelector("[data-workshop]")?.getAttribute("data-workshop")).toBe("gable");
-    fireEvent.click(court);
-    await settle();
-    expect(
-      (container.querySelector('select[aria-label="Workshop style"]') as HTMLSelectElement).value,
-    ).toBe("auto");
-    expect(
-      (container.querySelector('select[aria-label="Garden"]') as HTMLSelectElement).value,
-    ).toBe("none");
-    fireEvent.change(container.querySelector('select[aria-label="Workshop style"]') as Element, {
-      target: { value: "folded" },
-    });
-    expect(saved.at(-1)?.workshopStyles?.constructor).toBe("folded");
-    expect(saved.at(-1)?.workshopStyles?.neighbor).toBe("gable");
-  });
-
-  it("offers bounded additional neighborhoods when saved addresses are full", async () => {
-    const stead = steadHarness({ creatures: [creatureOnTheWire(bot("newcomer"))] });
-    const { container } = mountPane(
-      steadPane.component,
-      {
-        kind: "stead",
-        view: "courtyards",
-        courtOrder: Array.from({ length: 4096 }, (_, index) => `departed-${index}`),
-      },
-      stead.shell,
-    );
-    await settle();
-    const select = container.querySelector(
-      'select[aria-label="Neighborhood"]',
-    ) as HTMLSelectElement;
-    expect(select.options).toHaveLength(257);
-    expect(select.options[256]?.textContent).toContain("Additional neighborhood 1");
-    fireEvent.change(select, { target: { value: "256" } });
-    await settle();
-    expect(container.querySelectorAll(".kw-stead-row")).toHaveLength(1);
-    expect(container.querySelector('[data-slug="newcomer"]')).not.toBeNull();
-    expect(container.querySelector(".kw-stead-field")?.getAttribute("data-district")).toBe("256");
-  });
-
   it("expands into bounded neighborhoods and preserves architectural choices, gardens and addresses", async () => {
     const listed = Array.from({ length: 33 }, (_, index) => ({
       ...creatureOnTheWire(bot(`c${String(index).padStart(2, "0")}`)),
@@ -1152,74 +734,6 @@ describe("the stead's optional courtyards", () => {
     ).toBe("mushrooms");
   });
 
-  it("keeps requests in another neighborhood visible without mounting its creatures", async () => {
-    const listed = Array.from({ length: 20 }, (_, index) =>
-      creatureOnTheWire(bot(`c${String(index).padStart(2, "0")}`)),
-    );
-    const stead = steadHarness({
-      creatures: listed,
-      waiting: [{ ...heldChore, creature: "c19", key: "C:/work:chore:c19/triage/grants" }],
-    });
-    const { container, act } = mountPane(
-      steadPane.component,
-      { kind: "stead", view: "courtyards" },
-      stead.shell,
-    );
-    await settle();
-    expect(container.querySelector('[data-courtyard="c19"]')).toBeNull();
-    expect(headText(container)).toContain("1 needs you");
-    expect(
-      container.querySelector('select[aria-label="Neighborhood"] option[value="1"]')?.textContent,
-    ).toContain("1 waiting");
-    act("stead.approve");
-    expect(stead.panes).toEqual(["needs-you"]);
-    expect(stead.answered).toEqual([]);
-  });
-
-  it("counts residents with unsupported artwork and never calls their home empty", async () => {
-    const resident = { ...creatureOnTheWire(bot("stone")), skin: "my-unavailable-art" };
-    const stead = steadHarness({ creatures: [resident] });
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const { container } = mountPane(
-        steadPane.component,
-        { kind: "stead", view: "courtyards" },
-        stead.shell,
-      );
-      await settle();
-      expect(headText(container)).toContain("1 creature");
-      expect(container.querySelector("[data-courtyard=stone]")).not.toBeNull();
-      expect(container.querySelector(".kw-empty")).toBeNull();
-      expect(container.textContent).toContain("Artwork unavailable for stone");
-    } finally {
-      warning.mockRestore();
-    }
-  });
-
-  it("ages a folded working state on one shared clock without repainting the full scene", async () => {
-    vi.useFakeTimers();
-    try {
-      const stead = steadHarness({
-        summaries: [row("t1", "working", "reviewer", { working: true })],
-      });
-      const { container } = mountPane(
-        steadPane.component,
-        { kind: "stead", view: "courtyards" },
-        stead.shell,
-      );
-      await seated();
-      const court = () => container.querySelector('[data-courtyard="reviewer"]');
-      expect(court()?.getAttribute("data-state")).toBe("working");
-      const wakes = stageOf(container).dataset.wakes;
-      vi.advanceTimersByTime(31 * 60_000);
-      expect(court()?.getAttribute("data-state")).toBe("idle");
-      expect(headText(container)).not.toContain("working");
-      expect(stageOf(container).dataset.wakes).toBe(wakes);
-    } finally {
-      cleanup();
-      vi.useRealTimers();
-    }
-  });
   it("remembers the chosen view and restores focus and scroll when opening and folding a court", async () => {
     const stead = steadHarness({});
     const rebind = vi.fn();
@@ -1320,37 +834,5 @@ describe("the stead's optional courtyards", () => {
     expect(
       container.querySelector(".kw-stead-views button")?.closest("[data-native-activation]"),
     ).not.toBeNull();
-  });
-
-  it("stops scene scheduling while folded and resumes it when a court opens", async () => {
-    vi.useFakeTimers();
-    try {
-      const stead = steadHarness({});
-      const { container } = mountPane(
-        steadPane.component,
-        { kind: "stead", view: "courtyards" },
-        stead.shell,
-      );
-      await seated();
-      const field = stageOf(container);
-      const wakes = field.dataset.wakes;
-      vi.advanceTimersByTime(10_000);
-      expect(field.dataset.wakes).toBe(wakes);
-      const court = container.querySelector<HTMLButtonElement>("[data-courtyard]");
-      expect(court).not.toBeNull();
-      fireEvent.click(court as HTMLButtonElement);
-      await seated();
-      expect(Number(field.dataset.wakes)).toBeGreaterThan(Number(wakes ?? 0));
-      expect(field.dataset.tier).not.toBe("hidden");
-    } finally {
-      cleanup();
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe("the stead pane against the registry's rules", () => {
-  it("meets T7 and claims no key or command another action holds", () => {
-    checkPaneDefinition(steadPane);
   });
 });

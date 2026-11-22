@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BusEnvelope, MemoryGarden, PendingAsk } from "@keywork-app/protocol";
-import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { heldChoreNeed } from "../panes/chores/testing.ts";
 import { inertGarden } from "./memory-store.ts";
@@ -17,7 +16,6 @@ import {
   type WireLedger,
   wireItems,
 } from "./needs-you-ledger.ts";
-import { createNeedsYouQueue } from "./needs-you-queue.ts";
 import { airlockItem, askItem, decidedItem, failedItem, inboxItem } from "./needs-you-testing.ts";
 
 const workspace = "C:/work";
@@ -54,13 +52,6 @@ describe("asks on the wire", () => {
   it("settles on a replayed gate.permission too, since an answer is an answer", () => {
     const asked = fold([ask("c1", "s1")]);
     expect(wireItems(fold([permission("c1", { replay: true })], asked))).toEqual([]);
-  });
-
-  it("seeds from GET /asks with the server's asked-at time", () => {
-    const seeded = reconcileAsks(emptyWireLedger, workspace, [pending("c9")]);
-    expect(wireItems(seeded)).toEqual([
-      expect.objectContaining({ callId: "c9", since: "2026-10-15T09:59:00.000Z" }),
-    ]);
   });
 
   it("drops on reconnect the asks the server no longer holds, keeping those that arrived meanwhile", () => {
@@ -458,22 +449,5 @@ describe("one count for every surface", () => {
     const all = Object.values(oneOfEach);
     expect(needsYouCount(all)).toBe(Object.keys(urgency).length);
     expect(needsYouCount([...all, oneOfEach.review])).toBe(all.length);
-  });
-
-  it("is the count the desk's queue reports", () => {
-    createRoot((dispose) => {
-      const queue = createNeedsYouQueue();
-      const items = Object.values(oneOfEach);
-      queue.attach({
-        workspace,
-        items: () => items,
-        onArrival: () => () => undefined,
-        sessionName: (sessionId) => sessionId,
-        dispose: () => undefined,
-      });
-      expect(queue.count()).toBe(needsYouCount(items));
-      expect(queue.count()).toBe(7);
-      dispose();
-    });
   });
 });

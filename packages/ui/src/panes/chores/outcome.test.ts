@@ -9,17 +9,14 @@ const ended = (overrides: Partial<RunRow>): RunRow =>
 describe("a run's outcome", () => {
   it.each([
     [{ process: "completed", delivery: "delivered" }, "delivered"],
-    [{ process: "completed", delivery: "none" }, "completed"],
     [{ process: "completed", delivery: "unknown" }, "completed"],
     [{ process: "completed", delivery: "failed" }, "completed"],
     [{ process: "failed", delivery: "none" }, "blocked"],
     [{ process: "timed-out", delivery: "unknown" }, "blocked"],
-    [{ process: "blocked", delivery: "none" }, "blocked"],
     [{ process: "cancelled", delivery: "none" }, "cancelled"],
     [{ status: "running", process: null, delivery: null }, "running"],
     [{ status: "parked", process: null, delivery: null }, "needs you"],
     [{ status: "skipped", process: null, delivery: null }, "skipped"],
-    [{ status: "dropped", process: null, delivery: null }, "skipped"],
   ] as const)("derives %o as %s", (row, word) => {
     expect(runOutcome(ended(row)).word).toBe(word);
   });

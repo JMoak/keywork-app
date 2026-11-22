@@ -84,16 +84,6 @@ describe("the input helper stand-in, in process", () => {
     expect(lines.at(-1)).toEqual({ v, kind: "refused", reason: "malformed" });
   });
 
-  it("reports simulated local input only while it holds a grant", () => {
-    const { helper, lines } = inProcess();
-    helper.receive(JSON.stringify({ v, kind: "hello", versions: [1] }));
-    helper.localInput();
-    expect(lines.map((line) => line.kind)).not.toContain("local-input");
-    helper.receive(JSON.stringify({ v, kind: "grant", grantId: "g1", expiresAt: 2000, display }));
-    helper.localInput();
-    expect(lines.at(-1)).toEqual({ v, kind: "local-input" });
-  });
-
   it("names its control pipe for each platform", () => {
     expect(signalPipePath("keywork-stand-in", "win32")).toBe("\\\\.\\pipe\\keywork-stand-in");
     expect(signalPipePath("keywork-stand-in", "linux")).toMatch(/keywork-stand-in\.sock$/);

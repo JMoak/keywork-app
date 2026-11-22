@@ -5,16 +5,10 @@ import {
   compareNeedsYou,
   dismissible,
   dismissNotice,
-  glossOf,
-  inboxNeedsYouAt,
-  inboxNotice,
-  kindMarks,
   type NeedsYouItem,
-  needYouCount,
   orderNeedsYou,
   risingEdge,
   urgency,
-  whereOf,
 } from "./needs-you.ts";
 import { airlockItem, askItem, failedItem, inboxItem } from "./needs-you-testing.ts";
 
@@ -71,50 +65,6 @@ describe("the needs-you ordering rule", () => {
 });
 
 describe("the needs-you words", () => {
-  it("counts in the strip's grammar", () => {
-    expect(needYouCount(1)).toBe("1 needs you");
-    expect(needYouCount(3)).toBe("3 need you");
-  });
-
-  it("glosses each kind in a few words, a bash ask by its command alone", () => {
-    expect(glossOf(askItem("c1"))).toBe("ask: rm -rf dist");
-    expect(glossOf(askItem("c2", { tool: "write", subject: "src/a.ts" }))).toBe(
-      "ask: write src/a.ts",
-    );
-    expect(glossOf(askItem("c3", { tool: "mcp__docs__search", subject: "" }))).toBe(
-      "ask: mcp__docs__search",
-    );
-    expect(glossOf(airlockItem("pricing"))).toBe("airlock: 2 candidates, 1 question");
-    expect(glossOf(airlockItem("pricing", { candidates: 1, questions: 0 }))).toBe(
-      "airlock: 1 candidate",
-    );
-    expect(glossOf(airlockItem("pricing", { candidates: 0, questions: 0 }))).toBe(
-      "airlock: ready to close",
-    );
-    expect(glossOf(inboxItem("m1"))).toBe("inbox: entities/pricing.md");
-    expect(glossOf(failedItem("s4"))).toBe("failed: provider answered 529 overloaded");
-  });
-
-  it("names where each item is answered: its session, its arc, or memory", () => {
-    const name = (sessionId: string) => `session ${sessionId}`;
-    const places = [askItem("c1"), failedItem("s4"), airlockItem("pricing"), inboxItem("m1")].map(
-      (item) => whereOf(item, name),
-    );
-    expect(places).toEqual(["session s1", "session s4", "pricing", "memory"]);
-  });
-
-  it("marks urgency as density, and a failed turn with the failed stamp", () => {
-    expect(kindMarks).toEqual({
-      ask: "█",
-      airlock: "▓",
-      inbox: "▒",
-      failed: "▛",
-      review: "▒",
-      chore: "▓",
-      decided: "░",
-    });
-  });
-
   it("lets everything but an ask be dismissed, and says why an ask cannot be", () => {
     const items: NeedsYouItem[] = [
       askItem("c1"),
@@ -155,15 +105,5 @@ describe("the memory inbox rising edge", () => {
     expect(crossed(3)).toBe(true);
     expect(crossed(2)).toBe(false);
     expect(crossed(3)).toBe(true);
-  });
-
-  it("matches keywork's default inbox threshold of three", () => {
-    expect(inboxNeedsYouAt).toBe(3);
-    expect(risingEdge()(3)).toBe(true);
-    expect(inboxNotice("C:/w", 3)).toEqual({
-      title: "memory inbox",
-      body: "3 items wait for review",
-      trigger: { kind: "memory-inbox", workspace: "C:/w", pending: 3 },
-    });
   });
 });

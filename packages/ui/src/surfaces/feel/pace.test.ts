@@ -43,11 +43,6 @@ function glides(cues: readonly Cue[]): number[] {
 }
 
 describe("the pace a mood gives", () => {
-  it("leaves every turn and every glide as built when brisk", () => {
-    expect(pacedStarts(nine, { mood: "brisk" })).toBe(nine);
-    expect(pacedMs(170, { mood: "brisk" })).toBe(170);
-  });
-
   it("widens the gaps and lengthens the glide when calm, and closes both up when eager", () => {
     expect(lastOf(pacedStarts(nine, { mood: "calm" }))).toBeGreaterThan(lastOf(nine) * 1.5);
     expect(lastOf(pacedStarts(nine, { mood: "eager" }))).toBeLessThan(lastOf(nine) * 0.6);

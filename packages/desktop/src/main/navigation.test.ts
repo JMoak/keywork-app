@@ -97,13 +97,6 @@ describe("a pane leaving the window", () => {
     }
   });
 
-  it("still sends a web link to the browser whatever the window is named", () => {
-    expect(windowOpenVerdict("https://example.com/", app, isAppPage, "kw-surface:1")).toEqual({
-      kind: "hand-off",
-      url: "https://example.com/",
-    });
-  });
-
   it("is refused to every page but the app's own", () => {
     for (const opener of [banner, "about:blank", "https://example.com/"]) {
       expect(windowOpenVerdict("about:blank", opener, isAppPage, "kw-surface:1")).toEqual({

@@ -14,20 +14,6 @@ describe("the lineage the console walks", () => {
   ]);
   const lineage = yardLineageOf(() => yard);
 
-  it("goes rootward to the parent panel, then to the conversation the seed grew from", () => {
-    expect(stepAlong(lineage, "test", "rootward")).toBe("file");
-    expect(stepAlong(lineage, "file", "rootward")).toBe("diff");
-    expect(stepAlong(lineage, "diff", "rootward")).toBe("session-1");
-    expect(stepAlong(lineage, "session-1", "rootward")).toBeUndefined();
-  });
-
-  it("goes leafward to the newest child still out, from a panel or from the conversation", () => {
-    expect(stepAlong(lineage, "session-1", "leafward")).toBe("diff");
-    expect(stepAlong(lineage, "diff", "leafward")).toBe("file");
-    expect(stepAlong(lineage, "test", "leafward")).toBeUndefined();
-    expect(lineage.childrenOf("diff")).toEqual(["file", "older"]);
-  });
-
   it("goes leafward back to the child the keeper came from, while that child is still out", () => {
     const cameFrom = (id: string) => (id === "diff" ? "older" : id === "file" ? "gone" : undefined);
     expect(stepAlong(lineage, "diff", "leafward", cameFrom)).toBe("older");
@@ -43,17 +29,6 @@ describe("the lineage the console walks", () => {
       "test 2",
       "older 1",
     ]);
-  });
-
-  it("walks past a parent folded into a plot or settled out of the yard", () => {
-    const folded = yardOf([
-      grown("diff", "session-1", 1, { folded: "plot:diff" }),
-      grown("file", "diff", 2),
-      grown("test", "file", 3),
-    ]);
-    const walking = yardLineageOf(() => folded);
-    expect(stepAlong(walking, "test", "rootward")).toBe("file");
-    expect(stepAlong(walking, "file", "rootward")).toBe("session-1");
   });
 });
 

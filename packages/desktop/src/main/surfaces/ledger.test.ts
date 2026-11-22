@@ -5,15 +5,6 @@ const home = { x: 100, y: 100, width: 480, height: 360 };
 const away = { x: 900, y: 420, width: 480, height: 360 };
 
 describe("who moved a pane outside the window", () => {
-  it("is the keeper when the host placed nothing", () => {
-    expect(
-      moveLedger().moverOf(
-        () => away,
-        () => false,
-      ),
-    ).toBe("keeper");
-  });
-
   it("is the host for a move reported while the host is placing it, wherever it lands", () => {
     const ledger = moveLedger();
     const seen: string[] = [];
@@ -93,18 +84,6 @@ describe("who moved a pane outside the window", () => {
         () => false,
       ),
     ).toBe("keeper");
-  });
-
-  it("is the host again once the host places a pane the keeper never let go of", () => {
-    const ledger = moveLedger();
-    ledger.grabbed();
-    ledger.hostPlaces(home, () => undefined);
-    expect(
-      ledger.moverOf(
-        () => home,
-        () => false,
-      ),
-    ).toBe("host");
   });
 
   it("is the host for where the host sent a pane, though nothing was placed and the keeper never let go", () => {

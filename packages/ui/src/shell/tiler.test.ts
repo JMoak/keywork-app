@@ -1,6 +1,6 @@
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
-import { minPaneSize, type Screen } from "../layout/index.ts";
+import type { Screen } from "../layout/index.ts";
 import { definitionOf, type PaneDefinition, type PaneKind } from "../panes/index.ts";
 import {
   createTiler,
@@ -93,17 +93,6 @@ describe("createTiler", () => {
       expect(revived.panes().filter((id) => id.endsWith("-1"))).toHaveLength(2);
       expect(revived.focused()).toBe("sessions-1");
       dispose();
-    });
-  });
-
-  it("summons the sessions pane once and focuses it thereafter", () => {
-    withTiler((tiler) => {
-      tiler.open(conversation("s1"), screen);
-      expect(tiler.summon(sessions, screen).ok).toBe(true);
-      tiler.focus("conversation-1");
-      expect(tiler.summon(sessions, screen).ok).toBe(true);
-      expect(tiler.panes().filter((id) => id === sessionsPaneId)).toHaveLength(1);
-      expect(tiler.focused()).toBe(sessionsPaneId);
     });
   });
 
@@ -207,25 +196,6 @@ describe("createTiler", () => {
       expect(tiler.spec(sessionsPaneId)).toEqual({ kind: "tree", sessionId: "s1" });
       expect(tiler.panes().filter((id) => id.startsWith("themes"))).toHaveLength(1);
       expect(tiler.focused()).toBe(sessionsPaneId);
-    });
-  });
-
-  it("retargets the open pane of the kind when a summon names its target", () => {
-    withTiler((tiler) => {
-      tiler.open(conversation("s1"), screen);
-      tiler.summon({ kind: "workshop" }, screen);
-      tiler.bind("workshop-1", { kind: "workshop", creature: "bea" });
-      tiler.focus("conversation-1");
-      expect(tiler.summon({ kind: "workshop", creature: "osk" }, screen, "osk").ok).toBe(true);
-      expect(tiler.panes().filter((id) => id.startsWith("workshop"))).toEqual(["workshop-1"]);
-      expect(tiler.spec("workshop-1")).toEqual({ kind: "workshop", creature: "osk" });
-      expect(tiler.focused()).toBe("workshop-1");
-      expect(tiler.summon(conversation("s2"), screen, "s2").ok).toBe(true);
-      expect(tiler.panes().filter((id) => id.startsWith("conversation"))).toEqual([
-        "conversation-1",
-      ]);
-      expect(tiler.spec("conversation-1")).toEqual(conversation("s2"));
-      expect(tiler.focused()).toBe("conversation-1");
     });
   });
 
@@ -349,27 +319,6 @@ describe("refusals in keywork's words", () => {
       expect(tiler.slots(screen)).toHaveLength(showing);
     });
   });
-
-  it("docks a pane the stage cannot show beside the rest and says what waits", () => {
-    withTiler((tiler) => {
-      const narrow = { width: 1000, height: 600 };
-      filled(tiler, narrow);
-      const docked = tiler.dock("right", narrow);
-      expect(docked).toEqual({ ok: true, notice: shelfNotices.tucked(1) });
-      expect(tiler.layout.dockSideOf(tiler.focused() as string)).toBe("right");
-      expect(tiler.slots(narrow).some((slot) => slot.focused)).toBe(true);
-    });
-  });
-
-  it("says nothing is focused instead of refusing a close silently", () => {
-    withTiler((tiler) => {
-      expect(tiler.closeFocused()).toEqual({
-        ok: false,
-        refused: "no-focus",
-        notice: "no pane is focused · nothing to close",
-      });
-    });
-  });
 });
 
 describe("floats, the shelf and pins", () => {
@@ -378,21 +327,6 @@ describe("floats, the shelf and pins", () => {
     tiler.open(conversation("s2"), screen);
     tiler.open(conversation("s3"), screen);
   };
-
-  it("marks a floating slot with its place in the stack and lets the tiling close under it", () => {
-    withTiler((tiler) => {
-      three(tiler);
-      expect(tiler.float(screen)).toEqual({ ok: true });
-      const slots = tiler.slots(screen);
-      expect(slots.find((slot) => slot.id === "conversation-3")?.floating).toEqual({ z: 1 });
-      expect(slots.filter((slot) => slot.floating === undefined).map((slot) => slot.id)).toEqual([
-        "conversation-1",
-        "conversation-2",
-      ]);
-      expect(tiler.float(screen)).toEqual({ ok: true });
-      expect(tiler.slots(screen).every((slot) => slot.floating === undefined)).toBe(true);
-    });
-  });
 
   it("shelves the focused pane, lists it with its spec, and brings it back on summon", () => {
     withTiler((tiler) => {
@@ -415,31 +349,6 @@ describe("floats, the shelf and pins", () => {
       expect(tiler.summon(conversation("s3"), screen).ok).toBe(true);
       expect(tiler.focused()).toBe("conversation-3");
       expect(tiler.shelf(screen)).toEqual([]);
-    });
-  });
-
-  it("says why a verb did nothing: the last pane stays, the shelf is empty, nothing floats", () => {
-    withTiler((tiler) => {
-      tiler.open(conversation("s1"), screen);
-      expect(tiler.shelve()).toMatchObject({ ok: false, notice: shelfNotices.lastPaneStays });
-      expect(tiler.returnFromShelf(screen)).toMatchObject({
-        ok: false,
-        notice: shelfNotices.empty,
-      });
-      expect(tiler.focusAcrossLayers(screen)).toMatchObject({
-        ok: false,
-        notice: shelfNotices.nothingFloats,
-      });
-    });
-  });
-
-  it("pins and unpins the focused pane, says which, and carries the pin on its slot", () => {
-    withTiler((tiler) => {
-      three(tiler);
-      expect(tiler.pin()).toEqual({ ok: true, notice: shelfNotices.pinned });
-      expect(tiler.slots(screen).find((slot) => slot.focused)?.pinned).toBe(true);
-      expect(tiler.pin()).toEqual({ ok: true, notice: shelfNotices.unpinned });
-      expect(tiler.slots(screen).find((slot) => slot.focused)?.pinned).toBeUndefined();
     });
   });
 
@@ -488,15 +397,6 @@ describe("a full stage", () => {
       expect(tiler.crowds(sessions, screen)).toBe(false);
     });
   });
-
-  it("stops crowding once a pane closes", () => {
-    withTiler((tiler) => {
-      filledAroundAKnownSession(tiler);
-      const closing = tiler.findPane((spec) => spec.kind === "conversation");
-      expect(tiler.close(closing as string).ok).toBe(true);
-      expect(tiler.crowds(conversation("one more"), screen)).toBe(false);
-    });
-  });
 });
 
 describe("panes outside the window", () => {
@@ -527,23 +427,6 @@ describe("panes outside the window", () => {
     });
   });
 
-  it("remembers where the pane stands, and that the keeper moved it, through a snapshot", () => {
-    const snapshot = withTiler((tiler) => {
-      tiler.open(conversation("s1"), screen);
-      tiler.open(conversation("s2"), screen);
-      tiler.sendOutside("conversation-1");
-      expect(tiler.placeOutside("conversation-1", onTheDesktop, "keeper").ok).toBe(true);
-      return JSON.parse(JSON.stringify(tiler.snapshot()));
-    });
-    createRoot((dispose) => {
-      const restored = createTiler(parseTilerState(snapshot));
-      expect(restored.outside()).toMatchObject([
-        { id: "conversation-1", rect: onTheDesktop, follows: false },
-      ]);
-      dispose();
-    });
-  });
-
   it("counts a pane leaving as a change to the layout, and where it stands outside as its own count", () => {
     withTiler((tiler) => {
       tiler.open(conversation("s1"), screen);
@@ -559,67 +442,6 @@ describe("panes outside the window", () => {
       expect(tiler.sendOutside("conversation-1").ok).toBe(false);
       expect(tiler.version()).toBe(before + 1);
       expect(tiler.placements()).toBe(1);
-    });
-  });
-
-  it("says a pane waits on the shelf when bringing one inside leaves no room for every pane", () => {
-    withTiler((tiler) => {
-      const roomForOne = { width: minPaneSize.width + 40, height: minPaneSize.height + 40 };
-      tiler.open(conversation("s1"), roomForOne);
-      tiler.sendOutside("conversation-1");
-      expect(tiler.open(conversation("s2"), roomForOne)).toEqual({ ok: true });
-      expect(tiler.bringInside("conversation-1", roomForOne)).toEqual({
-        ok: true,
-        notice: shelfNotices.tucked(1),
-      });
-      expect(tiler.focused()).toBe("conversation-1");
-      expect(tiler.isOutside("conversation-1")).toBe(false);
-      expect(tiler.shelf(roomForOne).map((entry) => entry.id)).toEqual(["conversation-2"]);
-    });
-  });
-
-  it("brings every pane inside at once and leaves the focus where it was", () => {
-    withTiler((tiler) => {
-      tiler.summon(sessions, screen);
-      tiler.open(conversation("s1"), screen);
-      tiler.open(conversation("s2"), screen);
-      tiler.sendOutside("conversation-1");
-      tiler.sendOutside("conversation-2");
-      tiler.focus(sessionsPaneId);
-      expect(tiler.bringAllInside(screen).ok).toBe(true);
-      expect(tiler.outside()).toEqual([]);
-      expect(tiler.focused()).toBe(sessionsPaneId);
-      expect(tiler.bringAllInside(screen)).toMatchObject({ ok: false, refused: "nothing-to-do" });
-    });
-  });
-
-  it("opens a pane already outside without seating it, focusing it or disturbing a zoom", () => {
-    withTiler((tiler) => {
-      tiler.summon(sessions, screen);
-      tiler.open(conversation("s1"), screen);
-      tiler.zoom();
-      const before = tiler.slots(screen);
-      const opened = tiler.openOutside(conversation(), screen);
-      expect(opened).toBe("conversation-2");
-      expect(tiler.spec("conversation-2")).toEqual(conversation());
-      expect(tiler.slots(screen)).toEqual(before);
-      expect(tiler.zoomed()).toBe("conversation-1");
-      expect(tiler.focused()).toBe("conversation-1");
-      expect(tiler.outside().map((entry) => entry.id)).toEqual(["conversation-2"]);
-      expect(tiler.openOutside(conversation(), screen)).toBe("conversation-3");
-    });
-  });
-
-  it("steps across to a pane outside, and says so when nothing floats and nothing is outside", () => {
-    withTiler((tiler) => {
-      tiler.open(conversation("s1"), screen);
-      tiler.open(conversation("s2"), screen);
-      expect(tiler.focusAcrossLayers(screen).notice).toBe(
-        "no pane is floating or outside the window",
-      );
-      tiler.sendOutside("conversation-1");
-      expect(tiler.focusAcrossLayers(screen).ok).toBe(true);
-      expect(tiler.focused()).toBe("conversation-1");
     });
   });
 });

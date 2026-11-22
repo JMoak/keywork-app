@@ -25,20 +25,6 @@ describe("a plot folding and restoring on the springs", () => {
     expect(panel("test")).toBeUndefined();
   });
 
-  it("grows restored panels back out of the plot card", () => {
-    const run = renderPlot({ reducedMotion: false });
-    run.frames(90);
-    run.settle();
-    run.frames(90);
-    const card = plotCardRect();
-    run.restore();
-    const grown = rectOf(panel("file"));
-    expect(grown.y).toBe(card.y);
-    expect(grown.width).toBe(card.width);
-    run.frames(90);
-    expect(rectOf(panel("file")).width).toBeGreaterThan(card.width);
-  });
-
   it("snaps under reduced motion: the panels go at once and come back at once", () => {
     const run = renderPlot({ reducedMotion: true });
     run.settle();

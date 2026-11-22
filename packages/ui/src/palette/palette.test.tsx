@@ -2,14 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { Keymap } from "../keys/keymap.ts";
 import { CommandRegistry, fuzzyMatches, fuzzyScore } from "./commands.ts";
-import {
-  helpRows,
-  matchRuns,
-  Palette,
-  paletteModeOf,
-  paletteRows,
-  searchTextOf,
-} from "./palette.tsx";
+import { helpRows, Palette, paletteModeOf, paletteRows } from "./palette.tsx";
 
 const namesOf = (rows: ReturnType<typeof paletteRows>) => rows.map((row) => row.command.name);
 
@@ -77,21 +70,6 @@ describe("the fuzzy match as density", () => {
     expect(fuzzyMatches("dy", "dock-cycle")).toEqual([0, 6]);
     expect(fuzzyMatches("DY", "Dock-Cycle")).toEqual([0, 6]);
     expect(fuzzyMatches("zz", "zoom")).toBeUndefined();
-  });
-
-  it("splits a label into matched and unmatched runs", () => {
-    expect(matchRuns("dock-cycle", "dy")).toEqual([
-      { text: "d", matched: true },
-      { text: "ock-c", matched: false },
-      { text: "y", matched: true },
-      { text: "cle", matched: false },
-    ]);
-    expect(matchRuns("zoom", "")).toEqual([{ text: "zoom", matched: false }]);
-  });
-
-  it("searches commands without their leading slash", () => {
-    expect(searchTextOf("/spl")).toBe("spl");
-    expect(searchTextOf("alpha")).toBe("alpha");
   });
 });
 

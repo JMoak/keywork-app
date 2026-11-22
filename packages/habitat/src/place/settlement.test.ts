@@ -153,17 +153,6 @@ describe("bounded court readings", () => {
     expect(habitat.creatures).toHaveProperty(first);
   });
 
-  it("reconciles stale saved orders before reading a new district", () => {
-    const old = addresses(16);
-    const habitat = world(...old.map(creature), creature("new"));
-    expect(courtyardsInRange(habitat, old, now, { start: 16, end: 32 })).toMatchObject([
-      { slug: "new", index: 16, address: "Court 17" },
-    ]);
-    expect(courtyardsInRange(habitat, old, now, { start: 32, end: 48 })).toEqual([]);
-    expect(courtyardsInRange(habitat, old, now, { start: 0, end: 0 })).toEqual([]);
-    expect(old).toHaveLength(16);
-  });
-
   it("rejects malformed ranges without quietly reading a different court", () => {
     for (const range of [
       { start: -1, end: 1 },

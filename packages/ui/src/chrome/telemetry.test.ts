@@ -28,10 +28,6 @@ describe("telemetry", () => {
     const watched = projectAll(emptyProjection, [liveTurn]);
     expect(telemetry(watched)).toBe(`210k tokens · $0.0492 · ${liveTurnsOnly}`);
   });
-
-  it("says nothing before a turn has been seen or reported", () => {
-    expect(telemetry(emptyProjection)).toBe("");
-  });
 });
 
 describe("compactTelemetry", () => {

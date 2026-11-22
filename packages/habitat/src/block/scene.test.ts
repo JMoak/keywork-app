@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat, type HabitatState } from "../world/types.ts";
 import type { HouseSpec, Kit, MillSpec, PropSpec, ShedSpec, WorkshopSpec } from "./kit.ts";
-import { kits, lanternKit, neonKit } from "./kits/index.ts";
+import { kits, neonKit } from "./kits/index.ts";
 import { greenSpots, monumentFor, reserved, restsOnTheGreen, workshopCell } from "./layout.ts";
 import { type BlockWorld, cellPitch, type Item } from "./model.ts";
 import { blockScene, type ProjectSite, wallsAround } from "./scene.ts";
@@ -115,13 +115,6 @@ describe("the block world as a reading of the habitat", () => {
     expect(scene(withMill({ parcel: "elsewhere" }), noon).mill).toBeUndefined();
   });
 
-  it("lights the house and its smoke by night, as the theme's night says", () => {
-    const night = scene(sketchTown(5), noon, {}, "night");
-    const day = scene(sketchTown(5), noon, {}, "day");
-    expect(night.house).toMatchObject({ lit: true, smoke: true, night: true });
-    expect(day.house).toMatchObject({ lit: false, smoke: false, night: false });
-  });
-
   it("gives each project a building with its floors, stacking the last two as the sketch does", () => {
     const projects: Record<string, readonly ProjectSite[]> = {
       [slugOf(0)]: plotProjects(7, [1, 3, 8, 20, 1, 1, 1]),
@@ -140,32 +133,6 @@ describe("the block world as a reading of the habitat", () => {
     expect(built.sheds.map((spec) => spec.spot.y0)).toEqual([0, 0, 0, 0, 0, 12, 12]);
   });
 
-  it("carries each project's tracked files into its building's spec without drawing from it", () => {
-    const counted: Record<string, readonly ProjectSite[]> = {
-      [slugOf(0)]: [
-        { id: "/work/lamps", floors: 2, lit: true, conversations: 4, trackedFiles: 812 },
-        { id: "/work/notes", floors: 1, lit: false, conversations: 1, trackedFiles: undefined },
-      ],
-    };
-    const uncounted: Record<string, readonly ProjectSite[]> = {
-      [slugOf(0)]: (counted[slugOf(0)] ?? []).map((site) => ({ ...site, trackedFiles: 3 })),
-    };
-    const built = scene(sketchTown(2), noon, counted);
-    expect(built.sheds.map((spec) => spec.trackedFiles)).toEqual([812, undefined]);
-    const quads = (projects: Record<string, readonly ProjectSite[]>) =>
-      JSON.stringify(scene(sketchTown(2), noon, projects).world.cells);
-    expect(quads(uncounted)).toBe(quads(counted));
-  });
-
-  it("rests the sketch's napping and idle cast as the sketch does: four and eight on the green, thirteen by its door", () => {
-    const built = scene(sketchTown(16), noon).world;
-    expect(figureCell(built, slugOf(4))).toEqual(reserved.green);
-    expect(figureCell(built, slugOf(8))).toEqual(reserved.green);
-    expect(figureCell(built, slugOf(13))).toEqual(workshopCell(13));
-    expect(greenStanding(built).map((spot) => spot.slug)).toEqual([slugOf(4), slugOf(8)]);
-    expect(greenStanding(built).map((spot) => spot.at)).toEqual(greenSpots.slice(0, 2));
-  });
-
   it("rests every idle creature by its own door but one in four by seed, on four green spots that never overlap", () => {
     const town = sketchTown(28);
     const built = scene({ ...town, threads: {}, gates: {} }, noon).world;
@@ -181,28 +148,6 @@ describe("the block world as a reading of the habitat", () => {
 
   it("raises the green's monument by creature count: a stone from three, a gold statue from eight", () => {
     expect([0, 1, 2, 3, 7, 8, 16].map(monumentFor)).toEqual([0, 0, 0, 1, 1, 2, 2]);
-  });
-
-  it("draws decorations and the green's monument only when they are given", () => {
-    const plain = scene(sketchTown(5), noon);
-    expect(
-      Object.values(plain.workshops).every(
-        (spec) => spec?.garland === false && spec.banner === 0 && !spec.star,
-      ),
-    ).toBe(true);
-    expect(itemsIn(plain.world, reserved.green).some((item) => item.what === "monument")).toBe(
-      false,
-    );
-    const decorated = blockScene(sketchTown(5), {
-      kit: lanternKit,
-      appearance: "night",
-      now: noon,
-      decorations: { [slugOf(1)]: { garland: true, banner: 2, star: true } },
-      monument: 2,
-    });
-    expect(itemsIn(decorated.world, reserved.green).some((item) => item.what === "monument")).toBe(
-      true,
-    );
   });
 });
 

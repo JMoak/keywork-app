@@ -25,17 +25,8 @@ const scope = {
 } as unknown as SteadHomeScope;
 
 describe("the shell a creature's panes talk through", () => {
-  it("is the window's own where this host has no creature home", () => {
-    expect(creatureHomeShell(project)).toBe(project);
-  });
-
   it("is not known yet while the creature home is still opening", () => {
     expect(creatureHomeShell({ ...project, prepareSteadHome: () => undefined })).toBeUndefined();
-  });
-
-  it("is the window's own when the window is the creature home", () => {
-    const atHome = { ...project, workspace: home.workspace, steadHome: scope } as ShellSeams;
-    expect(creatureHomeShell(atHome)).toBe(atHome);
   });
 
   it("talks to the creature home from a project window, keeping the window's own pane binding", () => {

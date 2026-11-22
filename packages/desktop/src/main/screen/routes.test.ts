@@ -80,13 +80,6 @@ describe("signaling routes for a display on this machine", () => {
     });
   });
 
-  it("refuse plainly when the node has published no house ticket", async () => {
-    expect(await routes({ houseFile: async () => undefined })("moak-main", "s")).toEqual({
-      ok: false,
-      problem: "the node on moak-main has published no screen ticket: restart `keywork node`",
-    });
-  });
-
   it("name this machine by its tailnet DNS name too, and bracket an IPv6-only address", async () => {
     const ipv6Only = { ...self, addresses: ["fd7a:115c:a1e0::8928:307e"] };
     const route = await routes({ census: async () => ({ self: ipv6Only, peers: [] }) })(
@@ -155,30 +148,6 @@ describe("signaling routes that do not exist", () => {
       problem: "elsewhere is not a machine on this tailnet",
     });
   });
-
-  it("refuse a paired machine with no listener anywhere", async () => {
-    const quiet = { ...spark, endpoint: undefined };
-    const route = await routes({
-      census: async () => ({ self, peers: [quiet] }),
-      pairs: async () => ({ pairs: [{ ...pairWithSpark, endpoint: null }] }),
-    })("spark-ad4d", "s");
-    expect(route).toEqual({
-      ok: false,
-      problem: "spark-ad4d has no node listening on the tailnet",
-    });
-  });
-
-  it("refuse a peer lookup when no server answers the mesh routes", async () => {
-    const route = await routes({
-      census: async () => {
-        throw new Error("no server");
-      },
-    })("spark-ad4d", "s");
-    expect(route).toEqual({
-      ok: false,
-      problem: "cannot look up spark-ad4d: no engine answers",
-    });
-  });
 });
 
 describe("the inbound route this house's console listens on", () => {
@@ -189,13 +158,6 @@ describe("the inbound route this house's console listens on", () => {
         url: "http://100.124.48.125:47800/mesh/screen/signal?party=sharer",
         token: houseToken,
       },
-    });
-  });
-
-  it("says why it cannot listen while no node runs", async () => {
-    expect(await inboundSignaling(seams({ nodeFile: async () => undefined }))()).toEqual({
-      ok: false,
-      problem: "no node is running on this machine: start `keywork node`",
     });
   });
 });

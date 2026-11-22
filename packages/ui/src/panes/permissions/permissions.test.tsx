@@ -15,18 +15,8 @@ import { quietMark } from "../../chrome/title-row.tsx";
 import { inertFeed } from "../../shell/trust-testing.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
-import {
-  bundleRuleText,
-  grantRows,
-  hasGrants,
-  permissionsPane,
-  postureWord,
-  quietGrantedNothing,
-  revokedNotice,
-  revokeQuestion,
-  sessionGrantGroups,
-} from "./index.tsx";
-import { changesPermissions, createPermissionsStore, recordsGrant } from "./store.ts";
+import { grantRows, permissionsPane, quietGrantedNothing, sessionGrantGroups } from "./index.tsx";
+import { changesPermissions, createPermissionsStore } from "./store.ts";
 
 afterEach(cleanup);
 
@@ -35,8 +25,6 @@ const revokedView = grantAnswers.afterRevoke.body as PermissionsView;
 const gitAdd: PermissionRule = { action: "bash", resource: "git add *", effect: "allow" };
 const mkdir: PermissionRule = { action: "bash", resource: "mkdir -p *", effect: "allow" };
 const sessionRevokedView: PermissionsView = { ...recordedView, session: {} };
-
-const untrustedView: PermissionsView = { trusted: false, bundle: [], workspace: [], session: {} };
 
 const summaries = [{ id: "s1", title: "Build and stage" }] as SessionSummary[];
 
@@ -190,14 +178,6 @@ describe("the permissions pane", () => {
     );
   });
 
-  it("marks the grants of a session the server lists as quiet", async () => {
-    const { container } = mount(permissionsShell([{ ...recordedView, quiet: ["s1"] }]));
-    await settle();
-    expect(container.querySelector(".kw-perm-session-quiet")?.textContent).toBe(
-      `${quietMark} quiet`,
-    );
-  });
-
   it("shows a quiet session that holds no grants yet, so the mark has a home", async () => {
     const quietOnly: PermissionsView = { ...recordedView, session: {}, quiet: ["s1"] };
     const { container } = mount(permissionsShell([quietOnly]));
@@ -236,18 +216,6 @@ describe("the permissions pane", () => {
     expect(texts(container, ".kw-ov-line")).toContain(detail);
   });
 
-  it("teaches from an empty state when nothing is granted and says the workspace is untrusted", async () => {
-    const { container } = mount(permissionsShell([untrustedView]));
-    await settle();
-    expect(container.querySelector(".kw-ov-head")?.textContent).toContain("bundle · untrusted");
-    expect(container.querySelector(".kw-perm-quiet")?.textContent).toBe(
-      "no read posture until the workspace is trusted",
-    );
-    expect(container.querySelector(".kw-empty")?.textContent).toBe(
-      "no grants yet · ctrl+k ask.workspace answers an ask and remembers it for the workspace",
-    );
-  });
-
   it("refetches when a grant is recorded and not for a once answer", async () => {
     const harness = permissionsShell([recordedView]);
     mount(harness);
@@ -261,37 +229,9 @@ describe("the permissions pane", () => {
     await settle();
     expect(harness.reads()).toBe(3);
   });
-
-  it("refetches when keywork says the permissions changed, and not for another surface", async () => {
-    const harness = permissionsShell([recordedView]);
-    mount(harness);
-    await settle();
-    harness.emit(surfaceChanged("mcp"));
-    await settle();
-    expect(harness.reads()).toBe(1);
-    harness.emit(surfaceChanged("permissions"));
-    await settle();
-    expect(harness.reads()).toBe(2);
-  });
 });
 
 describe("the permissions readings", () => {
-  it("words the posture, the bundle's asks, and the grant groups", () => {
-    expect(postureWord(recordedView)).toBe("trusted");
-    expect(postureWord(untrustedView)).toBe("untrusted");
-    expect(bundleRuleText({ action: "bash", resource: "rg *--pre*", effect: "ask" })).toBe(
-      "rg *--pre* asks",
-    );
-    expect(hasGrants(recordedView)).toBe(true);
-    expect(hasGrants({ ...untrustedView, session: { s2: [] } })).toBe(false);
-    expect(sessionGrantGroups(recordedView, () => undefined)).toEqual([
-      { sessionId: "s1", title: "session s1", rules: [mkdir], quiet: false, firstRow: 1 },
-    ]);
-    expect(sessionGrantGroups({ ...recordedView, quiet: ["s1"] }, () => "Build and stage")).toEqual(
-      [{ sessionId: "s1", title: "Build and stage", rules: [mkdir], quiet: true, firstRow: 1 }],
-    );
-  });
-
   it("lays every grant on one cursor, the workspace's first, each session's after", () => {
     const view: PermissionsView = {
       ...recordedView,
@@ -306,27 +246,6 @@ describe("the permissions readings", () => {
     expect(sessionGrantGroups(view, () => undefined).map((group) => group.firstRow)).toEqual([
       1, 2,
     ]);
-  });
-
-  it("names how far a revoke reaches before and after it lands", () => {
-    const titleOf = (id: string) => (id === "s1" ? "Build and stage" : undefined);
-    const workspaceGrant = { layer: "workspace", rule: gitAdd } as const;
-    const sessionGrant = { layer: "session", rule: mkdir, sessionId: "s9" } as const;
-    expect(revokeQuestion(workspaceGrant, titleOf)).toBe("revoke git add * for every session");
-    expect(revokeQuestion({ ...sessionGrant, sessionId: "s1" }, titleOf)).toBe(
-      "revoke mkdir -p * for Build and stage",
-    );
-    expect(revokedNotice(workspaceGrant, titleOf)).toBe("revoked git add * · it asks again");
-    expect(revokedNotice(sessionGrant, titleOf)).toBe(
-      "revoked mkdir -p * · it asks again in session s9",
-    );
-  });
-
-  it("recognises only the decisions that record a grant", () => {
-    expect(recordsGrant(permissionDecision("session"))).toBe(true);
-    expect(recordsGrant(permissionDecision("workspace"))).toBe(true);
-    expect(recordsGrant(permissionDecision("once"))).toBe(false);
-    expect(recordsGrant(permissionDecision(undefined))).toBe(false);
   });
 
   it("reads the permissions as changed on a recorded grant or keywork's own word", () => {

@@ -11,7 +11,6 @@ import {
   openAsks,
   reviewMarked,
   reviewNotice,
-  reviewSnapshot,
   reviewState,
   reviewTally,
   reviewVerdictOf,
@@ -61,11 +60,6 @@ describe("the review trail", () => {
     expect(state.marks).toEqual([kept, asked]);
     expect(reviewMarked(state, dropped).marks).toEqual([kept, asked, dropped]);
     expect(reviewMarked(state, kept).marks).toEqual([kept, asked]);
-  });
-
-  it("snapshots the served trail and reads an empty one for a missing session", () => {
-    expect(reviewSnapshot({ verdicts: [kept] })).toEqual({ marks: [kept], loaded: true });
-    expect(reviewSnapshot("missing")).toEqual({ marks: [], loaded: true });
   });
 
   it("lets the last word on a hunk stand, tallies by file and lists the open asks", () => {

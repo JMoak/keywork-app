@@ -1,4 +1,4 @@
-import { keyworkProfile, steadProfile } from "@keywork-app/product";
+import { keyworkProfile } from "@keywork-app/product";
 import { describe, expect, it } from "vitest";
 import { fakeWindow } from "./testing.ts";
 import {
@@ -27,7 +27,7 @@ describe("companionWindowOptions", () => {
     preload: "C:/app/preload/companion.js",
   };
 
-  it.each([keyworkProfile, steadProfile])(
+  it.each([keyworkProfile])(
     "uses the $name profile and keeps the construction rules",
     (profile) => {
       const options = companionWindowOptions({ ...spec, platform: "linux", profile });

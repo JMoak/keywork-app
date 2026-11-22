@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { BatchListener, ConsoleClient } from "@keywork-app/client";
 import type {
   BusEnvelope,
@@ -12,10 +10,8 @@ import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fileWhole from "../../../../client/src/fixtures/file.json?raw";
-import fileRange from "../../../../client/src/fixtures/file-range.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertFeed, inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
-import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 import { describeRefusal, type FileSpec, filePane, lineRefusal } from "./index.tsx";
 import { landFileAt, landingFor } from "./landing.ts";
@@ -59,7 +55,6 @@ vi.mock("./text-view.ts", () => ({
 const fixture = (raw: string): FileSlice => JSON.parse(raw) as FileSlice;
 
 const whole = fixture(fileWhole);
-const range = fixture(fileRange);
 
 interface Harness {
   shell: ShellSeams;
@@ -138,17 +133,6 @@ describe("the file pane", () => {
     expect(mounts[0]?.scrolled).toEqual(["top", "by 1"]);
   });
 
-  it("opens a byte range and offers more while the slice stops short of the end", async () => {
-    const h = harness(() => range);
-    const { view } = mount(h, { kind: "file", path: "src/index.ts", from: 34, to: 60 });
-    await waitFor(() => expect(mounts[0]?.text).toBe(range.text));
-    expect(h.requests).toEqual([["src/index.ts", { from: 34, to: 60 }]]);
-    expect(view.container.querySelector(".kw-file-facts")?.textContent).toBe(
-      "bytes 34..60 of 68 B",
-    );
-    expect(view.container.querySelector(".kw-file-more")?.textContent).toContain("] loads more");
-  });
-
   it("reads the tail for atEnd by probing the size first, and steps slices with ] and [", async () => {
     const big = 3 * 1024 * 1024;
     const h = harness((_path, range) => ({
@@ -201,13 +185,6 @@ describe("the file pane", () => {
     expect(describeRefusal("binary", "a")).toContain("binary");
     expect(mounts).toHaveLength(0);
   });
-
-  it("shows the empty state for an empty file and titles itself with the path", async () => {
-    const h = harness(() => ({ ...whole, bytes: 0, to: 0, text: "" }));
-    const { view } = mount(h, { kind: "file", path: "empty.txt" });
-    await waitFor(() => expect(view.container.textContent).toContain("an empty file"));
-    expect(filePane.title({ kind: "file", path: "src/a.ts" }, h.shell)).toBe("src/a.ts");
-  });
 });
 
 describe("the file pane given a folder", () => {
@@ -241,54 +218,7 @@ describe("the file pane given a folder", () => {
     expect(h.requests.map(([path]) => path)).toEqual(["", "README.md"]);
     expect(filePane.title({ kind: "file", path: "" }, h.shell)).toBe("workspace");
   });
-
-  it("opens a folder's own README, preferring markdown, whatever its case", async () => {
-    const h = harness(readmeOnly, { docs: [file("readme.txt"), file("Readme.md")] });
-    const spec = mountFollowingRebinds(h, { kind: "file", path: "docs" });
-    await waitFor(() => expect(spec().path).toBe("docs/Readme.md"));
-  });
-
-  it("says a folder has no README and teaches the files pane instead of claiming a missing file", async () => {
-    const h = harness(readmeOnly, { "": [dir("src")], src: [file("index.ts")] });
-    mountFollowingRebinds(h, { kind: "file", path: "" });
-    await waitFor(() =>
-      expect(document.body.textContent).toContain(
-        "the workspace has no README · ctrl+k browser.summon browses the files",
-      ),
-    );
-    cleanup();
-    mountFollowingRebinds(h, { kind: "file", path: "src" });
-    await waitFor(() =>
-      expect(document.body.textContent).toContain(
-        "src has no README · ctrl+k browser.summon browses the files",
-      ),
-    );
-    expect(document.querySelector(".kw-file-note[data-level='error']")).toBeNull();
-  });
 });
-
-describe("the file pane's keyboard home", () => {
-  it("takes DOM focus from a typing field when it is focused", async () => {
-    const typing = holdTypingFocus();
-    const h = harness(() => whole);
-    const { view } = mount(h, { kind: "file", path: "src/index.ts" });
-    await waitFor(() =>
-      expect(view.container.firstElementChild?.contains(document.activeElement)).toBe(true),
-    );
-    typing.remove();
-  });
-});
-
-describe("the file pane's chrome", () => {
-  it("keeps the slice facts at every width, shedding only the hint, and draws no focus ring of its own", () => {
-    const narrow = fileCss.slice(fileCss.indexOf("@container"));
-    expect(narrow).not.toContain(".kw-file-facts");
-    expect(narrow).toContain(".kw-file-more");
-    expect(fileCss).toMatch(/\.kw-file:focus \{\s*outline: none;/);
-  });
-});
-
-const fileCss = readFileSync(join(process.cwd(), "packages/ui/src/panes/file/file.css"), "utf8");
 
 describe("the file pane's editor link", () => {
   it("says so in the pane when the host refuses to open the file, in the host's own words", async () => {
@@ -358,45 +288,9 @@ describe("the file pane keeping up with the disk", () => {
     expect(shown.offset).toBe(120);
     expect(mounts).toHaveLength(1);
   });
-
-  it("rereads when the window comes back, and on r says so honestly when the file is gone", async () => {
-    let reading: FileReading = whole;
-    const h = harness(() => reading);
-    const { view, act } = mount(h, { kind: "file", path: "src/index.ts" });
-    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
-    reading = { ...whole, text: "outside edit\n", bytes: 13, to: 13 };
-    window.dispatchEvent(new Event("focus"));
-    await waitFor(() => expect(mounts[0]?.text).toBe("outside edit\n"));
-    reading = "missing";
-    act("file.refresh");
-    await waitFor(() =>
-      expect(view.container.querySelector(".kw-file-note[data-level='error']")?.textContent).toBe(
-        "no file at src/index.ts",
-      ),
-    );
-  });
-
-  it("binds r to reread, and pages with page keys and space beside g and G's home and end", () => {
-    const chords = (action: string) => filePane.localActions?.[action]?.chords;
-    expect(chords("file.refresh")).toBe("r");
-    expect(chords("file.page-down")).toEqual(["pagedown", "space"]);
-    expect(chords("file.page-up")).toBe("pageup");
-    expect(chords("file.top")).toEqual(["g", "home"]);
-    expect(chords("file.end")).toEqual(["shift+g", "end"]);
-    expect(chords("file.line")).toBe("ctrl+g");
-  });
 });
 
 describe("the file pane's reading keys", () => {
-  it("pages down and up", async () => {
-    const h = harness(() => whole);
-    const { act } = mount(h, { kind: "file", path: "src/index.ts" });
-    await waitFor(() => expect(mounts[0]?.text).toBe(whole.text));
-    act("file.page-down");
-    act("file.page-up");
-    expect(mounts[0]?.scrolled).toEqual(["page 1", "page -1"]);
-  });
-
   it("goes to a typed line and marks it, and says why it cannot", async () => {
     const h = harness(() => whole);
     const { view, act } = mount(h, { kind: "file", path: "src/index.ts" });

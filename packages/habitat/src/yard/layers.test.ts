@@ -93,21 +93,6 @@ describe("the layered unfold budget", () => {
     );
   });
 
-  it("keeps six in ten minutes as the ceiling over every owner, checked first", () => {
-    const owners = ["a", "b", "c", "d", "e", "f"].map(
-      (slug): YardOwner => ({ kind: "creature", slug }),
-    );
-    const six = owners.reduce(
-      (budget, owner, index) =>
-        admitUnfold(budget, noon - (index + 1) * second, { owner, outside: false }),
-      unfoldedBy(bea, noon - 9 * minute),
-    );
-    expect(unfoldsSpent(six, noon)).toBe(unfoldBudget.unfolds + 1);
-    expect(decided({ rung: "unfold", creature: "a" }, asked, six)).toBe(
-      "hold:card:too many opened lately",
-    );
-  });
-
   it("forgets what fell out of each window when it admits the next unfold", () => {
     const old = unfoldedBy(vey, noon - unfoldBudget.windowMs, true);
     const admitted = admitUnfold(old, noon, { owner: bea, outside: false });
@@ -138,17 +123,6 @@ describe("the gate waits for a breakpoint", () => {
       "play:unfold:a delivery in your thread",
     );
   });
-
-  it("never waits over a card, an unearned unfold or a spent budget", () => {
-    const writing = { ...asked, draftOpen: true, streaming: true };
-    expect(decided({ rung: "card" }, writing)).toBe("play:card:as proposed");
-    expect(decided({ rung: "unfold", sessionId: "s2" }, writing)).toBe(
-      "hold:card:a card unless you asked",
-    );
-    expect(decided({ rung: "unfold" }, writing, unfoldedBy(bea, noon - minute))).toBe(
-      "hold:card:its owner just opened another",
-    );
-  });
 });
 
 describe("the display and fullscreen signals", () => {
@@ -165,18 +139,6 @@ describe("the display and fullscreen signals", () => {
       );
       expect(decided({ rung: "card" }, { ...asked, ...signal })).toBe("play:card:as proposed");
     }
-  });
-
-  it("reads an absent signal as false, never as a reason to hold", () => {
-    const signals = {
-      draftOpen: undefined,
-      streaming: undefined,
-      displayShared: undefined,
-      fullscreenElsewhere: undefined,
-    };
-    expect(decided({ rung: "unfold" }, { ...asked, ...signals })).toBe(
-      "play:unfold:you asked, it shows",
-    );
   });
 });
 
@@ -203,18 +165,6 @@ describe("keeper rules", () => {
     expect(decided(fileIn("t1", null), { rules: [rule] })).toBe("reduce:lantern:your rule");
     expect(decided(fileIn("t2", null), { rules: [rule] })).toBe("play:card:as proposed");
     expect(decided(fileIn("t1", "bea"), { rules: [rule] })).toBe("play:card:as proposed");
-  });
-
-  it("keys a creature's rule on the creature alone, whatever the thread", () => {
-    const rule = ruleFromHand(
-      aYardSetting({ what: { kind: "file", ref: "a" } }),
-      "lantern",
-      "always",
-    );
-    expect(rule).toEqual({ creature: "bea", kind: "file", rung: "lantern", lasts: "always" });
-    expect(decided({ sessionId: "s9", what: { kind: "file", ref: "z" } }, { rules: [rule] })).toBe(
-      "reduce:lantern:your rule",
-    );
   });
 
   it("keeps a while-present rule in force while away for a setting it already shaped", () => {

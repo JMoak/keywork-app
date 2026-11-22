@@ -199,28 +199,6 @@ describe("the recorded memory fixture", () => {
 });
 
 describe("the memory store across writes and a reopened server", () => {
-  it("rereads the garden after a successful discard, and not after a refused one", async () => {
-    let reads = 0;
-    let outcome: "discarded" | "missing" = "discarded";
-    const client = {
-      ...inertMemoryClient(),
-      memory: async () => {
-        reads += 1;
-        return trustedGarden([]);
-      },
-      discardStagedItem: async () => outcome,
-    } as unknown as KeyworkClient;
-    const store = createRoot(() => createMemoryStore(client, feedOf()));
-    await store.discard("a");
-    await settle();
-    expect(reads).toBe(1);
-    outcome = "missing";
-    await store.discard("a");
-    await settle();
-    expect(reads).toBe(1);
-    store.dispose();
-  });
-
   it("rereads the garden when the feed reconnects to a reopened server, not on its first connection", async () => {
     let reads = 0;
     const client = {

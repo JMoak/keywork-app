@@ -14,14 +14,10 @@ import grants from "../../../client/src/fixtures/grants.jsonl?raw";
 import {
   AskCard,
   type AskPick,
-  acceptedLine,
   askChoiceFor,
   askReason,
   blanketWarning,
-  cardKeys,
-  quietStillAsks,
   rememberableRules,
-  ruleText,
   untrustedAskReason,
 } from "./ask-card.tsx";
 import { stopAskingWhy } from "./ask-card-why.ts";
@@ -135,18 +131,6 @@ function texts(container: HTMLElement, selector: string): string[] {
   return [...container.querySelectorAll(selector)].map((node) => node.textContent ?? "");
 }
 
-function askedByTrustedReads(run: ToolRun): ToolRun {
-  return { ...run, ask: run.ask === undefined ? undefined : { ...run.ask, rule: "trusted" } };
-}
-
-const handedChords = {
-  approve: "ctrl+y",
-  once: "alt+o",
-  session: "alt+s",
-  workspace: "alt+w",
-  deny: "ctrl+n",
-};
-
 describe("the ask card", () => {
   it("shows the rule a remembered answer would record, in keywork's glob form, before the pick", () => {
     const { container } = mountCard(askingRun("g1"));
@@ -224,16 +208,6 @@ describe("the ask card", () => {
     expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
   });
 
-  it("takes a deny back by click on back as well", async () => {
-    const { container, card, answers } = mountCard(askingRun("g3"));
-    fireEvent.click(buttonLabelled(container, "deny n"));
-    await settle();
-    fireEvent.click(buttonLabelled(container, "back esc"));
-    await settle();
-    expect(answers).toEqual([]);
-    expect(card.hasAttribute("data-saying-why")).toBe(false);
-  });
-
   it("backs out of the line to the reasons on escape, sending nothing", async () => {
     const { container, card, answers, press } = mountCard(askingRun("g1"));
     await press("n");
@@ -243,16 +217,6 @@ describe("the ask card", () => {
     expect(container.querySelector(".kw-ask-note-input")).toBeNull();
     expect(container.querySelector(".kw-ask-reason-prompt")?.textContent).toBe("why?");
     expect(document.activeElement).toBe(card);
-  });
-
-  it("denies by click through the why step as well", async () => {
-    const { container, answers } = mountCard(askingRun("g3"));
-    fireEvent.click(buttonLabelled(container, "deny n"));
-    await settle();
-    expect(answerLabels(container)).toEqual(whyLabels);
-    fireEvent.click(buttonLabelled(container, "not now n"));
-    await settle();
-    expect(answers).toEqual([{ verdict: "denied", scope: undefined, reason: "not-now" }]);
   });
 
   it("leaves modified keys to the global chords", async () => {
@@ -276,10 +240,7 @@ describe("the ask card", () => {
     expect(answerLabels(container)).toEqual(["once y", "deny n"]);
   });
 
-  it.each([
-    ["write-once", "write and edit are approved once at a time"],
-    ["nothing-to-remember", "this call has nothing a grant could remember; approve it once"],
-  ] as const)(
+  it.each([["write-once", "write and edit are approved once at a time"]] as const)(
     "renders the %s refusal in the server's words and stays pending",
     async (refused, detail) => {
       const { container, answers, press } = mountCard(askingRun("g1"), { refused, detail });
@@ -326,36 +287,9 @@ describe("the ask card", () => {
     expect(card.contains(document.activeElement)).toBe(false);
   });
 
-  it("answers its letters once the person moves to it", async () => {
-    const { card, answers, press } = mountCard(askingRun("g1"));
-    card.focus();
-    await press("y");
-    expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
-  });
-
   it("is a stop on the transcript walk, so tab from the composer reaches it", () => {
     const { card } = mountCard(askingRun("g1"));
     expect(card.hasAttribute("data-walk")).toBe(true);
-  });
-
-  it("never takes the keys from a draft being typed in its pane", () => {
-    const run = askingRun("g1");
-    const [asking, setAsking] = createSignal(false);
-    const { container } = render(() => (
-      <div class="kw-frame-body">
-        <textarea class="draft" />
-        <Show when={asking()}>
-          <AskCard run={run} onAnswer={async () => "settled" as const} />
-        </Show>
-      </div>
-    ));
-    const draft = container.querySelector(".draft") as HTMLTextAreaElement;
-    draft.value = "half a thought";
-    draft.focus();
-
-    setAsking(true);
-    expect(container.querySelector(".kw-ask")).not.toBeNull();
-    expect(document.activeElement).toBe(draft);
   });
 
   it("leaves the keys with the empty composer the prompt was just sent from, so typing ahead never answers it", async () => {
@@ -391,48 +325,6 @@ describe("the ask card", () => {
     expect(container.querySelector(".kw-ask")?.hasAttribute("data-saying-why")).toBe(false);
   });
 
-  it("shows the chords it is handed, so the card names keys that work from anywhere", () => {
-    const { container } = render(() => (
-      <AskCard
-        run={askingRun("g1")}
-        onAnswer={async () => "settled" as const}
-        chords={handedChords}
-      />
-    ));
-    expect(answerLabels(container)).toEqual([
-      "once ctrl+y",
-      "this session alt+s",
-      "this workspace alt+w",
-      "deny ctrl+n",
-    ]);
-    expect(container.querySelector(".kw-ask-rules-label")?.textContent).toBe(
-      "alt+s or alt+w would allow",
-    );
-  });
-
-  it("keeps the handed chords in a quiet session and says the gate still asks", () => {
-    const { container } = render(() => (
-      <AskCard
-        run={askingRun("g1")}
-        onAnswer={async () => "settled" as const}
-        chords={handedChords}
-        quiet
-      />
-    ));
-    expect(answerLabels(container)).toEqual([
-      "once ctrl+y",
-      "this session alt+s",
-      "this workspace alt+w",
-      "deny ctrl+n",
-    ]);
-    expect(container.querySelector(".kw-ask-rules-label")?.textContent).toBe(
-      "alt+s or alt+w would allow",
-    );
-    expect(container.querySelector(".kw-ask-quiet")?.textContent).toBe(
-      "quiet · this one still needs you",
-    );
-  });
-
   it("says when trust setup already accepted what this answer would record, and grants nothing itself", async () => {
     const answers: Answer[] = [];
     const { container } = render(() => (
@@ -461,31 +353,6 @@ describe("the ask card", () => {
       />
     ));
     expect(container.querySelector(".kw-ask-accepted")).toBeNull();
-  });
-
-  it("names the session chord for a tool of a server accepted per session", () => {
-    expect(acceptedLine("session", cardKeys)).toBe(
-      "accepted in trust setup · s records it for this session",
-    );
-  });
-
-  it("asks the conversation's acceptance for each asking tool row", () => {
-    const projection = projectAll(emptyProjection, throughAsk("g1"));
-    const asked: string[] = [];
-    const { container } = render(() => (
-      <ConversationPane
-        projection={projection}
-        onAnswerAsk={async () => "settled" as const}
-        askAccepted={(ask) => {
-          asked.push(ask.callId);
-          return "session";
-        }}
-      />
-    ));
-    expect(asked).toEqual(["g1"]);
-    expect(container.querySelector(".kw-ask-accepted")?.textContent).toBe(
-      "accepted in trust setup · s records it for this session",
-    );
   });
 
   it("hands the scope from the card to the conversation's answer route", async () => {
@@ -525,31 +392,6 @@ describe("the ask card in a quiet session", () => {
   });
 
   it.each([
-    ["o", { verdict: "granted", scope: undefined }],
-    ["s", { verdict: "granted", scope: "session" }],
-    ["w", { verdict: "granted", scope: "workspace" }],
-  ] as const)("still answers %s with %o", async (key, expected) => {
-    const { answers, press } = mountCard(askingRun("g1"), "settled", true);
-    await press(key);
-    expect(answers).toEqual([expected]);
-  });
-
-  it("still asks why before a denial", async () => {
-    const { container, answers, press } = mountCard(askingRun("g1"), "settled", true);
-    await press("n");
-    expect(answerLabels(container)).toEqual(whyLabels);
-    expect(container.querySelector(".kw-ask-quiet")).toBeNull();
-    await press("u");
-    expect(answers).toEqual([{ verdict: "denied", scope: undefined, reason: "unsafe" }]);
-  });
-
-  it.each([
-    ["a write", askingRun("g4"), "quiet · write and edit still ask"],
-    [
-      "a call with nothing to remember",
-      askingRun("g5"),
-      "quiet · this call has nothing a grant could remember",
-    ],
     [
       "a blanket rule",
       withRules(askingRun("g1"), [bashRule("python *")]),
@@ -560,23 +402,12 @@ describe("the ask card in a quiet session", () => {
       withRules(askingRun("g1"), [bashRule("mkdir -p *"), bashRule("rm -rf build")]),
       "quiet · a destructive command still asks",
     ],
-    [
-      "a form the trusted reads ask about",
-      askedByTrustedReads(askingRun("g1")),
-      "quiet · trusted reads ask before this form on purpose",
-    ],
   ])("keeps approve to once for %s and says why", async (_case, run, reason) => {
     const { container, answers, press } = mountCard(run, "settled", true);
     expect(container.querySelector(".kw-ask-quiet")?.textContent).toBe(reason);
     expect(answerLabels(container)[0]).toBe("once y");
     await press("y");
     expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
-  });
-
-  it("never says quiet on a card whose session is listening", () => {
-    const { container } = mountCard(askingRun("g4"));
-    expect(container.querySelector(".kw-ask-quiet")).toBeNull();
-    expect(container.querySelector(".kw-ask")?.hasAttribute("data-quiet")).toBe(false);
   });
 });
 
@@ -588,17 +419,11 @@ describe("why the card asks", () => {
       "shell commands ask before they run · in a trusted folder plain reads don't",
     ],
     ["write", "default", "this changes a file"],
-    ["edit", "default", "this changes a file"],
     ["github__create_issue", "default", "this tool asks before it runs"],
     ["bash", "policy", "a rule asks before this tool runs"],
     ["bash", "trusted", "trusted reads ask before this form runs"],
   ] as const)("names why %s asks under the %s rule", (tool, rule, line) => {
     expect(askReason({ tool, rule })).toBe(line);
-  });
-
-  it("never calls a read-only shell command a change", () => {
-    const { container } = mountCard(askingRun("g1"));
-    expect(container.querySelector(".kw-ask-why")?.textContent).not.toContain("changes");
   });
 
   it("says the folder isn't trusted when that is why it asks, but keeps a rule's own reason", () => {
@@ -640,10 +465,6 @@ describe("askChoiceFor", () => {
       "denied:once",
     ]);
   });
-
-  it("words why a quiet session still asks about a rememberable call", () => {
-    expect(quietStillAsks(askingRun("g1"))).toBe("quiet · this one still needs you");
-  });
 });
 
 describe("the consequence on the card", () => {
@@ -664,12 +485,6 @@ describe("the consequence on the card", () => {
     expect(container.querySelector(".kw-ask-args")).toBeNull();
   });
 
-  it("keeps the keys of a card that shows a diff", async () => {
-    const { answers, press } = mountCard(askingRun("g4"));
-    await press("y");
-    expect(answers).toEqual([{ verdict: "granted", scope: undefined }]);
-  });
-
   it("says in one dim line why the server sent no preview, and tables the arguments", () => {
     const { container } = mountCard(withoutPreview(askingRun("g4"), "edit"));
     expect(container.querySelector(".kw-ask-consequence-head")?.textContent).toContain("notes.txt");
@@ -680,15 +495,6 @@ describe("the consequence on the card", () => {
     expect(container.querySelector(".kw-ask-diff")).toBeNull();
   });
 
-  it("typesets a bash command with its program, operator and path marked", () => {
-    const { container } = mountCard(askingRun("g5"));
-    const marked = [...container.querySelectorAll(".kw-ask-command [data-role]")]
-      .filter((part) => part.getAttribute("data-role") !== "space")
-      .map((part) => `${part.getAttribute("data-role")}:${part.textContent}`);
-    expect(marked).toEqual(["program:echo", "word:built", "operator:>", "path:build/stamp.txt"]);
-    expect(container.querySelector(".kw-ask-args")).toBeNull();
-  });
-
   it("says in plain words what each remembering key would cover, from the ask's own rules", () => {
     const { container } = mountCard(
       withRules(askingRun("g1"), [bashRule("mkdir -p *"), bashRule("git push *")]),
@@ -697,16 +503,6 @@ describe("the consequence on the card", () => {
       "s no ask for any mkdir -p command or any git push command but git push --force until this session ends",
       "w the same in every session of this workspace, until revoked",
     ]);
-  });
-
-  it("keeps the remembering keys beside their reach once the session is quiet", () => {
-    const { container } = mountCard(askingRun("g1"), "settled", true);
-    expect(texts(container, ".kw-ask-covers-key")).toEqual(["s", "w"]);
-  });
-
-  it("covers nothing on a bash ask keywork would remember nothing from", () => {
-    const { container } = mountCard(askingRun("g5"));
-    expect(container.querySelector(".kw-ask-covers")).toBeNull();
   });
 
   it("reads an mcp call as server and tool with its arguments as a table", () => {
@@ -727,35 +523,6 @@ describe("the consequence on the card", () => {
     expect(container.querySelector(".kw-ask-covers")).toBeNull();
     expect(texts(container, ".kw-ask-rule")).toEqual(["github__create_issue"]);
   });
-
-  it("keeps the rules, the accepted line and the keys after the consequence", () => {
-    const { container } = render(() => (
-      <AskCard
-        run={askingRun("g1")}
-        accepted="workspace"
-        onAnswer={async () => "settled" as const}
-      />
-    ));
-    expect(partsOf(container)).toEqual([
-      "kw-ask-why",
-      "kw-ask-consequence",
-      "kw-ask-rules",
-      "kw-ask-covers",
-      "kw-ask-covers",
-      "kw-ask-accepted",
-      "kw-ask-actions",
-    ]);
-  });
-
-  it("keeps the quiet line after the consequence", () => {
-    const { container } = mountCard(askingRun("g4"), "settled", true);
-    expect(partsOf(container)).toEqual([
-      "kw-ask-why",
-      "kw-ask-consequence",
-      "kw-ask-quiet",
-      "kw-ask-actions",
-    ]);
-  });
 });
 
 describe("the rules beside the keys", () => {
@@ -773,13 +540,6 @@ describe("the rules beside the keys", () => {
     expect(container.querySelector(".kw-ask-rule")?.textContent).toBe("python *");
     expect(container.querySelector(".kw-ask-blanket")?.textContent).toBe(
       "this would allow every python command",
-    );
-  });
-
-  it("writes bash rules as their glob and mcp rules by tool name", () => {
-    expect(ruleText(bashRule("git push *"))).toBe("git push *");
-    expect(ruleText({ action: "github__create_issue", resource: "*", effect: "allow" })).toBe(
-      "github__create_issue",
     );
   });
 

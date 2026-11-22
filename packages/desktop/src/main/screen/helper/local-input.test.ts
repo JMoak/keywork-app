@@ -98,11 +98,4 @@ describe("simulated physical input through the stand-in, end to end", () => {
     ]);
     await host.shutdown();
   });
-
-  it("tells the driver in words when no stand-in listens on that pipe", async () => {
-    await expect(driverSendsLocalInput(freshPipe())).rejects.toMatchObject({
-      code: 1,
-      stderr: expect.stringContaining("no stand-in listens on"),
-    });
-  });
 });

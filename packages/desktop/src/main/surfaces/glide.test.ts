@@ -60,10 +60,6 @@ describe("easedToRest", () => {
       last = eased;
     }
   });
-
-  it("covers most of the way early, so a pane arrives fast and comes to rest gently", () => {
-    expect(easedToRest(0.5)).toBeGreaterThan(0.95);
-  });
 });
 
 describe("a glide", () => {
@@ -124,13 +120,6 @@ describe("a glide", () => {
     const again = bodyAt(origin);
     await glides.run([{ key: "a", body: again, to: far }], Number.NaN);
     expect(again.path).toEqual([far]);
-  });
-
-  it("settles at once when every body already stands in its place", async () => {
-    const clock = fakeClock();
-    const body = bodyAt(far);
-    await glider<string>(framesOf(clock)).run([{ key: "a", body, to: far }], 240);
-    expect(body.path).toEqual([]);
   });
 
   it("gives a body to its newest glide, which starts from where the old one left it", async () => {
@@ -246,18 +235,6 @@ describe("playing without a helper", () => {
     expect(first.frame()).toEqual(large);
     expect(second.frame()).toEqual(large);
     expect(run.settled).toBe(true);
-  });
-
-  it("never sizes a body that keeps its size", async () => {
-    const clock = fakeClock();
-    const glides = glider<string>(framesOf(clock));
-    const body = framedAt(small);
-    void glides.play([
-      { key: "a", body, to: { ...small, x: 500, y: 40 }, delayMs: 0, durationMs: 160 },
-    ]);
-    clock.advance(200);
-    expect(body.shapes).toEqual([]);
-    expect(body.position()).toEqual({ x: 500, y: 40 });
   });
 
   it("answers for a body that is taken while it waits, and stops ticking when nothing is left", async () => {

@@ -31,16 +31,6 @@ Which models it uses.
 j k move · enter keeps · a keeps the suggestions for the rest · backspace goes back · esc not now"
 `;
 
-exports[`first-run onboarding on the stead > says a refusal plainly and backspace returns to the name > not made 1`] = `
-"a creature for C:/src/stead
-  name █
-  skin ·
-  workshop ·
-  models ·
-[portrait kid]
-not made: a bot already has the slug wren · backspace goes back · esc not now"
-`;
-
 exports[`first-run onboarding on the stead > walks name, skin, workshop and models on the keyboard, a text golden per step, and makes the creature from what was kept > 1 name 1`] = `
 "a creature for C:/src/stead
 > name

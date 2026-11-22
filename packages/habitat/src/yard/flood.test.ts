@@ -28,33 +28,6 @@ describe("grouping a flood", () => {
     expect(groupsOf(flood.slice(0, floodSize - 1))).toEqual([]);
   });
 
-  it("counts only live cards: never a pinned card, an unfold or a lantern", () => {
-    const settings = [
-      card("a", 1),
-      card("b", 2),
-      card("c", 3),
-      card("p", 9, { state: "pinned" }),
-      card("u", 8, { shown: "unfold" }),
-      card("l", 7, { shown: "lantern" }),
-    ];
-    expect(groupsOf(settings)).toEqual([]);
-    const flooded = [...settings, card("d", 4)];
-    expect(ids(grouped(flooded)).sort()).toEqual(["d", "l", "p", "u"]);
-  });
-
-  it("groups a creature-less thread apart from other threads and from creatures", () => {
-    const loose = (id: string, sessionId: string, depth: number): YardSetting =>
-      card(id, depth, { creature: null, sessionId });
-    const settings = [
-      ...["a", "b", "c", "d"].map((id, index) => loose(id, "t1", index)),
-      loose("e", "t2", 5),
-      loose("f", "t2", 6),
-      card("g", 7),
-    ];
-    expect(groupsOf(settings).map((group) => group.key)).toEqual(["thread:t1"]);
-    expect(ids(grouped(settings)).sort()).toEqual(["d", "e", "f", "g"]);
-  });
-
   it("leaves a group the keeper opened expanded in place", () => {
     const flood = ["a", "b", "c", "d", "e"].map((id, index) => card(id, index));
     expect(ids(grouped(flood, ["creature:bea"]))).toEqual(ids(flood));

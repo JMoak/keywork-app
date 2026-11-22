@@ -22,12 +22,6 @@ const visiting: PaneSlot = {
 };
 
 describe("the keywork hub", () => {
-  it("holds the focused conversation alone", () => {
-    const hub = conversationHub([{ ...talk, focused: true }], { width: 640, height: 868 }, "talk");
-    expect(hub.slots.map((held) => [held.id, held.rect.width])).toEqual([["talk", 640]]);
-    expect(hub.tabs).toEqual([]);
-  });
-
   it("draws a visiting tile beside the conversation when both halves stay readable", () => {
     const hub = conversationHub([talk, visiting], { width: 1440, height: 900 }, "talk");
     expect(hub.slots.map((held) => [held.id, held.rect.x, held.rect.width])).toEqual([

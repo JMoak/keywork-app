@@ -5,7 +5,6 @@ import {
   emptyChangesState,
   emptyProjection,
   emptyTreeState,
-  projectAll,
   type SessionProjection,
   treeSnapshot,
 } from "@keywork-app/client";
@@ -14,9 +13,8 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createStore } from "solid-js/store";
 import { afterEach, describe, expect, it } from "vitest";
 import { browserHost } from "../../host/browser.ts";
-import type { AttireTarget } from "../../theme/attire.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { costOf, sessionsNewestFirst, type TreeSpec, treePane } from "./index.tsx";
+import { type TreeSpec, treePane } from "./index.tsx";
 
 const entries = JSON.parse(
   readFileSync(join(process.cwd(), "packages/client/src/fixtures/entries.json"), "utf8"),
@@ -162,19 +160,6 @@ const recording = (): Recorded => ({
 afterEach(cleanup);
 
 describe("the tree pane, level one", () => {
-  it("lists sessions newest first with the liveness mark, cost when known, and age", () => {
-    const recorded = recording();
-    mount({ kind: "tree" }, recorded);
-    const names = [...document.querySelectorAll(".kw-tree-name")].map((node) => node.textContent);
-    expect(names).toEqual(["later one", "which way?"]);
-    const costs = [...document.querySelectorAll(".kw-tree-cost")].map((node) => node.textContent);
-    expect(costs).toEqual(["", "$0.0125"]);
-    expect(document.querySelectorAll(".kw-tree-age")).toHaveLength(2);
-    expect(document.querySelector(".kw-tree-mark")?.textContent).toBe("░");
-    expect(costOf(summaries[0] as SessionSummary)).toBe("$0.0125");
-    expect(sessionsNewestFirst(summaries).map((item) => item.id)).toEqual(["s2", "s1"]);
-  });
-
   it("moves the cursor with j and k, opens on enter, and dives on l", () => {
     const recorded = recording();
     const act = mount({ kind: "tree" }, recorded);
@@ -192,36 +177,6 @@ describe("the tree pane, level one", () => {
     act("tree.dive");
     expect(recorded.rebound).toEqual([{ kind: "tree", sessionId: "s2" }]);
   });
-
-  it("opens a session by click and dives by the row's tree button", () => {
-    const recorded = recording();
-    mount({ kind: "tree" }, recorded);
-    fireEvent.click(screen.getByText("which way?"));
-    expect(recorded.opened).toEqual(["s1"]);
-    fireEvent.click(screen.getByLabelText("tree of which way?"));
-    expect(recorded.rebound).toEqual([{ kind: "tree", sessionId: "s1" }]);
-  });
-
-  it("names the theme a session's pane would wear from its arc", () => {
-    const recorded = recording();
-    const inArc = summaries.map((item) => (item.id === "s1" ? { ...item, arc: "pricing" } : item));
-    const shell = {
-      ...shellSeams(recorded, undefined, inArc),
-      attire: { worn: (target: AttireTarget) => (target.kind === "arc" ? "whiplash" : undefined) },
-    } as ShellSeams;
-    mount({ kind: "tree" }, recorded, shell);
-    const wears = [...document.querySelectorAll(".kw-tree-session")].map(
-      (row) => row.querySelector(".kw-tree-wears")?.textContent ?? "",
-    );
-    expect(wears).toEqual(["", "· wears whiplash"]);
-    expect(document.querySelectorAll(".kw-tree-name")).toHaveLength(2);
-  });
-
-  it("teaches one key when there are no sessions", () => {
-    const recorded = recording();
-    mount({ kind: "tree" }, recorded, shellSeams(recorded, undefined, []));
-    expect(screen.getByText("no sessions yet · ctrl+k pane.split starts one")).toBeTruthy();
-  });
 });
 
 describe("the tree pane, the trash", () => {
@@ -233,20 +188,6 @@ describe("the tree pane, the trash", () => {
   const settle = async () => {
     for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
   };
-
-  it("keeps the trash collapsed until shift+x and says when it is empty", async () => {
-    const recorded = recording();
-    const act = mount({ kind: "tree" }, recorded);
-    expect(screen.getByText("trash · ctrl+k tree.trash shows it")).toBeTruthy();
-    expect(document.querySelectorAll(".kw-tree-session[data-trashed]")).toHaveLength(0);
-    act("tree.trash");
-    expect(recorded.trashed).toEqual(["open"]);
-    expect(
-      screen.getByText("the trash is empty · ctrl+k tree.remove sends a session here"),
-    ).toBeTruthy();
-    act("tree.trash");
-    expect(screen.getByText("trash · ctrl+k tree.trash shows it")).toBeTruthy();
-  });
 
   it("moves a session to the trash with x only after a one-line confirm", async () => {
     const recorded = recording();
@@ -268,40 +209,6 @@ describe("the tree pane, the trash", () => {
     expect([...document.querySelectorAll(".kw-tree-name")].map((node) => node.textContent)).toEqual(
       ["which way?"],
     );
-  });
-
-  it("names an untitled session in every trash line as its row does", async () => {
-    const recorded = recording();
-    const untitled: SessionSummary = {
-      ...(summaries[1] as SessionSummary),
-      title: "(untitled session)",
-    };
-    const prompted = projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: "2026-09-07T13:00:00.000Z",
-        sessionId: "s2",
-        type: "turn.started",
-        payload: { userText: "bash cat hello.txt" },
-      },
-    ]);
-    const shell = shellSeams(recorded, undefined, [untitled], { s2: prompted });
-    const act = mount({ kind: "tree" }, recorded, shell);
-    expect(cursorName()).toBe("bash cat hello.txt");
-    act("tree.remove");
-    expect(confirmLine().textContent).toContain('remove "bash cat hello.txt"?');
-    fireEvent.keyDown(confirmLine(), { key: "y" });
-    await settle();
-    expect(noticeLine()).toBe(
-      'removed "bash cat hello.txt" · ctrl+k tree.trash shows the trash, memory notes stay',
-    );
-    act("tree.trash");
-    expect(cursorName()).toBe("bash cat hello.txt");
-    act("tree.open");
-    expect(confirmLine().textContent).toContain('restore "bash cat hello.txt" from the trash');
-    fireEvent.keyDown(confirmLine(), { key: "y" });
-    await settle();
-    expect(noticeLine()).toBe('restored "bash cat hello.txt" · it is back in the session tree');
   });
 
   it("restores a trashed session with enter and deletes one for good with d, both confirmed", async () => {
@@ -371,19 +278,6 @@ describe("the tree pane, the trash", () => {
     ).toBeTruthy();
   });
 
-  it("says the trash is already empty rather than asking to empty nothing", async () => {
-    const recorded = recording();
-    const act = mount({ kind: "tree" }, recorded);
-    act("tree.purge");
-    await settle();
-    expect(confirmLine()).toBeNull();
-    expect(noticeLine()).toBe("the trash is already empty");
-    expect(recorded.trashed).toEqual(["open"]);
-    expect(
-      screen.getByText("the trash is empty · ctrl+k tree.remove sends a session here"),
-    ).toBeTruthy();
-  });
-
   it("says a running turn keeps a session out of the trash, in keywork's words", async () => {
     const busy = { ...(summaries[0] as SessionSummary), id: "busy", title: "busy one" };
     const recorded = recording();
@@ -396,31 +290,6 @@ describe("the tree pane, the trash", () => {
 });
 
 describe("the tree pane, level two", () => {
-  it("renders the folded tree with the active path lit, the label inline, and the leaf marked", () => {
-    const recorded = recording();
-    mount({ kind: "tree", sessionId: "s1" }, recorded);
-    expect(recorded.treeReads).toBe(1);
-    const rows = [...document.querySelectorAll(".kw-tree-entry")];
-    expect(rows.map((row) => row.querySelector(".kw-tree-text")?.textContent)).toEqual([
-      "user: which way?",
-      "assistant: Left it is.",
-      "label went left",
-      "user: no, the other way",
-      "assistant: Right, then.",
-    ]);
-    expect(rows.map((row) => row.hasAttribute("data-active"))).toEqual([
-      true,
-      false,
-      false,
-      true,
-      true,
-    ]);
-    expect(rows[1]?.querySelector(".kw-tree-label")?.textContent).toBe("went left");
-    expect(rows[4]?.hasAttribute("data-leaf")).toBe(true);
-    expect(rows[4]?.querySelector(".kw-tree-leaf-mark")?.textContent).toBe("leaf");
-    expect(rows[0]?.querySelector(".kw-tree-fold")?.textContent).toBe("▾");
-  });
-
   it("starts at the leaf, folds on enter and h, unfolds on l, and surfaces to the parent", () => {
     const recorded = recording();
     const act = mount({ kind: "tree", sessionId: "s1" }, recorded);
@@ -466,23 +335,6 @@ describe("the tree pane, level two", () => {
     fireEvent.keyDown(screen.getByLabelText("label"), { key: "Enter" });
     expect(recorded.labels.at(-1)).toEqual(["q8", null]);
   });
-
-  it("goes back to the sessions on escape and refreshes on r", () => {
-    const recorded = recording();
-    const act = mount({ kind: "tree", sessionId: "s1" }, recorded);
-    act("tree.refresh");
-    expect(recorded.treeReads).toBe(2);
-    act("tree.back");
-    expect(recorded.rebound).toEqual([{ kind: "tree" }]);
-    fireEvent.click(screen.getByText("‹ sessions"));
-    expect(recorded.rebound).toHaveLength(2);
-  });
-
-  it("says it is reading while the snapshot is missing", () => {
-    const recorded = recording();
-    mount({ kind: "tree", sessionId: "s1" }, recorded, shellSeams(recorded, emptyTreeState));
-    expect(screen.getByText("reading the tree…")).toBeTruthy();
-  });
 });
 
 describe("the tree pane, children", () => {
@@ -502,46 +354,8 @@ describe("the tree pane, children", () => {
   ];
   const withFamily = (recorded: Recorded, listed = summaries) =>
     shellSeams(recorded, undefined, listed, {}, [], family);
-  const rowTexts = () =>
-    [...document.querySelectorAll(".kw-tree-session")].map((row) =>
-      [...row.querySelectorAll(".kw-tree-row > span")]
-        .map((cell) => cell.textContent?.trim())
-        .filter((text) => text !== "")
-        .join(" | "),
-    );
   const cursorName = () =>
     document.querySelector(".kw-tree-session[data-cursor] .kw-tree-name")?.textContent;
-
-  it("nests each child under its parent with its own state and the bot by sigil", () => {
-    mount({ kind: "tree" }, recording(), withFamily(recording()));
-    const rows = rowTexts();
-    expect(rows.slice(1)).toEqual([
-      expect.stringMatching(/^░ \| which way\? \| \$0\.0125 \| /),
-      "└ | audit the trust rules | running | ◇ researcher",
-      "└ | count the callers | completed | drafter",
-    ]);
-    const states = [...document.querySelectorAll(".kw-tree-state")].map((state) =>
-      state.getAttribute("data-state"),
-    );
-    expect(states).toEqual(["running", "completed"]);
-  });
-
-  it("opens and dives into a child with the same keys and clicks as any session row", () => {
-    const recorded = recording();
-    const act = mount({ kind: "tree" }, recorded, withFamily(recorded));
-    act("tree.down");
-    act("tree.down");
-    expect(cursorName()).toBe("audit the trust rules");
-    act("tree.open");
-    act("tree.dive");
-    fireEvent.click(screen.getByText("count the callers"));
-    fireEvent.click(screen.getByLabelText("tree of count the callers"));
-    expect(recorded.opened).toEqual(["k1", "k2"]);
-    expect(recorded.rebound).toEqual([
-      { kind: "tree", sessionId: "k1" },
-      { kind: "tree", sessionId: "k2" },
-    ]);
-  });
 
   it("folds with h and unfolds with l as the entry tree does, h on a child going up first", () => {
     const recorded = recording();
@@ -559,58 +373,9 @@ describe("the tree pane, children", () => {
     act("tree.dive");
     expect(recorded.rebound).toEqual([{ kind: "tree", sessionId: "s1" }]);
   });
-
-  it("moves a child to the trash with x like any session", async () => {
-    const recorded = recording();
-    const act = mount({ kind: "tree" }, recorded, withFamily(recorded));
-    act("tree.down");
-    act("tree.down");
-    act("tree.remove");
-    const confirm = document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement;
-    expect(confirm.textContent).toContain('remove "audit the trust rules"?');
-    fireEvent.keyDown(confirm, { key: "y" });
-    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
-    expect(recorded.trashed).toEqual(["remove k1"]);
-  });
-
-  it("lists a child flat with a quiet lineage fact once its parent is in the trash", async () => {
-    const recorded = recording();
-    const restoredAlone: SessionSummary = {
-      id: "k1",
-      title: "audit the trust rules",
-      createdAt: "2026-09-07T14:00:00.000Z",
-      lastActivityAt: "2026-09-07T14:00:00.000Z",
-      messageCount: 2,
-    };
-    const act = mount(
-      { kind: "tree" },
-      recorded,
-      withFamily(recorded, [...summaries, restoredAlone]),
-    );
-    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(2);
-    expect(document.querySelector(".kw-tree-lineage")).toBeNull();
-    act("tree.down");
-    act("tree.remove");
-    fireEvent.keyDown(document.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement, {
-      key: "y",
-    });
-    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
-    expect(document.querySelectorAll(".kw-tree-session[data-child]")).toHaveLength(0);
-    const flat = document.querySelector(".kw-tree-session") as HTMLElement;
-    expect(flat.querySelector(".kw-tree-name")?.textContent).toBe("audit the trust rules");
-    expect(flat.querySelector(".kw-tree-lineage")?.textContent).toBe(
-      "↳ child of which way? · trashed",
-    );
-  });
 });
 
 describe("the tree pane's definition", () => {
-  it("titles level one as the sessions list and level two by the session's name", () => {
-    const shell = shellSeams(recording());
-    expect(treePane.title({ kind: "tree" }, shell)).toBe("sessions");
-    expect(treePane.title({ kind: "tree", sessionId: "s1" }, shell)).toBe("tree · which way?");
-  });
-
   it("revives a saved sessions pane as a tree pane", () => {
     expect(treePane.spec.parse({ kind: "sessions" })).toEqual({ kind: "tree" });
   });

@@ -7,7 +7,6 @@ import {
   onTheRim,
   outlined,
   type SystemColours,
-  systemColourNames,
 } from "./forced.ts";
 import { kits, neonKit } from "./kits/index.ts";
 import { resolveBlockPalette } from "./palette.ts";
@@ -25,26 +24,6 @@ const probe: SystemColours = {
 };
 
 describe("the block world under forced colours", () => {
-  it("paints every role of every kit's town in one of four system colours", () => {
-    const allowed = new Set(Object.values(systemColourNames));
-    for (const kit of kits) {
-      for (const appearance of ["night", "day"] as const) {
-        const list = townList(kit.id, appearance);
-        const palette = forcedBlockPalette(kit, appearance);
-        const roles = list.quads.flatMap((quad) =>
-          "texture" in quad.paint ? quad.paint.texture.roles : [quad.paint.fill],
-        );
-        for (const role of new Set(roles)) {
-          expect(allowed.has(palette.colourOf(role, undefined) ?? ""), `${kit.id} ${role}`).toBe(
-            true,
-          );
-        }
-        expect(palette.background).toBe("Canvas");
-        expect(palette.edge).toBe("CanvasText");
-      }
-    }
-  });
-
   it("keeps lines as text, lights and the porch's call as highlight, and roads and chalk as grey", () => {
     expect(forcedColourOf("ink")).toBe("CanvasText");
     expect(forcedColourOf("timber")).toBe("CanvasText");

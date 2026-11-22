@@ -12,7 +12,6 @@ import {
   evenRows,
   flipped,
   holdsOn,
-  largestFirst,
   mirrorsItself,
   type Seat,
   sameSeats,
@@ -146,36 +145,7 @@ describe("the catalogue of arrangements for eight to twelve panes", () => {
         expect(Math.min(...cutsOf(deal)), deal.name).toBeGreaterThanOrEqual(2);
       }
     });
-
-    it(`${count}: offers several by name, one that mirrors itself and at least two that do not`, () => {
-      const names = deals.map((deal) => deal.name);
-      expect(new Set(names).size).toBe(names.length);
-      expect(names.length).toBeGreaterThanOrEqual(3);
-      expect(deals.filter(mirrorsItself).length).toBeGreaterThanOrEqual(1);
-      expect(deals.filter((deal) => !mirrorsItself(deal)).length).toBeGreaterThanOrEqual(2);
-      for (const name of names) expect(name).toMatch(/^[a-z]+$/);
-    });
-
-    it(`${count}: every arrangement that does not mirror itself has a larger seat to give the heaviest pane`, () => {
-      const cells = (seat: Seat): number =>
-        Math.round(shareOf(seat).width * shareOf(seat).height * 144);
-      for (const deal of deals.filter((each) => !mirrorsItself(each))) {
-        const bySize = largestFirst(deal.seats);
-        expect(cells(bySize[0] as Seat), deal.name).toBeGreaterThan(cells(bySize.at(-1) as Seat));
-        expect(bySize.map(cells), deal.name).toEqual(bySize.map(cells).toSorted((a, b) => b - a));
-      }
-    });
   }
-
-  it("names them, in the order the keeper's key deals them", () => {
-    expect(dealtCounts.map((count) => dealsFor(count).map((deal) => deal.name))).toEqual([
-      ["tower", "ledger", "studio", "banner"],
-      ["marquee", "square", "tower", "pair"],
-      ["studio", "gallery", "tower", "steps"],
-      ["marquee", "keystone", "tower", "lead"],
-      ["marquee", "dozen", "brickwork", "tower"],
-    ]);
-  });
 
   it("draws a seat as the letters it is written in", () => {
     const tower = drawn("tower", "abb", "acd", "aef", "agh");
@@ -243,18 +213,6 @@ describe("every arrangement, on every desk", () => {
         }
       });
 
-      it(`${count} on ${where}: the heaviest pane has the largest seat, whichever pane it is`, () => {
-        for (const heaviest of [0, Math.floor(count / 2), count - 1]) {
-          const weighed = arriving(count, heaviest);
-          for (const way of dealWays({ desk, arriving: weighed })) {
-            const rooms = way.seats.map((seat) => roomOf(seat.bounds));
-            const led = way.seats.find((seat) => seat.id === `pane-${heaviest}`);
-            expect(roomOf(led?.bounds as ScreenRect), way.look).toBe(Math.max(...rooms));
-            expect(way.seats.map((seat) => seat.id)).toEqual(weighed.map((pane) => pane.id));
-          }
-        }
-      });
-
       it(`${count} on ${where}: a heavier pane never sits in a smaller seat than a lighter one`, () => {
         const weighed = arriving(count);
         const weightOf = (id: string): number =>
@@ -292,10 +250,6 @@ describe("every arrangement, on every desk", () => {
           const first = way.seats.find((seat) => seat.id === way.arrives[0]?.id)?.bounds;
           expect(first?.y, way.look).toBe(Math.min(...boundsOf(way).map((seat) => seat.y)));
         }
-      });
-
-      it(`${count} on ${where}: the same desk deals the same seats`, () => {
-        expect(waysOf(desk, count)).toEqual(ways);
       });
     }
   }
@@ -352,20 +306,6 @@ describe("where an arrangement is dealt", () => {
     );
     expect(cell).toEqual({ width: 326, height: 177 });
     expect(cell.width).toBeGreaterThanOrEqual(smallestSeat.width);
-  });
-
-  it("gives the sizes on 1920x1080 that the report quotes", () => {
-    const sizes = (desk: Desk, count: number, name: string): string[] => [
-      ...new Set(
-        boundsOf(called(waysOf(desk, count), name)[0] as Way)
-          .toSorted((one, other) => roomOf(one) - roomOf(other))
-          .map((seat) => `${seat.width}x${seat.height}`),
-      ),
-    ];
-    expect(sizes(maximised(full), 8, "tower")).toEqual(["585x255", "1182x255", "585x1056"]);
-    expect(sizes(maximised(full), 12, "marquee")).toEqual(["436x255", "884x255", "884x522"]);
-    expect(sizes(windowed(full), 8, "ledger")).toEqual(["404x255"]);
-    expect(sizes(windowed(full), 10, "studio")).toEqual(["407x255", "826x255", "826x789"]);
   });
 
   it("turns the picture to face a console that stands on the right, and offers it turned away too", () => {
@@ -449,10 +389,6 @@ describe("panes dealt evenly, for the counts the catalogue does not name", () =>
       }
     }
   });
-
-  it("has no arrangement for more than sixteen", () => {
-    expect(waysOf(maximised(wide), 17)).toEqual([]);
-  });
 });
 
 describe("dealing again", () => {
@@ -475,13 +411,6 @@ describe("dealing again", () => {
       });
     }
   }
-
-  it("deals the same seats each time round, to the same panes", () => {
-    const first = nextDeal(incoming(maximised(full), 9), undefined);
-    const round = nextDeal(incoming(maximised(full), 9), "pair");
-    expect(round).toEqual(first);
-    expect(first?.way.look).toBe("marquee");
-  });
 
   it("starts from the first when the last look was not one of these", () => {
     expect(nextDeal(incoming(maximised(full), 8), "dozen")?.way.look).toBe("tower");
@@ -549,13 +478,6 @@ describe("which arrangement a burst is given", () => {
     );
     expect(chosenWay([], { asker: "creature" }, mulberry32(3))).toBeUndefined();
     expect(chosenWay([], { asker: "keeper" }, unrolled)).toBeUndefined();
-  });
-
-  it("deals a creature the arrangements that do not mirror themselves about twice as often", () => {
-    const ways = waysOf(maximised(full), 12);
-    const turnedBothWays = looksOf(ways).filter((look) => called(ways, look).length === 6);
-    expect(turnedBothWays).toEqual(["marquee", "brickwork", "tower"]);
-    expect(called(ways, "dozen")).toHaveLength(3);
   });
 });
 

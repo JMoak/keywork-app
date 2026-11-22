@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { companionChannels } from "./channels.ts";
 import { startCompanion } from "./companion.ts";
 import {
   displaySessionOf,
@@ -71,39 +70,6 @@ describe("the Wayland presence fallback", () => {
     expect(ports.windows.created).toHaveLength(0);
     expect(ports.logs.filter((line) => line === waylandNotice)).toHaveLength(1);
     expect(waylandNotice).toContain("--ozone-platform=x11");
-    companion.dispose();
-  });
-
-  it("tells the console the reason with every presence change it sends", async () => {
-    const ports = fakePorts({ platform: "linux", wayland: true });
-    const companion = await startCompanion(ports);
-    expect(ports.logs).not.toContain(waylandNotice);
-    await companion.setPreferences({ enabled: true });
-    const sent = ports.console.sent.filter(
-      ([channel]) => channel === companionChannels.presenceChanged,
-    );
-    expect(sent.at(-1)?.[1]).toMatchObject({ mode: "pane", reason: waylandFallbackReason });
-    expect(ports.logs.filter((line) => line === waylandNotice)).toHaveLength(1);
-    companion.dispose();
-  });
-
-  it("stays silent when the keeper already prefers the pane or the tray", async () => {
-    const ports = fakePorts({
-      platform: "linux",
-      wayland: true,
-      prefs: { enabled: true, mode: "tray" },
-    });
-    const companion = await startCompanion(ports);
-    expect(companion.presence()).toMatchObject({ mode: "tray", window: "none" });
-    expect(ports.logs).not.toContain(waylandNotice);
-    companion.dispose();
-  });
-
-  it("floats as usual on X11 and under the XWayland opt-in", async () => {
-    const ports = fakePorts({ platform: "linux", wayland: false, prefs: { enabled: true } });
-    const companion = await startCompanion(ports);
-    expect(companion.presence()).toMatchObject({ mode: "floating", window: "shown" });
-    expect(ports.logs).not.toContain(waylandNotice);
     companion.dispose();
   });
 });

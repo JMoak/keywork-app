@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  answerSetting,
-  clearSignal,
-  pinAnswer,
-  type SettingAnswers,
-  type SignalClearing,
-} from "./answers.ts";
+import { answerSetting, clearSignal, type SettingAnswers, type SignalClearing } from "./answers.ts";
 
 describe("the keeper's answers", () => {
   it("post the outcome to the wire and say what follows, settling nothing here", async () => {
@@ -65,10 +59,5 @@ describe("the keeper's answers", () => {
       clearSignal: async () => ({ refused: "missing", detail: "no setting out has the id set-1" }),
     };
     expect(await clearSignal(gone, "set-1")).toBe("not answered · no setting out has the id set-1");
-  });
-
-  it("toggle a pin by what the setting already is", () => {
-    expect(pinAnswer(false)).toBe("pinned");
-    expect(pinAnswer(true)).toBe("unpinned");
   });
 });

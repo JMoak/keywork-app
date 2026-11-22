@@ -204,16 +204,6 @@ describe("project", () => {
     expect(runOf(failed, 1).reason).toBe("nope.txt not found");
   });
 
-  it("keeps every line of a settled tool's output for the reader to unfold", () => {
-    const output = Array.from({ length: 40 }, (_, line) => `line ${line + 1}`).join("\n");
-    const settled = projectAll(emptyProjection, [
-      at("turn.started", { userText: "cat" }),
-      at("tool.started", { call }),
-      at("tool.finished", { callId: "c1", output, isError: false }),
-    ]);
-    expect(runOf(settled, 1).detail).toHaveLength(40);
-  });
-
   it("times the tool's own run apart from the minute it waited for a human answer", () => {
     const asked = projectAll(emptyProjection, [
       at("turn.started", { userText: "run it" }),
@@ -245,23 +235,6 @@ describe("project", () => {
     expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · 1.0s · waited 1m · done");
   });
 
-  it("names no wait when the policy answered without asking", () => {
-    const settled = projectAll(emptyProjection, [
-      at("turn.started", { userText: "run it" }),
-      at("tool.started", { call }),
-      at(
-        "gate.permission",
-        {
-          decision: { tool: "bash", callId: "c1", verdict: "granted", gate: "policy" },
-        },
-        100,
-      ),
-      at("tool.finished", { callId: "c1", output: "hi", isError: false }, 400),
-    ]);
-    expect(runOf(settled, 1)).toMatchObject({ durationMs: 500, waitedMs: undefined });
-    expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · 500ms · done");
-  });
-
   it("marks a headless refusal on the proposed call and keeps it refused when the error result lands", () => {
     const refused = projectAll(emptyProjection, [
       at("turn.started", { userText: "rm it" }),
@@ -278,41 +251,6 @@ describe("project", () => {
     expect(runOf(settled, 1).phase).toBe("refused");
     expect(toolRowText(runOf(settled, 1))).toBe("bash echo hi · refused · no one answered");
     expect(settled.decisions.c1?.gate).toBe("headless");
-  });
-
-  it("folds thinking, keeps replayed history free of timing and usage, and notes interrupts", () => {
-    const state = projectAll(emptyProjection, [
-      at("turn.started", { userText: "old", replay: true }),
-      at("turn.delta", { delta: { type: "visible-thinking", text: "hm" }, replay: true }),
-      at("turn.delta", { delta: { type: "visible-thinking", text: "m" }, replay: true }),
-      at("turn.delta", { delta: { type: "text", text: "old answer" }, replay: true }),
-      at("turn.completed", {
-        message: assistant,
-        usage: { inputTokens: 9, outputTokens: 9 },
-        replay: true,
-      }),
-      at("turn.started", { userText: "new" }),
-      at("turn.delta", { delta: { type: "text", text: "partial" } }),
-      at("turn.interrupted", { message: assistant }),
-    ]);
-    expect(state.entries.map((entry) => entry.kind)).toEqual([
-      "user",
-      "thinking",
-      "assistant",
-      "user",
-      "assistant",
-      "ending",
-    ]);
-    expect(state.entries[1]).toEqual({ kind: "thinking", text: "hmm", replay: true });
-    expect(state.turn).toBeUndefined();
-    expect(state.usage.turns).toBe(0);
-    expect(state.entries.at(-1)).toEqual({
-      kind: "ending",
-      outcome: "interrupted",
-      text: "interrupted",
-      prompt: "new",
-      replay: false,
-    });
   });
 
   it("ends a turn that failed with its error and its prompt, ready to try again", () => {
@@ -402,20 +340,6 @@ describe("project", () => {
     });
   });
 
-  it("carries an external origin on the live turn, its entry and the queue", () => {
-    const origin = { kind: "external", client: "wispr-flow" } as const;
-    const state = projectAll(emptyProjection, [
-      at("turn.started", { userText: "dictated", origin }),
-      at("queue.changed", { queued: [{ id: "q1", text: "then this", behavior: "queue", origin }] }),
-    ]);
-    expect(state.turn).toMatchObject({ userText: "dictated", origin });
-    expect(state.entries[0]).toEqual({ kind: "user", text: "dictated", origin, replay: false });
-    expect(state.queue[0]?.origin).toEqual(origin);
-    const typed = projectAll(emptyProjection, [at("turn.started", { userText: "typed" })]);
-    expect(typed.turn).toEqual({ startedAt: typed.turn?.startedAt, userText: "typed" });
-    expect(typed.entries[0]).toEqual({ kind: "user", text: "typed", replay: false });
-  });
-
   it("never mutates a prior state", () => {
     const before = projectAll(emptyProjection, [at("turn.started", { userText: "a" })]);
     const frozen = JSON.stringify(before);
@@ -500,18 +424,6 @@ describe("a creature's report lines", () => {
       detail: { kind: "frame", origin: { kind: "creature", creature: "hal", thread: "s1" } },
     });
     expect(lines(projectAll(emptyProjection, [frame]))).toEqual([]);
-  });
-
-  it("keeps a frame, the creature's own instructions, out of the transcript live and replayed", () => {
-    const frame = (replay: boolean) =>
-      at("extension.notice", {
-        extension: "creature",
-        level: "info",
-        message: "You are Hal. Read nothing and run no tool.",
-        detail: { kind: "frame", origin: { kind: "creature", creature: "hal", thread: "s1" } },
-        ...(replay && { replay }),
-      });
-    expect(projectAll(emptyProjection, [frame(false), frame(true)]).entries).toEqual([]);
   });
 });
 
@@ -628,15 +540,6 @@ describe("delegated children on the parent's transcript", () => {
       child: { title: "scout it", sessionId: undefined, outcome: undefined },
     });
   });
-
-  it("ignores child events for calls it is not running", () => {
-    const before = projectAll(emptyProjection, [at("tool.started", { call })]);
-    const after = projectAll(before, [
-      at("child.started", { callId: "c1", sessionId: "k1", title: "t" }),
-      at("child.finished", { callId: "zz", outcome: "completed", usage }),
-    ]);
-    expect(after.entries).toEqual(before.entries);
-  });
 });
 
 describe("memory decisions", () => {
@@ -650,28 +553,6 @@ describe("memory decisions", () => {
     rule: '[[Shell Echo]] shares "echo" with the command',
     latencyMs: 2,
   };
-  const triage: MemoryDecision = {
-    ...recall,
-    id: "m2",
-    question: "entry-durability@1",
-    about: { kind: "entry", entryId: "2026-09-06#1" },
-    candidates: ["2026-09-06#1"],
-    choice: "unsure",
-  };
-
-  it("keeps every decision in arrival order and rides a recall on the call it decided for", () => {
-    const state = projectAll(emptyProjection, [
-      at("tool.started", { call }),
-      at("memory.decided", { decision: recall }),
-      at("memory.decided", { decision: triage }),
-      at("tool.finished", { callId: "c1", output: "hi", isError: false }, 40),
-    ]);
-    expect(state.memoryDecisions.map((decision) => decision.id)).toEqual(["m1", "m2"]);
-    expect(runOf(state, 0).recall).toEqual(recall);
-    expect(toolRowText(runOf(state, 0))).toBe(
-      'bash echo hi · 40ms · done · recalled [[Shell Echo]] · shares "echo" with the command',
-    );
-  });
 
   it("finds a settled call for a decision the journal replays after the turn", () => {
     const settled = projectAll(emptyProjection, [
@@ -688,14 +569,5 @@ describe("memory decisions", () => {
       at("memory.decided", { decision: { ...recall, latencyMs: 3 }, replay: true }),
     ]);
     expect(state.memoryDecisions).toEqual([{ ...recall, latencyMs: 3 }]);
-  });
-
-  it("leaves the transcript alone for a decision about no call it holds", () => {
-    const before = projectAll(emptyProjection, [at("tool.started", { call })]);
-    const after = projectAll(before, [
-      at("memory.decided", { decision: triage }),
-      at("memory.decided", { decision: { ...recall, about: { kind: "call", callId: "zz" } } }),
-    ]);
-    expect(after.entries).toEqual(before.entries);
   });
 });

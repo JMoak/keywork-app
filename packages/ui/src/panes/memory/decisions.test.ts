@@ -19,17 +19,6 @@ const jevRecall: MemoryDecision = {
   latencyMs: 212,
 };
 
-const lateRecall: MemoryDecision = {
-  ...jevRecall,
-  id: "j2",
-  choice: { kept: ["Auth Tokens", "Token Rotation"], dropped: ["Old Auth"] },
-  decider: "builtin",
-  scores: {},
-  rule: '[[Auth Tokens]] shares "auth" with the path; [[Old Auth]] is superseded; [[Token Rotation]] shares "token" with the path',
-  fallback: { reason: "late" },
-  latencyMs: 151,
-};
-
 const triage: MemoryDecision = {
   id: "t1",
   question: "entry-durability@1",
@@ -81,47 +70,6 @@ describe("the decisions lens rows", () => {
       ["[[Token Rotation]]", "dropped", "0.41"],
     ]);
   });
-
-  it("inks an undecided answer dim", () => {
-    const undecided = row({ ...jevRecall, confidence: 0.12 });
-    expect(undecided.mark).toEqual({ cell: { glyph: "░", level: "light" }, label: "odds 0.12" });
-    expect(row(builtinTriage).mark).toEqual({
-      cell: { glyph: "░", level: "light" },
-      label: "unsure",
-    });
-  });
-
-  it("names a fallback and keeps the builtin's rule in words for the fold", () => {
-    const fellBack = row(lateRecall);
-    expect(fellBack.facts).toEqual(["kept 2 of 3", "builtin", "fallback late", "151ms"]);
-    expect(fellBack.rule).toContain("[[Old Auth]] is superseded");
-    expect(fellBack.candidates.map((line) => line.verdict)).toEqual(["kept", "dropped", "kept"]);
-  });
-
-  it("asks each question in words, from what the decision was about", () => {
-    const about = (decision: Partial<MemoryDecision>) => row({ ...triage, ...decision }).asked;
-    expect(row(triage).asked).toBe("triage entry 2026-10-15#3");
-    expect(about({ question: "entry-kind@1" })).toBe("kind of entry 2026-10-15#3");
-    expect(about({ about: { kind: "pair", older: "Old Auth", newer: "Auth Tokens" } })).toBe(
-      "relate [[Old Auth]] and [[Auth Tokens]]",
-    );
-    expect(about({ about: { kind: "note", note: "Auth Tokens" } })).toBe(
-      "does [[Auth Tokens]] still hold",
-    );
-    expect(about({ about: { kind: "mention", note: "Setup", target: "Bun" } })).toBe(
-      "link [[Setup]] to [[Bun]]",
-    );
-    expect(about({ about: { kind: "query", query: "auth" } })).toBe('weigh hits for "auth"');
-    expect(row(jevRecall).asked).toBe("recall before call e1");
-  });
-
-  it("reads an option choice in words and names entries without note brackets", () => {
-    const relation = row({ ...triage, choice: "newer-supersedes-older" });
-    expect(relation.facts[0]).toBe("newer supersedes older");
-    expect(row(triage).candidates).toEqual([
-      { name: "2026-10-15#3", verdict: "offered", odds: undefined },
-    ]);
-  });
 });
 
 describe("odds on an inbox card", () => {
@@ -143,18 +91,5 @@ describe("odds on an inbox card", () => {
   it("renders nothing for the builtin's unsure, which is every entry the builtin triages", () => {
     expect(triageOdds(promotion, { "2026-10-15#3": builtinTriage })).toBeUndefined();
     expect(triageOdds(promotion, {})).toBeUndefined();
-  });
-
-  it("has no odds for a card no entry decision is about", () => {
-    const merge: StagedItem = {
-      id: "m1",
-      key: "k",
-      created: "2026-10-15T12:00:00.000Z",
-      kind: "merge-proposal",
-      keep: "A",
-      retire: "B",
-      confidence: 0.9,
-    };
-    expect(triageOdds(merge, { "2026-10-15#3": triage })).toBeUndefined();
   });
 });

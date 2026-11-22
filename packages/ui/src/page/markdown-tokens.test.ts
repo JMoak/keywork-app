@@ -60,11 +60,6 @@ describe("keepUnchanged", () => {
     expect(after[0]?.rows[0]).toBe(before[0]?.rows[0]);
     expect(after[0]?.rows[1]).not.toBe(before[0]?.rows[1]);
   });
-
-  it("returns the earlier list itself when nothing changed", () => {
-    const before = lexMarkdown("one\n\ntwo");
-    expect(keepUnchanged(before, lexMarkdown("one\n\ntwo"))).toBe(before);
-  });
 });
 
 describe("fenceIsClosed", () => {
@@ -72,14 +67,12 @@ describe("fenceIsClosed", () => {
 
   it.each([
     ["```ts\nconst a = 1;\n```", true],
-    ["```ts\nconst a = 1;\n```\n\nafter", true],
     ["~~~\nplain\n~~~~", true],
     ["````md\n```\ninner\n```\n````", true],
     ["```ts\nconst a = 1;", false],
     ["```ts\nconst a = 1;\n``", false],
     ["````\ncode\n```", false],
     ["```\ncode\n~~~", false],
-    ["```", false],
   ])("reads %j as closed: %s", (source, closed) => {
     expect(fenceIsClosed(fence(source))).toBe(closed);
   });

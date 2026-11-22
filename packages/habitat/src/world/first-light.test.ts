@@ -82,16 +82,6 @@ describe("first light on moak-main, replayed", () => {
       crates: 1,
     });
   });
-
-  it("learns the creature from session.state alone, the one live envelope that carries the bot", async () => {
-    const stream = await firstLight();
-    const opened = projectAll(
-      emptyHabitat(),
-      stream.filter((envelope) => envelope.id === 2 || envelope.id === 3),
-    );
-    expect(opened.threads[conversation]?.creature).toBe("bea");
-    expect(creatureReading(opened, "bea", whileAsking).state).toBe("working");
-  });
 });
 
 const runTwo = {

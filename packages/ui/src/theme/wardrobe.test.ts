@@ -130,10 +130,6 @@ describe("resolveTheme", () => {
     );
     expect(() => resolveTheme("nope", closetOf(served), true)).toThrow('no theme is named "nope"');
   });
-
-  it("wears a theme the server serves but the gallery lacks", () => {
-    expect(resolveTheme("dusk", closetOf([dusk]), true).chromeWeight).toBe("borderless");
-  });
 });
 
 describe("createWardrobe", () => {
@@ -227,11 +223,5 @@ describe("wearRememberedTheme", () => {
     expect(boot({ [formerWornThemeKey]: "keywork-day" }, true)).toBe(keyworkDay);
     expect(boot({ [wornThemeKey]: "closet-mist" }, true)).toBe(keyworkNight);
     expect(boot({}, false)).toBe(keyworkDay);
-  });
-
-  it("marks the document root when no apply is given", () => {
-    wearRememberedTheme({ storage: memoryStorage({ [wornThemeKey]: "keywork-night" }) });
-    expect(document.documentElement.dataset.theme).toBe("keywork-night");
-    expect(document.documentElement.dataset.appearance).toBe("dark");
   });
 });

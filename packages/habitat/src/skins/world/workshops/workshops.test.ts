@@ -12,7 +12,6 @@ import {
 import type { Tile } from "../tiles.ts";
 import { lit } from "../tiles.ts";
 import type { WorkshopRegion } from "./drawing.ts";
-import { gardenPlantings, gardenTile } from "./gardens.ts";
 import { workshopDesign, workshopDesigns } from "./index.ts";
 
 describe("authored workshops", () => {
@@ -114,26 +113,6 @@ describe("authored workshops", () => {
         family,
       ).toBe(true);
     }
-  });
-});
-
-describe("quiet garden beds", () => {
-  it("provides three distinct mature plantings without activity or attention colors", () => {
-    const silhouettes = new Set<string>();
-    for (const planting of gardenPlantings) {
-      const tile = gardenTile(planting);
-      expect(gardenTile(planting)).toBe(tile);
-      expect(tile.width).toBe(16);
-      expect(tile.height).toBe(8);
-      expect(tile.indices).toHaveLength(128);
-      expect(tile.indices.every((index) => index < 16)).toBe(true);
-      expect(tile.indices.some((index) => [lamplight, needsYou, trouble].includes(index))).toBe(
-        false,
-      );
-      silhouettes.add(Array.from(tile.indices, (index) => Number(index !== transparent)).join(""));
-      expect(occupied(tile, tile.height - 1)).toHaveLength(14);
-    }
-    expect(silhouettes.size).toBe(gardenPlantings.length);
   });
 });
 

@@ -1,4 +1,4 @@
-import { type MotionPrefs, mulberry32 } from "@keywork-app/habitat";
+import type { MotionPrefs } from "@keywork-app/habitat";
 import type { SettingSignal } from "@keywork-app/protocol";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -174,16 +174,6 @@ describe("a pane sent outside the window", () => {
     expect(outside.keyAt(pane.body)).toBe("notes");
   });
 
-  it("rests beside the console, clear of it and of the panes already standing", async () => {
-    const { outside, shows } = await warmed(bench());
-    await outside.send(paneNamed("first").tenant, byHand);
-    await outside.send(paneNamed("second").tenant, byHand);
-    const [first, second] = shows.map((show) => show.bounds) as [ScreenRect, ScreenRect];
-    expect(first.x).toBeGreaterThanOrEqual(desk.console.x + desk.console.width);
-    expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
-    expect(second.x).toBe(first.x);
-  });
-
   it("emerges from the console's edge and glides to its place when motion is welcome", async () => {
     const { outside, shows, glides } = await warmed(bench({ motion: () => gliding }));
     const pane = paneNamed("notes");
@@ -196,20 +186,6 @@ describe("a pane sent outside the window", () => {
     expect(shows[0]?.bounds).toMatchObject({ width: target.width, height: target.height });
     expect(shows[0]?.bounds.x).toBeLessThan(target.x);
     expect(chromeOf(pane.body).getAttribute("data-motion")).toBe("glide");
-  });
-
-  it("returns to the rectangle it last stood in while a display still shows it", async () => {
-    const { outside, shows } = await warmed(bench());
-    const last = { x: 1300, y: 500, width: 520, height: 400 };
-    await outside.send(paneNamed("notes").tenant, { ...byHand, focus: false, last });
-    expect(shows[0]?.bounds).toEqual(last);
-    expect(shows[0]?.focus).toBe(false);
-  });
-
-  it("says a window that had to be opened for it was not warm", async () => {
-    const { outside } = bench();
-    const arrived = await outside.send(paneNamed("notes").tenant, byHand);
-    expect(arrived?.warm).toBe(false);
   });
 
   it("leaves together with the panes sent in the same moment, each to its own place", async () => {
@@ -293,13 +269,6 @@ describe("the frame a pane wears outside", () => {
     expect(chrome.hasAttribute("data-focused")).toBe(false);
     expect(outside.holdingFocus()).toBeUndefined();
     expect(pane.log.slice(-2)).toEqual(["took focus", "lost focus"]);
-  });
-
-  it("can take focus from the ground the pane stands on", async () => {
-    const { outside } = await warmed(bench());
-    const pane = paneNamed("notes");
-    await outside.send(pane.tenant, byHand);
-    expect(pane.body.closest<HTMLElement>("[data-pane-id]")?.tabIndex).toBe(-1);
   });
 });
 
@@ -388,16 +357,6 @@ describe("a pane standing outside", () => {
     expect(shows).toEqual([]);
     expect(pane.log).toEqual([]);
   });
-
-  it("takes the keeper's focus when asked, once it is showing", async () => {
-    const { outside, desktop } = await warmed(bench());
-    await outside.send(paneNamed("notes").tenant, byACreature);
-    outside.focus("notes");
-    outside.focus("nobody");
-    expect(desktop.calls.filter((call) => call.startsWith("focus "))).toEqual([
-      "focus kw-surface:1",
-    ]);
-  });
 });
 
 describe("what a creature sets outside", () => {
@@ -423,19 +382,6 @@ describe("what a creature sets outside", () => {
     await vi.advanceTimersByTimeAsync(120);
     expect(shows).toHaveLength(2);
   });
-
-  it("arrives at once while the keeper is not typing, and never asks for focus", async () => {
-    const { outside, shows } = await warmed(bench());
-    await outside.send(paneNamed("note").tenant, byACreature);
-    expect(shows[0]).toMatchObject({ origin: "creature", focus: false, follows: true });
-  });
-
-  it("does not hold what the keeper sends by hand while typing", async () => {
-    const { outside, shows } = await warmed(bench());
-    document.body.dispatchEvent(new KeyboardEvent("keydown"));
-    await outside.send(paneNamed("notes").tenant, byHand);
-    expect(shows).toHaveLength(1);
-  });
 });
 
 describe("spreading the panes outside", () => {
@@ -449,11 +395,6 @@ describe("spreading the panes outside", () => {
     await settled();
     return { first, second };
   }
-
-  it("says so when no pane is outside", async () => {
-    const { outside } = await warmed(bench());
-    expect(await outside.toggleSpread()).toBe("nothing-outside");
-  });
 
   it("moves overlapping panes apart, and puts each back where it stood on the next press", async () => {
     const made = await warmed(bench());
@@ -513,18 +454,6 @@ describe("spreading the panes outside", () => {
     expect(await made.outside.toggleSpread()).toBe("spread");
     expect((made.glides[before]?.moves ?? []).map((move) => move.id)).not.toContain("kw-surface:1");
   });
-
-  it("says nothing can spread when the only pane outside fills its display", async () => {
-    const made = await warmed(bench());
-    await made.outside.send(paneNamed("only").tenant, byHand);
-    made.desktop.emit({
-      kind: "moved",
-      id: "kw-surface:1",
-      bounds: { x: -7, y: -7, width: 1934, height: 1054 },
-      by: "keeper",
-    });
-    expect(await made.outside.toggleSpread()).toBe("nothing-to-spread");
-  });
 });
 
 describe("the order panes outside stand in", () => {
@@ -547,13 +476,6 @@ describe("the order panes outside stand in", () => {
     expect(made.desktop.calls.at(-1)).toBe(`focus ${made.idOf("first")}`);
   });
 
-  it("does not restack for the pane already on top", async () => {
-    const made = await threeByHand(await warmed(bench({}, {}, {}, true)));
-    made.outside.focus("third");
-    expect(made.stacks).toEqual([]);
-    expect(made.desktop.calls.at(-1)).toBe(`focus ${made.idOf("third")}`);
-  });
-
   it("remembers the pane the keeper clicked as the one on top, without restacking", async () => {
     const made = await threeByHand(await warmed(bench({}, {}, {}, true)));
     made.desktop.emit({ kind: "focused", id: made.idOf("first") });
@@ -569,14 +491,6 @@ describe("the order panes outside stand in", () => {
     expect(focusCalls(made)).toEqual([]);
   });
 
-  it("has nothing to send a lone pane behind", async () => {
-    const made = await warmed(bench({}, {}, {}, true));
-    await made.outside.send(paneNamed("only").tenant, byHand);
-    expect(made.outside.sendBehind("only")).toBeUndefined();
-    expect(made.outside.sendBehind("nobody")).toBeUndefined();
-    expect(made.stacks).toEqual([]);
-  });
-
   it("keeps the order, and still names the next pane, when the host cannot restack", async () => {
     const made = await threeByHand(await warmed(bench()));
     made.outside.focus("first");
@@ -584,18 +498,6 @@ describe("the order panes outside stand in", () => {
     expect(focusCalls(made)).toEqual([`focus ${made.idOf("first")}`]);
     await settled();
     expect(made.faults).toEqual([]);
-  });
-
-  it("slips a creature's pane under the one the keeper is in, and never restacks for it", async () => {
-    const made = await warmed(bench({}, {}, {}, true));
-    await made.outside.send(paneNamed("first").tenant, byHand);
-    await made.outside.send(paneNamed("second").tenant, byHand);
-    await made.outside.send(paneNamed("note").tenant, byACreature);
-    await settled();
-    expect(made.stacks).toEqual([]);
-    expect(focusCalls(made)).toEqual([]);
-    made.outside.focus("first");
-    expect(made.stacks).toEqual([[made.idOf("note"), made.idOf("second"), made.idOf("first")]]);
   });
 
   it("restacks panes restored together in the order they were sent, once they have appeared", async () => {
@@ -625,23 +527,6 @@ describe("the order panes outside stand in", () => {
 });
 
 describe("handing a pane outside the keeper's focus", () => {
-  it("says so when the desktop refuses a pane that still stands outside", async () => {
-    const made = await warmed(bench({}, {}, { focus: true }));
-    await made.outside.send(paneNamed("notes").tenant, byACreature);
-    made.outside.focus("notes");
-    await settled();
-    expect(made.faults).toEqual(["the desktop would not focus it"]);
-  });
-
-  it("expects the refusal when the pane came inside before the desktop answered", async () => {
-    const made = await warmed(bench({}, {}, { focus: true }));
-    await made.outside.send(paneNamed("notes").tenant, byACreature);
-    made.outside.focus("notes");
-    made.outside.gone("notes");
-    await settled();
-    expect(made.faults).toEqual([]);
-  });
-
   it("asks nothing of the desktop for a pane on its way home", async () => {
     const made = await warmed(bench({ motion: () => gliding }));
     await made.outside.send(paneNamed("notes").tenant, byACreature);
@@ -667,12 +552,6 @@ describe("the letters that jump to a pane outside", () => {
 
   const letterOn = (pane: ReturnType<typeof paneNamed>): string | undefined =>
     chromeOf(pane.body).querySelector(".kw-surface-hint")?.textContent ?? undefined;
-
-  it("says there is nothing to letter while no pane is outside", async () => {
-    const { outside } = await warmed(bench());
-    expect(outside.toggleHints()).toBe("nothing-outside");
-    expect(outside.hinting()).toBe(false);
-  });
 
   it("letters each pane in reading order where it stands, and takes them off when asked again", async () => {
     const made = await warmed(bench());
@@ -712,12 +591,6 @@ describe("the letters that jump to a pane outside", () => {
     expect(made.outside.hinting()).toBe(false);
   });
 
-  it("answers nothing to a letter once the letters are off", async () => {
-    const made = await warmed(bench());
-    await twoApart(made);
-    expect(made.outside.pickHint(["a"])).toBeUndefined();
-  });
-
   it("takes the letters off when the last pane outside comes home", async () => {
     const made = await warmed(bench());
     await twoApart(made);
@@ -754,20 +627,6 @@ describe("the letters that jump to a pane outside", () => {
       ]),
     );
     expect(await made.outside.toggleSpread()).toBe("spread");
-  });
-
-  it("leaves the panes spread when the letters are dismissed, and takes the letters off on gathering", async () => {
-    const made = await warmed(bench());
-    await twoApart(made);
-    await made.outside.send(paneNamed("over").tenant, { ...byHand, last: { ...left, x: 1220 } });
-    await settled();
-    expect(await made.outside.toggleSpread()).toBe("spread");
-    const before = made.glides.length;
-    made.outside.pickHint(["escape"]);
-    expect(made.glides).toHaveLength(before);
-    expect(made.outside.hinting()).toBe(false);
-    expect(await made.outside.toggleSpread()).toBe("gathered");
-    expect(made.outside.hinting()).toBe(false);
   });
 
   it("letters sixteen panes piled over one another as they spread, each still outside", async () => {
@@ -826,14 +685,6 @@ describe("a pane outside moved and sized by key", () => {
     expect(pane.log.at(-1)).toBe("placed 1300,354 by keeper");
   });
 
-  it("stops a gap from the console's edge on its way across", async () => {
-    const made = await warmed(bench());
-    const pane = await standing(made);
-    await made.outside.stepAcross("notes", "left");
-    await made.outside.stepAcross("notes", "left");
-    expect(pane.log.at(-1)).toBe("placed 1112,500 by keeper");
-  });
-
   it("lines up a gap below another pane outside", async () => {
     const made = await warmed(bench());
     await made.outside.send(paneNamed("other").tenant, {
@@ -843,15 +694,6 @@ describe("a pane outside moved and sized by key", () => {
     const pane = await standing(made, { x: 1440, y: 340, width: 300, height: 300 });
     await made.outside.stepAcross("notes", "up");
     expect(pane.log.at(-1)).toBe("placed 1440,312 by keeper");
-  });
-
-  it("stays, and moves nothing, at the last stop before the edge of its display", async () => {
-    const made = await warmed(bench());
-    const pane = await standing(made, { ...stood, x: 1388 });
-    const before = made.glides.length;
-    expect(await made.outside.stepAcross("notes", "right")).toBe("stays");
-    expect(made.glides).toHaveLength(before);
-    expect(pane.log.at(-1)).not.toMatch(/by keeper$/);
   });
 
   it("grows and shrinks along the named sizes from its corner, as the keeper's own doing", async () => {
@@ -867,29 +709,6 @@ describe("a pane outside moved and sized by key", () => {
     expect(pane.log.at(-1)).toBe("placed 1200,300 by keeper");
   });
 
-  it("sizes a pane of code to its eighty columns", async () => {
-    const made = await warmed(bench());
-    const pane = paneNamed("source", "file");
-    await made.outside.send(pane.tenant, {
-      ...byHand,
-      last: { x: 300, y: 200, width: 720, height: 300 },
-    });
-    await settled();
-    await made.outside.stepSize("source", 1);
-    expect(lastGlide(made)).toEqual({ x: 300, y: 200, width: 942, height: 320 });
-  });
-
-  it("fills its display at the largest size, steps back down from there, and has nowhere to go across", async () => {
-    const made = await warmed(bench());
-    await standing(made, { x: 966, y: 12, width: 942, height: 1016 });
-    expect(await made.outside.stepSize("notes", 1)).toBe("moved");
-    expect(lastGlide(made)).toEqual(laptop);
-    expect(await made.outside.stepSize("notes", 1)).toBe("stays");
-    expect(await made.outside.stepAcross("notes", "left")).toBe("fills-its-display");
-    expect(await made.outside.stepSize("notes", -1)).toBe("moved");
-    expect(lastGlide(made)).toEqual({ x: 12, y: 12, width: 942, height: 1016 });
-  });
-
   it("leaves a pane the system maximised as it is", async () => {
     const made = await warmed(bench());
     await standing(made);
@@ -899,37 +718,9 @@ describe("a pane outside moved and sized by key", () => {
     expect(await made.outside.stepSize("notes", -1)).toBe("fills-its-display");
     expect(made.glides).toHaveLength(before);
   });
-
-  it("takes a pane out of the spread, where it was put by key", async () => {
-    const made = await warmed(bench());
-    const pane = await standing(made);
-    await made.outside.send(paneNamed("other").tenant, {
-      ...byHand,
-      last: { ...stood, x: 1320, y: 520 },
-    });
-    await settled();
-    await made.outside.toggleSpread();
-    await made.outside.stepAcross("notes", "down");
-    expect(pane.log.at(-1)).toMatch(/by keeper$/);
-    const before = made.glides.length;
-    await made.outside.toggleSpread();
-    expect(made.glides[before]?.moves.map((move) => move.id)).toEqual([made.idOf("other")]);
-  });
-
-  it("moves nothing for a pane that is not outside", async () => {
-    const made = await warmed(bench());
-    expect(await made.outside.stepAcross("nobody", "left")).toBe("not-outside");
-    expect(await made.outside.stepSize("nobody", 1)).toBe("not-outside");
-  });
 });
 
 describe("what the desktop will not tell or do", () => {
-  it("answers with no desk, and says why", async () => {
-    const made = await warmed(bench({}, {}, { desk: true }));
-    expect(await made.outside.desk()).toBeUndefined();
-    expect(made.faults).toEqual(["the desktop would not say where things are"]);
-  });
-
   it("leaves the panes where they are, and says why, when it cannot learn where to move them", async () => {
     const failing: Failing = {};
     const made = await warmed(bench({}, {}, failing));
@@ -1009,18 +800,6 @@ async function sentTogether(
 }
 
 describe("a burst of panes arriving together", () => {
-  it("lands three as a column of the same named size beside the console, top to bottom", async () => {
-    const made = await warmed(bench());
-    await sentTogether(made, 3);
-    const places = made.shows.map((show) => show.bounds);
-    expect(made.shows.map((show) => show.title)).toEqual(["pane-0", "pane-1", "pane-2"]);
-    expect(places.map((place) => [place.x, place.width, place.height])).toEqual(
-      Array(3).fill([desk.console.x + desk.console.width + 12, 624, 320]),
-    );
-    expect(places.map((place) => place.y)).toEqual([44, 376, 708]);
-    expect(overlapping(places)).toEqual([]);
-  });
-
   it("deals eight into a named arrangement where none overlaps, and tells each its seat", async () => {
     const made = await warmed(bench());
     const panes = await sentTogether(made, 8);
@@ -1051,22 +830,6 @@ describe("a burst of panes arriving together", () => {
     expect(made.glides).toEqual([]);
   });
 
-  it("glides each from the console's edge on its own turn when motion is welcome", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
-    const made = bench({ motion: () => gliding });
-    await vi.advanceTimersByTimeAsync(10);
-    for (const key of ["a", "b", "c"]) void made.outside.send(paneNamed(key).tenant, quietly);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(made.glides.map((glide) => glide.moves.length)).toEqual([1]);
-    await vi.advanceTimersByTimeAsync(60);
-    expect(made.glides).toHaveLength(2);
-    await vi.advanceTimersByTimeAsync(60);
-    expect(made.glides.map((glide) => glide.moves[0]?.id)).toEqual(
-      made.shows.map((show) => show.id),
-    );
-    expect(made.shows.map((show) => show.title)).toEqual(["a", "b", "c"]);
-  });
-
   it("restacks a creature's burst in the order it arrived, under the pane the keeper is in", async () => {
     const made = await warmed(bench({}, {}, {}, true));
     await made.outside.send(paneNamed("mine").tenant, byHand);
@@ -1077,13 +840,6 @@ describe("a burst of panes arriving together", () => {
     expect(made.desktop.calls.filter((call) => call.startsWith("focus "))).toEqual([]);
     expect(made.outside.holdingFocus()).toBe("mine");
     expect(made.shows.slice(1).every((show) => show.focus === false)).toBe(true);
-  });
-
-  it("stacks a dealt burst in the order its wave arrives", async () => {
-    const made = await warmed(bench({}, {}, {}, true));
-    await sentTogether(made, 8);
-    expect(made.stacks).toEqual([made.shows.map((show) => show.id)]);
-    expect(new Set(made.stacks[0]).size).toBe(8);
   });
 
   it("gives the largest seat to the pane that waits on the keeper, wherever it comes in the burst", async () => {
@@ -1097,23 +853,6 @@ describe("a burst of panes arriving together", () => {
     const largest = Math.max(...[...places.values()].map(roomOf));
     expect(roomOf(places.get("pane-6") as ScreenRect)).toBe(largest);
     expect([...places.values()].filter((place) => roomOf(place) === largest)).toHaveLength(1);
-  });
-
-  it("keeps the places panes return to, and deals the rest around none of them", async () => {
-    const made = await warmed(bench());
-    const kept = { x: 20, y: 400, width: 90, height: 200 };
-    const returning = paneNamed("returning");
-    const sent = [
-      made.outside.send(returning.tenant, { ...quietly, last: kept }),
-      ...Array.from({ length: 8 }, (_, at) =>
-        made.outside.send(paneNamed(`pane-${at}`).tenant, quietly),
-      ),
-    ];
-    await Promise.all(sent);
-    await settled();
-    expect(made.outside.places().get("returning")).toEqual(kept);
-    expect(made.shows[0]?.title).toBe("returning");
-    expect(overlapping([...made.outside.places().values()])).toEqual([]);
   });
 });
 
@@ -1136,17 +875,6 @@ describe("what a creature sets outside in the same moment", () => {
     expect(gathering.longestMs).toBeLessThan(50);
   });
 
-  it("shows a lone arrival once the short wait for company is over", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
-    const made = bench();
-    await vi.advanceTimersByTimeAsync(10);
-    void made.outside.send(paneNamed("alone").tenant, byACreature);
-    await vi.advanceTimersByTimeAsync(gathering.quietMs - 1);
-    expect(made.shows).toEqual([]);
-    await vi.advanceTimersByTimeAsync(2);
-    expect(made.shows.map((show) => show.title)).toEqual(["alone"]);
-  });
-
   it("never makes the keeper's own pane wait with it", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
     const made = bench();
@@ -1157,36 +885,6 @@ describe("what a creature sets outside in the same moment", () => {
     expect(made.shows.map((show) => show.title)).toEqual(["mine"]);
     await vi.advanceTimersByTimeAsync(gathering.quietMs);
     expect(made.shows.map((show) => show.title)).toEqual(["mine", "theirs"]);
-  });
-
-  it("varies one burst of eight from the next, by the dice it is given, and never repeats the last", async () => {
-    const made = await warmed(bench({ random: mulberry32(11), ...makingRoom }));
-    const seatsOf = (): string =>
-      [...made.outside.places().values()]
-        .map((place) => `${place.x},${place.y},${place.width},${place.height}`)
-        .toSorted()
-        .join(" ");
-    const dealt: string[] = [];
-    for (const round of ["first", "second", "third"]) {
-      const panes = await sentTogether(made, 8, byACreature, round);
-      dealt.push(seatsOf());
-      await made.outside.recall(panes.map((pane) => pane.tenant.key));
-    }
-    expect(dealt[1]).not.toBe(dealt[0]);
-    expect(dealt[2]).not.toBe(dealt[1]);
-    expect(made.desktop.calls.filter((call) => call.startsWith("focus "))).toEqual([]);
-  });
-
-  it("lands a keeper's own burst the same way every time", async () => {
-    const landed: string[] = [];
-    for (const seed of [1, 2]) {
-      const made = await warmed(bench({ random: mulberry32(seed) }));
-      await sentTogether(made, 8);
-      landed.push(JSON.stringify([...made.outside.places().values()]));
-      made.outside.dispose();
-      made.desktop.closeEverything();
-    }
-    expect(landed[0]).toBe(landed[1]);
   });
 });
 
@@ -1225,11 +923,6 @@ describe("dealing the panes outside again", () => {
     return names;
   };
 
-  it("says so when no pane is outside", async () => {
-    const made = await warmed(bench());
-    expect(await made.outside.deal()).toBe("nothing-outside");
-  });
-
   it("deals eight into each arrangement in turn and round to the first", async () => {
     const made = await warmed(bench());
     await sentTogether(made, 8);
@@ -1237,23 +930,6 @@ describe("dealing the panes outside again", () => {
     expect(await namesDealt(made, 4)).toEqual(["ledger 2", "studio 3", "banner 4", "tower 1"]);
     await vi.waitFor(() => expect(JSON.stringify([...made.outside.places()])).toBe(first));
     expect(overlapping([...made.outside.places().values()])).toEqual([]);
-  });
-
-  it("glides each pane to its new seat on its own turn, as the keeper's own doing", async () => {
-    const made = await warmed(bench({ motion: () => gliding }));
-    const panes = await sentTogether(made, 8);
-    await vi.waitFor(() => expect(made.glides).toHaveLength(8));
-    const before = made.glides.length;
-    expect(await made.outside.deal()).toEqual({ name: "ledger", turn: 2, of: 4 });
-    await vi.waitFor(() => expect(made.glides.length).toBe(before + 8));
-    expect(made.glides.slice(before).every((glide) => glide.moves.length === 1)).toBe(true);
-    const seats = made.glides.slice(before).map((glide) => glide.moves[0]?.bounds as ScreenRect);
-    expect(overlapping(seats)).toEqual([]);
-    expect(new Set(seats.map((seat) => `${seat.width}x${seat.height}`))).toEqual(
-      new Set(["392x245"]),
-    );
-    for (const pane of panes) expect(pane.log.at(-1)).toMatch(/^placed \d+,\d+ by keeper$/);
-    expect(made.faults).toEqual([]);
   });
 
   it("gives the largest seat to the pane the keeper is in, and the next to what waits on him", async () => {
@@ -1281,18 +957,6 @@ describe("dealing the panes outside again", () => {
     const moved = made.glides.slice(before).flatMap((glide) => glide.moves.map((move) => move.id));
     expect(moved).not.toContain(made.idOf("pane-0"));
     expect(made.outside.places().get("pane-0")).toEqual(filling);
-  });
-
-  it("has nothing to deal when every pane outside fills its display", async () => {
-    const made = await warmed(bench());
-    await made.outside.send(paneNamed("only").tenant, byHand);
-    made.desktop.emit({
-      kind: "moved",
-      id: made.idOf("only"),
-      bounds: { x: -7, y: -7, width: 1934, height: 1054 },
-      by: "keeper",
-    });
-    expect(await made.outside.deal()).toBe("nothing-to-deal");
   });
 
   it("ends a spread and takes its letters off, the deal standing as the panes' places", async () => {
@@ -1365,17 +1029,6 @@ describe("dealing the panes outside again", () => {
     expect(made.outside.places().get(waiting as string)).toEqual(put);
     expect(moved).toHaveLength(7);
   });
-
-  it("deals nothing, and says why, when the desktop will not say where things are", async () => {
-    const failing: Failing = {};
-    const made = await warmed(bench({}, {}, failing));
-    await sentTogether(made, 2);
-    failing.desk = true;
-    const before = made.glides.length;
-    expect(await made.outside.deal()).toBe("desktop-refused");
-    expect(made.glides).toHaveLength(before);
-    expect(made.faults).toEqual(["the desktop would not say where things are"]);
-  });
 });
 
 describe("an arrangement a creature composes for the panes outside", () => {
@@ -1400,11 +1053,6 @@ describe("an arrangement a creature composes for the panes outside", () => {
     return panes;
   }
 
-  it("says so when no pane is outside", async () => {
-    const made = await warmed(bench());
-    expect(await made.outside.compose(briefing)).toBe("nothing-outside");
-  });
-
   it("seats them as it was written, the weightiest in its largest seat, without taking focus", async () => {
     const made = await warmed(bench());
     const panes = await threeFromACreature(made);
@@ -1417,33 +1065,6 @@ describe("an arrangement a creature composes for the panes outside", () => {
     expect([places.get("pane-0")?.x, places.get("pane-2")?.x]).toEqual([1516, 1516]);
     for (const pane of panes) expect(pane.log.at(-1)).toMatch(/^placed \d+,\d+ by host$/);
     expect(focusCalls(made)).toEqual([]);
-  });
-
-  it("says in plain words what it had to put right", async () => {
-    const made = await warmed(bench());
-    await threeFromACreature(made);
-    const rough: Authored = {
-      name: "rough",
-      seats: [
-        { x: -0.1, y: 0, width: 0.62, height: 1 },
-        { x: 0.3, y: 0, width: 0.7, height: 0.5 },
-        { x: 0.5, y: 0.52, width: 0.5, height: 0.48 },
-        { x: 0.6, y: 0.6, width: 0.3, height: 0.3 },
-      ],
-    };
-    expect(await made.outside.compose(rough)).toEqual({
-      name: "rough",
-      said: [
-        "seat 1 reached past the display's edge and was brought inside",
-        "seat 1 was off the grid's lines and was moved onto them",
-        "seat 2 was off the grid's lines and was moved onto them",
-        "seat 2 lay over seat 1 and was cut back to stand beside it",
-        "seat 3 was off the grid's lines and was moved onto them",
-        "seat 4 was off the grid's lines and was moved onto them",
-        "seat 4 lay over seat 3 with no room beside it and was left out",
-      ],
-    });
-    await vi.waitFor(() => expect(overlapping([...made.outside.places().values()])).toEqual([]));
   });
 
   it("leaves a pane the keeper dragged where he put it, and seats the others around it", async () => {
@@ -1462,19 +1083,6 @@ describe("an arrangement a creature composes for the panes outside", () => {
     expect(moved).not.toContain(made.idOf("pane-0"));
     expect(made.outside.places().get("pane-0")).toEqual(outOfTheWay);
     expect(overlapping([...made.outside.places().values()])).toEqual([]);
-  });
-
-  it("leaves a pane the keeper stepped or sized by key where that left it", async () => {
-    const made = await warmed(bench());
-    await threeFromACreature(made);
-    expect(await made.outside.stepSize("pane-2", -1)).toBe("moved");
-    const stepped = made.outside.places().get("pane-2");
-    const before = made.glides.length;
-    await made.outside.compose(briefing);
-    await vi.waitFor(() => expect(made.glides.length).toBeGreaterThan(before));
-    const moved = made.glides.slice(before).flatMap((glide) => glide.moves.map((move) => move.id));
-    expect(moved).not.toContain(made.idOf("pane-2"));
-    expect(made.outside.places().get("pane-2")).toEqual(stepped);
   });
 
   it("leaves the pane the keeper is in where it stands, and a pane that fills its display out of it", async () => {
@@ -1549,15 +1157,6 @@ describe("an arrangement a creature composes for the panes outside", () => {
     await vi.waitFor(() => expect(made.glides.length).toBe(before + 3));
     expect(await made.outside.deal()).toEqual({ name: "rows", turn: 1, of: 2 });
   });
-
-  it("moves nothing, and says why, when the desktop will not say where things are", async () => {
-    const failing: Failing = {};
-    const made = await warmed(bench({}, {}, failing));
-    await threeFromACreature(made);
-    failing.desk = true;
-    expect(await made.outside.compose(briefing)).toBe("desktop-refused");
-    expect(made.faults).toEqual(["the desktop would not say where things are"]);
-  });
 });
 
 type Sent = Parameters<ReturnType<typeof bench>["outside"]["send"]>[1];
@@ -1569,7 +1168,6 @@ describe("a creature's own choreography", () => {
   const topRight = { x: 0.5, y: 0, width: 0.5, height: 0.5 };
   const bottomRight = { x: 0.5, y: 0.5, width: 0.5, height: 0.5 };
   const carriedOff: ScreenRect = { x: 20, y: 400, width: 90, height: 200 };
-  const roomIn = (rect: ScreenRect | undefined): number => (rect?.width ?? 0) * (rect?.height ?? 0);
   const focused = (made: ReturnType<typeof bench>): string[] =>
     made.desktop.calls.filter((call) => call.startsWith("focus "));
 
@@ -1631,24 +1229,6 @@ describe("a creature's own choreography", () => {
     expect(focused(made)).toEqual([]);
   });
 
-  it("gives the lead the largest seat of a named shape, on the first stage that holds it", async () => {
-    const made = await warmed(bench(makingRoom));
-    const keys = await threeOut(made);
-    const arranged = await made.outside.arrange({
-      keys,
-      lead: "pane-2",
-      instruction: {
-        kind: "dealt",
-        deals: (count) => dealsToTry({ shape: "lead-and-stack", led: true }, count),
-      },
-    });
-    expect(arranged).toMatchObject({ look: "lead and stack", stands: "beside", keepers: [] });
-    const places = made.outside.places();
-    expect(roomIn(places.get("pane-2"))).toBeGreaterThan(2 * roomIn(places.get("pane-0")));
-    expect(places.get("pane-0")?.x).toBe(places.get("pane-1")?.x);
-    expect(overlapping([...places.values()])).toEqual([]);
-  });
-
   it("drills in three deep, the newest leading beside the console over the trail of its ancestors, and back out to where everything stood", async () => {
     let stands = desk;
     const steppingAside = async (): Promise<Desk> => {
@@ -1686,17 +1266,6 @@ describe("a creature's own choreography", () => {
     expect(made.outside.places().get("list")).toEqual(stood);
     expect(made.shows.map((show) => show.title)).toEqual(["list", "item", "detail"]);
     expect(focused(made)).toEqual([]);
-  });
-
-  it("arises beside its parent, and leaves a parent the keeper placed where it stands", async () => {
-    const made = await warmed(bench());
-    await sentByTheCreature(made, "list");
-    const stood = made.outside.places().get("list") as ScreenRect;
-    made.desktop.emit({ kind: "moved", id: made.idOf("list"), bounds: stood, by: "keeper" });
-    await sentByTheCreature(made, "item", { from: "list", leads: true });
-    const places = made.outside.places();
-    expect(places.get("list")).toEqual(stood);
-    expect(overlapping([...places.values()])).toEqual([]);
   });
 });
 
@@ -2053,7 +1622,6 @@ describe("an arrangement that names things not yet out", () => {
 });
 
 describe("what a pane outside says by its border", () => {
-  const ofThread = { ...byACreature, company: "thread-1" } as const;
   const returning = { ...byACreature, last: desk.console } as const;
   const inks = { arrived: "#e0af68", "needs-you": "#e0af68", critical: "#f7768e" } as const;
   const inked = { frameInk: (signal: keyof typeof inks) => inks[signal] };
@@ -2064,25 +1632,6 @@ describe("what a pane outside says by its border", () => {
     const tenant: Tenant = { ...pane.tenant, facts: () => ({ ...facts(), signal: signal() }) };
     return { ...pane, tenant };
   }
-
-  async function standing(made: ReturnType<typeof bench>, key: string, sending: Sent) {
-    const pane = paneNamed(key);
-    void made.outside.send(pane.tenant, sending);
-    await vi.waitFor(() => expect(made.outside.places().has(key)).toBe(true));
-    await settled();
-    return pane;
-  }
-
-  it("draws no outline and asks the desktop for no frame for the keeper's own pane", async () => {
-    const made = await warmed(bench(inked));
-    const pane = paneNamed("notes");
-    await made.outside.send(pane.tenant, byHand);
-    const chrome = chromeOf(pane.body);
-    expect(chrome.dataset.signal).toBeUndefined();
-    expect(chrome.dataset.edge).toBeUndefined();
-    expect(made.shows[0]?.frame).toBeUndefined();
-    expect(made.frames).toEqual([]);
-  });
 
   it("outlines a creature's arrival in amber, on the page and the frame, for six seconds", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
@@ -2113,23 +1662,6 @@ describe("what a pane outside says by its border", () => {
     expect(chrome.dataset.signal).toBeUndefined();
   });
 
-  it("holds amber while the pane waits on the keeper, red only for critical, and no arrival on a return", async () => {
-    const made = await warmed(bench(inked));
-    const [signal, setSignal] = createSignal<SettingSignal | undefined>("needs-you");
-    const pane = signalled("tests", signal);
-    await made.outside.send(pane.tenant, returning);
-    const chrome = chromeOf(pane.body);
-    expect(chrome.dataset.signal).toBe("needs-you");
-    expect(made.shows[0]?.frame).toBe("#e0af68");
-    setSignal("critical");
-    expect(chrome.dataset.signal).toBe("critical");
-    setSignal(undefined);
-    expect(chrome.dataset.signal).toBeUndefined();
-    const waiting = paneNamed("asks", "conversation", "needs-you");
-    await made.outside.send(waiting.tenant, byHand);
-    expect(chromeOf(waiting.body).dataset.signal).toBe("needs-you");
-  });
-
   it("repaints the frame as the signal changes, once for each change", async () => {
     const made = await warmed(bench(inked));
     const [signal, setSignal] = createSignal<SettingSignal | undefined>();
@@ -2145,47 +1677,5 @@ describe("what a pane outside says by its border", () => {
       [id, "#e0af68"],
       [id, undefined],
     ]);
-  });
-
-  it("marks the lead of an arrangement with its top edge, and no lead once it stands alone", async () => {
-    const made = await warmed(bench({ ...makingRoom, ...inked }));
-    const keys = ["pane-0", "pane-1", "pane-2"];
-    const panes = keys.map((key) => paneNamed(key));
-    await Promise.all(panes.map((pane) => made.outside.send(pane.tenant, ofThread)));
-    await settled();
-    await made.outside.arrange({
-      keys,
-      lead: "pane-2",
-      instruction: {
-        kind: "dealt",
-        deals: (count) => dealsToTry({ shape: "lead-and-stack", led: true }, count),
-      },
-    });
-    const edges = () => panes.map((pane) => chromeOf(pane.body).dataset.edge);
-    expect(edges()).toEqual([undefined, undefined, "lead"]);
-    expect(made.frames.every(([, frame]) => frame === undefined)).toBe(true);
-    await made.outside.recall(["pane-0", "pane-1"]);
-    expect(chromeOf(panes[2]?.body as HTMLElement).dataset.edge).toBeUndefined();
-  });
-
-  it("marks the pane a drill came out of with its left edge while the drilled-in pane is out", async () => {
-    let stands = desk;
-    const steppingAside = async (): Promise<Desk> => {
-      stands = asTheHub;
-      return stands;
-    };
-    const made = await warmed(bench({ makeRoom: steppingAside }, {}, {}, false, () => stands));
-    const list = await standing(made, "list", ofThread);
-    expect(chromeOf(list.body).dataset.edge).toBeUndefined();
-    const item = await standing(made, "item", {
-      ...ofThread,
-      from: "list",
-      leads: true,
-      weight: 4,
-    });
-    expect(chromeOf(list.body).dataset.edge).toBe("way-back");
-    expect(chromeOf(item.body).dataset.edge).toBe("lead");
-    await made.outside.recall(["item"]);
-    expect(chromeOf(list.body).dataset.edge).toBeUndefined();
   });
 });

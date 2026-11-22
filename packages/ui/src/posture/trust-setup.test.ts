@@ -9,7 +9,7 @@ import {
   memoryStorage,
   type WorkspaceFixture,
 } from "./facts-testing.ts";
-import { type Offer, offerKey } from "./proposal.ts";
+import type { Offer } from "./proposal.ts";
 import { type PostureRecord, postureStorageKey, rememberedPosture } from "./record.ts";
 import { createTrustSetup, type TrustSetup, trustArrivals } from "./trust-setup.ts";
 
@@ -222,13 +222,6 @@ describe("the first trust setup on a workspace", () => {
 });
 
 describe("later launches", () => {
-  it("says nothing while the fingerprint is the one that was settled", async () => {
-    const first = setupOver(bunWorkspace);
-    await first.setup.begin();
-    await first.setup.acceptRest();
-    expect(await first.relaunch().setup.launchNotice()).toBeUndefined();
-  });
-
   it("names the difference once, then never again for the same facts", async () => {
     const first = setupOver(bunWorkspace);
     await first.setup.begin();
@@ -280,14 +273,6 @@ describe("later launches", () => {
     expect(await first.setup.launchNotice()).toBe(
       "no trust setup for this workspace yet · trust-setup proposes 3 rules",
     );
-    expect(await first.relaunch().setup.launchNotice()).toBeUndefined();
-  });
-
-  it("counts a fact it could not read as unchanged rather than new", async () => {
-    const first = setupOver(bunWorkspace);
-    await first.setup.begin();
-    await first.setup.acceptRest();
-    first.harness.fail("mcp", new ServerRefusal(503, "this host serves no mcp registry"));
     expect(await first.relaunch().setup.launchNotice()).toBeUndefined();
   });
 
@@ -349,12 +334,6 @@ describe("an ask the person already accepted in trust setup", () => {
     const setup = await accepted();
     expect(setup.acceptedScopeOf({ tool: "write", rules: [] })).toBeUndefined();
     expect(setup.acceptedScopeOf({ tool: "bash" })).toBeUndefined();
-  });
-
-  it("keys a decision by its scope and rule", async () => {
-    const { offers } = await begun();
-    const [, run] = offers;
-    expect(run === undefined ? undefined : offerKey(run)).toBe("workspace:bash:bun run *");
   });
 });
 

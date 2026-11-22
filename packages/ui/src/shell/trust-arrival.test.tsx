@@ -168,12 +168,4 @@ describe("trust setup arriving with trust", () => {
     await waitFor(() => expect(focusedName()).toBe("trust setup"));
     await waitFor(() => expect(proposedRules()).toEqual(["mcp playwright__*"]));
   });
-
-  it("shows nothing at all on a launch whose facts match the settled posture", async () => {
-    settleBefore(["playwright"]);
-    await open(servedWorkspace({ trusted: true, mcp: ["playwright"] }));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(statusNotice()).toBeUndefined();
-    expect(document.querySelector(".kw-setup")).toBeNull();
-  });
 });

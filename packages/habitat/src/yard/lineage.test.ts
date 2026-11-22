@@ -4,16 +4,7 @@ import { describe, expect, it } from "vitest";
 import { minute, second } from "../clock/clock.ts";
 import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
-import {
-  chainOf,
-  nameOf,
-  parentOf,
-  plotCardId,
-  plotOf,
-  plotSeedOf,
-  trailOf,
-  trailOrderOf,
-} from "./lineage.ts";
+import { chainOf, nameOf, parentOf, plotOf, trailOf, trailOrderOf } from "./lineage.ts";
 import { foldPlot } from "./plot.ts";
 import { stepYard } from "./step.ts";
 import { aSetting, calm, isoAt, noon, proposed, settled } from "./testing.ts";
@@ -55,12 +46,6 @@ function grown(settings: readonly Setting[], after: readonly BusEnvelope[] = [])
 const inquiry = grown([diff, file, test, note]);
 
 describe("the trail", () => {
-  it("walks from the root to a setting, root first", () => {
-    expect(trailOf(inquiry, "t")).toEqual(["d", "f", "t"]);
-    expect(trailOf(inquiry, "d")).toEqual(["d"]);
-    expect(trailOf(inquiry, "missing")).toEqual([]);
-  });
-
   it("names a parent only when the yard knows it, so a conversation's id roots a trail", () => {
     const fromThread = grown([aSetting({ id: "x", from: "s1" })]);
     expect(parentOf(inquiry, "t")).toBe("f");
@@ -73,22 +58,9 @@ describe("the trail", () => {
     expect(plotOf(inquiry, "f")).toEqual(["f", "t"]);
     expect(plotOf(inquiry, "missing")).toEqual([]);
   });
-
-  it("names the plot card after its seed and reads the seed back", () => {
-    expect(plotCardId("d")).toBe("plot:d");
-    expect(plotSeedOf("plot:d")).toBe("d");
-    expect(plotSeedOf("d")).toBeUndefined();
-  });
 });
 
 describe("the chain", () => {
-  it("names the trail from the seed to a setting, the setting last", () => {
-    expect(chainOf(inquiry, "t")).toBe("the fix → place.ts → place.test.ts");
-    expect(chainOf(inquiry, "d")).toBe("the fix");
-    expect(chainOf(inquiry, "n")).toBe("the fix → a side note");
-    expect(chainOf(inquiry, "missing")).toBe("");
-  });
-
   it("names a plot card from its seed to its deepest member, the newest leaf on a tie", () => {
     expect(chainOf(foldPlot(inquiry, "d"), "plot:d")).toBe("the fix → place.ts → place.test.ts");
     const later = aSetting({

@@ -128,14 +128,6 @@ describe("a plot growing from what the creature set out", () => {
     await screen.findByText("the end of this chain");
   });
 
-  it("walks rootward from the seed back to the conversation it grew from", async () => {
-    await openPlot();
-    focusInside("diff", ".kw-diff");
-    walk("rootward");
-    await waitFor(() => expect(panelHolding()).toBeUndefined());
-    expect(document.activeElement?.closest(".kw-yard-hub")).toBeTruthy();
-  });
-
   it("walks back out to the seed from inside the conversation, where leader ] stays a preset", async () => {
     await openPlot();
     focusInside("diff", ".kw-diff");

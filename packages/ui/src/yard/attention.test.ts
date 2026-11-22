@@ -36,18 +36,6 @@ describe("attention reports", () => {
     run.dispose();
   });
 
-  it("reports one interaction per panel every two seconds, each panel on its own clock", () => {
-    const run = reporting();
-    run.interact("diff");
-    run.interact("file");
-    run.later(interactEveryMs - 1);
-    run.interact("diff");
-    run.later(1);
-    run.interact("diff");
-    expect(run.kinds()).toEqual(["interact diff", "interact file", "interact diff"]);
-    run.dispose();
-  });
-
   it("reports an interaction exactly when that panel's last report is two seconds old, so none is too close and none due is dropped", () => {
     fc.assert(
       fc.property(fc.array(pressArb, { maxLength: 24 }), (presses) => {

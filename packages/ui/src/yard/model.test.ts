@@ -8,23 +8,6 @@ import { createYardRuleBook } from "./rules.ts";
 import { unseenSurroundings } from "./signals.ts";
 import { aSetting, proposed, settled } from "./testing.ts";
 
-describe("the yard model", () => {
-  it("feeds the keeper's attention into the habitat world, where the kernel measures it", () => {
-    const run = yardModel();
-    run.emit([proposed(1, aSetting({ id: "diff", rung: "unfold" }))]);
-    run.model.attend({ type: "keeper.attend", ts: at(1), id: "diff", kind: "interact" });
-    expect(run.attentionOf("diff")?.interactions).toBe(1);
-    run.dispose();
-  });
-
-  it("ignores attention to a panel the yard does not hold", () => {
-    const run = yardModel();
-    run.model.attend({ type: "keeper.attend", ts: at(1), id: "gone", kind: "enter" });
-    expect(run.model.settings()).toEqual([]);
-    run.dispose();
-  });
-});
-
 describe("when the yard re-sorts", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -74,13 +57,6 @@ describe("a size the creature named", () => {
       shown: "unfold",
       size: "working",
     });
-    run.dispose();
-  });
-
-  it("opens readable when a keeper's own opening names none", () => {
-    const run = yardModel({ focusedThread: "s1" });
-    run.emit([proposed(1, delivery({ origin: "keeper" }))]);
-    expect(settingOf(run.model.settings(), "delivery")?.size).toBeUndefined();
     run.dispose();
   });
 });

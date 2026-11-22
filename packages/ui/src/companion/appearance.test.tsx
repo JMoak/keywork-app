@@ -98,21 +98,6 @@ describe("the floating creature's appearance", () => {
     expect(seedOf(snapshot("first", "ada").creature)).not.toBe(seedOf(original.creature));
   });
 
-  it("holds changed appearances while tucked and draws only the latest one when shown", () => {
-    const first = recordedRenderer(4, referenceRows);
-    const second = recordedRenderer(7, referenceRows);
-    const page = mount((skin) => (skin === "second" ? second.render : first.render));
-    page.port.snapshot(snapshot("first"));
-    page.port.conditions({ ...restingConditions, ceiling: "hidden" });
-    const paints = first.poses.length + second.poses.length;
-    page.port.snapshot(snapshot("second"));
-    page.host.advance(10_000);
-    expect(first.poses.length + second.poses.length).toBe(paints);
-    expect(page.canvas.width).toBe(4);
-    page.port.conditions({ ...restingConditions, motion: "reduce" });
-    expect(page.canvas.width).toBe(7);
-  });
-
   it("carries refreshed native identity through the world and serialized feed into the real skin renderer", async () => {
     const native = nativeIdentity();
     const page = mount((id) => {

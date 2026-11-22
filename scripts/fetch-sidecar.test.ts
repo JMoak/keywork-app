@@ -15,7 +15,6 @@ import {
   type SidecarHost,
   sidecarDestination,
   sidecarIdentityLine,
-  sidecarTargets,
   verifyDigest,
 } from "./fetch-sidecar.ts";
 
@@ -23,16 +22,6 @@ const binary = new TextEncoder().encode("#!keywork\n");
 const binaryDigest = digestOf(binary);
 
 describe("releaseAssetName", () => {
-  it("mirrors keywork's release asset names", () => {
-    expect(sidecarTargets.map(releaseAssetName)).toEqual([
-      "keywork-windows-x64.exe",
-      "keywork-darwin-arm64",
-      "keywork-darwin-x64",
-      "keywork-linux-x64",
-      "keywork-linux-arm64",
-    ]);
-  });
-
   it("refuses a platform keywork does not publish", () => {
     expect(() => releaseAssetName({ platform: "freebsd", arch: "x64" })).toThrow(/freebsd/);
   });
@@ -50,12 +39,6 @@ describe("releaseAsset", () => {
 });
 
 describe("expectedDigest", () => {
-  it("reads the sha256sum line keywork publishes", () => {
-    expect(expectedDigest(`${"a".repeat(64)}  keywork-linux-x64\n`, "keywork-linux-x64")).toBe(
-      "a".repeat(64),
-    );
-  });
-
   it("finds the asset inside a combined SHA256SUMS", () => {
     const sums = [
       `${"1".repeat(64)}  keywork-darwin-arm64`,
@@ -136,26 +119,6 @@ function hostReporting(
 describe("sidecarIdentityLine", () => {
   it("is the exact line keywork --version prints for this console's contract", () => {
     expect(sidecarIdentityLine("0.2.2")).toBe(`keywork 0.2.2 · contract ${contractVersion}`);
-  });
-});
-
-describe("identityReport", () => {
-  it("says a confirmed binary reported its identity", () => {
-    expect(
-      identityReport("keywork-linux-x64", {
-        kind: "confirmed",
-        line: "keywork 0.2.2 · contract 1.28",
-      }),
-    ).toBe("keywork-linux-x64 reports keywork 0.2.2 · contract 1.28");
-  });
-
-  it("says plainly when the identity was not checked", () => {
-    expect(
-      identityReport("keywork-linux-arm64", {
-        kind: "unchecked",
-        reason: "this host cannot run it",
-      }),
-    ).toBe("keywork-linux-arm64 identity not checked: this host cannot run it");
   });
 });
 

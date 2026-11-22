@@ -271,11 +271,6 @@ export function nameTakenOnNode(slug: string, workshop: string): ServerReading {
   };
 }
 
-export const slugTaken: ServerReading = {
-  status: 409,
-  body: { error: "a bot already has the slug wren" },
-};
-
 export function workshopRaised(substrate: "host" | "sbx", creature = "wren"): ServerReading {
   return {
     status: 201,

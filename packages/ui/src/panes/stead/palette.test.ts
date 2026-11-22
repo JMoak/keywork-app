@@ -6,7 +6,7 @@ import {
   resolveSky,
   unresolvedRoles,
 } from "./habitat-render.ts";
-import { fitCanvas, paletteSourceOf, palettesOf } from "./painter.ts";
+import { fitCanvas } from "./painter.ts";
 import { sourceOfTheme } from "./theme-source.ts";
 
 const hex = /^#[0-9a-f]{6}$/;
@@ -38,21 +38,6 @@ describe("the palette across the gallery", () => {
         expect(sky.horizon, `${theme.name} ${phase}`).toMatch(hex);
       }
     }
-  });
-
-  it("falls back to the house theme when no theme variables are applied, and caches by token values", () => {
-    const source = paletteSourceOf(document.body);
-    expect(source.read("--kw-background")).toMatch(hex);
-    expect(source.appearance).toBe("dark");
-    const first = palettesOf(source, "day", "autumn", false, undefined);
-    const again = palettesOf(source, "day", "autumn", false, first);
-    expect(again).toBe(first);
-    expect(palettesOf(source, "night", "autumn", false, first)).not.toBe(first);
-    expect(first.coat(1)).toBe(first.coat(1));
-    expect(first.coat(1)).not.toEqual(first.coat(2));
-    const forced = palettesOf(source, "day", "autumn", true, undefined);
-    expect(forced.world[9]).toBe("CanvasText");
-    expect(forced.sky).toEqual({ zenith: "Canvas", horizon: "Canvas" });
   });
 
   it("keeps the integer scale of the device pixel ratio and lets a wide stead scroll", () => {

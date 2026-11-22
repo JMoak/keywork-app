@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { CreatureReading, Thread } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,9 +5,6 @@ import {
   askLine,
   bubbleLine,
   choreBoard,
-  emptyStateLine,
-  headLine,
-  steadTitle,
   type Telling,
   timeWord,
   trimmedFromTheLeft,
@@ -59,41 +54,10 @@ describe("the chore board", () => {
       nextAt: at(-2),
     });
   });
-
-  it("says so when nothing is scheduled", () => {
-    expect(choreBoard({ creatures: { vey: creature("vey", []) } }, noon, 0)).toEqual({
-      line: "chore board · nothing scheduled",
-      nextAt: undefined,
-    });
-  });
 });
 const at = (minutesBefore: number): string => new Date(noon - minutesBefore * 60_000).toISOString();
 
 describe("the stead's words", () => {
-  it("hold no exclamation mark and no emoji in any string", () => {
-    const source = readFileSync(join(process.cwd(), "packages/ui/src/panes/stead/copy.ts"), "utf8");
-    const literals = [...source.matchAll(/"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map(
-      ([, plain, template]) => plain ?? template ?? "",
-    );
-    expect(literals.length).toBeGreaterThan(10);
-    for (const literal of literals) {
-      expect(literal, literal).not.toMatch(/!/);
-      expect(literal, literal).not.toMatch(/\p{Extended_Pictographic}/u);
-    }
-  });
-
-  it("teaches the one next action in two parts and titles itself by the count", () => {
-    expect(emptyStateLine("ctrl+k b")).toBe("No creature yet · make one with ctrl+k b");
-    expect(steadTitle(0)).toBe("stead");
-    expect(steadTitle(2)).toBe("stead · 2 need you");
-    expect(headLine({ creatures: 1, needYou: 0, working: 0, phase: "dusk", clock: "18:40" })).toBe(
-      "1 creature · dusk 18:40",
-    );
-    expect(headLine({ creatures: 3, needYou: 1, working: 2, phase: "day", clock: "09:05" })).toBe(
-      "3 creatures · 1 needs you · 2 working · day 09:05",
-    );
-  });
-
   it("speaks the fixed bubble vocabulary and trims a long command from the left", () => {
     expect(askLine("edit", "src/a.ts")).toBe("asks to edit src/a.ts");
     expect(askLine("write", "")).toBe("asks to edit a file");

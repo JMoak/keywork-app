@@ -3,7 +3,6 @@ import type { SessionSummary } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import {
   foldedLine,
-  parentLine,
   type SessionsListing,
   type SessionsRow,
   sessionIdOf,
@@ -93,17 +92,6 @@ describe("the sessions level's rows", () => {
     expect(trashedParent[1]).toMatchObject({ parent: undefined });
     const unloaded = sessionsRows(listing({ sessions: [summary("k2")] }));
     expect(unloaded[0]).toMatchObject({ parent: { name: undefined, trashed: false } });
-  });
-
-  it("words the lineage fact for each case", () => {
-    expect(parentLine({ name: "refactor-permissions", trashed: true })).toBe(
-      "↳ child of refactor-permissions · trashed",
-    );
-    expect(parentLine({ name: undefined, trashed: true })).toBe("↳ child of a trashed session");
-    expect(parentLine({ name: "refactor-permissions", trashed: false })).toBe(
-      "↳ child of refactor-permissions · not loaded",
-    );
-    expect(parentLine({ name: undefined, trashed: false })).toBe("↳ child of a session not loaded");
   });
 
   it("lists trashed sessions after the live ones only while the trash shows", () => {

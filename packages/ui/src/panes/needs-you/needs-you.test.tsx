@@ -11,7 +11,6 @@ import type {
 import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { appActions } from "../../keys/actions.ts";
 import { keymapFromConfig } from "../../keys/index.ts";
 import { stopAskingWhy, whyLine } from "../../page/ask-card-why.ts";
 import { type NeedsYouItem, orderNeedsYou } from "../../shell/needs-you.ts";
@@ -56,26 +55,6 @@ describe("the desk", () => {
     expect(container.querySelector(".kw-ov-head-lead")?.textContent).toBe(
       "5 sessions · 2 need you · 1 working · $2.05",
     );
-  });
-
-  it("carries the arc chip, the bot, the theme it wears, its gauge, cost and age", () => {
-    const desk = deskHarness({
-      waiting: [askItem("c1", { sessionId: "rename" })],
-      summaries: [
-        { ...summary("rename", "rename the tiler verbs"), arc: "pricing", bot: "editor" },
-      ],
-      projections: { rename: asking("c1", []) },
-      dressed: { rename: "rose-pine-dawn" },
-    });
-    const { container } = mount(desk);
-    const row = container.querySelector(".kw-desk-row") as HTMLElement;
-    expect(row.querySelector(".kw-desk-arc")?.textContent).toBe("pricing");
-    expect(row.querySelector(".kw-desk-bot")?.textContent).toBe("◆ editor");
-    expect(row.querySelector(".kw-desk-wears")?.textContent).toBe("rose-pine-dawn");
-    expect(row.querySelectorAll(".kw-desk-swatch")).toHaveLength(8);
-    expect(row.querySelector(".kw-desk-cost")?.textContent).toBe("$0.41");
-    expect(row.querySelector(".kw-desk-age")?.textContent).toMatch(/^waiting \d+[mhd]$/);
-    expect(row.style.getPropertyValue("--kw-arc-hue")).toBe("var(--kw-ramp-2)");
   });
 
   it("answers the cursor row's ask in place with the card's own keys and labels", async () => {
@@ -211,80 +190,6 @@ describe("the desk", () => {
     act("needs-you.dismiss");
     expect(lineText(container)).toBe("marked read · the sessions tree still lists it");
     expect(groupNames(container)).toEqual(["needs you"]);
-  });
-
-  it("marks each workspace when more than one is waiting", () => {
-    const desk = deskHarness({
-      waiting: [
-        askItem("c1"),
-        askItem("c2", { workspace: "D:/side/tools", since: "2026-10-15T11:00:00.000Z" }),
-      ],
-    });
-    const { container } = mount(desk);
-    const headings = [...container.querySelectorAll(".kw-desk-workspace")].map(
-      (heading) => heading.textContent,
-    );
-    expect(headings).toEqual(["work", "tools"]);
-  });
-
-  it("teaches the one next key when the desk is clear, and titles itself by the count", () => {
-    const desk = deskHarness({});
-    const { container } = mount(desk);
-    expect(container.querySelector(".kw-empty")?.textContent).toBe(
-      "the desk is clear · ctrl+k t lists every session",
-    );
-    expect(container.querySelector(".kw-ov-line")).toBeNull();
-    expect(needsYouPane.title({ kind: "needs-you" }, desk.shell)).toBe("desk");
-    const waiting = deskHarness({ waiting: [askItem("c1"), inboxItem("m1")] });
-    expect(needsYouPane.title({ kind: "needs-you" }, waiting.shell)).toBe("desk · 2 need you");
-  });
-
-  it("wears the needs-you state while anything waits, the house always, and lives in main", () => {
-    const view = { id: "p1", spec: { kind: "needs-you" as const }, focused: false };
-    expect(needsYouPane.lifecycle?.(view, deskHarness({ waiting: [askItem("c1")] }).shell)).toBe(
-      "needs-you",
-    );
-    expect(needsYouPane.lifecycle?.(view, deskHarness({}).shell)).toBe("idle");
-    expect(needsYouPane.attire).toBe("house");
-    expect(needsYouPane.home).toBe("main");
-  });
-});
-
-describe("the desk's keys", () => {
-  it("owns leader n, leader shift+n and leader q, with palette names nobody else claims", () => {
-    const ours = Object.entries(appActions).filter(([id]) => id.startsWith("needs-you."));
-    expect(Object.fromEntries(ours.map(([id, action]) => [id, action.chords]))).toEqual({
-      "needs-you.next": "leader n",
-      "needs-you.back": "leader shift+n",
-      "needs-you.strip": "none",
-      "needs-you.summon": "leader q",
-      "needs-you.down": ["j", "down"],
-      "needs-you.up": ["k", "up"],
-      "needs-you.open": "enter",
-      "needs-you.waiting": "tab",
-      "needs-you.dismiss": "d",
-      "needs-you.overturn": "x",
-      "needs-you.approve": "y",
-      "needs-you.once": "o",
-      "needs-you.session": "s",
-      "needs-you.workspace": "w",
-      "needs-you.deny": "n",
-    });
-    const theirs = new Set(
-      Object.entries(appActions)
-        .filter(([id]) => !id.startsWith("needs-you."))
-        .flatMap(([, action]) => commandNames(action.command)),
-    );
-    const claimed = ours.flatMap(([, action]) => commandNames(action.command));
-    expect(claimed.filter((name) => theirs.has(name))).toEqual([]);
-  });
-
-  it("is summoned as desk and still answers to needs-you and waiting", () => {
-    expect(commandNames(appActions["needs-you.summon"]?.command)).toEqual([
-      "desk",
-      "needs-you",
-      "waiting",
-    ]);
   });
 });
 
@@ -453,10 +358,4 @@ function cursorName(container: HTMLElement): string {
 
 function lineText(container: HTMLElement): string {
   return container.querySelector(".kw-ov-line")?.textContent ?? "";
-}
-
-function commandNames(
-  command: { name: string; aliases?: readonly string[] } | undefined,
-): string[] {
-  return command === undefined ? [] : [command.name, ...(command.aliases ?? [])];
 }

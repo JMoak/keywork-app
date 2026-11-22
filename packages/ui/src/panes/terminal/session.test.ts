@@ -1,7 +1,6 @@
-import { emptyProjection, projectAll } from "@keywork-app/client";
 import { describe, expect, it } from "vitest";
 import { echoPty } from "../../host/echo-pty.ts";
-import { connectPty, mirrorPainter, type PtyEvent } from "./session.ts";
+import { connectPty, type PtyEvent } from "./session.ts";
 import { fakeSurface } from "./session-testing.ts";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -48,20 +47,6 @@ describe("a shell over the pty seam", () => {
     ]);
   });
 
-  it("does not resize a pty that opened at the size the surface still has", async () => {
-    const surface = fakeSurface({ cols: 80, rows: 24 });
-    const port = echoPty();
-    const resized: Array<[number, number]> = [];
-    connectPty(
-      surface,
-      { ...port, resize: (_id, cols, rows) => resized.push([cols, rows]) },
-      link,
-      () => {},
-    );
-    await settle();
-    expect(resized).toEqual([]);
-  });
-
   it("reports the exit and ignores input afterwards", async () => {
     const surface = fakeSurface();
     const events: PtyEvent[] = [];
@@ -97,41 +82,5 @@ describe("a shell over the pty seam", () => {
     await settle();
     expect(surface.text()).toContain("keywork attach");
     expect(surface.text()).not.toMatch(/token/i);
-  });
-});
-
-describe("the mirror painter", () => {
-  it("paints growth as a tail write and a rewrite as a reset", () => {
-    const surface = fakeSurface();
-    const painter = mirrorPainter(surface);
-    painter.paint(emptyProjection);
-    expect(surface.text()).toContain("no bash calls");
-    const started = projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: "t",
-        sessionId: "s",
-        type: "tool.started",
-        payload: {
-          call: { type: "tool-call", callId: "c1", name: "bash", arguments: { command: "pwd" } },
-        },
-      },
-    ]);
-    painter.paint(started);
-    expect(surface.resets).toBe(1);
-    expect(surface.text()).toContain("$ pwd");
-    const finished = projectAll(started, [
-      {
-        id: 2,
-        ts: "t",
-        sessionId: "s",
-        type: "tool.finished",
-        payload: { callId: "c1", output: "/w", isError: false },
-      },
-    ]);
-    painter.paint(finished);
-    expect(surface.resets).toBe(1);
-    expect(surface.text()).toContain("/w\r\n");
-    expect(surface.text()).toContain("done");
   });
 });

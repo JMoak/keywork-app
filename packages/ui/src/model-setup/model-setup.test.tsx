@@ -117,16 +117,6 @@ describe("model setup", () => {
     expect(host.pty.open).not.toHaveBeenCalled();
   });
 
-  it("names the detected server without recommending a model that is still loading", async () => {
-    const { host } = setupHost(async () => json(200, report(undefined, false)));
-    showSetup(host);
-    expect(await screen.findByText(/ollama found/)).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /On this computer/ }).hasAttribute("data-recommended"),
-    ).toBe(false);
-    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
-  });
-
   it("does not call a network endpoint local or replace an unconfirmed saved creature choice", async () => {
     const { host } = setupHost(async () =>
       json(

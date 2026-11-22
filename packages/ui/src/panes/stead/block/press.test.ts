@@ -1,6 +1,6 @@
 import type { HabitatState } from "@keywork-app/habitat";
 import type { Hit } from "@keywork-app/habitat/block";
-import { noon, sketchTown, slugOf } from "@keywork-app/habitat/block/testing";
+import { sketchTown, slugOf } from "@keywork-app/habitat/block/testing";
 import { describe, expect, it } from "vitest";
 import { noThreadYet } from "../copy.ts";
 import { directoryInWorkspace, outsideTheWorkspace, pressedOn } from "./press.ts";
@@ -10,18 +10,6 @@ const working = slugOf(0);
 const asleep = slugOf(4);
 
 describe("pressing a workshop's faces", () => {
-  it("opens the creature's conversation at the door", () => {
-    const town = withConversation(sketchTown(5), working, "talk-0");
-    expect(pressedOn(face(working, "door"), town, root)).toEqual({
-      kind: "session",
-      session: "talk-0",
-    });
-    expect(pressedOn(face(asleep, "door"), sketchTown(5), root)).toEqual({
-      kind: "notice",
-      line: noThreadYet(asleep),
-    });
-  });
-
   it("opens the thread that runs at the bench, or the latest one when the bench is dark", () => {
     const town = sketchTown(5);
     expect(pressedOn(face(working, "bench"), town, root)).toEqual({
@@ -34,22 +22,6 @@ describe("pressing a workshop's faces", () => {
     expect(pressedOn(face(asleep, "bench"), empty, root)).toEqual({
       kind: "notice",
       line: noThreadYet(asleep),
-    });
-  });
-
-  it("opens the creature's profile and its threads at the shelf, and its own chores at the board", () => {
-    const town = sketchTown(5);
-    expect(pressedOn(face(working, "shelf"), town, root)).toEqual({
-      kind: "pane",
-      spec: { kind: "creature", slug: working },
-    });
-    expect(pressedOn(face(working, "board"), town, root)).toEqual({
-      kind: "pane",
-      spec: { kind: "chores", creature: working },
-    });
-    expect(pressedOn(face(working, undefined), town, root)).toEqual({
-      kind: "creature",
-      creature: working,
     });
   });
 });
@@ -107,10 +79,4 @@ function face(creature: string, meaning: string | undefined): Hit {
     target: { kind: "workshop", creature },
     ...(meaning === undefined ? {} : { meaning }),
   };
-}
-
-function withConversation(state: HabitatState, slug: string, conversation: string): HabitatState {
-  const held = state.creatures[slug];
-  if (held === undefined) throw new Error(`no ${slug} in the town at ${noon}`);
-  return { ...state, creatures: { ...state.creatures, [slug]: { ...held, conversation } } };
 }

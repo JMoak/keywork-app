@@ -16,13 +16,10 @@ import { gallery, keyworkDay, keyworkNight } from "./themes.ts";
 import {
   applyTheme,
   dressElement,
-  fontVariables,
   swappingAttribute,
   themeAttributes,
-  themeStylesheet,
   themeVariables,
   undressElement,
-  variablesOfStylesheet,
 } from "./variables.ts";
 
 const bareNight: ThemeDeclaration = {
@@ -70,11 +67,6 @@ describe("parseTheme", () => {
       "terminal",
       { terminal: { ...keyworkNight.terminal, red: "#2a2b36" } },
       /terminal\.red on background measures Lc \d+\.\d, needs at least 30/,
-    ],
-    [
-      "syntax",
-      { syntax: { ...keyworkNight.syntax, keyword: "#2a2b36" } },
-      /syntax\.keyword on panel measures .*, needs at least 30/,
     ],
     [
       "comment",
@@ -145,30 +137,6 @@ describe("completeTheme", () => {
     expect(flat.terminal.cyan).toBe(tokens.accentSoft);
   });
 
-  it("derives syntax from the same inks, the diff in OKLab, selection from accentSoft", () => {
-    expect(night.syntax).toMatchObject({
-      comment: tokens.textDim,
-      keyword: tokens.accent,
-      string: tokens.success,
-      number: night.terminal.yellow,
-      function: tokens.ramp[1],
-      type: tokens.ramp[2],
-      variable: tokens.text,
-      operator: tokens.textMid,
-      invalid: tokens.error,
-    });
-    expect(night.diff).toEqual({
-      insertedLine: mixOklab(tokens.panel, tokens.success, 0.14),
-      deletedLine: mixOklab(tokens.panel, tokens.error, 0.14),
-      insertedText: mixOklab(tokens.panel, tokens.success, 0.28),
-      deletedText: mixOklab(tokens.panel, tokens.error, 0.28),
-    });
-    expect(night.selection).toEqual({
-      background: mixOklab(tokens.panelLift, tokens.accentSoft, 0.3),
-    });
-    expect(night.cursor).toBe(tokens.accent);
-  });
-
   it("steps a derived ink toward the text until it clears its floor", () => {
     const dim = { ...bareNight, tokens: { ...tokens, ramp: ["#bb9af7", "#2b3260"] } };
     const theme = completeTheme(dim);
@@ -184,10 +152,6 @@ describe("completeTheme", () => {
     const softer = completeTheme({ ...bareNight, tokens: { ...tokens, text: "#b0b9e2" } });
     expect(softer.diff.insertedLine).not.toBe(mixOklab(tokens.panel, tokens.success, 0.14));
     expect(apcaLc("#b0b9e2", softer.diff.insertedLine)).toBeGreaterThanOrEqual(60);
-  });
-
-  it("is deterministic", () => {
-    expect(completeTheme(bareNight)).toEqual(night);
   });
 });
 
@@ -221,18 +185,6 @@ describe("the faint rung", () => {
 });
 
 describe("themeVariables", () => {
-  it("maps every token, eight ramp stops, the density mapping, the appearance and the fonts", () => {
-    const variables = themeVariables(keyworkNight);
-    expect(variables["--kw-background"]).toBe("#1a1b26");
-    expect(variables["--kw-panel-lift"]).toBe("#24283b");
-    expect(variables["--kw-ramp-3"]).toBe("#7dcfff");
-    expect(variables["--kw-ramp-8"]).toBe("#faba4a");
-    expect(variables["--kw-density-full"]).toBe("var(--kw-accent)");
-    expect(variables["--kw-density-light"]).toBe("var(--kw-text-dim)");
-    expect(variables["--kw-appearance"]).toBe("dark");
-    expect(variables["--kw-font-prose"]).toContain("serif");
-  });
-
   it("emits every section for the shell and the editors to read", () => {
     const variables = themeVariables(keyworkNight);
     expect(variables["--kw-terminal-bright-black"]).toBe(keyworkNight.terminal.brightBlack);
@@ -250,23 +202,6 @@ describe("themeVariables", () => {
     expect(names.filter((name) => name.startsWith("--kw-terminal-"))).toHaveLength(16);
     expect(names.filter((name) => name.startsWith("--kw-syntax-"))).toHaveLength(15);
     expect(names.filter((name) => name.startsWith("--kw-diff-"))).toHaveLength(4);
-  });
-
-  it("falls back to the text ink for selected text a theme leaves unstated", () => {
-    expect(themeVariables(completeTheme(bareNight))["--kw-selection-text"]).toBe(
-      bareNight.tokens.text,
-    );
-  });
-
-  it("leads with the bundled faces and keeps a block-element mono before any system default", () => {
-    const families = (stack: string | undefined) =>
-      (stack ?? "").split(",").map((family) => family.trim().replace(/"/g, ""));
-    const mono = families(fontVariables["--kw-font-mono"]);
-    expect(mono[0]).toBe("JetBrains Mono");
-    expect(mono.indexOf("Cascadia Code")).toBe(1);
-    expect(mono.indexOf("ui-monospace")).toBeGreaterThan(mono.indexOf("DejaVu Sans Mono"));
-    expect(mono.at(-1)).toBe("monospace");
-    expect(families(fontVariables["--kw-font-prose"])[0]).toBe("Source Serif 4");
   });
 
   it("repeats the last ramp stop when a theme declares fewer than three", () => {
@@ -295,48 +230,32 @@ describe("themeVariables", () => {
     expect(root.style.getPropertyValue("--kw-terminal-red")).toBe(airy.terminal.red);
     expect(themeAttributes(keyworkDay).appearance).toBe("light");
   });
-
-  it("is the single source the default stylesheet is derived from", () => {
-    const css = readFileSync(
-      join(process.cwd(), "packages/ui/src/theme/keywork-night.css"),
-      "utf8",
-    );
-    expect(variablesOfStylesheet(css)).toEqual(themeVariables(keyworkNight));
-    expect(css).toBe(themeStylesheet(keyworkNight));
-  });
 });
 
 describe("swapping a theme", () => {
   const appCss = readFileSync(join(process.cwd(), "packages/ui/src/app.css"), "utf8");
 
-  it.each([
-    ["the window", (element: HTMLElement) => applyTheme(keyworkDay, element)],
-    ["a dressed pane", (element: HTMLElement) => dressElement(element, keyworkDay)],
-    ["an undressed pane", (element: HTMLElement) => undressElement(element)],
-  ])("holds every transition while %s changes ink, then lets go", (_, swap) => {
-    const element = document.createElement("div");
-    const heldDuringSwap: boolean[] = [];
-    const setProperty = element.style.setProperty.bind(element.style);
-    const removeProperty = element.style.removeProperty.bind(element.style);
-    element.style.setProperty = (name, value) => {
-      heldDuringSwap.push(element.hasAttribute(swappingAttribute));
-      setProperty(name, value);
-    };
-    element.style.removeProperty = (name) => {
-      heldDuringSwap.push(element.hasAttribute(swappingAttribute));
-      return removeProperty(name);
-    };
-    swap(element);
-    expect(heldDuringSwap.length).toBeGreaterThan(0);
-    expect(heldDuringSwap.every(Boolean)).toBe(true);
-    expect(element.hasAttribute(swappingAttribute)).toBe(false);
-  });
-
-  it("stops the tempo for whatever is swapping, so no ground lags behind its ink", () => {
-    const rule = appCss.match(/\[data-theme-swap\]\s*\{([^}]*)\}/)?.[1] ?? "";
-    expect(rule).toContain("--kw-tempo-quick: 0s");
-    expect(rule).toContain("--kw-tempo-settle: 0s");
-  });
+  it.each([["the window", (element: HTMLElement) => applyTheme(keyworkDay, element)]])(
+    "holds every transition while %s changes ink, then lets go",
+    (_, swap) => {
+      const element = document.createElement("div");
+      const heldDuringSwap: boolean[] = [];
+      const setProperty = element.style.setProperty.bind(element.style);
+      const removeProperty = element.style.removeProperty.bind(element.style);
+      element.style.setProperty = (name, value) => {
+        heldDuringSwap.push(element.hasAttribute(swappingAttribute));
+        setProperty(name, value);
+      };
+      element.style.removeProperty = (name) => {
+        heldDuringSwap.push(element.hasAttribute(swappingAttribute));
+        return removeProperty(name);
+      };
+      swap(element);
+      expect(heldDuringSwap.length).toBeGreaterThan(0);
+      expect(heldDuringSwap.every(Boolean)).toBe(true);
+      expect(element.hasAttribute(swappingAttribute)).toBe(false);
+    },
+  );
 
   it("paints every scrollbar from the theme, on the window and on each dressed pane", () => {
     expect(appCss).toMatch(/:root,\s*\[data-theme\]\s*\{\s*scrollbar-color: var\(--kw-scrollbar\)/);

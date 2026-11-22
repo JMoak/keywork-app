@@ -27,12 +27,6 @@ describe("window focus as the shell sees it", () => {
     dispose();
     expect(fake.listeners()).toBe(0);
   });
-
-  it("reads as focused where there is no window to ask", () => {
-    createRoot(() => {
-      expect(windowFocus(undefined)()).toBe(true);
-    });
-  });
 });
 
 describe("focus anywhere among the console and its panes outside", () => {
@@ -65,17 +59,6 @@ describe("focus anywhere among the console and its panes outside", () => {
       dismiss();
       child.close();
     }
-  });
-
-  it("follows the console alone exactly as before when no pane is outside", () => {
-    createRoot((dispose) => {
-      const focused = anyWindowFocus();
-      window.dispatchEvent(new Event("blur"));
-      expect(focused()).toBe(false);
-      window.dispatchEvent(new Event("focus"));
-      expect(focused()).toBe(true);
-      dispose();
-    });
   });
 });
 

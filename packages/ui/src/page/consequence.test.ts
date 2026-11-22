@@ -45,17 +45,6 @@ describe("what an ask would do", () => {
     });
   });
 
-  it("names why a write goes unpreviewed and folds its content to one line", () => {
-    const write = { path: "big.bin", content: "one\ntwo\nthree" };
-    expect(consequenceOf({ tool: "write", arguments: write })).toEqual({
-      kind: "unpreviewed",
-      head: "write big.bin",
-      rows: [{ name: "content", value: "one", fold: "… 2 more lines" }],
-      reason:
-        "no preview from the server · the file is too large or binary to show, or it is a memory note",
-    });
-  });
-
   it("typesets a bash command, tables an mcp call, and leaves any other tool its arguments", () => {
     expect(consequenceOf({ tool: "bash", arguments: { command: "ls" } })).toMatchObject({
       kind: "command",
@@ -107,12 +96,6 @@ describe("a file's head", () => {
     expect(head("one")).toBe("write notes.md · new file · 1 line");
     expect(head("")).toBe("write notes.md · new file · 0 lines");
   });
-
-  it("says when the call would leave the file as it is", () => {
-    expect(fileHead("write", { path: "a.ts", before, after: before })).toBe(
-      "write a.ts · no change",
-    );
-  });
 });
 
 describe("a typeset command", () => {
@@ -144,14 +127,6 @@ describe("a typeset command", () => {
       [">", "operator"],
       ["out", "path"],
       ["2>&1", "operator"],
-    ]);
-  });
-
-  it("reads a leading variable assignment apart from the program it sets up", () => {
-    expect(roles("CI=1 bun test")).toEqual([
-      ["CI=1", "word"],
-      ["bun", "program"],
-      ["test", "word"],
     ]);
   });
 

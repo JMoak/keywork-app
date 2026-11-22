@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessibleName, announcer } from "./announce.ts";
+import { announcer } from "./announce.ts";
 import type { CompanionSnapshot } from "./port.ts";
 
 const idle: CompanionSnapshot = {
@@ -26,13 +26,6 @@ const porch: CompanionSnapshot = {
     answers: ["approve"],
   },
 };
-
-describe("accessibleName", () => {
-  it("is creature, state label, active threads", () => {
-    expect(accessibleName(idle)).toBe("pip, idle, 0 active threads");
-    expect(accessibleName(porch)).toBe("pip, at the porch, 1 active thread");
-  });
-});
 
 describe("announcer", () => {
   it("announces needs-you once and assertively, back and blocked politely, nothing for idle or working", () => {

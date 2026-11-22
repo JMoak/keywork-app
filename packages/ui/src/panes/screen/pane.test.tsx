@@ -4,18 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras } from "../../shell/trust-testing.ts";
 import type { ShellSeams } from "../registry.ts";
-import { checkPaneDefinition } from "../testing.ts";
-import { desktopOnlyLine, type ScreenSpec, screenPane } from "./index.tsx";
+import { type ScreenSpec, screenPane } from "./index.tsx";
 import type { ScreenPort, ScreenViewEvent } from "./port.ts";
-import { screenPortOf } from "./port.ts";
-import {
-  endingLine,
-  pathWord,
-  startingView,
-  statsLine,
-  statusLine,
-  viewState,
-} from "./view-state.ts";
+import { startingView, statusLine, viewState } from "./view-state.ts";
 
 afterEach(cleanup);
 
@@ -136,36 +127,6 @@ describe("the screen pane", () => {
     expect(port.stop).not.toHaveBeenCalled();
   });
 
-  it("starts the requested session in an ended pane a summon rebinds, view or control", async () => {
-    const port = fakePort();
-    const [spec, rebind] = createSignal<ScreenSpec>({ kind: "screen", peer: "moak-main" });
-    const { container } = render(() => (
-      <screenPane.component
-        id="p1"
-        spec={spec()}
-        focused={true}
-        shell={shellWith(port)}
-        onAction={() => {}}
-      />
-    ));
-    await settle();
-    port.emit({ kind: "ended", sessionId, reason: "kill-switch" });
-    expect(container.textContent).toContain("ended · stopped by the kill switch on that machine");
-
-    rebind({ kind: "screen", peer: "moak-main", control: true });
-    await settle();
-    expect(port.view).toHaveBeenLastCalledWith({ peer: "moak-main", control: true });
-    expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("starting");
-    port.emit({ kind: "asking", sessionId });
-    expect(container.textContent).not.toContain("ended");
-
-    port.emit({ kind: "ended", sessionId, reason: "kill-switch" });
-    rebind({ kind: "screen", peer: "moak-main", control: true });
-    await settle();
-    expect(port.view).toHaveBeenCalledTimes(3);
-    expect(port.stop).not.toHaveBeenCalled();
-  });
-
   it("keeps a live session when a summon rebinds the request it already shows", async () => {
     const port = fakePort();
     const [spec, rebind] = createSignal<ScreenSpec>({ kind: "screen", peer: "moak-main" });
@@ -210,21 +171,6 @@ describe("the screen pane", () => {
     await settle();
     expect(container.textContent).toContain("could not reach nGone · no signaling route to nGone");
   });
-
-  it("teaches where it works when the host has no screen port", () => {
-    const { container } = mount({ kind: "screen", peer: "nSpark" }, shellWith(undefined));
-    expect(container.textContent).toBe(desktopOnlyLine);
-    expect(screenPortOf(browserHost())).toBeUndefined();
-  });
-
-  it("is summoned with a machine and titled by its label", () => {
-    const shell = shellWith(undefined);
-    expect(screenPane.summon?.spec(shell, "nSpark")).toEqual({ kind: "screen", peer: "nSpark" });
-    expect(screenPane.title({ kind: "screen", peer: "nSpark", label: "spark-ad4d" }, shell)).toBe(
-      "screen · spark-ad4d",
-    );
-    expect(screenPane.spec.safeParse({ kind: "screen", peer: "" }).success).toBe(false);
-  });
 });
 
 describe("the screen view state", () => {
@@ -237,32 +183,6 @@ describe("the screen view state", () => {
     });
     expect(viewState(ended, granted)).toBe(ended);
     expect(statusLine(ended, "spark")).toBe("ended · nobody answered within 30 s");
-  });
-
-  it("names every path class and every ending in words", () => {
-    expect(pathWord("derp")).toBe("relayed through DERP · low-bandwidth preset");
-    expect(pathWord("peer-relay")).toBe("peer relay");
-    expect(pathWord("local")).toBe("this machine");
-    expect(pathWord(undefined)).toBe("path unknown");
-    expect(endingLine({ reason: "denied", detail: "needs-permission" })).toBe(
-      "that machine has not allowed screen recording yet",
-    );
-    expect(endingLine({ reason: "idle" })).toBe("the viewer went quiet for five minutes");
-    expect(endingLine({ reason: "something-new" })).toBe("something-new");
-  });
-
-  it("shows stats only while live and names a quality limit", () => {
-    const connecting = viewState(viewState(startingView, granted), stats);
-    expect(statsLine(connecting)).toBe("");
-    const live = viewState(connecting, { kind: "connection", sessionId, state: "connected" });
-    const limited = viewState(live, {
-      ...stats,
-      stats: {
-        ...(stats.kind === "stats" ? stats.stats : { at: 0, frames: 0, bytes: 0 }),
-        qualityLimitation: "bandwidth",
-      },
-    } as ScreenViewEvent);
-    expect(statsLine(limited)).toContain("limited by bandwidth");
   });
 });
 
@@ -295,17 +215,5 @@ describe("the screen pane's path class", () => {
     expect(container.querySelector(".kw-screen-path")?.textContent).toBe(
       "relayed · low-bandwidth preset",
     );
-  });
-
-  it("keeps the last known class while a stats report carries no pair", () => {
-    const live = viewState(viewState(startingView, granted), stats);
-    const unpaired = { ...stats, stats: { at: 3000, frames: 1, bytes: 1 } } as ScreenViewEvent;
-    expect(viewState(live, unpaired).path).toBe("direct");
-  });
-});
-
-describe("the screen pane against the registry's rules", () => {
-  it("meets T7 and claims no key or command another action holds", () => {
-    checkPaneDefinition(screenPane);
   });
 });

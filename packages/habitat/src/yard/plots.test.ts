@@ -87,12 +87,6 @@ describe("the keeper's own openings", () => {
     expect(yard.budget).toBe(before.budget);
     expect(yard.settings.f?.size).toBeUndefined();
   });
-
-  it("never fold back, whatever the keeper looks at next", () => {
-    const yard = arrive(unfoldedSeed(), [opened("f", "d", 10)], 10);
-    const later = stepYard(yard, { ...asked, focusedThread: "s2" }, at(3600));
-    expect(later.settings.f?.shown).toBe("unfold");
-  });
 });
 
 describe("children grow beside their parent", () => {
@@ -147,12 +141,6 @@ describe("a plot folds as one", () => {
     expect(stepYard(busy, asked, due).settings.d?.folded).toBe("plot:d");
   });
 
-  it("folds back a plot the keeper only glanced at, since one entry is not attention", () => {
-    const glanced = noticed(noticed(grown, "c", "enter", 20), "c", "leave", 25);
-    expect(glanced.settings.c?.attention?.entries).toBe(1);
-    expect(stepYard(glanced, asked, at(25) + 10 * minute).settings.d?.folded).toBe("plot:d");
-  });
-
   it("never folds back while focus is inside it or the keeper opened something in it", () => {
     const inside = noticed(grown, "c", "enter", 20);
     const opening = arrive(grown, [opened("f", "d", 20)], 20);
@@ -178,21 +166,6 @@ describe("a plot folds as one", () => {
     const lone = moveByHand(unfoldedSeed(), "d", "card", at(30));
     expect(lone.settings.d).toMatchObject({ shown: "card" });
     expect(lone.settings.d?.folded).toBeUndefined();
-  });
-
-  it("folds a parent's children when it is dismissed or withdrawn, never when seen or pinned", () => {
-    const leaving = (outcome: "seen" | "dismissed" | "withdrawn" | "pinned", yard = grown) =>
-      withStream(yard, [
-        settled(9, isoAt(at(30)), "s1", {
-          id: "d",
-          outcome,
-          by: outcome === "withdrawn" ? "creature" : "keeper",
-        }),
-      ]);
-    expect(leaving("dismissed").settings.c?.folded).toBe("plot:d");
-    expect(leaving("withdrawn").settings.c?.folded).toBe("plot:d");
-    expect(leaving("seen").settings.c?.folded).toBeUndefined();
-    expect(leaving("pinned").settings.c?.folded).toBeUndefined();
   });
 
   it("waits for focus to leave before a withdrawal folds, and folds at once when the keeper dismisses", () => {
@@ -288,21 +261,6 @@ describe("restoring a plot", () => {
       prefs: { reducedMotion: false, tier: "active" },
     });
   }
-});
-
-describe("sizes follow measured attention", () => {
-  const yard = arrive(unfoldedSeed(), [opened("f", "d", 10)], 10);
-
-  it("change at the keeper's notices and never on the clock", () => {
-    const busy = interactions(noticed(yard, "f", "enter", 20), "f", 21, 22);
-    expect(busy.settings.f?.size).toBe("working");
-    const left = noticed(busy, "f", "leave", 70);
-    const muchLater = at(70) + 2 * hour;
-    expect(stepYard(left, asked, muchLater).settings.f?.size).toBe("working");
-    expect(nextChangeAt(left, noon + unfoldBudget.windowMs)).toBeUndefined();
-    const touched = attend(left, { id: "d", kind: "interact", at: muchLater });
-    expect(touched.settings.f?.size).toBe("readable");
-  });
 });
 
 function wide(): Rect {

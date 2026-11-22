@@ -4,13 +4,11 @@ import { logLine, parseLog, type SessionLogRow, sessionSummaries } from "./log.t
 import {
   forcedFieldTrials,
   isDemanding,
-  jitterBufferTargetFor,
   megabit,
   mergeFeatureList,
   mergeFieldTrials,
   orderCodecs,
   presetFor,
-  webRtcUdpPorts,
 } from "./media.ts";
 import {
   isHostPair,
@@ -44,16 +42,6 @@ describe("sender presets", () => {
       maxFramerate: 15,
       scaleResolutionDownBy: 2,
     });
-  });
-
-  it("lowers the jitter buffer only for control sessions", () => {
-    expect(jitterBufferTargetFor("view")).toBeNull();
-    expect(jitterBufferTargetFor("control")).toBe(0);
-  });
-
-  it("pins a narrow UDP range", () => {
-    expect(webRtcUdpPorts.max - webRtcUdpPorts.min).toBeLessThan(200);
-    expect(webRtcUdpPorts.min).toBeGreaterThan(1024);
   });
 });
 

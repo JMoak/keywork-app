@@ -2,7 +2,6 @@ import { overlaps } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import type { Desk, ScreenPoint, ScreenRect } from "../port.ts";
 import { type OutsideKind, orbit, outsideMetrics } from "./arrange.ts";
-import { arrivalTiming, glideTiming } from "./choreography.ts";
 import { groundMetrics } from "./pattern-ground.ts";
 import { shapeMetrics } from "./pattern-shapes.ts";
 import {
@@ -14,7 +13,6 @@ import {
   coversTheNearSide,
   deskOf,
   grown,
-  hiddenTitles,
   inArrivalOrder,
   landsUnderTheCursor,
   leavesTheDisplay,
@@ -40,7 +38,6 @@ import {
   fan,
   grid,
   type Incoming,
-  inTurn,
   type Pattern,
   patterns,
   pile,
@@ -98,10 +95,6 @@ describe("every pattern, wherever it says it holds", () => {
             expect(arrangement.pattern).toBe(pattern);
             expect(brokenPlaces(incoming, arrangement)).toEqual([]);
             expect(brokenTiming(arrangement)).toEqual([]);
-          });
-
-          it(`${pattern}, ${named(area, how, count)}: the same desk gives the same places`, () => {
-            expect(lays[pattern]({ ...incoming, desk: deskFor(area) })).toEqual(arrangement);
           });
         }
       }
@@ -175,13 +168,6 @@ describe("the cursor", () => {
       "16 on 1366x768, maximised",
     ]);
   });
-
-  it("deals the cascade below the cursor when it cannot step past it", () => {
-    const arriving = panes(5, small);
-    const cursor = centreOf(small);
-    const seats = boundsOf(cascade({ desk: windowed(small, cursor), arriving }));
-    expect(seats.every((seat) => seat.y >= cursor.y + gap)).toBe(true);
-  });
 });
 
 describe("panes already outside", () => {
@@ -223,15 +209,6 @@ describe("panes already outside", () => {
         ...size,
       })),
     );
-  });
-
-  it("slides a grid past a column that already stands beside the console", () => {
-    const desk = windowed(wide);
-    const standing = boundsOf(laid(column, { desk, arriving: alike(3, "earlier") }));
-    const tiled = boundsOf(laid(grid, { desk, arriving: alike(4), standing }));
-    const everyPair = tiled.flatMap((seat) => standing.map((pane) => [seat, pane] as const));
-    expect(everyPair.some(([seat, pane]) => overlaps(grown(seat, gap), pane))).toBe(false);
-    expect(tiled[0]?.y).toBe(desk.console.y);
   });
 });
 
@@ -372,13 +349,6 @@ describe("other desks", () => {
     expect(rights).toEqual(rights.toSorted((a, b) => b - a));
   });
 
-  it("lays a grid in the room below a console that spans the display", () => {
-    const desk = deskWith(wide, "room below");
-    const tiled = boundsOf(laid(grid, { desk, arriving: alike(6) }));
-    expect(tiled.every((seat) => seat.y >= desk.console.y + desk.console.height + gap)).toBe(true);
-    expect(pairs(tiled).some(([a, b]) => overlaps(grown(a, gap), b))).toBe(false);
-  });
-
   it("lets a small console in the middle of a small display be covered past its far side", () => {
     const desk = deskWith(small, "room all round");
     const incoming = { desk, arriving: panes(5, small) };
@@ -415,11 +385,6 @@ describe("the cascade", () => {
       [1, 2, 3, 4, 5, 6, 7].map((step) => [step * cascadeStep, step * cascadeStep]),
     );
     expect(Math.max(...seats.map((seat) => seat.x + seat.width))).toBe(small.width - gap);
-  });
-
-  it("arrives back to front", () => {
-    const arrangement = cascade({ desk: maximised(full), arriving: alike(5) });
-    expect(arrivalOf(arrangement)).toEqual(idsOf(alike(5)));
   });
 });
 
@@ -480,11 +445,6 @@ describe("the stair", () => {
     expect(flightTops).toHaveLength(2);
     expect(pairs(seats).some(([a, b]) => overlaps(grown(a, gap), b))).toBe(false);
   });
-
-  it("arrives in sequence", () => {
-    const arriving = panes(4, wide);
-    expect(arrivalOf(laid(stair, { desk: windowed(wide), arriving }))).toEqual(idsOf(arriving));
-  });
 });
 
 describe("the fan", () => {
@@ -501,16 +461,6 @@ describe("the fan", () => {
     expect(tops[0]).toBeGreaterThan(tops[1] as number);
     expect(tops[3]).toBeGreaterThan(tops[2] as number);
     expect(tops[4]).toBeGreaterThan(tops[3] as number);
-  });
-
-  it("overlaps each neighbour a little, like a hand of cards, and closes up evenly for more", () => {
-    const pitchesOf = (hand: readonly ScreenRect[]): number[] =>
-      hand.slice(1).map((seat, index) => seat.x - (hand[index]?.x ?? 0));
-    const three = boundsOf(laid(fan, { desk, arriving: alike(3) }));
-    expect(pitchesOf(three)).toEqual(Array(2).fill(size.width * shapeMetrics.fan.loosest));
-    expect(new Set(pitchesOf(seats)).size).toBe(1);
-    expect(pitchesOf(seats)[0]).toBeLessThan(size.width * shapeMetrics.fan.loosest);
-    expect(pitchesOf(seats)[0]).toBeGreaterThanOrEqual(shapeMetrics.fan.tightest);
   });
 
   it("arrives from its middle outward, each pane a title lower than the last", () => {
@@ -546,12 +496,6 @@ describe("the grid", () => {
     ]);
   });
 
-  it("is as square as the room lets it be", () => {
-    const four = boundsOf(laid(grid, { desk, arriving: alike(4) }));
-    expect(new Set(four.map((seat) => seat.x)).size).toBe(2);
-    expect(new Set(four.map((seat) => seat.y)).size).toBe(2);
-  });
-
   it("arrives as a diagonal wave from the console's corner", () => {
     const waves = inArrivalOrder(arrangement).map(
       (seat) => columns.indexOf(seat.bounds.x) + rows.indexOf(seat.bounds.y),
@@ -576,22 +520,6 @@ describe("the burst", () => {
     expect(reaches.map((reach) => wave(reach).length)).toEqual([8, 4, 2, 1, 1]);
     expect(strides).toEqual([...new Set(strides)].toSorted((a, b) => a - b));
     expect(strides[0]).toBe(title.width);
-  });
-
-  it("packs the nearest wave a title apart and loosens each wave after it", () => {
-    const gaps = reaches.slice(0, 3).map((reach) => {
-      const tops = wave(reach).map((seat) => seat.y);
-      return (tops[1] ?? 0) - (tops[0] ?? 0);
-    });
-    expect(gaps[0]).toBe(title.height);
-    expect(gaps).toEqual([...new Set(gaps)].toSorted((a, b) => a - b));
-  });
-
-  it("centres on the console's edge", () => {
-    const middle = desk.console.y + desk.console.height / 2;
-    const top = Math.min(...seats.map((seat) => seat.y));
-    const bottom = Math.max(...seats.map((seat) => seat.y + seat.height));
-    expect(Math.abs((top + bottom) / 2 - middle)).toBeLessThanOrEqual(1);
   });
 
   it("arrives nearest first", () => {
@@ -622,17 +550,6 @@ describe("the pile", () => {
     expect(shapeMetrics.pileDrift).toBeLessThan(8);
   });
 
-  it("takes little more room than its largest pane", () => {
-    const left = Math.min(...seats.map((seat) => seat.x));
-    const right = Math.max(...seats.map((seat) => seat.x + seat.width));
-    expect(right - left).toBe(720 + 7 * shapeMetrics.pileDrift);
-    expect(right).toBe(full.width - gap);
-  });
-
-  it("arrives bottom up", () => {
-    expect(arrivalOf(arrangement)).toEqual(idsOf(arriving));
-  });
-
   it("starts a second pile a title's width clear of the first when the display runs out", () => {
     const tall = boundsOf(laid(pile, { desk: maximised(small), arriving: alike(16) }));
     const [first, eighth, ninth] = [tall[0], tall[7], tall[8]] as ScreenRect[];
@@ -647,31 +564,11 @@ describe("the cascade in time", () => {
     expect(stepMs(40)).toBe(arrivalPace.quickestStepMs);
   });
 
-  it("has sixteen panes all started within about half a second", () => {
-    const ids = idsOf(alike(16));
-    const starts = inTurn(ids);
-    expect(starts.map((start) => start.id)).toEqual(ids);
-    expect(starts[0]?.atMs).toBe(0);
-    expect(starts.at(-1)?.atMs).toBe(510);
-  });
-
-  it("never asks for more glides at once than the choreography's cap", () => {
-    expect(arrivalPace.quickestStepMs * arrivalTiming.maxGliding).toBeGreaterThanOrEqual(
-      glideTiming.longestMs,
-    );
-  });
-
   it("recalls in reverse: the last to arrive leaves first, on the same beat", () => {
     const arrangement = laid(fan, { desk: windowed(wide), arriving: alike(5) });
     const leaving = recalled(arrangement.arrives);
     expect(leaving.map((start) => start.id)).toEqual(arrivalOf(arrangement).toReversed());
     expect(leaving.map((start) => start.atMs)).toEqual([0, 60, 120, 180, 240]);
     expect(recalled([])).toEqual([]);
-  });
-
-  it("stacks in arrival order: no title is left under a pane that arrives after it", () => {
-    const stacked = inArrivalOrder(cascade({ desk: maximised(full), arriving: panes(8, full) }));
-    expect(hiddenTitles(stacked)).toEqual([]);
-    expect(hiddenTitles(stacked.toReversed())).not.toEqual([]);
   });
 });

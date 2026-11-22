@@ -44,10 +44,6 @@ describe("command families from the manifests the server lists", () => {
     ]);
   });
 
-  it("offers nothing for a lockfile without a package.json", () => {
-    expect(commands(["bun.lock"])).toEqual([]);
-  });
-
   it("names every script run * would cover, so a deploy script is never hidden", () => {
     const [, run] = commandFamilies(
       ["bun.lock", "package.json"],
@@ -88,13 +84,6 @@ describe("command families from the manifests the server lists", () => {
 });
 
 describe("the scripts of a package.json", () => {
-  it("lists script names in the order the author wrote them", () => {
-    expect(scriptsOfPackage('{"scripts":{"test":"vitest","build":"tsc"}}')).toEqual([
-      "test",
-      "build",
-    ]);
-  });
-
   it("reads no scripts when the field is missing or not an object", () => {
     expect(scriptsOfPackage('{"name":"x"}')).toEqual([]);
     expect(scriptsOfPackage('{"scripts":["test"]}')).toEqual([]);

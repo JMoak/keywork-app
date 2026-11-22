@@ -2,12 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  namesATestFile,
-  scannedPath,
-  scanTestImports,
-  testImportsIn,
-} from "./check-test-imports.ts";
+import { scanTestImports, testImportsIn } from "./check-test-imports.ts";
 
 describe("check:test-imports", () => {
   it("finds a test file named by any import form", () => {
@@ -34,34 +29,6 @@ describe("check:test-imports", () => {
       "./later.test.ts",
       "./old.test.cjs",
     ]);
-  });
-
-  it("leaves testing modules, fixtures and ordinary modules alone", () => {
-    const source = [
-      'import { fakeClient } from "./client-testing.ts";',
-      'import { aSetting } from "./testing.ts";',
-      'import recorded from "../fixtures/memory.jsonl?raw";',
-      'import { describe } from "vitest";',
-      'import { attest } from "./attest.ts";',
-      'import { latest } from "./contest";',
-    ].join("\n");
-    expect(testImportsIn(source)).toEqual([]);
-  });
-
-  it("names a test file by its last segment, with or without an extension or a query", () => {
-    expect(namesATestFile("./trust.test.ts")).toBe(true);
-    expect(namesATestFile("./trust.test")).toBe(true);
-    expect(namesATestFile("../pane.test.tsx?raw")).toBe(true);
-    expect(namesATestFile("./test/helpers.ts")).toBe(false);
-    expect(namesATestFile("./trust-testing.ts")).toBe(false);
-  });
-
-  it("scans every script and source file, tests included, but not its own examples", () => {
-    expect(scannedPath("packages/ui/src/shell/client-testing.ts")).toBe(true);
-    expect(scannedPath("packages/ui/src/shell/trust-card.test.tsx")).toBe(true);
-    expect(scannedPath("packages/desktop/e2e/first-light/smoke.mjs")).toBe(true);
-    expect(scannedPath("docs/plan.md")).toBe(false);
-    expect(scannedPath("scripts/check-test-imports.test.ts")).toBe(false);
   });
 });
 

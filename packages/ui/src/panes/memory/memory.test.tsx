@@ -1,16 +1,11 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   emptyProjection,
   type KeyworkClient,
-  project,
   projectAll,
   type SessionProjection,
 } from "@keywork-app/client";
 import type {
-  BusEnvelope,
   LedgerEntry,
-  MemoryDecision,
   MemoryGarden,
   MemoryNoteDetail,
   MemoryNotes,
@@ -24,19 +19,11 @@ import gardenFixture from "../../../../client/src/fixtures/memory-garden.json";
 import { parseJsonl } from "../../dev/replay.ts";
 import { browserHost } from "../../host/browser.ts";
 import { createMemoryStore, inertGarden, type MemoryStore } from "../../shell/memory-store.ts";
-import {
-  feedOf,
-  inboxEnvelope,
-  inertMemoryClient,
-  stagedNote,
-} from "../../shell/memory-store-testing.ts";
+import { feedOf, inboxEnvelope, inertMemoryClient } from "../../shell/memory-store-testing.ts";
 import type { Reveal } from "../../shell/needs-you-jumps.ts";
 import { inboxItem } from "../../shell/needs-you-testing.ts";
-import { holdTypingFocus } from "../overview/testing.tsx";
-import { noWorkingSession } from "../overview/working-session.ts";
 import type { ShellSeams } from "../registry.ts";
-import { noDecisionsLine } from "./decisions.ts";
-import { inertLine, lifecycleOf, memoryPane, titleOf } from "./index.tsx";
+import { memoryPane, titleOf } from "./index.tsx";
 
 const fixture = gardenFixture as MemoryGarden;
 
@@ -181,20 +168,6 @@ const settle = async (): Promise<void> => {
 
 afterEach(cleanup);
 
-describe("the memory pane definition", () => {
-  it("summons on the leader, lives in the right dock, and goes needs-you at three waiting items", () => {
-    expect(memoryPane.summon?.chords).toBe("leader shift+m");
-    expect(memoryPane.home).toBe("right");
-    expect(titleOf(0)).toBe("memory");
-    expect(titleOf(2)).toBe("memory · 2 waiting");
-    expect(lifecycleOf(2)).toBe("idle");
-    expect(lifecycleOf(3)).toBe("needs-you");
-    expect(inertLine({ chord: () => "ctrl+k shift+t", leader: () => "ctrl+k" })).toContain(
-      "keywork trust",
-    );
-  });
-});
-
 describe("the garden lens", () => {
   it("renders the recorded garden: layers with their ramp, notes, the inbox by kind, the gardener", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-10T12:00:00Z") });
@@ -318,23 +291,6 @@ describe("the decisions lens", () => {
     [...document.querySelectorAll('[data-kind="decision"] .kw-memory-title')].map(
       (row) => row.textContent,
     );
-  const jevRecall: MemoryDecision = {
-    id: "j1",
-    question: "action-relevance@1",
-    about: { kind: "call", callId: "r1" },
-    candidates: ["Layout Rects"],
-    choice: { kept: ["Layout Rects"], dropped: [] },
-    scores: { "Layout Rects": 0.97 },
-    decider: "jev",
-    latencyMs: 180,
-  };
-  const decidedLive: BusEnvelope = {
-    id: 99,
-    ts: "2026-09-07T12:00:09.000Z",
-    sessionId: "s1",
-    type: "memory.decided",
-    payload: { decision: jevRecall },
-  };
 
   it("lists the working session's decisions newest first and folds one open to its candidates and rule", async () => {
     const { store } = harness(fixture);
@@ -364,83 +320,6 @@ describe("the decisions lens", () => {
     act("memory.back");
     expect(document.querySelector(".kw-memory")?.getAttribute("data-lens")).toBe("garden");
   });
-
-  it("takes a decision live as the session's projection receives it", async () => {
-    const { store } = harness(fixture);
-    const [projection, setProjection] = createSignal(recorded);
-    const act = mount(store, undefined, { id: "s1", projection });
-    await settle();
-    act("memory.decisions");
-    setProjection(project(recorded, decidedLive));
-    expect(titles()[0]).toBe("recall before write src/layout/rects.ts");
-    expect(document.querySelector('[data-row="j1"]')?.textContent).toContain("jev 0.97");
-    expect(document.querySelector('[data-row="j1"] .kw-memory-mark')?.getAttribute("title")).toBe(
-      "odds 0.97",
-    );
-  });
-
-  it("teaches what it will show before any decision, and asks for a session when it has none", async () => {
-    const { store } = harness(fixture);
-    const act = mount(store, undefined, { id: "s1", projection: () => emptyProjection });
-    await settle();
-    act("memory.decisions");
-    expect(screen.getByText(noDecisionsLine)).toBeTruthy();
-    cleanup();
-    const unbound = mount(harness(fixture).store);
-    await settle();
-    unbound("memory.decisions");
-    expect(screen.getByText(noWorkingSession)).toBeTruthy();
-  });
-});
-
-describe("odds on an inbox card", () => {
-  const promotion: StagedItem = {
-    id: "p1",
-    key: "k",
-    created: "2026-10-15T12:00:00.000Z",
-    kind: "borderline-promotion",
-    title: "Auth Tokens Rotate",
-    body: "Tokens rotate hourly.",
-    confidence: 0.7,
-    source: "2026-10-15#3",
-  };
-  const triage = (decision: Partial<MemoryDecision>): BusEnvelope => ({
-    id: 70,
-    ts: "2026-10-15T12:00:01.000Z",
-    sessionId: "",
-    type: "memory.decided",
-    payload: {
-      decision: {
-        id: "t1",
-        question: "entry-durability@1",
-        about: { kind: "entry", entryId: "2026-10-15#3" },
-        candidates: ["2026-10-15#3"],
-        choice: "new-durable",
-        confidence: 0.93,
-        decider: "jev",
-        latencyMs: 90,
-        ...decision,
-      },
-    },
-  });
-  const oddsFact = () => document.querySelector('[data-kind="inbox"] [data-fact="odds"]');
-
-  it("shows the entry's durability and odds on the promotion it became", async () => {
-    const { store, feed } = harness({ ...fixture, inbox: [promotion] });
-    mount(store);
-    await settle();
-    feed.push([triage({})]);
-    expect(oddsFact()?.textContent).toBe("new durable · jev 0.93");
-  });
-
-  it("shows nothing for the builtin, whose every triage is unsure", async () => {
-    const { store, feed } = harness({ ...fixture, inbox: [promotion] });
-    mount(store);
-    await settle();
-    feed.push([triage({ choice: "unsure", decider: "builtin" })]);
-    expect(document.querySelector('[data-kind="inbox"]')).toBeTruthy();
-    expect(oddsFact()).toBeNull();
-  });
 });
 
 describe("the daily lens", () => {
@@ -466,58 +345,7 @@ describe("the inert state", () => {
     expect(screen.getByText(/memory is inert/).textContent).toContain("ctrl+k terminal.summon");
     expect(screen.queryByText(/403/)).toBeNull();
   });
-
-  it("teaches one key when the garden is trusted but empty", async () => {
-    const { store } = harness({ ...inertGarden, trusted: true, inbox: [] });
-    mount(store);
-    await settle();
-    expect(screen.getByText(/nothing in the garden yet/).textContent).toContain(
-      "ctrl+k pane.split",
-    );
-  });
-
-  it("says empty, never untrusted, for a trusted workspace nobody ran init in", async () => {
-    const { store } = harness({ ...inertGarden, trusted: true, inbox: [] });
-    mount(store);
-    await settle();
-    expect(screen.getByText(/memory is empty/)).toBeTruthy();
-    expect(screen.queryByText(/inert|untrusted/)).toBeNull();
-  });
 });
-
-describe("the staged helper", () => {
-  it("builds a staged note the store counts", () => {
-    expect(stagedNote("x", "X.md").kind).toBe("note");
-  });
-});
-
-describe("the memory pane's keyboard home", () => {
-  it("takes DOM focus from a typing field when it is focused", async () => {
-    const typing = holdTypingFocus();
-    const { store } = harness(fixture);
-    mount(store);
-    await settle();
-    expect(document.querySelector(".kw-memory")?.contains(document.activeElement)).toBe(true);
-    typing.remove();
-  });
-});
-
-describe("the memory pane's chrome", () => {
-  it("draws no focus ring of its own, since the frame already marks focus", () => {
-    expect(memoryCss).toMatch(/\.kw-memory:focus \{\s*outline: none;/);
-  });
-
-  it("insets the daily lens title like the note lens title, never flush to the frame", () => {
-    expect(memoryCss).toMatch(
-      /\.kw-memory-daily > \.kw-memory-note-title \{\s*padding: 0\.5rem 1rem 0;/,
-    );
-  });
-});
-
-const memoryCss = readFileSync(
-  join(process.cwd(), "packages/ui/src/panes/memory/memory.css"),
-  "utf8",
-);
 
 describe("a note a creature's message staged", () => {
   const empty: MemoryGarden = { ...inertGarden, trusted: true };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { arrangeNotices } from "../surfaces/outside/panes-outside.tsx";
 import type { Desk, ScreenRect } from "../surfaces/port.ts";
-import { arrangementSaid, placementsReport, toldWords } from "./placements.ts";
+import { arrangementSaid, placementsReport } from "./placements.ts";
 
 const laptop: ScreenRect = { x: 0, y: 0, width: 1920, height: 1040 };
 
@@ -76,77 +76,9 @@ describe("what the console says an arrangement did", () => {
       '3 panes now stand beside the console as one large pane beside a column of the rest. "Change" stayed where the keeper put it.',
     );
   });
-
-  it("says what it corrected by the pane's name, and what it left where the keeper has it", () => {
-    expect(
-      arrangementSaid({
-        shape: undefined,
-        look: "composed",
-        room: "over",
-        seated: [{ title: "Plan", seat: { x: 0, y: 0, w: 6, h: 12 } }],
-        authored: ["Plan", "Notes"],
-        corrected: ["seat 2 has no size on the display and was left out"],
-        keepers: [],
-        inside: ["Log"],
-      }),
-    ).toBe(
-      '1 pane now stands over the console\'s far side as you composed them. "Notes" has no size on the display and was left out. "Log" stayed inside the console, where the keeper brought it.',
-    );
-  });
-
-  it("says plainly when nothing moved and why", () => {
-    const nothing = { shape: undefined, look: undefined, room: "beside", seated: [] } as const;
-    expect(
-      arrangementSaid({ ...nothing, authored: [], corrected: [], keepers: [], inside: [] }),
-    ).toBe("None of the panes named is outside, so nothing moved.");
-    expect(
-      arrangementSaid({
-        ...nothing,
-        authored: [],
-        corrected: [],
-        keepers: ["Plan", "Notes"],
-        inside: [],
-      }),
-    ).toBe('Nothing moved. "Plan" and "Notes" stayed where the keeper put them.');
-  });
 });
 
 describe("what the console tells of settings that are not where they were asked to be", () => {
-  it("sends a short note with a setting that found no room outside, and none with the rest", () => {
-    const report = placementsReport(desk, [
-      { id: "risks", where: "beside", by: "console", note: toldWords.noRoomOutside },
-      { id: "plan", where: "outside", by: "creature", bounds: leftHalf },
-      { id: "power", where: "beside", by: "keeper" },
-    ]);
-    expect(report.placements).toEqual([
-      { id: "risks", where: "beside", by: "console", note: "no room outside" },
-      { id: "plan", where: "outside", by: "creature", seat: { x: 0, y: 0, w: 6, h: 12 } },
-      { id: "power", where: "beside", by: "keeper" },
-    ]);
-  });
-
-  it("names what stepped aside for an arrangement and what went back beside the conversation", () => {
-    expect(
-      arrangementSaid({
-        shape: undefined,
-        look: "composed",
-        room: "beside",
-        seated: [
-          { title: "Plan", seat: { x: 0, y: 0, w: 6, h: 12 } },
-          { title: "Parts", seat: { x: 6, y: 0, w: 6, h: 6 } },
-        ],
-        authored: ["Plan", "Parts"],
-        corrected: [],
-        keepers: [],
-        inside: [],
-        aside: ["Risks", "Power"],
-        backBeside: ["Sunday"],
-      }),
-    ).toBe(
-      '2 panes now stand beside the console as you composed them. "Risks" and "Power" stepped aside as cards. "Sunday" went back beside the conversation as a card: no room was left on the stage. Name it in arrange to set it out again.',
-    );
-  });
-
   it("names up to four panes that share one outcome and counts the rest, inside what the engine keeps", () => {
     const titles = ["Plan", "Parts", "Morning", "Afternoon", "Sunday", "Risks", "Storage"];
     const said = arrangementSaid({

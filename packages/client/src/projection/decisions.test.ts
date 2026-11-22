@@ -1,6 +1,6 @@
 import type { MemoryDecision } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { candidateReasons, decisionOdds, recallText, withDecision } from "./decisions.ts";
+import { candidateReasons, decisionOdds, recallText } from "./decisions.ts";
 
 const byRule: MemoryDecision = {
   id: "m1",
@@ -36,15 +36,6 @@ describe("why a note was recalled", () => {
     expect(recallText(byOdds)).toBe("recalled [[Auth Tokens]] · jev 0.94");
   });
 
-  it("says nothing when the decision kept no note or chose an option", () => {
-    expect(recallText({ ...byRule, choice: { kept: [], dropped: ["Old Auth"] } })).toBeUndefined();
-    expect(recallText({ ...byRule, choice: "unsure" })).toBeUndefined();
-  });
-
-  it("names a kept note bare when nothing says why", () => {
-    expect(recallText(unexplained)).toBe("recalled [[Auth Tokens]]; [[Token Rotation]]");
-  });
-
   it("reasons for every candidate, odds first and the rule's clause otherwise", () => {
     expect([...candidateReasons(byOdds)]).toEqual([
       ["Auth Tokens", "jev 0.94"],
@@ -72,14 +63,5 @@ describe("a decision's odds", () => {
     };
     expect(decisionOdds(relation)).toBe(0.81);
     expect(decisionOdds(byRule)).toBeUndefined();
-  });
-});
-
-describe("the session's decision record", () => {
-  it("appends a new decision and replaces one it already holds by id", () => {
-    const once = withDecision([], byRule);
-    const twice = withDecision(once, byOdds);
-    expect(twice.map((decision) => decision.id)).toEqual(["m1", "m2"]);
-    expect(withDecision(twice, { ...byRule, latencyMs: 9 })[0]?.latencyMs).toBe(9);
   });
 });

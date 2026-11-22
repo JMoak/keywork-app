@@ -39,16 +39,6 @@ describe("composer edits the undo stack can take back", () => {
     expect(input.value).toBe("look: short\npaste[pasted #1, 9 lines, 62 B]");
   });
 
-  it("clears a sent draft and recalls a prompt through the editing command, keeping one history", () => {
-    const { input, commands } = mounted();
-    typeInto(input, "say ok");
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(commands).toEqual([{ command: "delete", value: "", selected: "say ok" }]);
-    fireEvent.keyDown(input, { key: "ArrowUp" });
-    expect(commands.at(-1)).toEqual({ command: "insertText", value: "say ok", selected: "" });
-    expect(input.value).toBe("say ok");
-  });
-
   it("falls back to a plain edit where no editing command runs", () => {
     const { input, commands } = mounted();
     typeInto(input, "hello");
@@ -56,12 +46,6 @@ describe("composer edits the undo stack can take back", () => {
     fireEvent.keyDown(input, { key: "Backspace" });
     expect(commands).toEqual([]);
     expect(input.value).toBe("hell");
-  });
-
-  it("redoes only what the focused field can redo", () => {
-    const { commands } = mounted();
-    expect(redoLastUndo()).toBe(true);
-    expect(commands.at(-1)?.command).toBe("redo");
   });
 
   it("edits through the page the field stands in when its pane is outside the window", () => {

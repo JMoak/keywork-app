@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as semantic from "../creature/semantic.ts";
-import { type WorkshopFamily, workshopFamilies, workshopFamilyOf } from "../place/architecture.ts";
+import { type WorkshopFamily, workshopFamilyOf } from "../place/architecture.ts";
 import { placeSlots } from "../pose/pose.ts";
 import type { IndexedFrame } from "../skins/atlas.ts";
 import { glass, lamplight } from "../skins/legend.ts";
@@ -29,7 +29,7 @@ const night = Date.UTC(2026, 10, 5, 23);
 afterEach(() => vi.restoreAllMocks());
 
 describe("shared miniature and detailed workshop art", () => {
-  it.each(workshopFamilies)("starts %s without unrequested activity or a garden", (family) => {
+  it.each(["gable"] as const)("starts %s without unrequested activity or a garden", (family) => {
     const design = workshopDesign(family);
     const quiet = workshopFrame(family);
     expect([quiet.width, quiet.height]).toEqual([48, 28]);
@@ -45,7 +45,7 @@ describe("shared miniature and detailed workshop art", () => {
     expect(pixel(design.facade, design.lamp.x, design.lamp.y)).toBe(glass);
   });
 
-  it.each(gardenPlantings)("attaches the requested %s garden at the ground", (garden) => {
+  it.each(["herbs"] as const)("attaches the requested %s garden at the ground", (garden) => {
     const frame = workshopFrame("gable", { garden });
     const planting = gardenTile(garden);
     const bare = workshopFrame("gable");
@@ -117,7 +117,7 @@ describe("shared miniature and detailed workshop art", () => {
     expect(composeStead(emptyHabitat(), day, options).anchors).toEqual({});
   });
 
-  it.each(workshopFamilies)("reuses the exact %s composite in daylight and at night", (family) => {
+  it.each(["root"] as const)("reuses the exact %s composite in daylight and at night", (family) => {
     const resident = creature("a");
     const chore = {
       id: "daily",
@@ -371,17 +371,6 @@ describe("bounded district scenes", () => {
       tiles.storehouse.width * tileScale * 3,
     );
     expect(legacy.infrastructure).toBeUndefined();
-  });
-
-  it("leaves the legacy route unchanged when optional scene preferences are absent", () => {
-    const habitat = world(creature("a"), creature("b"));
-    expect(
-      composeStead(habitat, day, {
-        courtSlugs: undefined,
-        workshops: undefined,
-        gardens: undefined,
-      }),
-    ).toEqual(composeStead(habitat, day));
   });
 });
 

@@ -3,27 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   bundledEngineVersion,
   type ChildHandle,
-  exitFailureOf,
   expectedContract,
   healthCheck,
   type ServeState,
   type Spawn,
   type SupervisorSeams,
-  serveArguments,
   superviseServer,
-  treeKillCommand,
   unresolvedFailure,
-  withSource,
 } from "./serve-process.ts";
-
-it("starts an explicit managed home without a project workspace", () => {
-  expect(serveArguments({ binary: "/engine", cwd: "/private/home", home: true }, 0)).toEqual([
-    "serve",
-    "--home",
-    "--port",
-    "0",
-  ]);
-});
 
 interface ScriptedChild {
   handle: ChildHandle;
@@ -251,15 +238,6 @@ describe("superviseServer", () => {
     expect(await child.handle.exited).toBe(137);
   });
 
-  it("accepts an engine of another release that speaks the same contract", async () => {
-    const h = harness({ version: "9.9.9" });
-    const server = superviseServer(spec, h.seams);
-    const starting = server.start();
-    await tick();
-    announce(h.children[0] as ScriptedChild);
-    expect(await starting).toMatchObject({ ok: true, version: "9.9.9" });
-  });
-
   it("refuses an engine whose contract differs, and stops it", async () => {
     const h = harness({ version: "9.9.9", contract: "1.7" });
     const server = superviseServer(spec, h.seams);
@@ -289,21 +267,6 @@ describe("superviseServer", () => {
       ok: false,
       failure: { kind: "contract-mismatch", expected: expectedContract, actual: undefined },
     });
-  });
-
-  it("puts the entry ahead of the serve verb when the engine runs through one", async () => {
-    const h = harness();
-    const cli = "/src/stead/repos/keywork/packages/cli/src/main.ts";
-    const server = superviseServer({ binary: "bun", cwd: "/work", entry: [cli] }, h.seams);
-    const starting = server.start();
-    await tick();
-    expect(h.spawned[0]).toEqual({
-      command: "bun",
-      args: [cli, "serve", "--port", "4771"],
-      cwd: "/work",
-    });
-    announce(h.children[0] as ScriptedChild);
-    expect((await starting).ok).toBe(true);
   });
 
   it("restarts after an unexpected exit with 250ms doubling to 5s, and not after stop", async () => {
@@ -382,13 +345,6 @@ describe("healthCheck", () => {
     operationIds: [],
   });
 
-  it("passes an engine that speaks the pinned contract at the pinned release", async () => {
-    expect(await healthCheck(ticket, served(bundledEngineVersion, expectedContract))).toEqual({
-      ok: true,
-      version: bundledEngineVersion,
-    });
-  });
-
   it("judges only the contract, whatever release the /doc names", async () => {
     expect(await healthCheck(ticket, served("9.9.9", "1.7"))).toMatchObject({
       failure: { kind: "contract-mismatch", actual: "1.7" },
@@ -407,14 +363,6 @@ describe("healthCheck", () => {
       failure: { kind: "contract-mismatch", expected: expectedContract, actual: previous },
     });
   });
-
-  it("stamps where the engine came from onto a contract refusal and nothing else", () => {
-    const source = { origin: "PATH" as const, from: "/usr/bin/keywork" };
-    const refused = { kind: "contract-mismatch" as const, expected: "1.25", actual: "1.7", ticket };
-    expect(withSource(refused, source)).toEqual({ ...refused, source });
-    const gone = { kind: "gone" as const, url: ticket.url };
-    expect(withSource(gone, source)).toBe(gone);
-  });
 });
 
 describe("failure parsing", () => {
@@ -429,19 +377,5 @@ describe("failure parsing", () => {
       message: "odd",
       nextAction: "",
     });
-  });
-
-  it("names the tree-kill command only where one is needed", () => {
-    expect(treeKillCommand(7, "win32")).toEqual({
-      command: "taskkill",
-      args: ["/pid", "7", "/T", "/F"],
-    });
-    expect(treeKillCommand(7, "darwin")).toBeUndefined();
-    expect(exitFailureOf(null, "boom", undefined)).toEqual({
-      kind: "failed",
-      exitCode: null,
-      detail: "boom",
-    });
-    expect(exitFailureOf(0, "", 4771)).toMatchObject({ kind: "no-ticket" });
   });
 });

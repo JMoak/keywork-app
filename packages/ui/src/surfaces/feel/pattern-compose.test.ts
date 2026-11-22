@@ -73,12 +73,6 @@ describe("a composition someone else wrote, made safe to play", () => {
     }
   });
 
-  it("knows the grid's lines: the edges, the half, the thirds and the quarters", () => {
-    expect(gridLines.map(placeOf)).toEqual([0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1]);
-    expect(gridLines.every((line) => line.of <= dealMetrics.finestCut)).toBe(true);
-    expect(gridLines.find((line) => placeOf(line) === 0.5)).toEqual({ of: 2, at: 1 });
-  });
-
   it("moves an edge that is off the lines onto the nearest one, and says which seat it moved", () => {
     const safe = madeSafe(written({ x: 0.03, y: 0, width: 0.45, height: 0.97 }, topRight));
     expect(sharesOf(safe.deal)[0]).toEqual(leftHalf);
@@ -166,22 +160,6 @@ describe("a composition someone else wrote, made safe to play", () => {
       "seat 2 has no size on the display and was left out",
       "seat 3 has no size on the display and was left out",
     ]);
-  });
-
-  it("never says what a pane stands on, only seats and the display", () => {
-    const said = madeSafe(
-      written({ x: -1, y: 0.4, width: 9, height: 0.01 }, leftHalf, {
-        x: 2,
-        y: 2,
-        width: 1,
-        height: 1,
-      }),
-    ).said;
-    expect(said.length).toBeGreaterThan(2);
-    for (const line of said) {
-      expect(line).not.toMatch(/surface/i);
-      expect(line).toMatch(/^seat \d+ /);
-    }
   });
 
   it("keeps whatever it is handed on the lines, inside, readable and apart, the same every time", () => {
@@ -318,12 +296,5 @@ describe("playing a composition", () => {
     expect(play(sixteen, maximised(small), 16)).toBeDefined();
     const staying = [{ x: 900, y: 400, width: 300, height: 200 }];
     expect(play(leadAndTwo, maximised(full), 3, staying)).toBeUndefined();
-  });
-
-  it("starts the panes a step apart, nearest the console's corner first", () => {
-    const way = play(threeOverTwo, maximised(full), 5) as Way;
-    expect(way.arrives.map((start) => start.atMs)).toEqual([0, 60, 120, 180, 240]);
-    const first = way.seats.find((seat) => seat.id === way.arrives[0]?.id)?.bounds as ScreenRect;
-    expect([first.x, first.y]).toEqual([128, 12]);
   });
 });

@@ -3,7 +3,7 @@ import { neonKit } from "./kits/index.ts";
 import type { CellAddress } from "./layout.ts";
 import { doorSegment, layRoads, type RoadRequest, type Segment } from "./roads.ts";
 import { blockScene } from "./scene.ts";
-import { noon, sketchTown, slugOf } from "./testing.ts";
+import { noon, sketchTown } from "./testing.ts";
 
 const row = landOf([
   [0, 0],
@@ -82,27 +82,6 @@ describe("roads", () => {
       }
     }
   });
-
-  it("grades the road between two creatures as the caller says, and lights a paved road", () => {
-    const state = sketchTown(5);
-    const between = [slugOf(0), slugOf(3)] as const;
-    const trodden = blockScene(state, { kit: neonKit, appearance: "night", now: noon });
-    const paved = blockScene(state, {
-      kit: neonKit,
-      appearance: "night",
-      now: noon,
-      partnerships: [{ between, grade: 3 }],
-    });
-    const third = trodden.roads.routes().length;
-    expect(paved.roads.routes().length).toBe(third + 1);
-    const route = paved.roads.routes()[third]?.corners ?? [];
-    expect(route.length).toBeGreaterThan(0);
-    for (const corner of route) expect(paved.roads.cornerGrade(corner)).toBe(3);
-    expect(lamps(paved.world)).toBeGreaterThan(0);
-    expect(lamps(trodden.world)).toBe(0);
-    expect(roadRoles(paved.world)).toContain("cobble");
-    expect(roadRoles(trodden.world)).not.toContain("cobble");
-  });
 });
 
 function request(
@@ -128,22 +107,4 @@ function gradesOf(segments: readonly (readonly [Segment, number])[]): Record<str
   return Object.fromEntries(
     segments.map(([segment, grade]) => [`${segment.kind}${segment.i},${segment.j}`, grade]),
   );
-}
-
-function lamps(world: ReturnType<typeof blockScene>["world"]): number {
-  return world.cells.flatMap((cell) => cell.items).filter((item) => item.what === "road-lamp")
-    .length;
-}
-
-function roadRoles(world: ReturnType<typeof blockScene>["world"]): string[] {
-  return [
-    ...new Set(
-      world.cells.flatMap((cell) =>
-        cell.ground.flatMap((box) => {
-          const top = box.faces.top;
-          return top !== undefined && "texture" in top ? top.texture.roles : [];
-        }),
-      ),
-    ),
-  ].filter((role) => /path|cobble/.test(role));
 }

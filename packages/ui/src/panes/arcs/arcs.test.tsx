@@ -7,14 +7,7 @@ import { keyworkNight } from "../../theme/themes.ts";
 import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
 import type { PaneSpecBase } from "../registry.ts";
-import {
-  type ArcsSpec,
-  arcHueStyle,
-  arcInheritsLine,
-  arcRows,
-  arcsPane,
-  closeOutcomeLine,
-} from "./index.tsx";
+import { type ArcsSpec, arcInheritsLine, arcsPane } from "./index.tsx";
 
 afterEach(cleanup);
 
@@ -27,34 +20,7 @@ const session = (id: string, arc?: string): SessionSummary => ({
   ...(arc !== undefined && { arc }),
 });
 
-const keys = { chord: (action: string) => `ctrl+k ${action}`, leader: () => "ctrl+k" };
-
 describe("the arcs pane", () => {
-  it("groups sessions under their arc once unfolded and keeps the unbound ones apart", () => {
-    const arcs = [{ slug: "arc-1", status: "active" as const, created: "t", sessions: 1 }];
-    const sessions = [session("s1", "arc-1"), session("s2")];
-    expect(arcRows(arcs, { "arc-1": 1 }, sessions, new Set()).map((row) => row.kind)).toEqual([
-      "arc",
-      "group",
-    ]);
-    expect(
-      arcRows(arcs, { "arc-1": 1 }, sessions, new Set(["arc-1", "unbound"])).map((row) => row.kind),
-    ).toEqual(["arc", "session", "group", "session"]);
-    expect(arcHueStyle(4)).toEqual({ "--kw-arc-hue": "var(--kw-ramp-5)" });
-    expect(arcHueStyle(undefined)).toEqual({});
-  });
-
-  it("says pending honestly and points at the memory pane for the review", () => {
-    expect(
-      closeOutcomeLine("arc-1", { kind: "pending", candidates: 2, questions: 1, wedged: 0 }, keys),
-    ).toBe(
-      "arc-1 pending · 2 candidates, 1 question wait for review · ctrl+k memory.summon opens the memory pane",
-    );
-    expect(closeOutcomeLine("arc-1", { kind: "closed", delivered: 3, released: 1 }, keys)).toBe(
-      "arc-1 closed · 3 delivered · 1 released",
-    );
-  });
-
   it("renders arcs with their hue chip by ordinal and opens a session on enter", async () => {
     const harness = overviewShell({ summaries: [session("s1", "arc-1")] });
     await harness.surfaces.load();

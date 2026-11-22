@@ -8,7 +8,7 @@ import { yardCard } from "./card.ts";
 import { byDepth } from "./depth.ts";
 import { foldBackAfterMs } from "./fold-back.ts";
 import { unfoldBudget } from "./gate.ts";
-import { breakpointWaitMs, moveByHand, stepYard, wakeYard } from "./step.ts";
+import { stepYard, wakeYard } from "./step.ts";
 import { aSetting, askedIn, calm, isoAt, noon, proposed } from "./testing.ts";
 import {
   emptyYard,
@@ -26,45 +26,6 @@ function yardWith(settings: readonly Setting[], start: YardState = emptyYard): Y
   const stream = settings.map((setting, index) => proposed(index + 1, setting));
   return yardOf(projectAll({ ...emptyHabitat(), yard: start }, stream));
 }
-
-const unfoldAtNoon = aSetting({ id: "u", rung: "unfold", at: isoAt(noon) });
-
-describe("the next moment the yard changes by itself", () => {
-  it("is never for a yard with nothing waiting, cooling or in the window", () => {
-    expect(nextChangeAt(emptyYard, noon)).toBeUndefined();
-    const card = stepYard(yardWith([aSetting()]), asked, noon);
-    expect(nextChangeAt(card, noon)).toBeUndefined();
-  });
-
-  it("is a deferred unfold's two-minute bound", () => {
-    const waiting = stepYard(yardWith([unfoldAtNoon]), { ...asked, draftOpen: true }, noon);
-    expect(nextChangeAt(waiting, noon + 10 * second)).toBe(noon + breakpointWaitMs);
-  });
-
-  it("walks an unfold's cooldown end, then its fold-back and its budget window", () => {
-    const unfolded = stepYard(yardWith([unfoldAtNoon]), asked, noon);
-    expect(nextChangeAt(unfolded, noon)).toBe(noon + unfoldBudget.cooldownMs);
-    const cooled = noon + unfoldBudget.cooldownMs;
-    expect(nextChangeAt(unfolded, cooled)).toBe(noon + foldBackAfterMs);
-    expect(foldBackAfterMs).toBe(unfoldBudget.windowMs);
-    expect(nextChangeAt(unfolded, noon + foldBackAfterMs)).toBeUndefined();
-  });
-
-  it("never wakes for a raise by the keeper's hand, which spends nothing and never folds back", () => {
-    const raised = moveByHand(
-      stepYard(yardWith([aSetting()]), asked, noon),
-      "set-1",
-      "unfold",
-      noon,
-    );
-    expect(nextChangeAt(raised, noon)).toBeUndefined();
-  });
-
-  it("names only moments after the one asked about", () => {
-    const unfolded = stepYard(yardWith([unfoldAtNoon]), asked, noon);
-    expect(nextChangeAt(unfolded, noon + hour)).toBeUndefined();
-  });
-});
 
 describe("a wake, which lets time pass and nothing else", () => {
   const crossing = [

@@ -66,16 +66,9 @@ describe("workspace identity, as keywork derives it", () => {
 
 const keyworkRuleOnPosix = [
   { cwd: "/srv/fx/plain", root: "/srv/fx/plain", source: "launch", identity: "af205435e241" },
-  { cwd: "/srv/fx/repo/src", root: "/srv/fx/repo", source: "git", identity: "8760a98c2740" },
-  {
-    cwd: "/srv/fx/declared/deep",
-    root: "/srv/fx/declared",
-    source: "declaration",
-    identity: "a14af0704a5c",
-  },
 ] as const;
 
-const posixMarkers = new Set(["/srv/fx/repo/.git", "/srv/fx/declared/.keywork/workspace.json"]);
+const posixMarkers = new Set(["/srv/fx/repo/.git"]);
 
 const linux: IdentitySeams = {
   home: "/home/me",

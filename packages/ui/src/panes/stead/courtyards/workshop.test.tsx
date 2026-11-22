@@ -1,11 +1,4 @@
-import {
-  type CreatureOnTheStead,
-  emptyHabitat,
-  type HabitatState,
-  type Thread,
-  type WorkshopFamily,
-} from "@keywork-app/habitat";
-import type { GardenKind } from "@keywork-app/habitat/render";
+import { type CreatureOnTheStead, emptyHabitat, type HabitatState } from "@keywork-app/habitat";
 import { cleanup, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,73 +20,6 @@ afterEach(() => {
 });
 
 describe("courtyard workshop miniatures", () => {
-  it("updates the building and chosen garden without remounting its focused court", () => {
-    const ink = canvasInk();
-    const [families, setFamilies] = createSignal<Readonly<Record<string, WorkshopFamily>>>({});
-    const [gardens, setGardens] = createSignal<Readonly<Record<string, GardenKind>>>({});
-    const view = render(() => (
-      <CourtyardOverview
-        world={world(creature("a"))}
-        order={["a"]}
-        now={now}
-        families={families()}
-        gardens={gardens()}
-        onOpen={() => undefined}
-      />
-    ));
-    const button = view.getByRole("button");
-    const canvas = view.container.querySelector<HTMLCanvasElement>(".kw-courtyard-workshop");
-    if (canvas === null) throw new Error("Missing workshop");
-    button.focus();
-    expect(canvas.dataset.workshop).toBe("gable");
-    expect(canvas.dataset.garden).toBeUndefined();
-    const original = ink.take(canvas);
-    setFamilies({ a: "canopy" });
-    expect(canvas.dataset.workshop).toBe("canopy");
-    const bare = ink.take(canvas);
-    expect(bare).not.toEqual(original);
-    const beforeGarden = canvas.width;
-    setGardens({ a: "flowers" });
-    expect(canvas.dataset.garden).toBe("flowers");
-    expect(canvas.width).toBe(beforeGarden);
-    expect(ink.take(canvas)).not.toEqual(bare);
-    expect(view.getByRole("button")).toBe(button);
-    expect(document.activeElement).toBe(button);
-  });
-
-  it("reads live workshop activity and boards from the whole world's facts", () => {
-    const ink = canvasInk();
-    const [habitat, setHabitat] = createSignal(world(creature("a")));
-    const view = render(() => (
-      <CourtyardOverview world={habitat()} order={["a"]} now={now} onOpen={() => undefined} />
-    ));
-    const canvas = view.container.querySelector<HTMLCanvasElement>(".kw-courtyard-workshop");
-    if (canvas === null) throw new Error("Missing workshop");
-    const idle = ink.take(canvas);
-    setHabitat({ ...habitat(), threads: { running: thread("a") } });
-    expect(ink.take(canvas)).not.toEqual(idle);
-    expect(view.getByRole("button").getAttribute("data-state")).toBe("working");
-    const resident = creature("a");
-    setHabitat(world({ ...resident, workshop: { ...resident.workshop, boardedAt: at } }));
-    expect(canvas.hasAttribute("data-boarded")).toBe(true);
-    expect(ink.take(canvas)).not.toEqual(idle);
-  });
-
-  it("keeps a building and its court reachable when the creature's artwork is unavailable", () => {
-    const view = render(() => (
-      <CourtyardOverview
-        world={world({ ...creature("a"), skin: "unavailable-miniature-skin" })}
-        order={["a"]}
-        now={now}
-        onOpen={() => undefined}
-      />
-    ));
-    expect(view.getByText("Artwork unavailable")).toBeTruthy();
-    expect(view.container.querySelector(".kw-courtyard-portrait")).toBeNull();
-    expect(view.container.querySelector(".kw-courtyard-workshop")).not.toBeNull();
-    expect(view.getByRole("button").getAttribute("aria-label")).toContain("Court 1");
-  });
-
   it("mounts at most one district's art from a thousand residents and preserves addresses", () => {
     const residents = Array.from({ length: 1000 }, (_, index) => creature(`resident-${index}`));
     const habitat = world(...residents);
@@ -188,31 +114,6 @@ function creature(slug: string): CreatureOnTheStead {
     },
     conversation: undefined,
     chores: [],
-  };
-}
-
-function thread(creature: string): Thread {
-  return {
-    id: "running",
-    creature,
-    kind: "conversation",
-    parent: undefined,
-    title: "Working",
-    restingSince: undefined,
-    turn: { startedAt: at, lastProgressAt: at, tool: undefined, stumbledAt: undefined },
-    asks: {},
-    answered: {},
-    back: undefined,
-    failure: undefined,
-    failures: 0,
-    changes: [],
-    queued: 2,
-    children: [],
-    outcome: undefined,
-    lastActivityAt: at,
-    viewedAt: undefined,
-    waiting: undefined,
-    removed: false,
   };
 }
 

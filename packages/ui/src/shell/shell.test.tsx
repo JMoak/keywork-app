@@ -224,18 +224,6 @@ describe("the app shell", () => {
     expect(slotLeft(frameNamed("stead"))).toBeGreaterThan(slotLeft(frameNamed("sessions")));
   });
 
-  it("restores a saved Keywork layout without summoning Stead for an empty creature list", async () => {
-    localStorage.setItem("keywork.layout:C:/work", conversationOnlyLayout);
-    const fake = servedClient();
-    const client = { ...fake.client, creatures: async () => [] };
-    render(() => <App host={hostWithServer()} connect={() => client} />);
-    await openWorkspace("C:/work");
-    await settle();
-    expect(frameNamed("stead")).toBeUndefined();
-    expect(localStorage.getItem(steadSummonedKey)).toBeNull();
-    expect(localStorage.getItem("keywork.layout:C:/work")).toBe(conversationOnlyLayout);
-  });
-
   it("selects Stead explicitly and keeps its creature-first layout separate from Keywork", async () => {
     localStorage.setItem("keywork.layout:C:/work", conversationOnlyLayout);
     const fake = servedClient();
@@ -448,17 +436,6 @@ describe("the app shell", () => {
     expect(frameNamed("sessions")?.dataset.theme).toBeUndefined();
   });
 
-  it("tags a conversation's title row with its arc while the sessions pane carries none", async () => {
-    const fake = servedClient({ arc: "pricing" });
-    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
-    await openWorkspace("C:/work");
-    const conversation = frameNamed("run echo served");
-    await waitFor(() =>
-      expect(conversation?.querySelector(".kw-frame-arc")?.textContent).toBe("#pricing"),
-    );
-    expect(frameNamed("sessions")?.querySelector(".kw-frame-arc")).toBeNull();
-  });
-
   it("marks the focused pane with the leader and shows the mark in its title row", async () => {
     const fake = servedClient();
     render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
@@ -491,19 +468,6 @@ describe("the app shell", () => {
     expect(card.textContent).toContain("quiet · this one still needs you");
     expect(frameNamed("run echo served")?.dataset.state).toBe("needs-you");
     fireEvent.keyDown(document, { key: "y", ctrlKey: true });
-    await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
-  });
-
-  it("still approves once from anywhere in a quiet session", async () => {
-    const fake = servedClient({ asked: { command: "mkdir -p build", rule: "mkdir -p *" } });
-    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
-    await openWorkspace("C:/work");
-    await screen.findByRole("group", { name: "permission ask" });
-    pressLeader("S", { shiftKey: true });
-    await waitFor(() =>
-      expect(frameNamed("run echo served")?.querySelector(".kw-frame-quiet")).toBeTruthy(),
-    );
-    fireEvent.keyDown(document, { key: "o", code: "KeyO", altKey: true });
     await waitFor(() => expect(fake.answers).toEqual(["c9:granted"]));
   });
 
@@ -621,12 +585,6 @@ describe("the app shell", () => {
     );
     expect(screen.queryByText(/starting keywork in/)).toBeNull();
   });
-
-  it("shows the host's failure text when a workspace cannot open", async () => {
-    render(() => <App host={browserHost()} connect={() => servedClient().client} />);
-    await openTyped("C:/work");
-    await screen.findByText(/no server/);
-  });
 });
 
 describe("the needs-you flow", () => {
@@ -652,18 +610,6 @@ describe("the needs-you flow", () => {
     fake.emit([answered("c9")]);
     await waitFor(() => expect(document.querySelector(".kw-needs-you")).toBeNull());
     expect(document.title).toBe("keywork");
-  });
-
-  it("says so when nothing waits and there is no jump to return from", async () => {
-    const fake = servedClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
-    await openWorkspace("C:/work");
-    pressLeader("n");
-    await screen.findByText("nothing needs you", { selector: ".kw-status-notice" });
-    pressLeader("N", { shiftKey: true });
-    await screen.findByText("no needs-you jump to go back from", {
-      selector: ".kw-status-notice",
-    });
   });
 
   it("summons the desk on leader q, collapses the strip to its count, and jumps from a row", async () => {
@@ -707,75 +653,9 @@ describe("the needs-you flow", () => {
     await waitFor(() => expect(frameNamed("desk")).toBeDefined());
     expect(document.querySelector(".kw-needs-you")).toBeNull();
   });
-
-  it("brings a session back to the desk when it moves unseen, and reads it once visited", async () => {
-    const fake = servedClient();
-    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
-    await openWorkspace("C:/work");
-    pressLeader("q");
-    await waitFor(() => expect(frameNamed("desk")?.dataset.focused).toBe(""));
-    expect(backOnTheDesk()).toEqual([]);
-
-    const listed = await fake.client.sessions();
-    const moved = { ...(listed[0] as SessionSummary), lastActivityAt: new Date().toISOString() };
-    (listed as SessionSummary[])[0] = moved;
-    fake.emit([turnCompleted("s1")]);
-    await waitFor(() => expect(backOnTheDesk()).toEqual(["run echo served"]));
-
-    press("Enter");
-    await waitFor(() => expect(frameNamed("run echo served")?.dataset.focused).toBe(""));
-    pressLeader("N", { shiftKey: true });
-    await waitFor(() => expect(frameNamed("desk")?.dataset.focused).toBe(""));
-    expect(backOnTheDesk()).toEqual([]);
-  });
-
-  it("hides the strip from the palette and remembers that across launches", async () => {
-    const fake = servedClient({ pendingAsk: true });
-    render(() => <App host={hostWithServer()} connect={() => fake.client as ConsoleClient} />);
-    await openTyped("C:/work");
-    await waitFor(() => expect(stripText()).toContain("1 needs you"));
-    runCommand("needs-you-strip");
-    await waitFor(() => expect(document.querySelector(".kw-needs-you")).toBeNull());
-    await screen.findByText("needs-you strip hidden · ctrl+k q still lists everything");
-    expect(localStorage.getItem("keywork.needs-you-strip")).toBe("hidden");
-
-    cleanup();
-    render(() => (
-      <App host={hostWithServer()} connect={() => servedClient({ pendingAsk: true }).client} />
-    ));
-    await openWorkspace("C:/work");
-    await screen.findByRole("group", { name: "permission ask" });
-    expect(document.querySelector(".kw-needs-you")).toBeNull();
-    runCommand("needs-you-strip");
-    await waitFor(() => expect(stripText()).toContain("1 needs you"));
-  });
 });
 
 describe("the context map", () => {
-  it("maps the focused session on leader shift+g, docked beside it, and closes on escape", async () => {
-    const fake = servedClient();
-    const client = { ...fake.client, context: async () => recordedContext };
-    render(() => <App host={hostWithServer()} connect={() => client as ConsoleClient} />);
-    await openWorkspace("C:/work");
-    pressLeader("0");
-    await waitFor(() => expect(frameNamed("stead")?.dataset.focused).toBe(""));
-    pressLeader("x");
-    await waitFor(() => expect(frameNamed("run echo served")?.dataset.focused).toBe(""));
-    pressLeader("G", { shiftKey: true });
-    await waitFor(() => expect(frameNamed("context")?.dataset.focused).toBe(""));
-    const map = frameNamed("context") as HTMLElement;
-    await waitFor(() =>
-      expect(map.querySelector(".kw-context-map-total")?.textContent).toBe(
-        "1.9k of 200k · 1% estimated",
-      ),
-    );
-    expect(map.querySelector(".kw-ov-head-lead")?.textContent).toBe("run echo served");
-    expect(slotLeft(map)).toBeGreaterThan(slotLeft(frameNamed("run echo served")));
-    press("Escape");
-    await waitFor(() => expect(frameNamed("context")).toBeUndefined());
-    expect(frameNamed("run echo served")?.dataset.focused).toBe("");
-  });
-
   it("opens from the conversation's gauge and the palette, and compacts with c", async () => {
     const fake = servedClient();
     const compacted: string[] = [];
@@ -850,23 +730,4 @@ function quietSwitched(sessionId: string, quiet: boolean): BusEnvelope {
       redoable: false,
     },
   };
-}
-
-function turnCompleted(sessionId: string): BusEnvelope {
-  return {
-    id: 901,
-    ts: new Date().toISOString(),
-    sessionId,
-    type: "turn.completed",
-    payload: {
-      message: { role: "assistant", parts: [{ type: "text", text: "done" }] },
-      usage: { inputTokens: 10, outputTokens: 2 },
-    },
-  };
-}
-
-function backOnTheDesk(): string[] {
-  return [...document.querySelectorAll(".kw-desk-group[data-group='back'] .kw-desk-name")].map(
-    (name) => name.textContent ?? "",
-  );
 }

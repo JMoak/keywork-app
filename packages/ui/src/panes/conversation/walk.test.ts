@@ -15,15 +15,6 @@ describe("walking the transcript by keyboard", () => {
     expect(document.activeElement).toBe(rows[2]);
   });
 
-  it("lets tab and shift+tab move on from a row in page order", () => {
-    const { rows } = transcript(2);
-    rows[1]?.focus();
-    expect(keyDown(rows[1] as HTMLElement, { key: "Tab" }).defaultPrevented).toBe(false);
-    expect(keyDown(rows[1] as HTMLElement, { key: "Tab", shiftKey: true }).defaultPrevented).toBe(
-      false,
-    );
-  });
-
   it("walks rows with the arrows and j and k, and goes home on escape", () => {
     const { composer, rows } = transcript(3);
     rows[2]?.focus();
@@ -33,12 +24,6 @@ describe("walking the transcript by keyboard", () => {
     expect(document.activeElement).toBe(rows[2]);
     keyDown(rows[2] as HTMLElement, { key: "Escape" });
     expect(document.activeElement).toBe(composer);
-  });
-
-  it("leaves shift+tab alone when the transcript has no rows to enter", () => {
-    const { composer } = transcript(0);
-    composer.focus();
-    expect(keyDown(composer, { key: "Tab", shiftKey: true }).defaultPrevented).toBe(false);
   });
 });
 

@@ -23,19 +23,6 @@ const quiet: ThreadFacts = {
 const creature = { name: "pip", hueStop: 2 };
 
 describe("snapshotFrom", () => {
-  it("is idle with nothing to do and names the creature", () => {
-    expect(snapshotFrom(creature, [quiet])).toEqual({
-      creature,
-      state: "idle",
-      stateLabel: "idle",
-      activeThreads: 0,
-      finishedUnseen: 0,
-      threadId: "t0",
-      tool: undefined,
-      needsYou: undefined,
-    });
-  });
-
   it("shows the highest-priority thread: the porch beats blocked beats back beats working", () => {
     const working: ThreadFacts = { ...quiet, id: "w", live: true, working: true, tool: "bash" };
     const back: ThreadFacts = { ...quiet, id: "b", finishedUnseen: true };

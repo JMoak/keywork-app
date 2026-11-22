@@ -60,7 +60,6 @@ describe("campaign artifact export", () => {
     new TypeError("Connection lost"),
     new CampaignRequestError(200, "Unreadable response"),
     new CampaignRequestError(502, "Unsupported export acknowledgement"),
-    new CampaignRequestError(503, "Service unavailable"),
   ])("asks for destination inspection when export is unconfirmed: %s", async (cause) => {
     let calls = 0;
     render(() => (

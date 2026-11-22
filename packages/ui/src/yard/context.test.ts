@@ -15,11 +15,6 @@ describe("when the keeper last spoke", () => {
     ];
     expect(keeperSpokeAfter({}, batch)).toEqual({ s1: Date.parse("2026-11-08T09:01:00.000Z") });
   });
-
-  it("keeps the record as it was when a batch holds nothing the keeper said", () => {
-    const held = { s1: 1 };
-    expect(keeperSpokeAfter(held, [])).toBe(held);
-  });
 });
 
 function turn(

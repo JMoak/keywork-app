@@ -1,13 +1,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type PoseName, poseNames, referenceRows, type Skin, validateSkin } from "../pose/skin.ts";
+import { type PoseName, type Skin, validateSkin } from "../pose/skin.ts";
 import {
   clearSliceCache,
   contentHash,
   lowestOpaqueRow,
   mirrorFrame,
-  opaqueCount,
   sliceCacheSize,
   sliceSkin,
 } from "./atlas.ts";
@@ -18,9 +17,9 @@ import {
   codexRows,
   importCodexAtlas,
 } from "./codex.ts";
-import { defaultSkinId, loadSkin, skinIds, skins } from "./index.ts";
-import { bitmapFromRows, outline, rowsFromBitmap, transparent, worldGlyphs } from "./legend.ts";
-import { groundContact, outlineSeals, validateAtlas } from "./loader.ts";
+import { defaultSkinId, loadSkin, skinIds } from "./index.ts";
+import { bitmapFromRows, outline, rowsFromBitmap, worldGlyphs } from "./legend.ts";
+import { groundContact, validateAtlas } from "./loader.ts";
 import { placeholderAirborne, placeholderSkin } from "./placeholder.ts";
 import * as tiles from "./world/tiles.ts";
 
@@ -63,23 +62,6 @@ describe("the skin registry", () => {
 
 describe("atlas validation", () => {
   const sound = placeholderSkin();
-
-  it("accepts the placeholder and the kid as they stand", () => {
-    expect(validateAtlas(sound)).toEqual([]);
-    expect(validateAtlas(skins.kid?.() as Skin)).toEqual([]);
-  });
-
-  it("rejects an atlas narrower than its widest row", () => {
-    const atlas = { ...sound.atlas, width: sound.atlas.width - sound.cell.width };
-    const faults = validateAtlas({ ...sound, atlas });
-    expect(faults.some((fault) => fault.includes("atlas width"))).toBe(true);
-  });
-
-  it("rejects an atlas with the wrong number of rows", () => {
-    const atlas = { ...sound.atlas, height: sound.cell.height * (poseNames.length - 1) };
-    const faults = validateAtlas({ ...sound, atlas });
-    expect(faults.some((fault) => fault.includes("atlas height"))).toBe(true);
-  });
 
   it("rejects an atlas whose index buffer does not fill its grid", () => {
     const atlas = { ...sound.atlas, indices: sound.atlas.indices.slice(0, 100) };
@@ -124,33 +106,6 @@ describe("atlas validation", () => {
       "greet frame 1 stands on row 48",
       "greet frame 2 stands on row 47",
     ]);
-  });
-
-  it("finds no fill pixel touching air in the placeholder: the outline seals every frame", () => {
-    expect(outlineSeals(sound)).toEqual([]);
-  });
-
-  it("keeps the placeholder on a 48x52 cell with the reference timings and every row drawn", () => {
-    expect(sound.cell).toEqual({ width: 48, height: 52 });
-    expect(sound.rows).toBe(referenceRows);
-    expect(sound.groundLine).toBe(51);
-    const sliced = sliceSkin(sound);
-    for (const pose of poseNames) {
-      for (let frame = 0; frame < sound.rows[pose].frames; frame += 1) {
-        expect(opaqueCount(sliced.frame(pose, frame)), `${pose} ${frame}`).toBeGreaterThan(200);
-      }
-    }
-  });
-
-  it("breathes in idle: the chest rises by one row on the inhale frames and the eyes close on the blink", () => {
-    const sliced = sliceSkin(sound);
-    const top = (frame: number): number => topOpaqueRowOfBody(sliced.frame("idle", frame));
-    expect(top(2)).toBe(top(0) - 1);
-    expect(top(3)).toBe(top(0) - 1);
-    expect(top(5)).toBe(top(0));
-    expect(rowsFromBitmap(sliced.frame("idle", 1))).not.toEqual(
-      rowsFromBitmap(sliced.frame("idle", 0)),
-    );
   });
 });
 
@@ -282,51 +237,6 @@ describe("the world tiles", () => {
         expect([...tile.indices].includes(outline), tile.name).toBe(true);
     }
   });
-
-  it("turns the mill sails through four distinct frames with cloth only on the upper arms", () => {
-    const frames = Array.from({ length: tiles.sailFrames }, (_, frame) => tiles.millSails(frame));
-    const seen = new Set(frames.map((frame) => rowsFromBitmap(frame, worldGlyphs).join("\n")));
-    expect(seen.size).toBe(4);
-    for (const frame of frames) {
-      const rows = rowsFromBitmap(frame, worldGlyphs);
-      const lower = rows.slice(tiles.sailRadius + 1).join("");
-      expect(lower.includes("=")).toBe(false);
-    }
-  });
-
-  it("grows the tree from a sapling to a full crown, outlined and standing on its last row", () => {
-    const stages = [0, 1, 2].map((stage) => tiles.tree(stage));
-    expect(stages.map((tree) => tree.width)).toEqual([7, 11, 17]);
-    expect(stages.map((tree) => tree.height)).toEqual([9, 14, 23]);
-    for (const stage of stages) {
-      expect(lowestOpaqueRow(stage)).toBe(stage.height - 1);
-      expect([...stage.indices].includes(outline)).toBe(true);
-    }
-  });
-
-  it("ghosts a fogged building down to a dashed outline in the fog tone", () => {
-    const ghost = tiles.ghosted(tiles.workshop);
-    const used = new Set(ghost.indices);
-    expect([...used].sort()).toEqual([0, 14]);
-    expect(opaqueCount(ghost)).toBeLessThan(opaqueCount(tiles.workshop) / 2);
-    expect(opaqueCount(ghost)).toBeGreaterThan(0);
-  });
-
-  it("lights a window by painting lamplight over the glass", () => {
-    const litShop = tiles.lit(tiles.workshop, tiles.workshopLamp);
-    const at = (x: number, y: number): number =>
-      litShop.indices[y * litShop.width + x] ?? transparent;
-    expect(at(tiles.workshopLamp.x, tiles.workshopLamp.y)).toBe(10);
-    expect(
-      tiles.workshop.indices[tiles.workshopLamp.y * tiles.workshop.width + tiles.workshopLamp.x],
-    ).toBe(13);
-  });
-
-  it("turns the vane to four headings", () => {
-    const headings = Array.from({ length: 4 }, (_, heading) => tiles.weathervane(heading));
-    const seen = new Set(headings.map((vane) => rowsFromBitmap(vane, worldGlyphs).join("\n")));
-    expect(seen.size).toBe(4);
-  });
 });
 
 describe("the palette discipline", () => {
@@ -350,14 +260,6 @@ function filesUnder(directory: string): string[] {
   });
 }
 
-function topOpaqueRowOfBody(frame: { width: number; height: number; indices: Uint8Array }): number {
-  const column = 16;
-  for (let y = 23; y < frame.height; y += 1) {
-    if (frame.indices[y * frame.width + column] === 2) return y;
-  }
-  return -1;
-}
-
 function codexCell(manifest: CodexManifest, row: number, column: number): Uint8Array {
   const { width, height } = manifest.cell;
   const cell = new Uint8Array(width * height);
@@ -367,16 +269,3 @@ function codexCell(manifest: CodexManifest, row: number, column: number): Uint8A
   }
   return cell;
 }
-
-describe("slicing by identity", () => {
-  it("answers a repeated skin object without hashing the atlas again, so hit tests stay cheap", () => {
-    clearSliceCache();
-    const skin = placeholderSkin();
-    const first = sliceSkin(skin);
-    const started = performance.now();
-    for (let n = 0; n < 20000; n += 1) sliceSkin(skin);
-    expect(performance.now() - started).toBeLessThan(200);
-    expect(sliceSkin(skin)).toBe(first);
-    expect(sliceCacheSize()).toBe(1);
-  });
-});

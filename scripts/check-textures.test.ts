@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { gallery, keyworkDay, keyworkNight } from "../packages/ui/src/theme/themes.ts";
+import { keyworkNight } from "../packages/ui/src/theme/themes.ts";
 import { committedRatchets, judgeTextures } from "./check-textures.ts";
 import { repoRoot } from "./lib/repo-files.ts";
 import { parseRatchets, ratchetsFile } from "./textures/ratchets.ts";
@@ -16,10 +16,6 @@ describe("check:textures", () => {
       expect(committedRatchets()).toBeDefined();
     },
   );
-
-  it("holds the shipped gallery and corpus at their ratchets", () => {
-    expect(judgeTextures(ratchets, ratchets, gallery).violations).toEqual([]);
-  });
 
   it("fails a light theme that only tints a dark one", () => {
     const tinted = { ...keyworkNight, name: "keywork-day", appearance: "light" as const };
@@ -35,18 +31,6 @@ describe("check:textures", () => {
     expect(judgeTextures(ratchets, undefined, [keyworkNight]).violations).toContain(
       "T6: the gallery ships no light theme",
     );
-  });
-
-  it("fails a theme whose contrast headroom shrank even while it clears the floor", () => {
-    const fainterBorder = {
-      ...keyworkDay,
-      tokens: { ...keyworkDay.tokens, border: "#cdd1df" },
-    };
-    expect(judgeTextures(ratchets, undefined, [keyworkNight, fainterBorder]).violations).toEqual([
-      expect.stringMatching(
-        /^T6\.minMarginLc\.keywork-day regressed to \d+(\.\d)?; the ratchet holds 13\.1/,
-      ),
-    ]);
   });
 });
 

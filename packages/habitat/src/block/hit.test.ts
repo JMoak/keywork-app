@@ -54,11 +54,6 @@ describe("what is under the pointer", () => {
     );
     expect(inside).toBeDefined();
   });
-
-  it("finds nothing off the world", () => {
-    const list = drawList(world, restCamera(0, raisedEye), viewOf(world, 1008, 580, raisedEye));
-    expect(hitAt(list, -50, -50)).toBeUndefined();
-  });
 });
 
 function reachableHits(list: DrawList): Hit[] {

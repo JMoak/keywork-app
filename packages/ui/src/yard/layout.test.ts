@@ -1,4 +1,4 @@
-import { defaultHub, placeYard, yardIds, yardMetrics } from "@keywork-app/habitat";
+import { defaultHub, yardIds, yardMetrics } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import type { Rect } from "../layout/index.ts";
 import { yardLayout } from "./layout.ts";
@@ -8,11 +8,6 @@ const viewport: Rect = { x: 0, y: 0, width: 1440, height: 900 };
 const prefs = { reducedMotion: false, tier: "interact" } as const;
 
 describe("the yard's layout", () => {
-  it("gives the hub the whole field while nothing is set out", () => {
-    const layout = yardLayout({ viewport, settings: [], railWanted: false, prefs });
-    expect(layout).toEqual({ hub: viewport, rail: undefined, satellites: [], selectable: [] });
-  });
-
   it("keeps a lantern off the rail and the hub whole", () => {
     const lantern = aYardSetting({ shown: "lantern" });
     const layout = yardLayout({ viewport, settings: [lantern], railWanted: false, prefs });
@@ -81,15 +76,6 @@ describe("the yard's layout", () => {
     const layout = yardLayout({ viewport, settings: [], railWanted: true, prefs });
     expect(layout.rail?.cards).toEqual([]);
     expect(layout.rail?.region.x).toBe(layout.hub.width + yardMetrics.gap);
-  });
-
-  it("hands the panel the keeper is inside to placement, so it never yields under them", () => {
-    const settings = ["a", "b"].map((id, index) =>
-      aYardSetting({ id, shown: "unfold", depth: 9 - index, what: { kind: "note", ref: id } }),
-    );
-    const inside = yardLayout({ viewport, settings, railWanted: false, prefs, inside: "b" });
-    const placed = placeYard({ viewport, hub: inside.hub, settings, prefs, inside: "b" });
-    expect(inside.satellites).toEqual(placed.filter((placement) => placement.rung === "unfold"));
   });
 });
 

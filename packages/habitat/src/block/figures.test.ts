@@ -13,7 +13,6 @@ import { identityRamp } from "./model.ts";
 import { resolveBlockPalette } from "./palette.ts";
 import { pageGround } from "./testing.ts";
 
-const generated = ["folio", "tessera", "cairn", "purl", "hush", "knot"] as const;
 const doings: readonly Doing[] = ["work", "porch", "walk", "nap", "idle", "blocked", "sit"];
 
 describe("the creatures in the town", () => {
@@ -32,23 +31,6 @@ describe("the creatures in the town", () => {
     ]) {
       expect(figureFor(skin), String(skin)).toBe(neutralFigure);
     }
-  });
-
-  it("draws a creature whose skin is named for one of the six by that figure", () => {
-    for (const name of generated) expect(figureFor(name).name).toBe(name);
-  });
-
-  it("holds the six generated figures at about 26 by 22, and the kid as it was", () => {
-    for (const name of generated) {
-      const rows = figureArts[name]?.rows ?? [];
-      const width = Math.max(...rows.map((row) => row.length));
-      expect(width, name).toBeGreaterThanOrEqual(24);
-      expect(width, name).toBeLessThanOrEqual(28);
-      expect(rows.length, name).toBeGreaterThanOrEqual(18);
-      expect(rows.length, name).toBeLessThanOrEqual(26);
-    }
-    expect(figureArts.kid?.rows.length).toBe(16);
-    expect(figureArts.kid?.rows.every((row) => row.length === 13)).toBe(true);
   });
 
   it("paints every figure in every doing from roles each kit resolves, in any of the eight colours", () => {

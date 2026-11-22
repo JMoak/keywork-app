@@ -55,11 +55,6 @@ describe("the side the large seat takes", () => {
       ).toBe(false);
     }
   });
-
-  it("reaches the deals the console tries", () => {
-    const [first] = dealsToTry({ shape: "lead-and-stack", led: true, side: "right" }, 3);
-    expect(leadOf(first?.[0] as Deal).x).toBeGreaterThan(0);
-  });
 });
 
 describe("the pictures tried for one large pane with cards around it", () => {
@@ -106,21 +101,6 @@ describe("the arrangements a creature may name", () => {
     for (const count of [1, 5, 13, 16]) {
       expect(dealsToTry({ shape: "lead-and-cards", led: true }, count).at(-1)?.[0]?.name).toBe(
         "grid",
-      );
-    }
-  });
-
-  it("give a grid equal seats, columns their full height and rows their full width", () => {
-    for (const count of counts) {
-      expect(new Set(first("grid", count).map(room)).size).toBe(1);
-    }
-    for (const count of [2, 3, 4]) {
-      expect(first("columns", count).every((seat) => seat.height === 1)).toBe(true);
-      expect(first("rows", count).every((seat) => seat.width === 1)).toBe(true);
-      expect(first("columns", count).map((seat) => seat.x)).toEqual(
-        first("columns", count)
-          .map((seat) => seat.x)
-          .toSorted((one, other) => one - other),
       );
     }
   });

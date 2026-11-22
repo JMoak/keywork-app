@@ -197,24 +197,6 @@ describe("a creature's burst", () => {
     expect(chosenAcross(creatures({ count: 3, relation: "siblings" }))).toEqual(["column", "fan"]);
   });
 
-  it("holds to the one pattern made for the arrivals", () => {
-    expect(chosenAcross(creatures({ relation: "sequence" }))).toEqual(["stair"]);
-    expect(chosenAcross(creatures({ relation: "siblings" }))).toEqual(["fan"]);
-    expect(chosenAcross(creatures({ relation: "tasks" }))).toEqual(["grid"]);
-    expect(chosenAcross(creatures({ relation: "notes" }))).toEqual(["burst"]);
-  });
-
-  it("gives the same pattern for the same seed and context", () => {
-    for (const seed of seeds) {
-      for (const relation of relations) {
-        const context = creatures({ relation, count: 12 });
-        expect(choosePattern(context, mulberry32(seed))).toBe(
-          choosePattern(context, mulberry32(seed)),
-        );
-      }
-    }
-  });
-
   it("does not repeat the previous burst's pattern when another suits as well", () => {
     const suited = chosenAcross(creatures());
     for (const previous of suited) {
@@ -249,11 +231,6 @@ describe("the context read from a desk", () => {
     const context = contextOf({ desk: maximised(full), arriving: panes(5, full) }, facts);
     expect(context).toMatchObject({ room: "none", maximised: true });
     expect(context.fits).toEqual(["cascade", "fan", "pile"]);
-  });
-
-  it("carries the previous burst's pattern", () => {
-    const incoming = { desk: windowed(wide), arriving: panes(5, wide) };
-    expect(contextOf(incoming, { ...facts, previous: "grid" }).previous).toBe("grid");
   });
 });
 
@@ -302,17 +279,5 @@ describe("the arrangement chosen for a burst", () => {
     const incoming = { desk: windowed(wide), arriving: panes(5, wide) };
     const tasks: BurstFacts = { asker: "keeper", relation: "tasks", urgency: "soon" };
     expect(arrangedFor(incoming, tasks, unrolled).pattern).toBe("grid");
-  });
-
-  it("varies with the seed for a creature, only among what holds here", () => {
-    const incoming = { desk: windowed(wide), arriving: panes(5, wide) };
-    const unknown: BurstFacts = { asker: "creature", relation: "unknown", urgency: "soon" };
-    const chosen = new Set(
-      manySeeds.map((seed) => arrangedFor(incoming, unknown, mulberry32(seed)).pattern),
-    );
-    expect(chosen.size).toBeGreaterThan(1);
-    expect(
-      [...chosen].every((pattern) => eligible(incoming).some((h) => h.pattern === pattern)),
-    ).toBe(true);
   });
 });

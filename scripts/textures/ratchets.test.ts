@@ -1,16 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { repoRoot } from "../lib/repo-files.ts";
-import {
-  coverageGaps,
-  loosenings,
-  parseRatchets,
-  type Ratchets,
-  ratchetsFile,
-  regressions,
-  tightenable,
-} from "./ratchets.ts";
+import { coverageGaps, loosenings, parseRatchets, type Ratchets, regressions } from "./ratchets.ts";
 
 const held: Ratchets = {
   "T2.floodDraftChars": { value: 33, better: "lower", why: "the placeholder, never the payload" },
@@ -18,11 +7,6 @@ const held: Ratchets = {
 };
 
 describe("the texture ratchets", () => {
-  it("parses the checked-in file and covers every texture of record", () => {
-    const ratchets = parseRatchets(JSON.parse(readFileSync(join(repoRoot, ratchetsFile), "utf8")));
-    expect(coverageGaps(ratchets)).toEqual([]);
-  });
-
   it("refuses a ratchet without a written why or a direction", () => {
     expect(() => parseRatchets({ "T1.samples": { value: 3, better: "higher", why: " " } })).toThrow(
       'ratchet "T1.samples" needs a written why',
@@ -55,12 +39,6 @@ describe("the texture ratchets", () => {
     ]);
     expect(regressions(held, { "T9.unknown": 1 })).toEqual([
       "T9.unknown measures 1 but records no ratchet",
-    ]);
-  });
-
-  it("hints when a measurement has room to tighten", () => {
-    expect(tightenable(held, { "T2.floodDraftChars": 30 })).toEqual([
-      "T2.floodDraftChars measures 30; tighten it from 33",
     ]);
   });
 

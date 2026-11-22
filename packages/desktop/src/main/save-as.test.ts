@@ -37,17 +37,6 @@ describe("saving a page through the host", () => {
     expect(save.written).toEqual([]);
   });
 
-  it("says why a write failed", async () => {
-    const save = seams("locked.html", async () => {
-      throw new Error("EACCES");
-    });
-    expect(await saveAs({ suggestedName: "a.html", text: "x" }, save.seams)).toEqual({
-      saved: false,
-      refused: "failed",
-      detail: "could not write locked.html: EACCES",
-    });
-  });
-
   it("refuses a malformed request before any dialog opens", async () => {
     const save = seams("never.html");
     expect(await saveAs({ suggestedName: 3 }, save.seams)).toMatchObject({ refused: "invalid" });

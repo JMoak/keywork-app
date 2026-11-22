@@ -1,16 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { appActions, appBindings } from "../keys/actions.ts";
-import { createCompanionController } from "./floating.ts";
 import type { CompanionHost, CompanionPreferences, PreferencePatch, Presence } from "./port.ts";
-import {
-  CompanionSwitchRow,
-  companionSwitch,
-  companionToggleActionId,
-  offerDue,
-  switchLine,
-} from "./switch.tsx";
+import { CompanionSwitchRow, companionSwitch, offerDue } from "./switch.tsx";
 
 const offPreferences: CompanionPreferences = {
   version: 1,
@@ -74,26 +66,6 @@ const settled = (): Promise<void> => new Promise((resolve) => setTimeout(resolve
 afterEach(cleanup);
 
 describe("the companion switch", () => {
-  it("states where the creature is, and says the pane fallback plainly", () => {
-    expect(switchLine(undefined, undefined)).toBeUndefined();
-    expect(switchLine(offPreferences, off)).toBe("companion off");
-    expect(switchLine({ ...offPreferences, enabled: true }, floating)).toBe(
-      "companion on · floating",
-    );
-    expect(
-      switchLine(
-        { ...offPreferences, enabled: true },
-        {
-          mode: "pane",
-          window: "none",
-          reason: "transparent windows paint black on this machine; the creature lives in the pane",
-        },
-      ),
-    ).toBe(
-      "companion on · transparent windows paint black on this machine; the creature lives in the pane",
-    );
-  });
-
   it("turns the companion on and off through the host port and says so", async () => {
     const host = fakeHost();
     const said: string[] = [];
@@ -110,28 +82,6 @@ describe("the companion switch", () => {
       await toggle.toggle();
       expect(host.stored.enabled).toBe(false);
       expect(said).toEqual(["companion on · floating", "companion off"]);
-      dispose();
-    });
-  });
-
-  it("is reachable from the palette and a free leader chord", async () => {
-    const action = appActions[companionToggleActionId];
-    expect(action?.command?.name).toBe("companion");
-    expect(appBindings[companionToggleActionId]).toBe("leader shift+a");
-    const host = fakeHost();
-    await createRoot(async (dispose) => {
-      const toggle = companionSwitch(host);
-      const controller = createCompanionController();
-      const unbind = controller.bindToggle(toggle);
-      await settled();
-      action?.invoke({
-        toggleCompanion: () => void controller.toggle()?.toggle(),
-      } as Parameters<NonNullable<typeof action>["invoke"]>[0]);
-      await settled();
-      await settled();
-      expect(host.stored.enabled).toBe(true);
-      unbind();
-      expect(controller.toggle()).toBeUndefined();
       dispose();
     });
   });

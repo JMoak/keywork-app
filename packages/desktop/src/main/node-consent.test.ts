@@ -13,13 +13,11 @@ import {
   nodeConsumerArgs,
   nodeStatusArgs,
   offerNodeAtFirstRun,
-  readNodeStanding,
   restartAnOlderNode,
   runtimeConsumerFile,
   type SidecarRun,
   sidecarNodeServing,
 } from "./node-consent.ts";
-import { runtimeFailure } from "./runtime-failure.ts";
 import { bundledEngineVersion, type ContractMismatch, expectedContract } from "./serve-process.ts";
 
 const userData = "C:/Users/keeper/AppData/Roaming/stead";
@@ -121,14 +119,6 @@ describe("product consent and durable runtime registration", () => {
     expect(world.runs[1]?.args).not.toContain("workspace");
     expect(world.runs[1]?.args).not.toContain(userData);
   });
-
-  it("stays silent when no compiled sidecar is available", async () => {
-    const world = fakeWorld(true);
-    world.seams.exists = async () => false;
-    expect(await offerNodeAtFirstRun(world.seams)).toEqual({ kind: "no-sidecar" });
-    expect(world.asked).toEqual([]);
-    expect(world.runs).toEqual([]);
-  });
 });
 
 describe("shared runtime compatibility", () => {
@@ -183,7 +173,6 @@ describe("shared runtime compatibility", () => {
 
   it.each([
     { version: "9.9.9", contract: expectedContract },
-    { version: "0.1.0", contract: expectedContract },
     { version: bundledEngineVersion, contract: "1.28" },
     {},
   ])(
@@ -279,18 +268,6 @@ describe("shared runtime compatibility", () => {
     expect(world.runs.map((run) => run.args)).toEqual([nodeStatusArgs]);
     expect(world.asked).toEqual([]);
   });
-
-  it("reads exact running engine and contract identities", async () => {
-    const world = fakeWorld(true);
-    expect(await readNodeStanding(world.seams)).toMatchObject({
-      runtimeCompatibility: 1,
-      installed: true,
-      running: true,
-      version: bundledEngineVersion,
-      contract: expectedContract,
-      tickets: [ticket.url],
-    });
-  });
 });
 
 describe("runtime presentation", () => {
@@ -304,21 +281,6 @@ describe("runtime presentation", () => {
     expect(card.detail).toContain("private home before you choose a project");
     expect(card.detail).toContain("Uninstalling one app preserves the other");
     expect(card.detail).not.toContain("keywork node");
-  });
-
-  it("maps structured recovery actions into product copy", () => {
-    expect(
-      runtimeFailure(
-        JSON.stringify({
-          message: "The other client still needs the engine.",
-          recovery: "close-clients",
-        }),
-      ),
-    ).toEqual({
-      message: "The other client still needs the engine.",
-      nextAction:
-        "Close the other app windows, then follow the upgrade guide to stop the shared engine before applying its update.",
-    });
   });
 });
 

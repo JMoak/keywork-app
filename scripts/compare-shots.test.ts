@@ -74,12 +74,6 @@ describe("differingPixelRatio", () => {
     expect(differingPixelRatio(base, drifted)).toBe(0);
     expect(differingPixelRatio(base, changed)).toBe(0.02);
   });
-
-  it("reports a size mismatch as undefined", () => {
-    expect(
-      differingPixelRatio(solid(2, 2, [0, 0, 0, 0]), solid(3, 2, [0, 0, 0, 0])),
-    ).toBeUndefined();
-  });
 });
 
 describe("compareShotSets", () => {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   channelOf,
-  inputChannels,
   inputOrder,
   inputSequencer,
   isInside,
@@ -11,11 +10,6 @@ import {
 } from "./input.ts";
 
 describe("remote input on ctl and ptr", () => {
-  it("opens ctl ordered and reliable, ptr unordered and lossy", () => {
-    expect(inputChannels.ctl).toEqual({ label: "ctl", id: 1, ordered: true });
-    expect(inputChannels.ptr).toEqual({ label: "ptr", id: 2, ordered: false, maxRetransmits: 0 });
-  });
-
   it("sends moves and wheels on ptr, buttons, keys and release-all on ctl, each channel numbered from 1", () => {
     const sequence = inputSequencer();
     expect(sequence.stamp({ kind: "move", x: 0.5, y: 0.5 })).toEqual({

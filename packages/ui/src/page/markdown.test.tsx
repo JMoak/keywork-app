@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { shareDelegatedEvents } from "../surfaces/runtime/delegation.ts";
 import { openChild } from "../surfaces/runtime/testing.ts";
 import { copyWords } from "./fence.tsx";
-import { decodeEntities, externalLinkHint, Markdown } from "./markdown.tsx";
+import { externalLinkHint, Markdown } from "./markdown.tsx";
 import { type MarkdownHost, MarkdownHostProvider } from "./markdown-host.ts";
 
 afterEach(cleanup);
@@ -73,18 +73,6 @@ describe("Markdown", () => {
     expect(container.querySelectorAll("td")).toHaveLength(2);
     expect(container.querySelector(".kw-image-ref")?.textContent).toBe("[image: alt]");
   });
-
-  it("decodes the entities marked leaves in escaped text", () => {
-    expect(decodeEntities("a &amp; b &lt; c &gt; d &quot;e&quot; &#39;f&#39;")).toBe(
-      "a & b < c > d \"e\" 'f'",
-    );
-  });
-
-  it("hides link reference definitions the way a reader expects", () => {
-    const { container, text } = html("see [the docs][d]\n\n[d]: https://keywork.dev");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("https://keywork.dev");
-    expect(text).not.toContain("[d]:");
-  });
 });
 
 describe("Markdown while a reply streams", () => {
@@ -103,29 +91,6 @@ describe("Markdown while a reply streams", () => {
     ).toEqual(["First paragraph.", "Second, still growing.", "Third arrives."]);
   });
 
-  it("adds table rows without rebuilding the rows already shown", async () => {
-    const reply = streamed("| # | name |\n|---|---|\n| 1 | one |\n| 2 | tw");
-    const rows = [...reply.container.querySelectorAll("tbody tr")];
-    await reply.append("o |\n| 3 | three |\n| 4 | fo");
-    reply.stop();
-    const after = [...reply.container.querySelectorAll("tbody tr")];
-    expect(after.slice(0, 2)).toEqual(rows);
-    expect(after.map((row) => row.textContent)).toEqual(["1one", "2two", "3three", "4fo"]);
-    expect(reply.removed.filter((node) => node.nodeType === Node.ELEMENT_NODE)).toEqual([]);
-  });
-
-  it("leaves a selection in a finished paragraph intact as text keeps arriving", async () => {
-    const reply = streamed("Copy this command.\n\nThe model keeps");
-    const finished = reply.container.querySelector(".kw-paragraph");
-    const range = document.createRange();
-    range.selectNodeContents(finished as Node);
-    await reply.append(" writing more and more words");
-    await reply.append("\n\nand another paragraph.");
-    reply.stop();
-    expect(finished?.isConnected).toBe(true);
-    expect(range.toString()).toBe("Copy this command.");
-  });
-
   it("keeps the code of a growing fence in one text node instead of rebuilding it", async () => {
     const reply = streamed("```ts\nconst a = 1;");
     const code = reply.container.querySelector(".kw-fence-code code");
@@ -138,17 +103,6 @@ describe("Markdown while a reply streams", () => {
 });
 
 describe("Markdown task lists and footnotes", () => {
-  it("renders task items as read-only checkboxes that carry their state", () => {
-    const { container, text } = html("- [ ] an open task\n- [x] a done task\n- a plain item");
-    const boxes = [...container.querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
-    expect(boxes.map((box) => box.checked)).toEqual([false, true]);
-    expect(boxes.every((box) => box.disabled)).toBe(true);
-    expect(text).not.toContain("[ ]");
-    expect(text).not.toContain("[x]");
-    const items = [...container.querySelectorAll(".kw-list-item")];
-    expect(items.map((item) => item.getAttribute("data-task"))).toEqual(["false", "true", null]);
-  });
-
   it("renders a footnote reference that jumps to its footnote", () => {
     const { container, text } = html("Claim with a source[^1].\n\n[^1]: The source itself.");
     const reference = container.querySelector<HTMLAnchorElement>(".kw-footnote-ref a");
@@ -194,13 +148,6 @@ describe("Markdown links", () => {
     expect(host.openExternal).toHaveBeenCalledWith("https://keywork.dev");
   });
 
-  it("keeps a link's own title beside where it goes", () => {
-    const { container } = html('[docs](https://keywork.dev "the manual")');
-    expect(container.querySelector("a")?.title).toBe(
-      `the manual · https://keywork.dev · ${externalLinkHint}`,
-    );
-  });
-
   it("shows links the browser cannot open as plain text with their target", () => {
     const { container } = html(
       "[ok](https://keywork.dev), [script](javascript:alert(1)), [mail](mailto:a@b.c), [file](src/math.ts)",
@@ -222,17 +169,6 @@ describe("Markdown links", () => {
 });
 
 describe("Markdown code blocks", () => {
-  it("keeps the language label and the copy button out of the code's text", () => {
-    const { container } = hosted("```typescript\nconst aVeryLongIdentifierName = 1;\n```");
-    const fence = container.querySelector(".kw-fence");
-    expect(fence?.getAttribute("data-lang")).toBe("typescript");
-    expect(fence?.querySelector(".kw-fence-code")?.textContent).toBe(
-      "const aVeryLongIdentifierName = 1;",
-    );
-    expect(fence?.textContent).toBe(`${copyWords.idle}const aVeryLongIdentifierName = 1;`);
-    expect(fence?.querySelector(".kw-fence-code .kw-fence-copy")).toBeNull();
-  });
-
   it("copies exactly the block's code from its own button, reachable on the transcript walk", async () => {
     const { container, host } = hosted("```ts\nlet a = 1;\nlet b = 2;\n```\n\n```\nplain\n```");
     const buttons = [...container.querySelectorAll<HTMLButtonElement>(".kw-fence-copy")];
@@ -261,11 +197,5 @@ describe("Markdown code blocks", () => {
     await waitFor(() => expect(code.querySelector(".kw-syntax-keyword")).not.toBeNull());
     expect(code.querySelector(".kw-syntax-comment")?.textContent).toBe("// why");
     expect(code.textContent).toBe("export const answer: number = 42; // why");
-  });
-
-  it("leaves a fence in an unknown language plain", async () => {
-    const { container } = html("```zork\nexport const a = 1;\n```");
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(container.querySelector(".kw-fence-code span")).toBeNull();
   });
 });

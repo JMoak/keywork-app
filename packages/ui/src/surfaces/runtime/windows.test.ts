@@ -64,19 +64,6 @@ describe("every window", () => {
     expect(heard).toEqual(["window a", "document a", "window b", "document b"]);
   });
 
-  it("stops hearing a window that left, and hears one that arrives after the listener", () => {
-    const early = secondWindow();
-    const dismiss = admit(early);
-    const heard: string[] = [];
-    stops.push(listenInEveryWindow("keydown", (event) => void heard.push(event.key)));
-    const late = secondWindow();
-    admit(late);
-    dismiss();
-    press(field(early.document), "gone");
-    press(field(late.document), "late");
-    expect(heard).toEqual(["late"]);
-  });
-
   it("names a window that is showing, the console first", () => {
     const child = secondWindow();
     admit(child);

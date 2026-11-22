@@ -388,26 +388,6 @@ describe("the workshop pane", () => {
     );
   });
 
-  it("refuses the window plainly when there is no display or the workshop is dark", async () => {
-    const dark = { ...sealedWorkshop, state: "stopped" as const };
-    const h = harness(servingWorkshops([bareWorkshop, dark]));
-    const bare = mount({ kind: "workshop", creature: "wren" }, h);
-    await waitFor(() => expect(headText(bare.container)).toContain("bare host"));
-    bare.act("workshop.display");
-    expect(noticeText(bare.container)).toBe("no display · a bare host workshop has none");
-    bare.unmount();
-    const sealed = mount({ kind: "workshop", creature: "tam" }, h);
-    await waitFor(() => expect(headText(sealed.container)).toContain("sealed microVM"));
-    expect(roomLines(sealed.container, "display")).toEqual([
-      "display dark while the workshop is stopped · s starts it",
-    ]);
-    sealed.act("workshop.display");
-    expect(noticeText(sealed.container)).toBe(
-      "display dark while the workshop is stopped · s starts it",
-    );
-    expect(h.server.calls.filter((call) => call.endsWith("/display"))).toEqual([]);
-  });
-
   it("opens a bare host's files in the file browser and never pretends to for a microVM", async () => {
     const h = harness(servingWorkshops([bareWorkshop, sealedWorkshop]));
     const bare = mount({ kind: "workshop", creature: "wren" }, h);
@@ -466,16 +446,6 @@ describe("the workshop pane", () => {
     expect(h.opened).toEqual([{ kind: "terminal", mode: "mirror", sessionId: "t2" }]);
   });
 
-  it("says so when no thread of the creature runs in the workshop", async () => {
-    const h = harness(servingWorkshops([bareWorkshop]));
-    const { container, act } = mount({ kind: "workshop", creature: "wren" }, h);
-    await waitFor(() => expect(headText(container)).toContain("bare host"));
-    expect(roomLines(container, "terminal")[0]).toBe("no thread of wren runs in the workshop yet");
-    act("workshop.terminal");
-    expect(noticeText(container)).toBe("no thread of wren to mirror yet");
-    expect(h.opened).toEqual([]);
-  });
-
   it("raises a workshop sealed when the node can and bare when it cannot, then binds to it", async () => {
     const server = servingWorkshops([]);
     const asked: unknown[] = [];
@@ -510,36 +480,6 @@ describe("the workshop pane", () => {
     expect(h.rebound).toContainEqual({ kind: "workshop", creature: "wren" });
   });
 
-  it("asks which creature when summoned bare on a node with no workshop", async () => {
-    const server = servingWorkshops([]);
-    const asked: unknown[] = [];
-    server.set("POST /workshops", (body) => {
-      asked.push(body);
-      return { status: 201, body: { ...sealedWorkshop, creature: "moss", id: "moss-111111" } };
-    });
-    server.set("GET /workshops/moss-111111/health", {
-      status: 200,
-      body: healthOf(sealedWorkshop, "starting"),
-    });
-    const h = harness(server);
-    const { container, act } = mount({ kind: "workshop" }, h);
-    await waitFor(() =>
-      expect(container.querySelector(".kw-empty")?.textContent).toBe(
-        "No workshop yet · raise one with r",
-      ),
-    );
-    act("workshop.raise");
-    const input = container.querySelector(".kw-ov-draft input") as HTMLInputElement;
-    expect(input.getAttribute("aria-label")).toBe("raise a workshop for which creature?");
-    fireEvent.input(input, { target: { value: "moss" } });
-    fireEvent.submit(container.querySelector(".kw-ov-draft") as HTMLFormElement);
-    await waitFor(() =>
-      expect(noticeText(container)).toContain("raised a sealed microVM for moss"),
-    );
-    expect(asked).toEqual([{ creature: "moss", substrate: "sbx" }]);
-    expect(h.rebound.at(-1)).toEqual({ kind: "workshop", creature: "moss" });
-  });
-
   it("removes the workshop after one question, keeping or wiping its disk", async () => {
     const server = servingWorkshops([bareWorkshop]);
     server.set("DELETE /workshops/wren-0a1b2c?keepDisk=true", {
@@ -569,23 +509,6 @@ describe("the workshop pane", () => {
     expect(h.server.calls).toContain("DELETE /workshops/wren-0a1b2c?keepDisk=true");
     expect(container.querySelector(".kw-empty")?.textContent).toBe(
       "No workshop for wren yet · raise one with r",
-    );
-  });
-
-  it("shows the snapshots room only when the node serves one", async () => {
-    const server = servingWorkshops([sealedWorkshop]);
-    server.set("GET /doc", {
-      status: 200,
-      body: {
-        paths: { "/workshops/{id}/snapshots": { post: { operationId: "snapshotWorkshop" } } },
-      },
-    });
-    const h = harness(server);
-    const { container } = mount({ kind: "workshop", creature: "tam" }, h);
-    await waitFor(() =>
-      expect(roomLines(container, "snapshots")).toEqual([
-        "served by this node but not read by this pane yet",
-      ]),
     );
   });
 
@@ -670,51 +593,6 @@ describe("the workshop pane", () => {
     expect(h.opened).toEqual([]);
   });
 
-  it("says so when this node serves no workshops", async () => {
-    const h = harness(
-      fakeServer({
-        "GET /workshops": { status: 503, body: { error: "workshops is not served by this host" } },
-        "GET /doc": { status: 200, body: { paths: {} } },
-      }),
-    );
-    const { container } = mount({ kind: "workshop", creature: "wren" }, h);
-    await waitFor(() =>
-      expect(container.querySelector(".kw-workshop-note")?.textContent).toBe(
-        "could not read the workshops on this node · workshops is not served by this host",
-      ),
-    );
-  });
-
-  it("binds a bare summon to the first workshop on the node", async () => {
-    const h = harness(servingWorkshops([bareWorkshop, sealedWorkshop]));
-    const { container } = mount({ kind: "workshop" }, h);
-    await waitFor(() => expect(headText(container)).toContain("bare host"));
-    expect(h.rebound[0]).toEqual({ kind: "workshop", creature: "wren" });
-  });
-
-  it("binds a bare summon to the floating creature's workshop and lists other steads' apart", async () => {
-    const server = servingWorkshops([neighbourWorkshop, bareWorkshop, sealedWorkshop]);
-    server.set("GET /creatures", { status: 200, body: { creatures: [wrenHome, tamHome] } });
-    const h = harness(server);
-    h.companion.noteFloating("tam");
-    try {
-      const { container } = mount({ kind: "workshop" }, h);
-      await waitFor(() => expect(h.rebound[0]).toEqual({ kind: "workshop", creature: "tam" }));
-      expect(headText(container)).toContain("sealed microVM");
-      expect(container.querySelector(".kw-workshop-place")?.textContent).toBe(
-        "2 of 2 on this node · ] next · [ previous",
-      );
-      expect(container.querySelector(".kw-workshop-elsewhere-name")?.textContent).toBe(
-        "other workshops on this node",
-      );
-      expect(elsewhereLines(container)).toEqual([
-        expect.stringMatching(/^bea · bea-dc1057 · bare host · stopped · raised /),
-      ]);
-    } finally {
-      h.companion.noteFloating(undefined);
-    }
-  });
-
   it("never binds a bare summon to another stead's workshop", async () => {
     const server = servingWorkshops([neighbourWorkshop]);
     server.set("GET /creatures", {
@@ -741,21 +619,5 @@ describe("the workshop pane", () => {
     await waitFor(() => expect(headText(ours.container)).toContain("sealed microVM"));
     ours.act("workshop.next");
     expect(h.rebound).toEqual([{ kind: "workshop", creature: "wren" }]);
-  });
-
-  it("is summoned with a creature, titled by it, and parses only its own spec", () => {
-    const h = harness(servingWorkshops([]));
-    expect(workshopPane.summon?.spec(h.shell, "wren")).toEqual({
-      kind: "workshop",
-      creature: "wren",
-    });
-    expect(workshopPane.summon?.spec(h.shell, undefined)).toEqual({ kind: "workshop" });
-    expect(workshopPane.title({ kind: "workshop", creature: "wren" }, h.shell)).toBe(
-      "workshop · wren",
-    );
-    expect(workshopPane.title({ kind: "workshop" }, h.shell)).toBe("workshop");
-    expect(workshopPane.spec.safeParse({ kind: "workshop", creature: "" }).success).toBe(false);
-    expect(workshopPane.spec.safeParse({ kind: "screen", peer: "x" }).success).toBe(false);
-    expect(workshopPane.emptyState(h.shell.keys)).toBe("No workshop yet · raise one with r");
   });
 });

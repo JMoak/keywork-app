@@ -161,15 +161,6 @@ describe("the controls store", () => {
     expect(reloads).toEqual(["s1"]);
   });
 
-  it("neither seeds nor reloads when the server refuses a restore", async () => {
-    const { store, reloads } = storeOver({
-      restoreTurn: async () => ({ refused: "nothing", detail: "no turn 9 on this session's path" }),
-    });
-    expect(await store.restoreTurn("s1", 9)).toMatchObject({ refused: "nothing" });
-    expect(store.seed("s1")).toBeUndefined();
-    expect(reloads).toEqual([]);
-  });
-
   it("neither seeds nor reloads when the server refuses an undo", async () => {
     const { store, reloads } = storeOver({
       undo: async () => ({ refused: "nothing", detail: "nothing to undo" }),

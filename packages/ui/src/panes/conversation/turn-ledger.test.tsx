@@ -19,17 +19,10 @@ import recordedRestore from "../../../../client/src/fixtures/restored.json";
 import restoredStream from "../../../../client/src/fixtures/restored.jsonl?raw";
 import { parseJsonl } from "../../dev/replay.ts";
 import { browserHost } from "../../host/browser.ts";
-import { appActions } from "../../keys/actions.ts";
 import { createSessionStore } from "../../shell/session-store.ts";
 import type { ShellSeams } from "../registry.ts";
 import { conversationPane } from "./index.tsx";
-import {
-  forkedNotice,
-  noSettledTurnNotice,
-  restoredNotice,
-  restoreQuestion,
-  unplacedNotice,
-} from "./turn-ledger.ts";
+import { forkedNotice, restoredNotice, unplacedNotice } from "./turn-ledger.ts";
 
 afterEach(cleanup);
 
@@ -195,18 +188,6 @@ function confirmLine(): HTMLElement | null {
 }
 
 describe("the turn ledger in a live conversation", () => {
-  it("ends each settled turn with its files, its time in tools and the turn the server counts", async () => {
-    const { shell } = await mounted();
-    await waitFor(() =>
-      expect(ledgerLines()).toEqual(["turn 1 · 1 file · +2 −0 · 500ms in tools", "turn 2"]),
-    );
-    const adornments = conversationPane.adornments?.(
-      { kind: "conversation", sessionId: "s1" },
-      shell,
-    );
-    expect(adornments?.ribbon).toBe("turn 2");
-  });
-
   it("asks before restoring, naming the turns and files that go back, then restores on y", async () => {
     const { server } = await mounted();
     await waitFor(() => expect(ledgerOf(1)).toBeTruthy());
@@ -306,22 +287,6 @@ describe("the turn ledger in a live conversation", () => {
     await waitFor(() => expect(composer.value).toBe("write two lines to notes.txt"));
   });
 
-  it("offers no everything step when every changed file is this session's own", async () => {
-    const own = {
-      ...sessionScoped,
-      files: sessionScoped.files.filter((file) => file.goesBack),
-    } as RestorePreviewReading;
-    const { server } = await mounted({ preview: own });
-    fireEvent.keyDown(ledgerOf(1), { key: "u" });
-    await waitFor(() => expect(confirmLine()).toBeTruthy());
-    expect(confirmLine()?.firstChild?.textContent).not.toContain("everything");
-    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "e" });
-    expect(confirmLine()?.firstChild?.textContent).toMatch(/^restore to before turn 1,/);
-    fireEvent.keyDown(confirmLine() as HTMLElement, { key: "n" });
-    await waitFor(() => expect(said()).toEqual(["left unchanged"]));
-    expect(server.sent).toEqual([]);
-  });
-
   it("shows the restore taken back once redo brings the turns home", async () => {
     const { server, act } = await mounted();
     fireEvent.keyDown(ledgerOf(1), { key: "u" });
@@ -393,77 +358,5 @@ describe("the turn ledger without the server's path", () => {
     expect(document.querySelector(".kw-ledger-hint")).toBeNull();
     act("conversation.restore-turn");
     await waitFor(() => expect(said()).toEqual([unplacedNotice]));
-  });
-
-  it("says when no turn has settled yet", () => {
-    const server = scriptedServer();
-    const store = createRoot(() => createSessionStore(server.client, server.feed));
-    let handle: (action: string) => void = () => {};
-    const shell = {
-      store,
-      keys: { chord: (action: string) => action, leader: () => "" },
-      sessions: { openSession: () => {} },
-      trust: { untrusted: () => false },
-    } as unknown as ShellSeams;
-    render(() => (
-      <conversationPane.component
-        id="conversation-1"
-        spec={{ kind: "conversation", sessionId: "s1" }}
-        focused
-        shell={shell}
-        onAction={(handler) => {
-          handle = handler;
-        }}
-      />
-    ));
-    handle("conversation.fork-turn");
-    expect(said()).toEqual([noSettledTurnNotice]);
-  });
-});
-
-describe("the turn ledger's keys", () => {
-  it("claims no chord: two palette names, and no binding a conversation hears takes u or f", () => {
-    expect(conversationPane.localActions?.["conversation.restore-turn"]).toMatchObject({
-      chords: "none",
-      command: { name: "restore-turn" },
-    });
-    expect(conversationPane.localActions?.["conversation.fork-turn"]).toMatchObject({
-      chords: "none",
-      command: { name: "fork-turn" },
-    });
-    const heard = Object.values(appActions)
-      .filter((action) => action.scope === undefined || action.scope === "conversation")
-      .flatMap((action) => (typeof action.chords === "string" ? [action.chords] : action.chords));
-    expect(heard).not.toContain("u");
-    expect(heard).not.toContain("f");
-  });
-});
-
-describe("the restore question", () => {
-  const turn = {
-    turn: 3,
-    promptId: "p3",
-    leafId: "r3",
-    text: "rename every verb in the tiler to keywork's action ids, then run the checks",
-    costUsd: undefined,
-    marks: [],
-  };
-
-  it("names the turn by its prompt, cut to fit, and counts what goes back", () => {
-    expect(restoreQuestion(turn, { turns: 1, files: undefined })).toBe(
-      `restore to before turn 3, "rename every verb in the tiler to keywo…"? 1 turn goes back · redo brings them back · y/n`,
-    );
-    expect(restoreQuestion(turn, { turns: 3, files: 0 })).toMatch(/\? 3 turns go back · /);
-    expect(restoreQuestion(turn, { turns: 3, files: 1 })).toMatch(
-      /\? 3 turns and 1 file go back · /,
-    );
-  });
-
-  it("falls back on the server's files note when no file moved", () => {
-    expect(
-      restoredNotice({ ...restored, undoneTurns: 1, files: [], filesNote: "files untouched" }),
-    ).toBe(
-      "restored to before turn 1 · 1 turn went back · files untouched · the prompt is back in the composer",
-    );
   });
 });

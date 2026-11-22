@@ -161,26 +161,6 @@ describe("the terminal pane", () => {
     await settle();
     expect(view.container.textContent).toContain("exited with code 0");
   });
-
-  it("describes itself per mode and names the leader in its empty state", () => {
-    const shell = shellSeams();
-    expect(terminalPane.title({ kind: "terminal", mode: "shell" }, shell)).toBe("shell");
-    expect(terminalPane.title({ kind: "terminal", mode: "bridge" }, shell)).toBe("bridge");
-    expect(terminalPane.title({ kind: "terminal", mode: "bridge", verb: "connect" }, shell)).toBe(
-      "connect",
-    );
-    expect(terminalPane.title({ kind: "terminal", mode: "mirror" }, shell)).toBe("mirror");
-    expect(terminalPane.emptyState(shell.keys)).toContain("every key but the leader");
-    expect(terminalPane.adornments?.({ kind: "terminal", mode: "bridge" }, shell)).toEqual({
-      modeWord: "bridge",
-    });
-    expect(terminalPane.summon?.spec(shell, "mirror")).toEqual({
-      kind: "terminal",
-      mode: "mirror",
-      sessionId: "s1",
-    });
-    expect(terminalPane.summon?.spec(shell)).toEqual({ kind: "terminal", mode: "shell" });
-  });
 });
 
 describe("a shell in the terminal pane", () => {

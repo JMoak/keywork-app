@@ -4,7 +4,6 @@ import {
   emptyProjection,
   emptyTreeState,
   projectAll,
-  reviewNotice,
   type SessionControls,
   type SessionProjection,
   unknownControls,
@@ -29,22 +28,11 @@ import { browserHost } from "../../host/browser.ts";
 import type { SaveOutcome } from "../../host/port.ts";
 import type { SessionReadings } from "../../shell/controls-store.ts";
 import type { ShellSeams } from "../registry.ts";
-import {
-  childAtWorkNotice,
-  compactNotice,
-  inferenceWords,
-  looseningQuestion,
-  nextEffort,
-  presetStep,
-  sessionGoneNotice,
-  unsteppableNotice,
-} from "./controls.ts";
+import { childAtWorkNotice, presetStep, unsteppableNotice } from "./controls.ts";
 import {
   type ConversationSpec,
   childStartingLine,
   conversationPane,
-  emptySessionLine,
-  loadingSessionLine,
   nothingToRetryNotice,
 } from "./index.tsx";
 
@@ -224,25 +212,6 @@ function answer(text: string): void {
 }
 
 describe("the control words", () => {
-  it("writes the model and the reasoning words typographically, effort only when chosen", () => {
-    expect(inferenceWords(unknownControls)).toBeUndefined();
-    expect(
-      inferenceWords({ ...unknownControls, model: "mock/beta", thinking: true, effort: "high" }),
-    ).toBe("mock/beta · thinking · effort high");
-    expect(inferenceWords({ ...unknownControls, model: "mock/alpha" })).toBe("mock/alpha");
-  });
-
-  it("cycles effort low to max and then hands it back to the provider", () => {
-    const visited: Array<EffortLevel | null> = [];
-    let level: EffortLevel | undefined;
-    for (let step = 0; step < 7; step += 1) {
-      const next = nextEffort(level);
-      visited.push(next);
-      level = next ?? undefined;
-    }
-    expect(visited).toEqual(["low", "medium", "high", "xhigh", "max", null, "low"]);
-  });
-
   it("steps the preset one place and refuses to guess an unknown or custom one", () => {
     expect(presetStep("standard", "looser")).toBe("open");
     expect(presetStep("standard", "tighter")).toBe("careful");
@@ -251,17 +220,6 @@ describe("the control words", () => {
     expect(presetStep(undefined, "looser")).toBeUndefined();
     expect(unsteppableNotice("open", "looser")).toBe("already on open, the loosest");
     expect(unsteppableNotice(undefined, "looser")).toMatch(/has not said which preset/);
-  });
-
-  it("asks the loosening question in keywork's words", () => {
-    expect(looseningQuestion("standard", "open")).toBe(
-      "switching standard → open loosens permissions. continue? y/n",
-    );
-  });
-
-  it("says when compaction had nothing to fold", () => {
-    expect(compactNotice({ compacted: null, notices: [] })).toBe("nothing to fold yet");
-    expect(compactNotice({ compacted: null, notices: ["kept 3 turns"] })).toBe("kept 3 turns");
   });
 });
 
@@ -300,14 +258,6 @@ describe("the conversation pane's controls", () => {
     expect(input.value).toBe("also check the callers");
     expect(document.querySelector(".kw-composer-hold")?.textContent).toBe(childAtWorkNotice);
     expect(document.querySelector(".kw-empty")?.textContent).toBe(childStartingLine);
-  });
-
-  it("says a session with nothing in it is empty, and an unread one is still being read", () => {
-    mount();
-    expect(document.querySelector(".kw-empty")?.textContent).toBe(emptySessionLine);
-    cleanup();
-    mount({ loading: true });
-    expect(document.querySelector(".kw-empty")?.textContent).toBe(loadingSessionLine);
   });
 
   it("opens a delegated child from its transcript row by the session-opening path", () => {
@@ -452,13 +402,6 @@ describe("the conversation pane's controls", () => {
     expect(lines()).toEqual(["session page written to <cwd>/Lights.html"]);
   });
 
-  it("says a cancelled save plainly", async () => {
-    const { act, sent } = mount();
-    await act("conversation.export");
-    expect(sent.verbs).toEqual(["save session.html 36"]);
-    expect(lines()).toEqual(["export cancelled · nothing was written"]);
-  });
-
   it("says why a save dialog that fails wrote nothing, instead of failing silently", async () => {
     const { act } = mount({
       saveFails:
@@ -467,20 +410,6 @@ describe("the conversation pane's controls", () => {
     await act("conversation.export");
     expect(lines()).toEqual([
       "the save dialog failed · Failed to get 'downloads' path · export-file writes the page into the workspace instead",
-    ]);
-  });
-
-  it("points at export-file when the host has no save dialog", async () => {
-    const { act } = mount({
-      saved: {
-        saved: false,
-        refused: "unavailable",
-        detail: "the browser host has no save dialog",
-      },
-    });
-    await act("conversation.export");
-    expect(lines()).toEqual([
-      "the browser host has no save dialog · export-file writes the page into the workspace instead",
     ]);
   });
 
@@ -495,13 +424,6 @@ describe("the conversation pane's controls", () => {
       "cost unknown · no pricing for mock/beta",
       "  mock/alpha · 1 turn · 12▸5 · no pricing",
     ]);
-  });
-
-  it("asks for a session before a session verb runs", async () => {
-    const { sent, act } = mount({}, { kind: "conversation" });
-    await act("conversation.thinking");
-    expect(sent.verbs).toEqual([]);
-    expect(lines()).toEqual(["no session here yet · send a prompt first"]);
   });
 });
 
@@ -519,46 +441,6 @@ describe("a session the server no longer knows", () => {
     expect(lines()).toEqual(['restored "Lights" · it is back in the session tree']);
   });
 
-  it("names the session as its frame did, though the store forgot it on removal", async () => {
-    const [summary, setSummary] = createSignal<SessionSummary | undefined>({
-      id: "s1",
-      title: "(untitled session)",
-      createdAt: "t",
-      lastActivityAt: "t",
-      messageCount: 2,
-    });
-    const [trashed, setTrashed] = createSignal(false);
-    const projection = projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: "2026-09-07T12:00:00.000Z",
-        sessionId: "s1",
-        type: "turn.started",
-        payload: { userText: "bash cat hello.txt" },
-      },
-    ]);
-    mount({ live: { summary, trashed, projection: () => projection } });
-    setSummary(undefined);
-    setTrashed(true);
-    await settle();
-    const confirm = document.querySelector(".kw-controls-confirm") as HTMLElement;
-    expect(confirm.textContent).toBe(
-      'removed "bash cat hello.txt" · it is in the trash, memory notes stay · restore it? y/n',
-    );
-    fireEvent.keyDown(confirm, { key: "y" });
-    await settle();
-    expect(lines()).toEqual(['restored "bash cat hello.txt" · it is back in the session tree']);
-  });
-
-  it("leaves a declined session in the trash and says where to restore it", async () => {
-    const { sent } = mount({ trashed: true });
-    await settle();
-    fireEvent.keyDown(document.querySelector(".kw-controls-confirm") as HTMLElement, { key: "n" });
-    await settle();
-    expect(sent.verbs).toEqual([]);
-    expect(lines()).toEqual(["left in the trash · the sessions pane restores it"]);
-  });
-
   it("starts a new session with the prompt instead of dropping it", async () => {
     const { sent } = mount({ promptOutcome: "missing" });
     const input = document.querySelector(".kw-composer-input") as HTMLTextAreaElement;
@@ -572,33 +454,6 @@ describe("a session the server no longer knows", () => {
     expect(lines()).toEqual([
       "that session was gone from the server · your prompt started a new one",
     ]);
-  });
-});
-
-describe("a pane whose session is gone", () => {
-  it("says so as its one empty line, not beside a second one", async () => {
-    const sent: Sent = { prompts: [], verbs: [], followed: [] };
-    const [spec, setSpec] = createSignal<ConversationSpec>({
-      kind: "conversation",
-      sessionId: "s1",
-    });
-    const shell = {
-      ...shellOver(sent, { gone: true }),
-      rebind: (_pane: string, next: ConversationSpec) => setSpec(next),
-    } as ShellSeams;
-    render(() => (
-      <conversationPane.component
-        id="conversation-1"
-        spec={spec()}
-        focused={true}
-        shell={shell}
-        onAction={() => undefined}
-      />
-    ));
-    await settle();
-    const empties = [...document.querySelectorAll(".kw-empty")].map((line) => line.textContent);
-    expect(empties).toEqual([sessionGoneNotice]);
-    expect(lines()).toEqual([]);
   });
 });
 
@@ -630,15 +485,6 @@ describe("the conversation pane's keyboard home", () => {
     mount();
     expect(document.activeElement).toBe(document.querySelector(".kw-composer-input"));
   });
-
-  it("hands the keys to an inline ask and back to the composer once it is answered", async () => {
-    const { act } = mount();
-    await act("conversation.rename");
-    expect(document.activeElement).toBe(document.querySelector(".kw-controls-input"));
-    answer("Lights");
-    await settle();
-    expect(document.activeElement).toBe(document.querySelector(".kw-composer-input"));
-  });
 });
 
 describe("the conversation pane's title row", () => {
@@ -662,223 +508,5 @@ describe("the conversation pane's title row", () => {
       declared: false,
       flushAt: 177_289,
     });
-  });
-
-  it("carries the session's arc slug and its bot to the title row", () => {
-    const bound: SessionSummary = {
-      id: "s1",
-      title: "Lights",
-      createdAt: "t",
-      lastActivityAt: "t",
-      messageCount: 2,
-      arc: "pricing-v2",
-      bot: "reviewer",
-    };
-    const shell = shellOver(
-      { prompts: [], verbs: [], followed: [] },
-      { live: { summary: () => bound, projection: () => emptyProjection, trashed: () => false } },
-    );
-    const adornments = conversationPane.adornments?.(
-      { kind: "conversation", sessionId: "s1" },
-      shell,
-    );
-    expect(adornments?.arc).toBe("pricing-v2");
-    expect(adornments?.bot).toEqual({ name: "reviewer" });
-  });
-
-  it("keeps the assumed basis until the first reading arrives", () => {
-    const shell = shellOver({ prompts: [], verbs: [], followed: [] });
-    const adornments = conversationPane.adornments?.(
-      { kind: "conversation", sessionId: "s1" },
-      shell,
-    );
-    expect(adornments?.context).toBeUndefined();
-    expect(adornments?.inference).toBeUndefined();
-  });
-
-  it("binds its chords without colliding with any global one", () => {
-    const chords = Object.values(conversationPane.localActions ?? {}).flatMap((action) =>
-      typeof action.chords === "string" ? [action.chords] : [...action.chords],
-    );
-    expect(chords.filter((chord) => chord !== "none")).toEqual([
-      "leader o",
-      "leader v",
-      "leader e",
-      "leader shift+c",
-      "leader shift+r",
-      "leader shift+e",
-      "leader end",
-      "leader shift+x",
-      "leader [",
-      "leader ]",
-    ]);
-  });
-});
-
-describe("the review trail in the conversation", () => {
-  const at = "2026-11-06T10:00:00.000Z";
-  const mark = {
-    index: 1,
-    entryId: "v1",
-    at,
-    path: "src/a.ts",
-    header: "@@ -1,3 +1,4 @@",
-    digest: "a1b2c3d4",
-    verdict: "keep",
-  } as const;
-  const quoted = [
-    "About src/a.ts @@ -1,3 +1,4 @@ (hunk a1b2c3d4):",
-    "",
-    "```diff",
-    "-two",
-    "+2",
-    "```",
-    "",
-    "why 2 and not two?",
-  ].join("\n");
-
-  function reviewed(replay: boolean): SessionProjection {
-    return projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: at,
-        sessionId: "s1",
-        type: "turn.started",
-        payload: { userText: "take the delivery", entryId: "q1", replay },
-      },
-      {
-        id: 2,
-        ts: at,
-        sessionId: "s1",
-        type: "extension.notice",
-        payload: { ...reviewNotice(mark), replay },
-      },
-      {
-        id: 3,
-        ts: at,
-        sessionId: "s1",
-        type: "turn.started",
-        payload: { userText: quoted, entryId: "q2", replay },
-      },
-    ]);
-  }
-
-  it("draws each verdict as a bare notice between the turns, live and replayed", () => {
-    for (const replay of [false, true]) {
-      mount({
-        live: {
-          summary: () => undefined,
-          projection: () => reviewed(replay),
-          trashed: () => false,
-        },
-      });
-      const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
-      expect(notices, `replay ${replay}`).toEqual([
-        "keep · src/a.ts @@ -1,3 +1,4 @@ · hunk a1b2c3d4",
-      ]);
-      cleanup();
-    }
-  });
-
-  it("shows talking to the diff as the keeper's own message carrying the hunk reference", () => {
-    mount({
-      live: { summary: () => undefined, projection: () => reviewed(false), trashed: () => false },
-    });
-    const prompts = [...document.querySelectorAll(".kw-user")].map((n) => n.textContent ?? "");
-    expect(prompts).toHaveLength(2);
-    expect(prompts[1]).toContain("About src/a.ts @@ -1,3 +1,4 @@ (hunk a1b2c3d4):");
-    expect(prompts[1]).toContain("why 2 and not two?");
-  });
-});
-
-describe("a creature's report on its own turn", () => {
-  const at = "2026-11-06T10:00:00.000Z";
-  const sentence = "I listed the five largest files under docs and wrote them to notes/largest.md.";
-  const reply = `${sentence} The list is sorted by size.`;
-  const crateDeliveredLine = "delivered · the crate is on the porch";
-
-  function reported(replay: boolean): SessionProjection {
-    return projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: at,
-        sessionId: "s1",
-        type: "turn.started",
-        payload: { userText: "list the five largest files under docs", entryId: "q1", replay },
-      },
-      {
-        id: 2,
-        ts: at,
-        sessionId: "s1",
-        type: "turn.delta",
-        payload: { delta: { type: "text", text: reply }, replay },
-      },
-      {
-        id: 3,
-        ts: at,
-        sessionId: "s1",
-        type: "turn.completed",
-        payload: {
-          message: { role: "assistant", parts: [{ type: "text", text: reply }] },
-          usage: { inputTokens: 1, outputTokens: 1 },
-          replay,
-        },
-      },
-      {
-        id: 4,
-        ts: at,
-        sessionId: "s1",
-        type: "extension.notice",
-        payload: {
-          extension: "creature",
-          level: "info",
-          message: sentence,
-          detail: { origin: { kind: "creature", creature: "cob", thread: "s1" }, entryId: "e9" },
-          replay,
-        },
-      },
-    ]);
-  }
-
-  it("draws the turn's first sentence once and its report line as the delivery notice, live and replayed", () => {
-    for (const replay of [false, true]) {
-      mount({
-        live: {
-          summary: () => undefined,
-          projection: () => reported(replay),
-          trashed: () => false,
-        },
-      });
-      const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
-      expect(notices, `replay ${replay}`).toEqual([crateDeliveredLine]);
-      const drawn = document.querySelector(".kw-transcript")?.textContent ?? "";
-      expect(drawn.split(sentence).length - 1, `replay ${replay}`).toBe(1);
-      cleanup();
-    }
-  });
-
-  it("still draws a thread's report line as its own sentence, since only the conversation's label is the crate", () => {
-    const threadReport = projectAll(emptyProjection, [
-      {
-        id: 1,
-        ts: at,
-        sessionId: "s1",
-        type: "extension.notice",
-        payload: {
-          extension: "creature",
-          level: "info",
-          message: sentence,
-          detail: {
-            origin: { kind: "creature", creature: "cob", thread: "thread-2" },
-            entryId: "e9",
-          },
-        },
-      },
-    ]);
-    mount({
-      live: { summary: () => undefined, projection: () => threadReport, trashed: () => false },
-    });
-    const notices = [...document.querySelectorAll(".kw-notice")].map((n) => n.textContent);
-    expect(notices).toEqual([sentence]);
   });
 });

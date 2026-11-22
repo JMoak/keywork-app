@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  bannerSize,
   edgeThickness,
   indicatorLayout,
   placedStrip,
@@ -11,12 +10,6 @@ import {
 const windowsMinimum = { width: 29, height: 33 };
 
 const scales = [
-  {
-    percent: 100,
-    scaleFactor: 1,
-    workArea: { x: 0, y: 0, width: 1920, height: 1032 },
-    pixels: { width: 1920, height: 1032 },
-  },
   {
     percent: 133,
     scaleFactor: 1.3333333730697632,
@@ -32,17 +25,6 @@ const scales = [
 ] as const;
 
 describe("indicatorLayout", () => {
-  it("frames the area it is given with four edges and a banner under the top edge", () => {
-    const layout = indicatorLayout({ x: 0, y: 0, width: 1920, height: 1080 });
-    expect(layout.edges).toEqual([
-      { x: 0, y: 0, width: 1920, height: 4 },
-      { x: 0, y: 1076, width: 1920, height: 4 },
-      { x: 0, y: 4, width: 4, height: 1072 },
-      { x: 1916, y: 4, width: 4, height: 1072 },
-    ]);
-    expect(layout.banner).toEqual({ x: 680, y: 4, width: 560, height: bannerSize.height });
-  });
-
   for (const scale of scales) {
     it(`keeps every edge ${edgeThickness} DIP thick and inside the work area at ${scale.percent} percent`, () => {
       const { edges, banner } = indicatorLayout(scale.workArea, scale.scaleFactor);
@@ -99,28 +81,6 @@ describe("placedStrip", () => {
     expect(placedStrip(strip, strip, { x: 0, y: 0, width: 1920, height: 1032 })).toEqual({
       bounds: strip,
       shape: { x: 0, y: 0, width: 1920, height: 4 },
-    });
-  });
-
-  it("grows a bottom or right strip inward, never past the work area", () => {
-    const area = { x: 0, y: 0, width: 1920, height: 1032 };
-    const bottom = placedStrip(
-      { x: 0, y: 1028, width: 1920, height: 4 },
-      { width: 1920, height: 33 },
-      area,
-    );
-    expect(bottom).toEqual({
-      bounds: { x: 0, y: 999, width: 1920, height: 33 },
-      shape: { x: 0, y: 29, width: 1920, height: 4 },
-    });
-    const right = placedStrip(
-      { x: 1916, y: 4, width: 4, height: 1024 },
-      { width: 29, height: 1024 },
-      area,
-    );
-    expect(right).toEqual({
-      bounds: { x: 1891, y: 4, width: 29, height: 1024 },
-      shape: { x: 25, y: 0, width: 4, height: 1024 },
     });
   });
 });

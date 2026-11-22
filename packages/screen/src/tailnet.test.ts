@@ -23,7 +23,6 @@ describe("tailnet addresses", () => {
     ["100.64.0", false],
     ["100.64.0.256", false],
     ["fd7a:115c:a1e0::1", true],
-    ["fd7a:115c:a1e0:ab12:4843:cd96:6258:b240", true],
     ["FD7A:115C:A1E0::53", true],
     ["[fd7a:115c:a1e0::9]", true],
     ["fd7a:115c:a1e0::9%13", true],

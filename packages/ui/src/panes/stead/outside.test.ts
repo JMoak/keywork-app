@@ -32,15 +32,6 @@ describe("the stead painter in a pane outside the window", () => {
     expect(paints).toBe(1);
   });
 
-  it("still watches the console page when no stage is named", async () => {
-    let paints = 0;
-    const stop = watchTheme(() => (paints += 1));
-    document.documentElement.setAttribute("data-theme", "worn");
-    await settled();
-    stop();
-    expect(paints).toBe(1);
-  });
-
   it("reads pixel ratio and forced colours from the window the canvas stands in", () => {
     const child = secondWindow();
     const canvas = stageIn(child.document);

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { gallery, keyworkNight } from "../../theme/themes.ts";
-import { applyTheme, swappingAttribute } from "../../theme/variables.ts";
+import { applyTheme } from "../../theme/variables.ts";
 import { type Mirror, mirrorDocument, StylesheetRefused } from "./mirror.ts";
 import type { Realm } from "./realm.ts";
 import { openChild, serveStylesheets, turn } from "./testing.ts";
@@ -48,24 +48,6 @@ describe("what the theme sets on the page", () => {
     expect(root.hasAttribute("data-leaving")).toBe(false);
     expect(child.document.body.classList.contains("worn")).toBe(true);
   });
-
-  it("swaps a theme at once in the child as the console did", async () => {
-    applyTheme(keyworkNight);
-    const child = mirrored().child;
-    const root = child.document.documentElement;
-    const changed: Array<string | null> = [];
-    const watcher = new child.MutationObserver((records) => {
-      for (const record of records) changed.push(record.attributeName);
-    });
-    watcher.observe(root, { attributes: true });
-    applyTheme(otherTheme());
-    await turn();
-    watcher.disconnect();
-    expect(changed.at(0)).toBe(swappingAttribute);
-    expect(changed.at(-1)).toBe(swappingAttribute);
-    expect(changed).toContain("style");
-    expect(root.hasAttribute(swappingAttribute)).toBe(false);
-  });
 });
 
 describe("the stylesheets of the console", () => {
@@ -80,14 +62,6 @@ describe("the stylesheets of the console", () => {
     ]);
     expect(clones[0]?.getAttribute("data-vite-dev-id")).toBe("/src/a.css");
     expect(clones[1]?.getAttribute("media")).toBe("screen");
-  });
-
-  it("keeps the text of a style matched when the dev server rewrites it", async () => {
-    const style = styleOf(".a { color: var(--kw-text); }");
-    const child = mirrored().child;
-    style.textContent = ".a { color: var(--kw-accent); }";
-    await turn();
-    expect(textsIn(child)).toEqual([".a { color: var(--kw-accent); }"]);
   });
 
   it("adds a style where the console put it, and removes one the console removed", async () => {

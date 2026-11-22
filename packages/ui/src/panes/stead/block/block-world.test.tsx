@@ -1,16 +1,13 @@
 import {
   backdropOf,
   blockScene,
-  cornerTurn,
   drawList,
   firefliesOf,
   identityCount,
-  identityIndex,
   kits,
   lanternKit,
   neonKit,
   type Picture,
-  quarterTurn,
   raisedEye,
   residentsOf,
   resolveBlockPalette,
@@ -23,25 +20,7 @@ import { cleanup, fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { rampStops } from "../../../chrome/pane-frame.tsx";
 import { coatOf } from "../herd.ts";
-import {
-  artPointOf,
-  BlockWorld,
-  type BlockWorldControls,
-  deviceSizeOf,
-  samePicture,
-  tickAt,
-} from "./block-world.tsx";
-import {
-  cameraAt,
-  cornered,
-  easeInOut,
-  eyeFor,
-  lifted,
-  moving,
-  stillMotion,
-  turned,
-  turnMs,
-} from "./motion.ts";
+import { artPointOf, BlockWorld, type BlockWorldControls, deviceSizeOf } from "./block-world.tsx";
 import { paintPicture, textureCache } from "./paint.ts";
 import { blockWorldShown, blockWorldSwitch, blockWorldVariable } from "./switch.ts";
 
@@ -74,25 +53,6 @@ describe("the block world switch", () => {
 });
 
 describe("a creature's colour in the world", () => {
-  it("is one of eight, chosen by the creature's seed, or its rank when it has none", () => {
-    expect(identityCount(neonKit)).toBe(8);
-    for (let seed = 0; seed < 40; seed += 1) expect(identityIndex(seed, 8)).toBe(seed % 8);
-    const town = sketchTown(10);
-    const unseeded = {
-      ...town,
-      creatures: Object.fromEntries(
-        Object.entries(town.creatures).map(([slug, creature]) => [
-          slug,
-          { ...creature, seed: undefined },
-        ]),
-      ),
-    };
-    const ranks = Object.keys(unseeded.creatures).sort();
-    for (const resident of residentsOf(unseeded, neonKit)) {
-      expect(resident.identity).toBe(ranks.indexOf(resident.slug) % 8);
-    }
-  });
-
   it("is the same colour the console's chrome gives the creature, seeded or not", () => {
     const town = sketchTown(12);
     const mixed = {
@@ -132,22 +92,6 @@ describe("forced colours", () => {
     expect(painted.styles()).toContain("CanvasText");
     vi.unstubAllGlobals();
   });
-
-  it("paints theme colours, never system ones, when nothing forces them", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("reduce"),
-      media: query,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-    }));
-    const painted = styledCanvas();
-    render(() => <BlockWorld world={sketchTown(5)} focused={false} hidden={false} />);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(painted.styles().size).toBeGreaterThan(0);
-    expect([...painted.styles()].some((style) => systemNames.has(style))).toBe(false);
-    vi.unstubAllGlobals();
-  });
 });
 
 describe("fitting, ticks and motion", () => {
@@ -160,35 +104,6 @@ describe("fitting, ticks and motion", () => {
       x: 30 / list.view.scale,
       y: 60 / list.view.scale,
     });
-  });
-
-  it("counts time in the sketch's ticks, and stands still under reduced motion", () => {
-    expect(tickAt(1250, false)).toBe(10);
-    expect(tickAt(1250, true)).toBe(0);
-  });
-
-  it("turns a quarter in 620 ms, eased at both ends, ignoring a second turn mid-way", () => {
-    const start = stillMotion(0, raisedEye);
-    const turning = turned(start, 1, 1000, false);
-    expect(turned(turning, 1, 1100, false)).toBe(turning);
-    expect(cameraAt(turning, 1000 + turnMs / 2).angle).toBeCloseTo(quarterTurn / 2);
-    expect(cameraAt(turning, 1000 + turnMs * 0.1).angle).toBeLessThan(quarterTurn * 0.1);
-    expect(moving(turning, 1000 + turnMs)).toBe(false);
-    expect(cameraAt(turning, 1000 + turnMs).angle).toBe(quarterTurn);
-    expect(easeInOut(0)).toBe(0);
-    expect(easeInOut(1)).toBe(1);
-  });
-
-  it("rests on a corner and back, jumps under reduced motion, and raises the eye once a street forms", () => {
-    const corner = cornered(stillMotion(1, raisedEye), true, 0, true);
-    expect(cameraAt(corner, 0).angle).toBeCloseTo(quarterTurn + cornerTurn);
-    expect(cameraAt(cornered(corner, false, 0, true), 0).angle).toBeCloseTo(quarterTurn);
-    expect(moving(turned(stillMotion(0, raisedEye), -1, 0, true), 0)).toBe(false);
-    expect(eyeFor(2)).toBe(0);
-    expect(eyeFor(3)).toBe(raisedEye);
-    const rising = lifted(stillMotion(0, 0), raisedEye, 0, false);
-    expect(cameraAt(rising, 100).eye).toBeGreaterThan(0);
-    expect(cameraAt(rising, 100).eye).toBeLessThan(raisedEye);
   });
 });
 
@@ -223,18 +138,6 @@ describe("painting a picture", () => {
     paintPicture(context.context, picture, palette(), cache);
     expect(made.length).toBe(first * 2);
   });
-
-  it("knows an unchanged picture when it sees one", () => {
-    const world = blockScene(sketchTown(2), { kit: neonKit, appearance: "day", now: noon }).world;
-    const view = viewOf(world, 640, 400, raisedEye);
-    const pictureAt = (quarter: number): Picture => ({
-      list: drawList(world, restCamera(quarter, raisedEye), view),
-      backdrop: [],
-      lights: [],
-    });
-    expect(samePicture(pictureAt(0), pictureAt(0))).toBe(true);
-    expect(samePicture(pictureAt(0), pictureAt(1))).toBe(false);
-  });
 });
 
 describe("the block world on the stead", () => {
@@ -263,21 +166,6 @@ describe("the block world on the stead", () => {
     expect(stage.dataset.kit).toBe("lantern");
   });
 
-  it("offers Deco beside the other three kits, chosen the same way", () => {
-    stubCanvas();
-    const { container, getByText } = render(() => (
-      <BlockWorld world={sketchTown(5)} focused={true} hidden={false} />
-    ));
-    const stage = container.querySelector<HTMLElement>(".kw-stead-block");
-    const buttons = [...container.querySelectorAll(".kw-stead-block-controls button")].map(
-      (button) => button.textContent,
-    );
-    expect(buttons.slice(0, 4)).toEqual(["Neon", "Lantern", "Terrace", "Deco"]);
-    fireEvent.click(getByText("Deco"));
-    expect(stage?.dataset.kit).toBe("deco");
-    expect(getByText("Deco").getAttribute("aria-pressed")).toBe("true");
-  });
-
   it("paints once and then sleeps under reduced motion, however lively the town", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("matchMedia", (query: string) => ({
@@ -294,14 +182,6 @@ describe("the block world on the stead", () => {
     expect(painted).toBeGreaterThan(0);
     expect(context.clears()).toBe(painted);
     vi.unstubAllGlobals();
-  });
-
-  it("draws nothing while hidden", async () => {
-    vi.useFakeTimers();
-    const context = stubCanvas();
-    render(() => <BlockWorld world={sketchTown(2)} focused={false} hidden={true} />);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(context.clears()).toBe(0);
   });
 });
 

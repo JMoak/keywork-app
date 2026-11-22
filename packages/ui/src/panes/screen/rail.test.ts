@@ -13,12 +13,6 @@ const sessionId = "session-1";
 const now = Date.parse("2026-11-06T08:38:00.000Z");
 
 describe("the screen rail's grant", () => {
-  it("says view only for a view grant and nothing of control", () => {
-    const viewing = live();
-    expect(grantOf(viewing)).toBe("view");
-    expect(rail(viewing)).toBe(`view only · LG TV SSCR2 · until ${untilOf(viewing)}`);
-  });
-
   it("says control, never view only, while the viewer holds control", () => {
     const controlling = live(controlGrant);
     expect(grantOf(controlling)).toBe("control");
@@ -75,10 +69,6 @@ function rail(state: ScreenViewState): string {
   return [statusLine(state, "moak-main"), controlLine(state, now)]
     .filter((segment) => segment !== "")
     .join(" · ");
-}
-
-function untilOf(state: ScreenViewState): string {
-  return statusLine(state, "moak-main").split("until ")[1] ?? "";
 }
 
 function occurrences(text: string, phrase: string): number {

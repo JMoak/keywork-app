@@ -6,7 +6,7 @@ import { project, projectAll } from "../world/project.ts";
 import { emptyHabitat, type HabitatState } from "../world/types.ts";
 import { attend, attentionTuning, flowedScore, scoreAt } from "./attention.ts";
 import { yardCard } from "./card.ts";
-import { codeWidth, defaultHub, overlaps, placeYard } from "./place.ts";
+import { codeWidth, defaultHub, placeYard } from "./place.ts";
 import { moveByHand, stepYard } from "./step.ts";
 import { aSetting, askedIn, aYardSetting, calm, isoAt, noon, proposed } from "./testing.ts";
 import {
@@ -25,7 +25,6 @@ const { halfLifeMs, working } = attentionTuning;
 const asked: YardContext = { ...calm, ...askedIn("s1", noon - 30 * second) };
 
 const desktop: Rect = { x: 0, y: 0, width: 1920, height: 1080 };
-const laptop: Rect = { x: 0, y: 0, width: 1280, height: 800 };
 
 function named(id: string, overrides: Partial<Setting> = {}): Setting {
   return aSetting({
@@ -81,22 +80,6 @@ describe("a size the creature named", () => {
       size: "working",
       headStart: { lastAt: noon + minute },
     });
-  });
-
-  it("waits through a held unfold too, the gate deciding the rung and never the size", () => {
-    const unasked = arrived([named("a")], calm);
-    expect(unasked.settings.a).toMatchObject({ shown: "card", size: "working" });
-    expect(moveByHand(unasked, "a", "unfold", noon).settings.a?.size).toBe("working");
-  });
-
-  it("leaves the choice to the yard when none was named or readable was", () => {
-    const quiet = arrived([plain("a")]).settings.a;
-    expect(quiet?.size).toBeUndefined();
-    expect(quiet?.headStart).toBeUndefined();
-    const readable = arrived([named("a", { size: "readable" })]);
-    expect(readable.settings.a?.size).toBe("readable");
-    expect(readable.settings.a?.headStart).toBeUndefined();
-    expect(interactions(readable, "a", noon, 22).settings.a?.size).toBe("working");
   });
 
   it("is honoured once: however it folds, the next unfold is readable", () => {
@@ -157,37 +140,10 @@ describe("a size the creature named", () => {
     expect(three.settings.c?.size).toBe("readable");
     expect(three.settings.c?.headStart).toBeUndefined();
   });
-
-  it("gives way to panels the keeper's own attention made working", () => {
-    const busy = interactions(
-      interactions(arrived([plain("x"), plain("y")]), "x", noon, 22),
-      "y",
-      noon + minute,
-      22,
-    );
-    expect(busy.settings.x?.size).toBe("working");
-    expect(busy.settings.y?.size).toBe("working");
-    const later = noon + 3 * minute;
-    const context = { ...asked, ...askedIn("s1", later - second) };
-    const next = stepYard(
-      yardOf(project(habitatWith(busy), proposed(9, named("z", { at: isoAt(later) })))),
-      context,
-      later,
-    );
-    expect(next.settings.z).toMatchObject({ shown: "unfold", size: "readable" });
-    expect(next.settings.x?.size).toBe("working");
-    expect(next.settings.y?.size).toBe("working");
-  });
 });
 
 describe("the head start a named working panel opens with", () => {
   const opened = arrived([named("a"), plain("o")]);
-
-  it("holds it working through the keeper's unrelated keystrokes and every yard step", () => {
-    const typing = interactions(opened, "o", noon + second, 5);
-    expect(typing.settings.a).toMatchObject({ size: "working" });
-    expect(stepYard(opened, asked, noon + 5 * minute).settings.a?.size).toBe("working");
-  });
 
   it("decays like attention, sending an ignored panel back only at the keeper's next input", () => {
     const byHand = moveByHand(
@@ -202,12 +158,6 @@ describe("the head start a named working panel opens with", () => {
     const sent = noticed(byHand, "o", "interact", later).settings.a;
     expect(sent?.size).toBe("readable");
     expect(sent?.headStart).toBeUndefined();
-  });
-
-  it("folds back with the panel when the keeper leaves it alone, as anything ignored does", () => {
-    const stepped = stepYard(opened, asked, noon + 10 * minute);
-    expect(stepped.settings.a?.shown).toBe("card");
-    expect(stepped.settings.a?.size).toBeUndefined();
   });
 
   it("joins the keeper's own attention: a glance keeps it, a long look outlasts it", () => {
@@ -293,35 +243,12 @@ describe("where a named working panel goes", () => {
     };
   }
 
-  it("grows into free space, and stops at every panel already out", () => {
-    const neighbour = panel("d", 3, 1);
-    const before = find(place([neighbour]), "d");
-    const placed = place([onHeadStart(panel("f", 9, 0)), neighbour]);
-    expect(find(placed, "d")).toEqual(before);
-    expect(find(placed, "f")).toMatchObject({ size: "working", rung: "unfold" });
-    expect(overlaps(find(placed, "f").rect, before.rect)).toBe(false);
-  });
-
-  it("shows less where the free space is too small, and keeps its working size in state", () => {
-    const placed = place([panel("d", 3, 0), onHeadStart(panel("f", 9, 1))], laptop);
-    expect(find(placed, "f").size).toBe("readable");
-    expect(find(placed, "d").size).toBe("readable");
-  });
-
   it("yields to a working panel the keeper earned, however deep it is", () => {
     const keeperWorks = earned(panel("e", 3, 1));
     const alone = find(place([keeperWorks]), "e");
     const placed = place([keeperWorks, onHeadStart(panel("f", 30, 0))]);
     expect(find(placed, "e")).toEqual(alone);
     expect(find(placed, "f")).toMatchObject({ rung: "unfold", size: "card" });
-  });
-
-  it("lets an older head start keep its space when a later one arrives", () => {
-    const opened = (at: number, slot: number) => ({ at, slot, focus: undefined, byHand: false });
-    const first = onHeadStart(panel("a", 3, 0, { unfolded: opened(1, 0) }));
-    const later = onHeadStart(panel("b", 30, 1, { unfolded: opened(2, 1) }));
-    const alone = find(place([first]), "a");
-    expect(find(place([first, later]), "a")).toEqual(alone);
   });
 
   it("competes as any panel once the keeper has attended it", () => {

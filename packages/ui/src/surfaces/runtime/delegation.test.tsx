@@ -12,14 +12,6 @@ afterEach(() => {
 });
 
 describe("Solid's delegated events in a second document", () => {
-  it("leaves a transplanted component deaf when the child document is not sharing them", () => {
-    const child = secondWindow();
-    const clicks = clickCounter();
-    child.document.body.append(clicks.host);
-    clicks.button().click();
-    expect(clicks.count()).toBe(0);
-  });
-
   it("fires a transplanted component's click handler in the child document", () => {
     const child = secondWindow();
     cleanups.push(shareDelegatedEvents(child.document));

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { ConsoleClient } from "@keywork-app/client";
 import type { BusEnvelope, TreeListing } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
@@ -8,9 +6,8 @@ import treeRoot from "../../../../client/src/fixtures/tree-root.json?raw";
 import treeSrc from "../../../../client/src/fixtures/tree-src.json?raw";
 import { browserHost } from "../../host/browser.ts";
 import { inertShellExtras, inertWorkspaceClient } from "../../shell/trust-testing.ts";
-import { holdTypingFocus } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import { browserPane, describeTreeRefusal, filterMissLine, markOf } from "./index.tsx";
+import { browserPane, describeTreeRefusal, markOf } from "./index.tsx";
 
 const fixture = (raw: string): TreeListing => JSON.parse(raw) as TreeListing;
 
@@ -86,24 +83,6 @@ const names = (root: HTMLElement): string[] =>
 afterEach(cleanup);
 
 describe("the files pane", () => {
-  it("loads the root lazily, folders first, ignored entries dimmed and dotfiles hidden until . is pressed", async () => {
-    const h = harness();
-    const { view, act } = mount(h);
-    await waitFor(() => expect(names(view.container)).toEqual(["dist", "src", "README.md"]));
-    expect(h.asked).toEqual([""]);
-    expect(
-      view.container.querySelector(".kw-browser-row[data-ignored] .kw-browser-name")?.textContent,
-    ).toBe("dist");
-    act("browser.hidden");
-    expect(names(view.container)).toEqual([
-      "dist",
-      "src",
-      ".editorconfig",
-      ".gitignore",
-      "README.md",
-    ]);
-  });
-
   it("walks with j, k, l, h and enter, loading a folder only when it unfolds, and opens a file pane", async () => {
     const h = harness();
     const { view, act } = mount(h);
@@ -143,22 +122,22 @@ describe("the files pane", () => {
     expect(names(view.container)).toHaveLength(3);
   });
 
-  it("says a filter matched nothing instead of calling the workspace empty", async () => {
+  it("loads the root lazily, folders first, ignored entries dimmed and dotfiles hidden until . is pressed", async () => {
     const h = harness();
     const { view, act } = mount(h);
-    await waitFor(() => expect(names(view.container)).toHaveLength(3));
-    act("browser.filter");
-    const field = (await waitFor(() => {
-      const input = view.container.querySelector(".kw-browser-filter");
-      expect(input).not.toBeNull();
-      return input;
-    })) as HTMLInputElement;
-    field.value = "zzz";
-    fireEvent.input(field);
-    fireEvent.keyDown(field, { key: "Enter" });
-    expect(names(view.container)).toEqual([]);
-    expect(view.container.textContent).toContain(filterMissLine("zzz"));
-    expect(view.container.textContent).not.toContain("nothing here");
+    await waitFor(() => expect(names(view.container)).toEqual(["dist", "src", "README.md"]));
+    expect(h.asked).toEqual([""]);
+    expect(
+      view.container.querySelector(".kw-browser-row[data-ignored] .kw-browser-name")?.textContent,
+    ).toBe("dist");
+    act("browser.hidden");
+    expect(names(view.container)).toEqual([
+      "dist",
+      "src",
+      ".editorconfig",
+      ".gitignore",
+      "README.md",
+    ]);
   });
 
   it("rereads every open folder on r", async () => {
@@ -167,37 +146,6 @@ describe("the files pane", () => {
     await waitFor(() => expect(names(view.container)).toHaveLength(3));
     act("browser.refresh");
     await waitFor(() => expect(h.asked).toEqual(["", ""]));
-  });
-
-  it("lifts the file the agent touches and unfolds its loaded ancestors", async () => {
-    const h = harness();
-    const { view, act } = mount(h);
-    await waitFor(() => expect(names(view.container)).toHaveLength(3));
-    act("browser.down");
-    act("browser.down");
-    act("browser.expand");
-    await waitFor(() => expect(names(view.container)).toHaveLength(5));
-    act("browser.collapse");
-    expect(names(view.container)).toHaveLength(3);
-    h.push({
-      id: 3,
-      ts: "t",
-      sessionId: "s1",
-      type: "tool.started",
-      payload: {
-        call: {
-          type: "tool-call",
-          callId: "c1",
-          name: "read",
-          arguments: { path: "src/index.ts" },
-        },
-      },
-    });
-    await waitFor(() =>
-      expect(view.container.querySelector("[data-lit] .kw-browser-name")?.textContent).toBe(
-        "index.ts",
-      ),
-    );
   });
 
   it("names a missing or confined root plainly and marks rows by kind", () => {
@@ -210,17 +158,6 @@ describe("the files pane", () => {
     expect(browserPane.emptyState({ chord: () => "ctrl+k f", leader: () => "ctrl+k" })).toContain(
       "ctrl+k f",
     );
-  });
-});
-
-describe("the files pane's keyboard home", () => {
-  it("takes DOM focus from a typing field when it is focused, so its single keys reach it", async () => {
-    const typing = holdTypingFocus();
-    const { view } = mount(harness());
-    await waitFor(() =>
-      expect(view.container.firstElementChild?.contains(document.activeElement)).toBe(true),
-    );
-    typing.remove();
   });
 });
 
@@ -271,19 +208,3 @@ function toolStarted(callId: string, name: string, path: string): BusEnvelope {
     payload: { call: { type: "tool-call", callId, name, arguments: { path } } },
   };
 }
-
-describe("the files pane's chrome", () => {
-  it("keeps the root path at every width and draws no focus ring of its own", () => {
-    expect(narrowRules(browserCss)).not.toContain(".kw-browser-root");
-    expect(browserCss).toMatch(/\.kw-browser:focus \{\s*outline: none;/);
-  });
-});
-
-function narrowRules(css: string): string {
-  return css.slice(css.indexOf("@container"));
-}
-
-const browserCss = readFileSync(
-  join(process.cwd(), "packages/ui/src/panes/browser/browser.css"),
-  "utf8",
-);

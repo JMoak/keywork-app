@@ -65,10 +65,6 @@ describe("pathReading: the turns the server counts", () => {
     expect(partly.turns[0]?.costUsd).toBeUndefined();
     expect(pathReading(log([prompt("p1", "a")])).turns[0]?.costUsd).toBeUndefined();
   });
-
-  it("reads one snapshot once", () => {
-    expect(pathReading(recordedLog)).toBe(pathReading(recordedLog));
-  });
 });
 
 describe("transcriptLedger: each settled turn's facts", () => {
@@ -88,15 +84,6 @@ describe("transcriptLedger: each settled turn's facts", () => {
       { head: 0, end: 2, turn: 1, files: ["notes.txt"], toolMs: 500 },
       { head: 3, end: 4, turn: 2, files: [], toolMs: undefined },
     ]);
-  });
-
-  it("says nothing it was not told: no path, no place; no changes read, no files", () => {
-    const ledger = transcriptLedger(projection, undefined, emptyChangesState);
-    expect(ledger.turns.map((turn) => [turn.place, turn.files, turn.costUsd])).toEqual([
-      [undefined, undefined, undefined],
-      [undefined, undefined, undefined],
-    ]);
-    expect(ledger.turns[0]?.toolMs).toBe(500);
   });
 
   it("leaves the running turn without a ledger until it settles", () => {

@@ -54,13 +54,6 @@ describe("satellites keep their ring slot", () => {
     expect(others.every((placement) => placement.slot === undefined)).toBe(true);
   });
 
-  it("never backfills a freed slot by moving another satellite", () => {
-    const both = place([unfold("a", 5, inSlot(0)), unfold("b", 3, inSlot(1))]);
-    const left = place([unfold("b", 3, inSlot(1))]);
-    expect(satellites(both)).toEqual(["a 0 972,632 648", "b 1 1256,16 648"]);
-    expect(satellites(left)).toEqual(["b 1 1256,16 648"]);
-  });
-
   it("gives a newcomer the lowest free slot, oldest unfold first", () => {
     const placed = place([
       unfold("kept", 1, inSlot(1)),

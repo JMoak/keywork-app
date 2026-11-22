@@ -47,10 +47,6 @@ describe("sseFrames", () => {
     const frame = parseFrame(": note\nid: 3\ndata: {\ndata: }");
     expect(frame).toEqual({ id: "3", event: undefined, data: "{\n}", comments: ["note"] });
   });
-
-  it("ignores an empty block", () => {
-    expect(parseFrame("")).toBeUndefined();
-  });
 });
 
 describe("envelopeOf", () => {

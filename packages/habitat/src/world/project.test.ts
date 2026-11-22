@@ -198,23 +198,6 @@ describe("a thread's day", () => {
     expect(stopped.threads.s1?.restingSince).toBe(stopped.asOf);
   });
 
-  it("counts bench notes from the queue and keeps the title from session.state", () => {
-    const state = run([
-      at("session.state", {
-        model: "m",
-        thinking: false,
-        title: "Lights",
-        leafId: null,
-        quiet: false,
-        undoable: false,
-        redoable: false,
-      }),
-      at("queue.changed", { queued: [{ id: "q2", text: "second", behavior: "queue" }] }),
-    ]);
-    expect(state.threads.s1).toMatchObject({ title: "Lights", queued: 1 });
-    expect(run([at("queue.changed", { queued: [] })], state).threads.s1?.queued).toBe(0);
-  });
-
   it("paints replayed history as a known thread, never as a live turn", () => {
     const replayed = run([
       at("turn.started", { userText: "old", replay: true }),

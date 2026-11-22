@@ -148,23 +148,6 @@ describe("the score", () => {
     expect(attentionOf(twice, "a")).toMatchObject({ interactions: 2, interactedAt: at(2) });
   });
 
-  it("saturates at forty", () => {
-    const busy = Array.from({ length: 60 }, (_, index): [string, AttendKind, number] => [
-      "a",
-      "interact",
-      index * 2,
-    ]);
-    expect(attentionOf(noticed(busy), "a")?.score).toBe(ceiling);
-  });
-
-  it("returns the same yard for a notice about no setting or a leave from elsewhere", () => {
-    const yard = yardOfThree();
-    expect(attend(yard, { id: "missing", kind: "enter", at: noon })).toBe(yard);
-    expect(attend(yard, { id: "a", kind: "leave", at: noon })).toBe(yard);
-    const inside = noticed([["a", "enter", 0]]);
-    expect(attend(inside, { id: "a", kind: "enter", at: at(1) })).toBe(inside);
-  });
-
   it("stops its clock while the console is hidden, and decays while the keeper is elsewhere", () => {
     const attended = stepYard(noticed([["a", "interact", 0]]), calm, at(0));
     const hidden = stepYard(attended, { ...calm, visible: false }, at(60));
@@ -240,15 +223,6 @@ describe("sizes", () => {
     expect(left.settings.a?.size).toBe("readable");
   });
 
-  it("settle to one size: a second look at the same score changes nothing", () => {
-    fc.assert(
-      fc.property(sizeArb, scoreArb, (size, score) => {
-        const once = sizeAfter(size, score);
-        expect(sizeAfter(once, score)).toBe(once);
-      }),
-    );
-  });
-
   it("never flicker: under a monotone score the size moves one way only", () => {
     fc.assert(
       fc.property(
@@ -263,22 +237,6 @@ describe("sizes", () => {
             const next = sizeAfter(size, score);
             if (next !== size) expect(next).toBe(rising ? "working" : "readable");
             size = next;
-          }
-        },
-      ),
-    );
-  });
-
-  it("hold while the score wanders inside the band's gap", () => {
-    fc.assert(
-      fc.property(
-        fc.array(
-          fc.double({ min: working.leave, max: working.enter, maxExcluded: true, noNaN: true }),
-        ),
-        (wandering) => {
-          for (const score of wandering) {
-            expect(sizeAfter("working", score)).toBe("working");
-            expect(sizeAfter("readable", score)).toBe("readable");
           }
         },
       ),
@@ -368,24 +326,6 @@ describe("attention, for any run of notices", () => {
           expect(settings.filter((s) => s.size === "working").length).toBeLessThanOrEqual(2);
           expect(now?.entries ?? 0).toBeGreaterThanOrEqual(before?.entries ?? 0);
           expect(now?.dwellMs ?? 0).toBeGreaterThanOrEqual(before?.dwellMs ?? 0);
-        }
-      }),
-    );
-  });
-
-  it("never rises without a notice", () => {
-    fc.assert(
-      fc.property(fc.array(noticeArb, { maxLength: 20 }), fc.nat(60 * minute), (drawn, later) => {
-        let moment = noon;
-        let yard = yardOfThree();
-        for (const { id, kind, after } of drawn) {
-          moment += after;
-          yard = attend(yard, { id, kind, at: moment });
-        }
-        for (const setting of Object.values(yard.settings)) {
-          expect(scoreAt(setting.attention, moment + later)).toBeLessThanOrEqual(
-            scoreAt(setting.attention, moment),
-          );
         }
       }),
     );

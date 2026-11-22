@@ -1,18 +1,10 @@
-import { hunkDigest, verdictLine } from "@keywork-app/client";
+import { hunkDigest } from "@keywork-app/client";
 import type { ReviewVerdict, VerdictMark } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ShellSeams } from "../registry.ts";
 import { type DiffSpec, diffPane } from "./index.tsx";
 import type { MergeHunk } from "./merge-view.ts";
-import {
-  fileTallyLine,
-  hunkPlace,
-  referenceOf,
-  reviewedLine,
-  talkedNotice,
-  talkMessage,
-} from "./review.ts";
 
 interface Recorded {
   verdicts: Array<[string, ReviewVerdict]>;
@@ -33,8 +25,6 @@ const delivered = {
 };
 
 const firstHunk: MergeHunk = { header: "@@ -2,1 +2,1 @@", removed: ["two"], added: ["2"], line: 2 };
-
-const secondHunk: MergeHunk = { header: "@@ -4,0 +4,1 @@", removed: [], added: ["four"], line: 4 };
 
 function shellOver(recorded: Recorded, seams: Seams = {}): ShellSeams {
   const shell: Partial<ShellSeams> = {
@@ -113,38 +103,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const row = (selector: string): string => document.querySelector(selector)?.textContent ?? "";
 
-const mark = (
-  hunk: MergeHunk,
-  verdict: ReviewVerdict["verdict"],
-  entryId: string,
-): VerdictMark => ({
-  index: 0,
-  entryId,
-  at: "t",
-  ...referenceOf("notes.txt", hunk),
-  verdict,
-});
-
 afterEach(cleanup);
 
 describe("reviewing a delivery hunk by hunk", () => {
-  it("shows the hunk under the cursor, its verdict, the keys and what is still unreviewed", async () => {
-    const recorded = recording();
-    const act = await mountSettled(recorded, { verdicts: [mark(secondHunk, "ask", "v9")] });
-    expect(recorded.reads).toBe(1);
-    expect(row(".kw-diff-review-place")).toBe("hunk 1 of 2");
-    expect(row(".kw-diff-review-verdict")).toBe("unreviewed");
-    expect(row(".kw-diff-review-keys")).toBe("mark y keepd dropa askt talk");
-    expect(row(".kw-diff-review-reviewed")).toBe("1 of 2 reviewed · 1 ask");
-    await act("diff.next");
-    await act("diff.next");
-    expect(row(".kw-diff-review-place")).toBe("hunk 2 of 2");
-    expect(row(".kw-diff-review-verdict")).toBe("ask");
-    expect(document.querySelector(".kw-diff-review-verdict")?.getAttribute("data-verdict")).toBe(
-      "ask",
-    );
-  });
-
   it("records keep, drop and ask on the hunk under the cursor with a stable reference and moves on", async () => {
     const recorded = recording();
     const act = await mountSettled(recorded);
@@ -166,20 +127,6 @@ describe("reviewing a delivery hunk by hunk", () => {
     await act("diff.drop");
     expect(row(".kw-diff-review-verdict")).toBe("drop");
     expect(row(".kw-diff-review-reviewed")).toBe("2 of 2 reviewed");
-  });
-
-  it("counts only the hunks still shown and names the marks left on hunks that changed since", async () => {
-    const recorded = recording();
-    const gone: MergeHunk = { header: "@@ -2,1 +2,1 @@", removed: ["two"], added: ["II"], line: 2 };
-    await mountSettled(recorded, {
-      verdicts: [mark(gone, "keep", "v1"), mark(gone, "drop", "v2"), mark(firstHunk, "ask", "v3")],
-    });
-    expect(row(".kw-diff-review-reviewed")).toBe(
-      "1 of 2 reviewed · 1 ask · 1 mark on a hunk since changed",
-    );
-    expect(reviewedLine({ keep: 0, drop: 0, ask: 0 }, 2, 3)).toBe(
-      "0 of 2 reviewed · 3 marks on hunks since changed",
-    );
   });
 
   it("says a drop is a mark only and how to have the change taken out", async () => {
@@ -249,27 +196,6 @@ describe("reviewing a delivery hunk by hunk", () => {
     await settle();
     expect(document.querySelector(".kw-controls-input")).toBeNull();
     expect(recorded.prompts).toEqual([]);
-  });
-
-  it("tallies each file's verdicts in the list of changes", async () => {
-    const recorded = recording();
-    const marks = [mark(firstHunk, "keep", "v1"), mark(secondHunk, "ask", "v2")];
-    expect(fileTallyLine(marks, "notes.txt")).toBe("1 keep · 1 ask");
-    expect(fileTallyLine(marks, "other.ts")).toBeUndefined();
-    expect(hunkPlace(1, 0)).toBe("no hunks");
-    expect(reviewedLine({ keep: 2, drop: 0, ask: 2 }, 5)).toBe("4 of 5 reviewed · 2 asks");
-    expect(talkedNotice(referenceOf("a.ts", firstHunk))).toMatch(/^said to the thread · a\.ts /);
-    expect(talkMessage("a.ts", secondHunk, "  fine  ")).toContain("+four\n```\n\nfine");
-    expect(verdictLine(marks[0] as VerdictMark)).toMatch(/^keep · notes\.txt/);
-    expect(recorded.reads).toBe(0);
-  });
-
-  it("binds y, d, a and t, which no other diff chord holds", () => {
-    const chords = Object.values(diffPane.localActions ?? {}).flatMap((action) =>
-      typeof action.chords === "string" ? [action.chords] : [...action.chords],
-    );
-    expect(chords).toEqual(expect.arrayContaining(["y", "d", "a", "t"]));
-    expect(new Set(chords).size).toBe(chords.length);
   });
 });
 

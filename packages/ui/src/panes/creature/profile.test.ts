@@ -1,28 +1,16 @@
 import type { Thread } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import {
-  choresOf,
   creatureFilePath,
   liveState,
-  nextChore,
   parseModelReference,
   pausePlan,
   plainName,
-  policyRows,
-  rememberedRows,
-  shadowRows,
   threadRows,
   usageRows,
   weekMs,
 } from "./profile.ts";
-import {
-  minutesAgo,
-  wrenChild,
-  wrenDetail,
-  wrenReport,
-  wrenRoutines,
-  wrenRows,
-} from "./testing.ts";
+import { minutesAgo, wrenChild, wrenDetail, wrenRoutines, wrenRows } from "./testing.ts";
 
 const now = Date.UTC(2026, 10, 5, 12, 0, 0);
 
@@ -128,59 +116,7 @@ describe("usage rows", () => {
   });
 });
 
-describe("the policy, the firsts and the shadow report", () => {
-  it("list every class with inherit shown as inherit", () => {
-    expect(policyRows(wrenDetail(now).models).map((row) => [row.modelClass, row.line])).toEqual([
-      ["strong", "anthropic/claude-sonnet-4-5"],
-      ["loop", "inherit · workspace, then user"],
-      ["decide", "ollama/qwen3:8b"],
-      ["vision", "inherit · workspace, then user"],
-    ]);
-  });
-
-  it("keep only this creature's landmarks, oldest first, each with the first it stands for", () => {
-    const rows = rememberedRows(
-      [
-        { kind: "tree", creature: "wren", at: "2026-11-03T10:00:00.000Z", evidence: "thread:s1" },
-        {
-          kind: "workshop",
-          creature: "wren",
-          at: "2026-11-01T09:00:00.000Z",
-          evidence: "creature:wren",
-        },
-        { kind: "well", creature: "tam", at: "2026-11-02T09:00:00.000Z", evidence: "night:1" },
-      ],
-      "wren",
-    );
-    expect(rows.map((row) => [row.at.slice(0, 10), row.line, row.kind])).toEqual([
-      ["2026-11-01", "the workshop was raised", "workshop"],
-      ["2026-11-03", "the first crate delivered planted the tree", "tree"],
-    ]);
-  });
-
-  it("summarise the shadow report per rule class without ever enforcing anything", () => {
-    const report = wrenReport();
-    expect(report.enforced).toBe(false);
-    expect(shadowRows(report).map((row) => [row.ruleClass, row.agreement, row.oneWayDoor])).toEqual(
-      [
-        ["bash", 0.92, false],
-        ["rm", 1, true],
-      ],
-    );
-  });
-});
-
 describe("chores and the pause plan", () => {
-  it("turn routine rows into chores with the next run only while the schedule fires", () => {
-    const chores = choresOf(wrenRoutines(now));
-    expect(chores.map((chore) => [chore.id, chore.title, chore.nextAt])).toEqual([
-      ["nightly", "nightly tests", "2026-11-06T02:00:00.000Z"],
-      ["tidy", "storehouse tidy", undefined],
-    ]);
-    expect(nextChore(chores)?.id).toBe("nightly");
-    expect(choresOf([{ ...wrenRoutines()[0], routine: null } as never])).toEqual([]);
-  });
-
   it("pause what fires, resume everything readable once nothing fires, and do nothing with no chores", () => {
     const firing = pausePlan(wrenRoutines());
     expect(firing.kind).toBe("pause");

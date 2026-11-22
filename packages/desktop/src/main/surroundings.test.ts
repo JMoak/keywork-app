@@ -167,28 +167,4 @@ describe("the surroundings relay", () => {
     ]);
     expect(relay.read(undefined)).toEqual(unknownSurroundings);
   });
-
-  it("tells only the window on the covered display that another application is fullscreen", () => {
-    const sent: Array<[number, boolean]> = [];
-    const windowOn = (id: number, display: string): SurroundingsWindow => ({
-      id,
-      isDestroyed: () => false,
-      isFullScreen: () => false,
-      display: () => display,
-      send: (surroundings) => sent.push([id, surroundings.fullscreenElsewhere]),
-    });
-    surroundingsRelay({
-      windows: () => [windowOn(1, "1"), windowOn(2, "2")],
-      displays: () => 2,
-      notificationState: () => notificationStates.d3dFullScreen,
-      foregroundIsOurs: () => false,
-      coveredDisplays: () =>
-        displaysCoveredBy({ x: 1920, y: 0, width: 1280, height: 720 }, sideBySide),
-      sharedDisplays: () => [],
-    }).push();
-    expect(sent).toEqual([
-      [1, false],
-      [2, true],
-    ]);
-  });
 });

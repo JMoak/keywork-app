@@ -4,17 +4,6 @@ import { linkOpened, openFrom, panelShell, subjectOfPane } from "./openings.ts";
 import { aSetting } from "./testing.ts";
 
 describe("what an opening from inside a panel sets out", () => {
-  it("names a file by its path and a conversation as its thread", () => {
-    expect(subjectOfPane({ kind: "file", path: "src/sum.test.ts" })).toEqual({
-      kind: "file",
-      ref: "src/sum.test.ts",
-    });
-    expect(subjectOfPane({ kind: "conversation", sessionId: "s2" })).toEqual({
-      kind: "thread",
-      ref: "s2",
-    });
-  });
-
   it("leaves to the tiles what no setting can name", () => {
     expect(subjectOfPane({ kind: "tree" })).toBeUndefined();
     expect(subjectOfPane({ kind: "conversation" })).toBeUndefined();

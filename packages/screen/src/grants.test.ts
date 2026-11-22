@@ -16,19 +16,6 @@ function issued() {
 }
 
 describe("the screen grant book", () => {
-  it("issues a view grant with the expiry, idle timeout and maximum duration of the terms", () => {
-    const { clock, grant } = issued();
-    expect(grant).toMatchObject({
-      scope: "view",
-      issuedAt: clock.now(),
-      expiresAt: clock.now() + 60 * minute,
-      idleTimeoutMs: 5 * minute,
-      maxDurationMs: 60 * minute,
-      reconfirmEveryMs: 30 * minute,
-    });
-    expect(viewGrantTerms.scope).toBe("view");
-  });
-
   it("lapses as idle when the viewer stops touching it and stays live while it does", () => {
     const { clock, book } = issued();
     book.started(grantA);

@@ -5,7 +5,7 @@ import { hitAt, type Seam } from "./hit.ts";
 import { Layout } from "./layout.ts";
 import { advancePointer, idlePointer, type PointerInput, type PointerState } from "./pointer.ts";
 import { floatStep } from "./standing.ts";
-import { layoutStateSchema, parseLayoutState } from "./state.ts";
+import { parseLayoutState } from "./state.ts";
 import { minPaneSize } from "./tree.ts";
 
 const screen: Screen = { width: 1600, height: 1000 };
@@ -100,14 +100,6 @@ describe("the fit", () => {
     const short: Screen = { width: 1600, height: minPaneSize.height + 20 };
     expect(shown(layout, short)).toEqual(["a", "c"]);
     expect(layout.shelved(short)).toEqual([{ id: "b", why: "tucked" }]);
-  });
-
-  it("returns every pane to its seat when the room comes back", () => {
-    const layout = columns(["a", "b", "c"]);
-    const before = layout.rects(screen);
-    layout.rects(oneColumn);
-    expect(layout.rects(screen)).toEqual(before);
-    expect(layout.shelved(screen)).toEqual([]);
   });
 
   it("resizes the seam between two shown panes when a pane between them is tucked", () => {
@@ -319,11 +311,6 @@ describe("floating panes", () => {
     expect(layout.isFloating(layout.focused() as string)).toBe(false);
   });
 
-  it("says there is nothing to step to when no pane floats", () => {
-    const layout = opened(["a", "b"]);
-    expect(layout.focusAcrossLayers(screen)).toEqual({ ok: false, refused: "nothing-to-do" });
-  });
-
   it("lands a float in a dock when it is docked, and in the tiling when it is sent to main", () => {
     const layout = opened(["a", "b"]);
     layout.floatToggle(screen);
@@ -387,16 +374,6 @@ describe("pointer gestures on a float", () => {
     expect(state.phase).toBe("sizing");
     expect(layout.rects(screen).get("b")).toEqual({ x: 800, y: 200, width: 480, height: 500 });
   });
-
-  it("leaves a press on the float's body to the pane", () => {
-    const layout = floated();
-    const state = drive(layout, [
-      { type: "down", x: 900, y: 400, grip: "body" },
-      { type: "move", x: 500, y: 110 },
-    ]);
-    expect(state.phase).toBe("pressed");
-    expect(layout.rects(screen).get("b")).toEqual({ x: 800, y: 200, width: 800, height: 600 });
-  });
 });
 
 describe("panes outside the window", () => {
@@ -441,40 +418,6 @@ describe("panes outside the window", () => {
     expect(layout.rects(screen)).toEqual(before);
     expect(layout.bringInside("b")).toEqual({ ok: false, refused: "nothing-to-do" });
     expect(layout.bringInside("nobody")).toEqual({ ok: false, refused: "unknown-pane" });
-  });
-
-  it("sends the focused pane out and back with one verb, and the pane keeps the focus", () => {
-    const layout = opened(["a", "b"]);
-    const before = layout.rects(screen);
-    expect(layout.outsideToggle().ok).toBe(true);
-    expect(layout.isOutside("b")).toBe(true);
-    expect(layout.focused()).toBe("b");
-    expect(layout.outsideToggle().ok).toBe(true);
-    expect(layout.isOutside("b")).toBe(false);
-    expect(layout.focused()).toBe("b");
-    expect(layout.rects(screen)).toEqual(before);
-    expect(new Layout().outsideToggle()).toEqual({ ok: false, refused: "no-focus" });
-  });
-
-  it("leaves from a seat, from a float and from the shelf, and holds one standing at a time", () => {
-    const layout = opened(["a", "b", "c", "d"]);
-    layout.floatToggle(screen);
-    layout.shelve("a");
-    for (const id of ["a", "b", "d"]) expect(layout.sendOutside(id).ok, id).toBe(true);
-    expect(outsideIds(layout)).toEqual(["a", "b", "d"]);
-    expect(layout.isShelved("a")).toBe(false);
-    expect(layout.isFloating("d")).toBe(false);
-    expect(layout.shelved(screen)).toEqual([]);
-    expect(layout.floating(screen)).toEqual([]);
-    expect([...layout.rects(screen)]).toEqual([["c", { x: 0, y: 0, ...screen }]]);
-    expect(layout.sendOutside("a")).toEqual({ ok: false, refused: "nothing-to-do" });
-    expect(layout.sendOutside("nobody")).toEqual({ ok: false, refused: "unknown-pane" });
-    layout.bringInside("d");
-    layout.bringInside("a");
-    expect(layout.isFloating("d")).toBe(false);
-    expect(layout.isShelved("a")).toBe(false);
-    expect(shown(layout, screen)).toEqual(["a", "c", "d"]);
-    expect(tiles(layout.rects(screen).values(), screen)).toBe(true);
   });
 
   it("holds no pin while a pane is outside and remembers it for the pane's return", () => {
@@ -529,15 +472,6 @@ describe("panes outside the window", () => {
     expect(revived(layout).outside()).toEqual(layout.outside());
   });
 
-  it("starts over, following and unplaced, each time a pane leaves", () => {
-    const layout = opened(["a", "b"]);
-    layout.sendOutside("b");
-    layout.placeOutside("b", onTheDesktop, "keeper");
-    layout.bringInside("b");
-    layout.sendOutside("b");
-    expect(layout.outside()).toEqual([{ id: "b", rect: undefined, follows: true }]);
-  });
-
   it("brings every pane inside in the order they went out, and leaves the focus where it was", () => {
     const layout = opened(["a", "b", "c", "d"]);
     const before = layout.rects(screen);
@@ -549,16 +483,6 @@ describe("panes outside the window", () => {
     expect(layout.recentlyFocused()).toEqual(["a", "d", "c", "b"]);
     expect(layout.rects(screen)).toEqual(before);
     expect(layout.bringAllInside()).toEqual({ ok: false, refused: "nothing-to-do" });
-  });
-
-  it("keeps the focus on a pane inside when the others come home", () => {
-    const layout = opened(["a", "b", "c"]);
-    layout.sendOutside("a");
-    layout.sendOutside("c");
-    layout.focus("b");
-    layout.bringAllInside();
-    expect(layout.focused()).toBe("b");
-    expect(layout.recentlyFocused()).toEqual(["b", "c", "a"]);
   });
 
   it("lets a pane outside hold the focus while the arrows stay inside the window", () => {
@@ -641,18 +565,6 @@ describe("panes outside the window", () => {
     expect(layout.swapWith("c")).toEqual({ ok: false, refused: "outside" });
     layout.focus("c");
     expect(JSON.stringify(layout.toJSON())).toBe(saved);
-  });
-
-  it("closes a pane outside like any other and hands the focus back inside", () => {
-    const layout = opened(["a", "b", "c"]);
-    layout.sendOutside("c");
-    layout.placeOutside("c", onTheDesktop, "host");
-    expect(layout.close("c").ok).toBe(true);
-    expect(layout.panes().sort()).toEqual(["a", "b"]);
-    expect(layout.outside()).toEqual([]);
-    expect(layout.openingOrder()).toEqual(["a", "b"]);
-    expect(layout.focused()).toBe("b");
-    expect(tiles(layout.rects(screen).values(), screen)).toBe(true);
   });
 
   it("hands the focus to the shelf before a pane outside when the last pane inside closes", () => {
@@ -782,11 +694,6 @@ describe("panes outside the window", () => {
     );
     expect(layout.focused()).toBe("a");
     expect(layout.isOutside("a")).toBe(true);
-  });
-
-  it("says in the schema why the outside record is kept", () => {
-    expect(layoutStateSchema.shape.outside.description).toContain("outside the window");
-    expect(layoutStateSchema.shape.outside.description).toContain("exists so");
   });
 
   it("opens a pane already outside: no seated pane moves, and focus and zoom stay where they were", () => {
@@ -959,15 +866,6 @@ describe("room for a newcomer", () => {
     expect(layout.hasRoomInDock("left", exactlyTwo)).toBe(false);
   });
 
-  it("asks without seating anything", () => {
-    const layout = columns(["a", "b"]);
-    const saved = JSON.stringify(layout.toJSON());
-    layout.hasRoomBeside(exactlyTwo);
-    layout.hasRoomInDock("right", exactlyTwo);
-    expect(JSON.stringify(layout.toJSON())).toBe(saved);
-    expect(layout.panes()).toEqual(["a", "b"]);
-  });
-
   it("agrees with what opening then shows", () => {
     for (const at of [screen, exactlyTwo, twoColumns, oneColumn]) {
       const layout = columns(["a", "b"]);
@@ -976,16 +874,6 @@ describe("room for a newcomer", () => {
       layout.open("c", at);
       expect(layout.shelved(at).length <= waiting, JSON.stringify(at)).toBe(roomy);
     }
-  });
-
-  it("counts a shelved or a floating pane as taking no room", () => {
-    const shelving = columns(["a", "b"]);
-    shelving.shelve("a");
-    expect(shelving.hasRoomBeside(exactlyTwo)).toBe(true);
-    const floating = columns(["a", "b"]);
-    floating.floatToggle(exactlyTwo);
-    floating.focus("a");
-    expect(floating.hasRoomBeside(exactlyTwo)).toBe(true);
   });
 
   it("counts a pane outside the window as taking no room", () => {

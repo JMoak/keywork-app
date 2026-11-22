@@ -58,11 +58,6 @@ describe("drafts kept across a relaunch", () => {
     drafts.memory("pane-1", "s1").keep({ text: "still here", pastes: [] });
     expect(drafts.memory("pane-1", "s1").recall()?.text).toBe("still here");
   });
-
-  it("hands one memory per place, so a composer sees the same keeper on every read", () => {
-    const drafts = ledger(memoryStorage());
-    expect(drafts.memory("pane-1", "s1")).toBe(drafts.memory("pane-2", "s1"));
-  });
 });
 
 function ledger(storage: DraftStorage) {

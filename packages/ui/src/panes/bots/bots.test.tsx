@@ -1,29 +1,13 @@
 import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
+import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import { noWorkingSession } from "../overview/working-session.ts";
-import { botAside, botLabel, botsPane } from "./index.tsx";
+import { botsPane } from "./index.tsx";
 
 afterEach(cleanup);
 
 describe("the bots pane", () => {
-  it("spells identity typographically as sigil and name with scope and cost beside", async () => {
-    const harness = overviewShell();
-    await harness.surfaces.load();
-    const { container } = mountPane(botsPane.component, { kind: "bots" }, harness.shell);
-    expect(rowTexts(container)).toEqual([
-      "▓ ◆ reviewer project · 3 sessions · $0.412",
-      "░ ✎ scribe user · 0 sessions",
-    ]);
-    expect(container.querySelector(".kw-ov-chip")).toBeNull();
-    expect(botLabel({ sigil: "◆", name: "reviewer" })).toBe("◆ reviewer");
-    expect(botAside({ name: "x", sigil: "x", source: "user", sessions: 1 })).toBe(
-      "user · 1 session",
-    );
-    harness.dispose();
-  });
-
   it("switches the focused session, shows a mid-turn refusal as the server says, and releases", async () => {
     const calls: string[] = [];
     let busy = true;

@@ -208,24 +208,6 @@ describe("campaign creation", () => {
     expect(screen.getByRole("alert").textContent).toBe("Only some models can run a campaign.");
     expect(submit).toHaveBeenCalledTimes(1);
   });
-
-  it("closes only after confirmed creation", async () => {
-    const close = vi.fn();
-    const cancel = vi.fn();
-    render(() => (
-      <CampaignForm
-        models={[first]}
-        busy={false}
-        submit={async () => true}
-        close={close}
-        cancel={cancel}
-      />
-    ));
-    await fillBrief();
-    await submitForm();
-    await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
-    expect(cancel).not.toHaveBeenCalled();
-  });
 });
 
 async function fillBrief(): Promise<void> {

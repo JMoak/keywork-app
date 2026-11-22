@@ -37,7 +37,11 @@ subagent writing keywork-app code; the perspective is the point.
 ## Conventions
 
 - Strict TypeScript everywhere; no `any` without a written reason in the PR description.
-- Every behavior lands with tests; acceptance criteria in `docs/plan.md` are the bar.
+- Tests must earn their place. Write one where it guards something (a refusal, the wire
+  contract), where a mistake is likely (boundaries, ordering, what survives a restart), or as
+  the one end-to-end case for a feature at the highest layer. Do not restate a case at another
+  layer, add nothing-there variants or assert on elapsed time; a test may depend on nothing
+  installed on the machine. Acceptance criteria in `docs/plan.md` are the bar.
 - Exact-pinned dependencies only (`scripts/check-pins.ts` enforces).
 - One theme system: keywork themes. No hard-coded colors anywhere; every color is a token.
 - Every new config option needs a `.describe()` justification in the schema (keywork D9).

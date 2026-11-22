@@ -63,15 +63,6 @@ describe("the placeholder renderer", () => {
     expect(frame.alpha.some((bit) => bit === 1)).toBe(true);
   });
 
-  it("varies the idle frames and closes the eyes on the blink frame", () => {
-    const open = paintGrid({ clip: "idle", frame: 0, facing: "right" });
-    const breath = paintGrid({ clip: "idle", frame: 1, facing: "right" });
-    const blink = paintGrid({ clip: "idle", frame: 4, facing: "right" });
-    expect(breath).not.toEqual(open);
-    expect(blink).not.toEqual(open);
-    expect(paintGrid({ clip: "blocked", frame: 0, facing: "right" })).not.toEqual(open);
-  });
-
   it("paints only through the palette it was given", () => {
     const fills = new Set<string>();
     const context = {

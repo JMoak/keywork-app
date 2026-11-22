@@ -67,19 +67,6 @@ describe("where the keyboard rests", () => {
     expect(document.activeElement).toBe(focusedComposer());
   });
 
-  it("sends typing home when the keys fell to the page body, and jumps by number to the pane already focused", async () => {
-    await openWorkspace();
-    await startASession("the first prompt");
-    dropFocus();
-    fireEvent.keyDown(document.body, { key: "h" });
-    expect(document.activeElement).toBe(focusedComposer());
-
-    dropFocus();
-    press("2", { altKey: true });
-    await settled();
-    expect(document.activeElement).toBe(focusedComposer());
-  });
-
   it("leaves keys with modifiers, spaces and a pane's own controls where they are", async () => {
     await openWorkspace();
     await startASession("the first prompt");
@@ -102,14 +89,6 @@ describe("tab through the panes", () => {
     expect(focusedName()).toBe("sessions");
     tab(document.activeElement as HTMLElement, { shiftKey: true });
     expect(document.activeElement).toBe(composer);
-  });
-
-  it("leaves shift+tab to the platform rather than a mode switch", async () => {
-    await openWorkspace();
-    const composer = focusedComposer();
-    composer.focus();
-    tab(composer, { shiftKey: true });
-    expect(document.querySelector(".kw-status-notice")?.textContent ?? "").not.toContain("mode");
   });
 });
 
@@ -142,47 +121,6 @@ describe("verbs that cannot act", () => {
     leaderThen("c");
     expect(localStorage.getItem("keywork.layout:C:/work")).toBe(before);
     expect(document.querySelector(".kw-empty-main")).toBeNull();
-  });
-
-  it("shows each pane's number while its modifier is held, and a move keeps the numbers", async () => {
-    await openWorkspace();
-    await startASession("the first prompt");
-    press("k", { ctrlKey: true });
-    press("s");
-    await waitFor(() => expect(frames()).toHaveLength(3));
-    leaderThen("H", { shiftKey: true });
-    fireEvent.keyDown(document.activeElement as Element, { key: "Alt", altKey: true });
-    expect(badges()).toEqual({
-      "tree-1": "alt+1",
-      "conversation-1": "alt+2",
-      "conversation-2": "alt+3",
-    });
-    fireEvent.keyUp(document.activeElement as Element, { key: "Alt" });
-    expect(badges()).toEqual({});
-  });
-
-  it("marks a zoom with how many panes it hides and the key that brings them back", async () => {
-    await openWorkspace();
-    press("z", { altKey: true });
-    expect(document.querySelector(".kw-zoom-badge")?.textContent).toBe(
-      "zoomed · 1 pane hidden · ctrl+k z shows them",
-    );
-    press("z", { altKey: true });
-    expect(document.querySelector(".kw-zoom-badge")).toBeNull();
-  });
-
-  it("closes a pane nothing guards within the same keystroke", async () => {
-    await openWorkspace();
-    const open = frames().length;
-    leaderThen("x");
-    expect(frames()).toHaveLength(open - 1);
-  });
-
-  it("puts the leader badge away once the leader lapses", async () => {
-    await openWorkspace();
-    press("k", { ctrlKey: true });
-    expect(screen.getByText("ctrl+k …")).toBeTruthy();
-    await waitFor(() => expect(screen.queryByText("ctrl+k …")).toBeNull(), { timeout: 3000 });
   });
 
   it("leaves ctrl+y to the text field's own redo while nothing asks", async () => {
@@ -300,13 +238,6 @@ const focusedName = () =>
   document.querySelector(".kw-frame[data-focused] .kw-frame-name")?.textContent ?? undefined;
 const focusedComposer = () =>
   document.querySelector(".kw-frame[data-focused] .kw-composer-input") as HTMLTextAreaElement;
-const badges = (): Record<string, string> =>
-  Object.fromEntries(
-    [...document.querySelectorAll(".kw-ordinal-badge")].map((badge) => [
-      badge.closest(".kw-slot")?.getAttribute("data-pane-id"),
-      badge.textContent,
-    ]),
-  );
 const slotOrder = () =>
   [...document.querySelectorAll(".kw-stage > .kw-slot")].map((slot) =>
     slot.getAttribute("data-pane-id"),

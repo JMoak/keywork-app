@@ -33,18 +33,6 @@ function verdict(beat: Beat, context: Partial<GateContext> = {}, budget = emptyB
 }
 
 describe("the decision gate", () => {
-  it("plays an ambient beat on a shown, calm stead and records why", () => {
-    expect(verdict(fidget)).toBe("play:test");
-    const decision = decide({ beat: fidget, reason: "idle stretch" }, shown, emptyBudget, 1000);
-    expect(decision).toEqual({
-      at: 1000,
-      lane: "ambient",
-      clip: "stretch",
-      verdict: "play",
-      reason: "idle stretch",
-    });
-  });
-
   it("holds ambient and input beats when the creature is not shown, but keeps agent state honest", () => {
     for (const context of [{ visible: false }, { tier: "hidden" as const }]) {
       expect(verdict(fidget, context)).toBe("hold:not shown");

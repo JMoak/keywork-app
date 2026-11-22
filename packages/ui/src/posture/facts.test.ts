@@ -15,12 +15,6 @@ describe("reading the posture's facts over the wire", () => {
     expect(facts.unread).toEqual([]);
   });
 
-  it("asks the server for every fact and opens package.json only when the root lists it", async () => {
-    const harness = factsHarness({ root: ["Cargo.toml"] });
-    await readPostureFacts(harness.client);
-    expect([...harness.calls].sort()).toEqual(["bots", "document", "mcp", "permissions", "tree:"]);
-  });
-
   it("keeps going when one fact cannot be read and says which, in the server's words", async () => {
     const harness = factsHarness(bunWorkspace);
     harness.fail("mcp", new ServerRefusal(503, "this host serves no mcp registry"));

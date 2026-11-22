@@ -1,7 +1,7 @@
 import type { StagedItem } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { inboxNeedsYouAt } from "../../shell/needs-you.ts";
-import { stagedWrites, stagingNeedsYou, stagingTitle } from "./admission.ts";
+import { stagingNeedsYou } from "./admission.ts";
 import { inboxView } from "./rows.ts";
 
 function staged(id: string, created: string, source?: string): StagedItem {
@@ -49,18 +49,5 @@ describe("staged admissions", () => {
         title: "3 staged from web:example.com and creature:pip wait for admit or drop",
       },
     ]);
-  });
-
-  it("count only staged writes, never the gardener's proposals", () => {
-    expect(stagedWrites([proposal, staged("s1", "t")]).map((item) => item.id)).toEqual(["s1"]);
-    expect(
-      stagingTitle(
-        stagedWrites([
-          staged("a", "t", "web:a"),
-          staged("b", "t", "web:b"),
-          staged("c", "t", "web:c"),
-        ]),
-      ),
-    ).toBe("3 staged from 3 sources wait for admit or drop");
   });
 });

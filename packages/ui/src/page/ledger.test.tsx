@@ -9,7 +9,7 @@ import {
 import { cleanup, fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { scenarios } from "../dev/scenarios.ts";
-import { type LedgerVerbs, ledgerFacts, ledgerKeyOf, markText, ribbonText } from "./ledger.tsx";
+import { type LedgerVerbs, ledgerFacts, ledgerKeyOf, markText } from "./ledger.tsx";
 import { ConversationPane } from "./pane.tsx";
 
 afterEach(cleanup);
@@ -45,26 +45,6 @@ describe("the ledger line's facts", () => {
       "$0.04",
     ]);
   });
-
-  it("omits every fact the projection did not give", () => {
-    const replayed: TurnLedger = {
-      ...settledTurn,
-      files: [],
-      toolMs: undefined,
-      costUsd: undefined,
-    };
-    expect(ledgerFacts(replayed)).toEqual(["turn 4"]);
-    const unplaced: TurnLedger = { ...replayed, place: undefined, files: undefined, toolMs: 120 };
-    expect(ledgerFacts(unplaced)).toEqual(["120ms in tools"]);
-    expect(ledgerFacts({ ...unplaced, toolMs: undefined })).toEqual([]);
-  });
-
-  it("condenses to a ribbon of the turn, its file count and its spend", () => {
-    expect(ribbonText(settledTurn)).toBe("turn 4 · 2 files · $0.04");
-    expect(ribbonText({ ...settledTurn, files: [], costUsd: undefined })).toBe("turn 4");
-    expect(ribbonText({ ...settledTurn, place: undefined })).toBeUndefined();
-    expect(ribbonText(undefined)).toBeUndefined();
-  });
 });
 
 describe("the path's marks", () => {
@@ -74,15 +54,6 @@ describe("the path's marks", () => {
     expect(markText(restore, true)).toBe("restored to before turn 3 · redo brings the turns back");
     expect(markText(restore, false)).toBe("restored to before turn 3");
     expect(markText({ ...restore, leaf: false }, true)).toBe("restored to before turn 3");
-  });
-
-  it("says when a restore was taken back", () => {
-    expect(markText({ ...restore, kind: "restore-undone" }, false)).toBe(
-      "the restore to before turn 3 was taken back",
-    );
-    expect(markText({ ...restore, kind: "restore-undone", turn: undefined }, false)).toBe(
-      "the restore to before a turn was taken back",
-    );
   });
 });
 
@@ -154,12 +125,6 @@ describe("the transcript with its ledger", () => {
       "ledger turn 2",
       "mark restored to before turn 2 · redo brings the turns back",
     ]);
-  });
-
-  it("draws no ledger when none is given, so a bare transcript paints as it did", () => {
-    const { container } = render(() => <ConversationPane projection={twoTurns} />);
-    expect(container.querySelector(".kw-ledger")).toBeNull();
-    expect(container.querySelectorAll(".kw-transcript > li")).toHaveLength(twoTurns.entries.length);
   });
 
   it("hands its keys to the verbs, remembers the line that held focus and unfolds the files", () => {

@@ -13,12 +13,6 @@ import { Yard } from "./yard.tsx";
 afterEach(cleanup);
 
 describe("the rail's trail view", () => {
-  it("lists every node on the rail in trail order, each one level under its parent", () => {
-    renderTrail({ view: "trail" });
-    expect(railCards()).toEqual(["a stale branch 0", "the sum change 0", "sum.ts 1"]);
-    expect(railRungs()).toEqual(["card", "unfold", "unfold"]);
-  });
-
   it("keeps only cards on the rail by depth now, and takes the trail when toggled while the rail holds still", () => {
     const yard = renderTrail({ view: "now" });
     expect(railCards()).toEqual(["a stale branch -"]);
@@ -54,21 +48,6 @@ describe("the rail's trail view", () => {
       ["diff", "leafward"],
     ]);
   });
-
-  it("heads the hub with the chain of the node under the cursor, and only when it grew from one", () => {
-    const yard = renderTrail({ view: "now" });
-    expect(crumb()).toBeNull();
-    keyOnRail("j");
-    expect(crumb()?.textContent).toBe("the sum change → sum.ts");
-    yard.moveRail("note");
-    expect(crumb()).toBeNull();
-  });
-
-  it("calls the keeper's own opening theirs, from the panel it grew out of", () => {
-    renderTrail({ view: "now" });
-    expect(byLineOf("file")).toBe("you opened it from the sum change");
-    expect(byLineOf("diff")).toBe("Wren showed a note");
-  });
 });
 
 describe("a panel in the yard", () => {
@@ -79,15 +58,6 @@ describe("a panel in the yard", () => {
     bodyOf("diff").append(link);
     fireEvent.click(link);
     expect(yard.opened).toEqual([["diff", { kind: "url", ref: "https://example.com/spec" }]]);
-  });
-
-  it("reports a scroll, an edit and a keypress inside it as interactions with it", () => {
-    const yard = renderTrail({ view: "now", railActive: false });
-    const inside = bodyOf("file");
-    inside.dispatchEvent(new Event("scroll"));
-    fireEvent.input(inside);
-    fireEvent.keyDown(inside, { key: "a" });
-    expect(yard.interacted).toEqual(["file", "file", "file"]);
   });
 
   it("is focusable and tells the yard when the keeper is inside it", () => {
@@ -199,10 +169,6 @@ function railCards(): string[] {
   );
 }
 
-function railRungs(): Array<string | undefined> {
-  return cards().map((card) => card.dataset.rung);
-}
-
 function cursorOn(): string | undefined {
   return (
     document.querySelector(".kw-yard-card[data-cursor] .kw-yard-card-title")?.textContent ??
@@ -216,11 +182,6 @@ function railHead(): string {
 
 function crumb(): HTMLElement | null {
   return document.querySelector(".kw-yard-crumb");
-}
-
-function byLineOf(id: string): string {
-  const satellite = document.querySelector(`.kw-yard-satellite[data-setting="${id}"]`);
-  return satellite?.querySelector(".kw-frame-turn")?.textContent ?? "";
 }
 
 function bodyOf(id: string): HTMLElement {

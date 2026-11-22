@@ -33,49 +33,6 @@ describe("show settings in the habitat", () => {
     expect(listed.yard).toBeUndefined();
   });
 
-  it("sets out a proposed setting at the glyph rung until the gate has heard the context", () => {
-    const state = project(emptyHabitat(), proposed(1, aSetting({ rung: "unfold" })));
-    expect(yardOf(state).settings["set-1"]).toMatchObject({
-      id: "set-1",
-      rung: "unfold",
-      shown: "glyph",
-      depth: 0,
-      state: "live",
-    });
-    expect(state.lastEventId).toBe(1);
-  });
-
-  it("follows the wire when the same thing is shown again: the earlier one withdrawn, a new one set out", () => {
-    const first = aSetting({ id: "a", what: { kind: "file", ref: "notes.md" } });
-    const again = aSetting({ id: "b", what: { kind: "file", ref: "notes.md", title: "Notes" } });
-    const state = projectAll(emptyHabitat(), [
-      proposed(1, first),
-      settled(2, later, "s1", { id: "a", outcome: "withdrawn", by: "creature" }),
-      proposed(3, again),
-    ]);
-    expect(Object.keys(yardOf(state).settings)).toEqual(["b"]);
-  });
-
-  it("changes a setting's mark in place, keeping the rung it shows, and ignores one it never saw", () => {
-    const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
-      a: { shown: "card", depth: 2 },
-    });
-    const changed = (state: HabitatState, setting: Setting): HabitatState =>
-      project(state, {
-        id: 2,
-        ts: later,
-        sessionId: setting.sessionId,
-        type: "show.changed",
-        payload: { setting },
-      });
-
-    const marked = changed(decided, aSetting({ id: "a", mark: "chosen" }));
-    expect(yardOf(marked).settings.a).toMatchObject({ shown: "card", depth: 2, mark: "chosen" });
-    expect(yardOf(changed(marked, aSetting({ id: "a" }))).settings.a).not.toHaveProperty("mark");
-    const unseen = changed(decided, aSetting({ id: "b", mark: "chosen" }));
-    expect(yardOf(unseen).settings).toEqual(yardOf(decided).settings);
-  });
-
   it("raises and lowers a setting's signal in place, taking the reason and the hold it came with", () => {
     const decided = showing(
       project(emptyHabitat(), proposed(1, aSetting({ id: "a", until: "rests" }))),
@@ -105,14 +62,6 @@ describe("show settings in the habitat", () => {
     const lowered = changed(raised, aSetting({ id: "a", why: reason, until: "seen" }));
     expect(yardOf(lowered).settings.a).not.toHaveProperty("signal");
     expect(yardOf(lowered).settings.a).toMatchObject({ why: reason, until: "seen" });
-  });
-
-  it("keeps the rung a setting shows when its proposal is replayed", () => {
-    const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
-      a: { shown: "card", depth: 2 },
-    });
-    const replayed = project(decided, proposed(1, aSetting({ id: "a" })));
-    expect(yardOf(replayed).settings.a).toMatchObject({ shown: "card", depth: 2 });
   });
 
   it("attaches a setting with no creature to its thread, and keeps it apart from other threads", () => {
@@ -166,15 +115,6 @@ describe("show settings in the habitat", () => {
     );
     expect(shownIn(unpinned)).toEqual({});
   });
-
-  it("ignores a settlement for a setting it never saw", () => {
-    const state = project(emptyHabitat(), proposed(1, aSetting()));
-    const after = project(
-      state,
-      settled(2, later, "s1", { id: "elsewhere", outcome: "seen", by: "keeper" }),
-    );
-    expect(after.yard).toBe(state.yard);
-  });
 });
 
 describe("keeper.show seats GET /show rows on cold start", () => {
@@ -208,18 +148,6 @@ describe("keeper.show seats GET /show rows on cold start", () => {
       settings: [aSetting({ id: "a" })],
     });
     expect(Object.keys(yardOf(listed).settings).sort()).toEqual(["a", "new"]);
-  });
-
-  it("keeps the rung a known setting already shows", () => {
-    const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
-      a: { shown: "card" },
-    });
-    const listed = project(decided, {
-      type: "keeper.show",
-      ts: later,
-      settings: [aSetting({ id: "a" })],
-    });
-    expect(yardOf(listed).settings.a?.shown).toBe("card");
   });
 
   it("agrees with the live wire once the wire has had its say", () => {

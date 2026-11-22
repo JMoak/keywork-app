@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { day, fakeClock, hour, localTime, minute, parseTs } from "./clock.ts";
+import { day, hour, localTime, minute, parseTs } from "./clock.ts";
 import { between, hashSeed, jittered, mulberry32, pick, unit, weightedPick } from "./random.ts";
 
 describe("the fake clock", () => {
-  it("advances only forward and can be set", () => {
-    const clock = fakeClock(1_000);
-    expect(clock.advance(250)).toBe(1_250);
-    expect(clock.advance(-50)).toBe(1_250);
-    clock.set(10);
-    expect(clock.now()).toBe(10);
-  });
-
   it("names a day and an hour in the house's own zone", () => {
     const noonUtc = Date.parse("2026-11-05T12:30:00.000Z");
     expect(localTime(noonUtc, 0)).toEqual({ dayKey: "2026-11-05", hour: 12.5, month: 11 });
@@ -33,16 +25,6 @@ describe("seeded randomness", () => {
     const draws = Array.from({ length: 8 }, () => first());
     expect(Array.from({ length: 8 }, () => second())).toEqual(draws);
     expect(draws.every((n) => n >= 0 && n < 1)).toBe(true);
-  });
-
-  it("differs by seed and spreads across the unit interval", () => {
-    const a = mulberry32(1);
-    const b = mulberry32(2);
-    expect(a()).not.toBe(b());
-    const draws = Array.from({ length: 2_000 }, mulberry32(99));
-    const mean = draws.reduce((sum, n) => sum + n, 0) / draws.length;
-    expect(mean).toBeGreaterThan(0.45);
-    expect(mean).toBeLessThan(0.55);
   });
 
   it("hashes names and days into stable, distinct seeds", () => {

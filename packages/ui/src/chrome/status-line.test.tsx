@@ -63,23 +63,9 @@ describe("statusItems", () => {
       detail: "/srv/pricing-site",
     });
   });
-
-  it("says the same usage words the focused frame's title row says", () => {
-    const items = statusItems({ ...quiet, usage: "734k tokens · $0.1722" });
-    expect(items.at(-1)).toEqual({ tone: "quiet", text: "734k tokens · $0.1722" });
-  });
 });
 
 describe("StatusLine", () => {
-  it("renders each item in its own ink and the moment zone only when something happens", () => {
-    const { container } = render(() => <StatusLine {...quiet} />);
-    const tones = [...container.querySelectorAll<HTMLElement>(".kw-status-item")].map(
-      (item) => item.dataset.tone,
-    );
-    expect(tones).toEqual(["mark", "where", "word"]);
-    expect(container.querySelector(".kw-status-moment")?.textContent).toBe("");
-  });
-
   it("keeps the moment zone a live status region, empty or not", () => {
     render(() => <StatusLine {...quiet} folder="/srv/pricing-site" />);
     expect(screen.getByRole("status").textContent).toBe("");
@@ -103,14 +89,5 @@ describe("StatusLine", () => {
       "update 0.2.1 available · manual compatibility review required",
     );
     expect(container.querySelector(".kw-status-update button")).toBeNull();
-  });
-
-  it("shows the armed leader, the notice, and a lost server", () => {
-    const { container } = render(() => (
-      <StatusLine {...quiet} leader="ctrl+k" notice="no room" lost="keywork serve exited" />
-    ));
-    expect(container.querySelector(".kw-status-leader")?.textContent).toBe("ctrl+k …");
-    expect(container.querySelector(".kw-status-notice")?.textContent).toBe("no room");
-    expect(container.querySelector(".kw-status")?.hasAttribute("data-lost")).toBe(true);
   });
 });

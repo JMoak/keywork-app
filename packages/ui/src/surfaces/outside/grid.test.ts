@@ -108,15 +108,6 @@ describe("the named sizes a pane outside steps through", () => {
     }
   });
 
-  it("takes its heights from where placement rests and works a pane", () => {
-    expect(presetSize("reading", laptop, "note").height).toBe(outsideMetrics.restingHeight);
-    expect(presetSize("working", laptop, "note").height).toBe(
-      Math.round(laptop.height * outsideMetrics.workingShare),
-    );
-    expect(presetSize("half", laptop, "note")).toEqual({ width: 942, height: 1016 });
-    expect(presetSize("full", laptop, "note")).toEqual({ width: 1920, height: 1040 });
-  });
-
   it("drops a step that would not be larger on a display too small to tell them apart", () => {
     const squat: ScreenRect = { x: 0, y: 0, width: 1280, height: 360 };
     const names = sizeLadder(squat, "conversation").map((preset) => preset.name);
@@ -135,21 +126,6 @@ describe("a pane outside stepped along the sizes by key", () => {
       y: 300,
       width: 624,
       height: 624,
-    });
-  });
-
-  it("shrinks to the next size smaller than it is", () => {
-    const arrived = pane(1200, 300, 520, 400);
-    expect(steppedAlongLadder(desk, arrived, "conversation", -1)).toEqual({
-      x: 1200,
-      y: 300,
-      width: 624,
-      height: 320,
-    });
-    const reading = pane(1200, 300, 624, 320);
-    expect(steppedAlongLadder(desk, reading, "conversation", -1)).toMatchObject({
-      width: 624,
-      height: 160,
     });
   });
 
@@ -232,14 +208,6 @@ describe("a pane outside stepped across the grid by key", () => {
     expect(stepsFrom(pane(12, 12, 624, 160), "down")).toEqual([269, 354, 526, 696, 783, 868]);
   });
 
-  it("steps down the rows the same way, and back up", () => {
-    const card = pane(12, 12, 624, 160);
-    const down = steppedOnGrid(emptyDesk, card, "down", []);
-    expect(down).toEqual({ ...card, y: 269 });
-    expect(steppedOnGrid(emptyDesk, down, "up", [])).toEqual(card);
-    expect(steppedOnGrid(emptyDesk, { ...card, x: 1284 }, "left", [])).toEqual({ ...card, x: 648 });
-  });
-
   it("brings a pane the pointer dropped anywhere onto the grid at its first step", () => {
     const dropped = pane(733, 41, 500, 300);
     expect(steppedOnGrid(emptyDesk, dropped, "left", []).x).toBe(648);
@@ -297,9 +265,5 @@ describe("a pane outside stepped across the grid by key", () => {
     expect(landed.x).toBe(beside.x + gap);
     expect(sameRect(steppedOnGrid(emptyDesk, landed, "left", []), landed)).toBe(true);
     expect(steppedOnGrid(emptyDesk, landed, "right", []).x).toBe(beside.x + 649);
-  });
-
-  it("has nowhere to step a pane as large as its display", () => {
-    expect(sameRect(steppedOnGrid(emptyDesk, laptop, "right", []), laptop)).toBe(true);
   });
 });

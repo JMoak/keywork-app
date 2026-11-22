@@ -142,12 +142,6 @@ describe("historyEnvelopes", () => {
     expect(state.entries.every((entry) => entry.kind !== "ending" || entry.replay)).toBe(true);
   });
 
-  it("treats a turn with no mark as unknown, never as a failure", () => {
-    const unmarked: SessionDetail = { ...detail, outcomes: [] };
-    const state = projectAll(replayBase(unmarked), historyEnvelopes(unmarked));
-    expect(state.entries.some((entry) => entry.kind === "ending")).toBe(false);
-  });
-
   it("gives replayed envelopes negative ids so they never advance the resume point", () => {
     const state = projectAll(emptyProjection, historyEnvelopes(detail));
     expect(state.lastEventId).toBeLessThan(0);

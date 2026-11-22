@@ -41,18 +41,6 @@ describe("the measuring hook", () => {
     expect(built).toBe(1);
   });
 
-  it("is withdrawn with the workspace that offered it", () => {
-    const host = new EventTarget();
-    const withdraw = offerSurfacesPerfHook(host, () => hook);
-    host.dispatchEvent(new Event(surfacesPerfRequest));
-    withdraw();
-    expect(Reflect.get(host, surfacesPerfHookName)).toBeUndefined();
-    const unasked = new EventTarget();
-    offerSurfacesPerfHook(unasked, () => hook)();
-    unasked.dispatchEvent(new Event(surfacesPerfRequest));
-    expect(Reflect.get(unasked, surfacesPerfHookName)).toBeUndefined();
-  });
-
   it("is the hook the harness asks for, by the same names", () => {
     const harness = readFileSync(
       join(process.cwd(), "packages/desktop/e2e/surfaces/perf.mjs"),

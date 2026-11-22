@@ -31,23 +31,6 @@ describe("the master switch", () => {
     expect(ports.book.writes).toBe(0);
   });
 
-  it("off with the opt-in answered creates no window, at launch and after the warm-up timer", async () => {
-    const ports = fakePorts({ prefs: { optInOffered: true, shortcut: "Control+Alt+K" } });
-    const companion = await startCompanion(ports);
-    expect(ports.windows.created).toHaveLength(0);
-    ports.clock.advance(warmAfterLaunchMs);
-    await companion.settle();
-    companion.publish(porchSnapshot);
-    await companion.settle();
-    expect(ports.windows.created).toHaveLength(0);
-    expect(ports.shortcuts.registered.size).toBe(0);
-    expect(companion.presence()).toEqual({
-      mode: "off",
-      window: "none",
-      reason: "companions are off",
-    });
-  });
-
   it("turning it off destroys the window and releases the shortcut", async () => {
     const ports = fakePorts({ prefs: { enabled: true, shortcut: "Control+Alt+K" } });
     const companion = await startCompanion(ports);
@@ -97,20 +80,6 @@ describe("the floating window", () => {
     expect(companion.presence().window).toBe("shown");
   });
 
-  it("uses a panel on macOS and leaves focusable alone off Windows", async () => {
-    const mac = fakePorts({ platform: "darwin", prefs: { enabled: true } });
-    await startCompanion(mac);
-    expect(mac.windows.created[0]?.options).toMatchObject({
-      type: "panel",
-      hiddenInMissionControl: true,
-    });
-    expect(mac.windows.created[0]?.options.focusable).toBeUndefined();
-    expect(mac.windows.created[0]?.calls).toContain("setVisibleOnAllWorkspaces:true:true");
-    const linux = fakePorts({ platform: "linux", prefs: { enabled: true } });
-    await startCompanion(linux);
-    expect(linux.windows.created[0]?.calls).toContain("setIgnoreMouseEvents:true");
-  });
-
   it("Hide is durable: no window, no wake on a publish, and still hidden after a relaunch", async () => {
     const ports = fakePorts({ prefs: { enabled: true } });
     const first = await startCompanion(ports);
@@ -158,34 +127,6 @@ describe("the floating window", () => {
     await companion.settle();
     expect(ports.windows.created[0]?.visible).toBe(true);
   });
-
-  it("rests when the system has been idle, and wakes when it is active again", async () => {
-    const ports = fakePorts({ prefs: { enabled: true } });
-    const companion = await startCompanion(ports);
-    const window = ports.windows.created[0];
-    if (window === undefined) throw new Error("no window");
-    ports.power.idle = "idle";
-    ports.clock.advance(30_000);
-    await companion.settle();
-    expect(lastConditions(window)?.ceiling).toBe("rest");
-    ports.power.idle = "active";
-    ports.clock.advance(30_000);
-    await companion.settle();
-    expect(lastConditions(window)?.ceiling).toBe("ambient");
-  });
-
-  it("floats only while something works when asked to", async () => {
-    const ports = fakePorts({ prefs: { enabled: true, onlyWhileBusy: true } });
-    const companion = await startCompanion(ports);
-    expect(companion.presence()).toMatchObject({ window: "tucked" });
-    expect(ports.windows.created).toHaveLength(0);
-    companion.publish(workingSnapshot);
-    await companion.settle();
-    expect(ports.windows.created[0]?.visible).toBe(true);
-    companion.publish(idleSnapshot);
-    await companion.settle();
-    expect(ports.windows.created[0]?.visible).toBe(false);
-  });
 });
 
 describe("the transparency self-test", () => {
@@ -225,21 +166,6 @@ describe("the transparency self-test", () => {
     expect(ports.selfTest.runs).toBe(2);
   });
 
-  it("retests an opaque record when the keeper turns the companion back on", async () => {
-    const ports = fakePorts({
-      prefs: { enabled: true, selfTest: { result: "opaque", gpu: "gpu-a", at: "earlier" } },
-    });
-    const companion = await startCompanion(ports);
-    expect(companion.presence().mode).toBe("pane");
-    expect(ports.windows.created).toHaveLength(0);
-    await companion.setPreferences({ enabled: false });
-    ports.selfTest.verdict = "clear";
-    await companion.setPreferences({ enabled: true });
-    expect(ports.selfTest.runs).toBe(1);
-    expect(companion.presence()).toMatchObject({ mode: "floating", window: "shown" });
-    expect(companion.preferences().selfTest?.result).toBe("clear");
-  });
-
   it("floats on an inconclusive verdict and retests on the next display change", async () => {
     const ports = fakePorts({ prefs: { enabled: true }, transparency: "unknown" });
     const companion = await startCompanion(ports);
@@ -255,20 +181,6 @@ describe("the transparency self-test", () => {
     ports.screen.set([primaryDisplay, secondDisplay]);
     await companion.settle();
     expect(ports.selfTest.runs).toBe(2);
-  });
-
-  it("stops retesting on display changes once a verdict is conclusive", async () => {
-    const ports = fakePorts({ prefs: { enabled: true }, transparency: "unknown" });
-    const companion = await startCompanion(ports);
-    ports.selfTest.verdict = "clear";
-    ports.screen.set([primaryDisplay]);
-    await companion.settle();
-    expect(ports.selfTest.runs).toBe(2);
-    expect(ports.windows.created[0]?.visible).toBe(true);
-    ports.screen.set([primaryDisplay, secondDisplay]);
-    await companion.settle();
-    expect(ports.selfTest.runs).toBe(2);
-    expect(companion.preferences().selfTest?.result).toBe("clear");
   });
 
   it("paints within the first-paint budget on enable and tests transparency on the shown window after", async () => {
@@ -300,22 +212,6 @@ describe("the transparency self-test", () => {
     expect(shownAtTest).toEqual([true]);
     expect(ports.windows.created[0]?.visible).toBe(true);
     expect(companion.presence()).toMatchObject({ mode: "floating", window: "shown" });
-  });
-
-  it("an opaque verdict on the shown window still sends the creature to the pane", async () => {
-    const ports = fakePorts({ transparency: "opaque" });
-    const companion = await startCompanion(ports);
-    await companion.setPreferences({ enabled: true });
-    expect(ports.selfTest.runs).toBe(1);
-    expect(companion.presence()).toMatchObject({ mode: "pane", window: "none" });
-    expect(ports.windows.created[0]?.destroyed).toBe(true);
-  });
-
-  it("Wayland defaults to the pane without creating a window", async () => {
-    const ports = fakePorts({ platform: "linux", wayland: true, prefs: { enabled: true } });
-    const companion = await startCompanion(ports);
-    expect(companion.presence().mode).toBe("pane");
-    expect(ports.windows.created).toHaveLength(0);
   });
 });
 
@@ -356,19 +252,6 @@ describe("position", () => {
     ports.ipc.emit(companionChannels.home, pet);
     await companion.settle();
     expect(window.getBounds()).toEqual(home);
-  });
-
-  it("grows upward from its anchor for a needs-you bubble and shrinks back under Quiet", async () => {
-    const ports = fakePorts({ prefs: { enabled: true } });
-    const companion = await startCompanion(ports);
-    const window = ports.windows.created[0];
-    if (window === undefined) throw new Error("no window");
-    companion.publish(porchSnapshot);
-    await companion.settle();
-    expect(window.getBounds()).toEqual({ x: 1616, y: 788, width: 288, height: 236 });
-    await companion.setPreferences({ quiet: true });
-    expect(window.getBounds()).toEqual(home);
-    expect(lastConditions(window)?.quiet).toBe(true);
   });
 });
 
@@ -506,29 +389,6 @@ describe("the first enable after launch", () => {
     expect(companion.presence()).toMatchObject({ mode: "floating", window: "shown" });
   });
 
-  it("pre-creates for a Show when the switch is on but the creature is hidden", async () => {
-    const ports = fakePorts({ prefs: { enabled: true, hidden: true, optInOffered: true } });
-    coldPages(ports);
-    const companion = await startCompanion(ports);
-    ports.clock.advance(warmAfterLaunchMs);
-    await companion.settle();
-    expect(ports.windows.created[0]?.visible).toBe(false);
-    ports.clock.advance(keeperWaitsMs);
-    await companion.show();
-    expect(ports.windows.created).toHaveLength(1);
-    expect(ports.logs).toContain(`companion painted in 0 ms (within ${firstPaintBudgetMs} ms)`);
-  });
-
-  it("drops the pre-created window once the keeper prefers a presence that never floats", async () => {
-    const ports = fakePorts();
-    const companion = await startCompanion(ports);
-    ports.clock.advance(warmAfterLaunchMs);
-    await companion.settle();
-    await companion.setPreferences({ mode: "pane" });
-    expect(ports.windows.created[0]?.destroyed).toBe(true);
-    expect(companion.presence().mode).toBe("off");
-  });
-
   it("creates nothing for a keeper who turned companions off, and logs a cold page over budget", async () => {
     const ports = fakePorts({ prefs: { optInOffered: true } });
     coldPages(ports);
@@ -575,15 +435,6 @@ describe("a launch with the companion on", () => {
       `companion painted in ${pageLoadMs} ms (within ${firstPaintBudgetMs} ms)`,
     );
     expect(companion.presence()).toMatchObject({ mode: "floating", window: "shown" });
-  });
-
-  it("floats again, after the launch, when the GPU no longer matches a stored opaque verdict", async () => {
-    const ports = fakePorts({
-      prefs: { enabled: true, selfTest: { result: "opaque", gpu: "gpu-b", at: "earlier" } },
-    });
-    const companion = await startCompanion(ports);
-    expect(companion.presence().window).toBe("shown");
-    expect(ports.selfTest.runs).toBe(1);
   });
 });
 

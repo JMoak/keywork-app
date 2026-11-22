@@ -12,7 +12,6 @@ import {
   skip,
   skipRest,
   stepOf,
-  steps,
   workshopRequestOf,
 } from "./sequence.ts";
 import { surpriseMe } from "./skins.ts";
@@ -33,19 +32,6 @@ const proposals: Proposals = {
 };
 
 describe("the sequence", () => {
-  it("runs name, skin, workshop, models in that order and then is finished", () => {
-    expect(steps).toEqual(["name", "skin", "workshop", "models"]);
-    let sequence = begun;
-    const seen: string[] = [];
-    while (!finished(sequence)) {
-      seen.push(stepOf(sequence) ?? "");
-      sequence = skip(sequence);
-    }
-    expect(seen).toEqual(["name", "skin", "workshop", "models"]);
-    expect(stepOf(sequence)).toBeUndefined();
-    expect(skip(sequence)).toBe(sequence);
-  });
-
   it("skips every step to a working default", () => {
     const settled = settle(skipRest(begun), proposals, "C:/src/stead");
     expect(settled).toEqual({

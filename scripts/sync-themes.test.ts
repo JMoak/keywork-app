@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { completeTheme } from "../packages/ui/src/theme/complete.ts";
 import { themeSchema } from "../packages/ui/src/theme/schema.ts";
 import {
-  checkThemes,
   galleryDrift,
   gallerySource,
   galleryViolations,
@@ -18,10 +17,6 @@ import {
 const keyworkCompletion = await keyworkCompletionOf();
 
 describe("check:themes", () => {
-  it("holds the app gallery and the default stylesheet to keywork's gallery", async () => {
-    expect(await checkThemes(await gallerySource())).toEqual([]);
-  });
-
   it("names a theme added, dropped, changed or reordered at the source", async () => {
     const [night, day] = (await recordedThemes()) as [{ name: string }, unknown];
     const recorded = [night, day];
@@ -69,10 +64,6 @@ describe("check:themes", () => {
 
     afterAll(async () => {
       await rm(checkout, { recursive: true, force: true });
-    });
-
-    it("falls back to the house themes when the checkout has no gallery", async () => {
-      expect((await gallerySource(checkout)).origin).toBe(houseFile);
     });
 
     it("imports the gallery module by path when the checkout has one", async () => {

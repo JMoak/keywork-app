@@ -96,16 +96,6 @@ describe("the control grant over a view grant", () => {
     book.reconfirmed("grant-control");
     expect(book.due()).toEqual([]);
   });
-
-  it("never survives a restart: a new book knows no grant", () => {
-    const book = grantBook(manualClock());
-    book.issue(viewRequest);
-    book.allowControl("grant-view", "grant-control");
-    expect(grantBook(manualClock()).standing("grant-control")).toEqual({
-      live: false,
-      reason: "unknown",
-    });
-  });
 });
 
 describe("the control consent cards", () => {

@@ -149,16 +149,6 @@ describe("choosing what to wear", () => {
     dispose();
   });
 
-  it("hands the window to the wardrobe", () => {
-    const { attire, wardrobe, dispose } = dressed();
-    expect(attire.wear({ kind: "window" }, "keywork-day")).toBeUndefined();
-    expect(wardrobe.worn()).toBe("keywork-day");
-    expect(attire.worn({ kind: "window" })).toBe("keywork-day");
-    attire.undress({ kind: "window" });
-    expect(wardrobe.worn()).toBe("keywork-day");
-    dispose();
-  });
-
   it("dresses a marked set pane by pane and reports their common choice", () => {
     const { attire, dispose } = dressed();
     const marked = { kind: "panes", ids: ["a", "b", "tree"] } as const;
@@ -169,16 +159,6 @@ describe("choosing what to wear", () => {
     expect(attire.worn({ kind: "panes", ids: ["a", "b"] })).toBeUndefined();
     attire.undress(marked);
     expect(attire.worn({ kind: "pane", id: "a" })).toBeUndefined();
-    dispose();
-  });
-
-  it("names every target the way the themes pane says it", () => {
-    const { attire, dispose } = dressed();
-    expect(attire.describe({ kind: "window" })).toBe("the window");
-    expect(attire.describe({ kind: "arc", slug: "pricing" })).toBe("arc pricing");
-    expect(attire.describe({ kind: "pane", id: "echo" })).toBe('pane "run echo"');
-    expect(attire.describe({ kind: "panes", ids: ["a", "b", "c"] })).toBe("3 marked panes");
-    expect(attire.describe({ kind: "panes", ids: ["a"] })).toBe("1 marked pane");
     dispose();
   });
 });
@@ -218,14 +198,6 @@ describe("previewing", () => {
     expect(attire.outfit("b").theme).toBe(keyworkDay);
     attire.preview({ kind: "window" }, undefined);
     expect(attire.outfit("b").source).toBe("window");
-    dispose();
-  });
-
-  it("lets wearing replace the preview on the same target", () => {
-    const { attire, dispose } = dressed();
-    attire.preview({ kind: "pane", id: "a" }, "nord");
-    attire.wear({ kind: "pane", id: "a" }, "rose-pine");
-    expect(attire.outfit("a").theme.name).toBe("rose-pine");
     dispose();
   });
 

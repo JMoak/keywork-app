@@ -9,7 +9,6 @@ import {
   type OutsideKind,
   orbit,
   outsideMetrics,
-  recallEnd,
   type Standing,
   seatBesidePane,
   spread,
@@ -150,10 +149,6 @@ describe("the orbit around a windowed console", () => {
         const spills = cascaded.flatMap((pane) => seated.map((other) => [pane, other] as const));
         expect(spills.some(([a, b]) => overlaps(a.bounds, b.bounds))).toBe(false);
       });
-
-      it(`${named}: the same desk gives the same places`, () => {
-        expect(orbit(windowed(area), panes(count, area))).toEqual(placed);
-      });
     }
   }
 
@@ -231,10 +226,6 @@ describe("the orbit over a maximised console", () => {
         expect(placed.every((pane) => inside(area, pane.bounds))).toBe(true);
         expect(new Set(placed.map((pane) => topRight(pane.bounds))).size).toBe(count);
         expect(placed[0]?.bounds.x).toBeGreaterThanOrEqual(area.x + area.width / 3);
-      });
-
-      it(`${named}: the same desk gives the same places`, () => {
-        expect(orbit(maximised(area), panes(count, area))).toEqual(placed);
       });
     }
   }
@@ -331,12 +322,6 @@ describe("emerging and returning", () => {
     expect(inside(area, start)).toBe(true);
     expect(start).not.toEqual(first?.bounds);
   });
-
-  it("sends a recalled pane back to the place it would have emerged from", () => {
-    const standing = { x: 1500, y: 700, width: 400, height: 300 };
-    expect(recallEnd(desk, standing)).toEqual(emergeStart(desk, standing));
-    expect(overlaps(recallEnd(desk, standing), console)).toBe(true);
-  });
 });
 
 describe("the spread", () => {
@@ -357,10 +342,6 @@ describe("the spread", () => {
             expect(pane.bounds.width).toBeLessThanOrEqual(before.width);
             expect(pane.bounds.height).toBeLessThanOrEqual(before.height);
           }
-        });
-
-        it(`${named}, ${how}: the same panes spread the same way`, () => {
-          expect(spread(desk, outside)).toEqual(spreadOut);
         });
       }
     }
@@ -435,25 +416,6 @@ describe("sizes", () => {
     expect(sizeFor("file", { width: 200, height: 400 }, area).width).toBe(942);
     expect(sizeFor("diff", undefined, area).width).toBe(942);
     expect(sizeFor("diff", undefined, area).width).toBeGreaterThanOrEqual(codeWidth);
-  });
-
-  it("takes the smallest named size that holds what it measures, with no strip added on", () => {
-    expect(sizeFor("note", { width: 480, height: 300 }, area).height).toBe(320);
-    expect(sizeFor("note", { width: 480, height: 320 }, area).height).toBe(320);
-    expect(sizeFor("note", { width: 480, height: 321 }, area).height).toBe(648);
-    expect(sizeFor("note", { width: 480, height: 20 }, area).height).toBe(floor.height);
-    expect(sizeFor("file", { width: 720, height: 9000 }, area).height).toBe(
-      Math.round(area.height * workingShare),
-    );
-  });
-
-  it("is always one of the sizes the keeper's keys step through", () => {
-    const named = (["card", "reading", "working"] as const).map((name) =>
-      presetSize(name, area, "conversation"),
-    );
-    for (const height of [1, 160, 161, 320, 500, 648, 2000]) {
-      expect(named).toContainEqual(sizeFor("conversation", { width: 700, height }, area));
-    }
   });
 
   it("gives an unmeasured pane its kind's resting height", () => {

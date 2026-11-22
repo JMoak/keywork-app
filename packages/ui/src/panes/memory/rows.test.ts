@@ -1,23 +1,8 @@
-import type {
-  LedgerEntry,
-  MemoryDecision,
-  MemoryGarden,
-  MemoryNote,
-  StagedItem,
-} from "@keywork-app/protocol";
+import type { MemoryDecision, MemoryGarden, MemoryNote, StagedItem } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { inertGarden } from "../../shell/memory-store.ts";
-import { airlockItem, askItem, inboxItem } from "../../shell/needs-you-testing.ts";
-import {
-  entriesTouching,
-  flatRows,
-  gardenSections,
-  inboxView,
-  ledgerSummary,
-  newestFirst,
-  noteNameOf,
-  rowRevealing,
-} from "./rows.ts";
+import { airlockItem } from "../../shell/needs-you-testing.ts";
+import { flatRows, gardenSections, inboxView, rowRevealing } from "./rows.ts";
 
 function note(name: string, layer = "workspace"): MemoryNote {
   return {
@@ -36,15 +21,6 @@ function note(name: string, layer = "workspace"): MemoryNote {
     curing: 1,
     injected: false,
     recalls: 0,
-  };
-}
-
-function entry(id: string, op: LedgerEntry["op"], path: string): LedgerEntry {
-  return {
-    id,
-    op,
-    timestamp: `2026-09-07T12:00:0${id}.000Z`,
-    deltas: [{ path, before: null, beforeHash: null, after: "x", afterHash: "h" }],
   };
 }
 
@@ -128,31 +104,10 @@ describe("garden sections", () => {
       "finish",
     ]);
   });
-
-  it("puts the ask hits first as note rows", () => {
-    const sections = gardenSections({
-      garden,
-      notes: [],
-      dates: [],
-      hits: [
-        { note: "Layout Rects", layer: "workspace", ranks: { lexical: 1 }, superseded: false },
-      ],
-    });
-    expect(sections[0]?.heading).toBe("ask · 1 hits");
-    expect(sections[0]?.rows[0]?.kind).toBe("hit");
-    expect(gardenSections({ garden, notes: [], dates: [], hits: [] })[0]?.heading).toBe(
-      "ask · nothing matches",
-    );
-  });
 });
 
 describe("rows a needs-you jump reveals", () => {
   const rows = flatRows(gardenSections({ garden, notes: [], dates: [] }));
-
-  it("finds an inbox item by its id", () => {
-    expect(rowRevealing(rows, inboxItem("r1"))).toBe("inbox:r1");
-    expect(rowRevealing(rows, inboxItem("gone"))).toBeUndefined();
-  });
 
   it("lands an airlock on its first undecided entry, else on its close row", () => {
     expect(rowRevealing(rows, airlockItem("launch"))).toBe("candidate:launch:Plan");
@@ -182,10 +137,6 @@ describe("rows a needs-you jump reveals", () => {
       }),
     );
     expect(rowRevealing(decided, airlockItem("launch"))).toBe("finish:launch");
-  });
-
-  it("reveals nothing for an item answered in a session", () => {
-    expect(rowRevealing(rows, askItem("c1"))).toBeUndefined();
   });
 });
 
@@ -240,22 +191,5 @@ describe("a promotion card's odds", () => {
 
   it("carries the entry's decision onto the card it was promoted from", () => {
     expect(viewOf(triage)?.odds).toBe("changes a note · jev 0.91");
-  });
-
-  it("carries nothing for the builtin, whose triage is always unsure", () => {
-    const view = viewOf({ ...triage, choice: "unsure", decider: "builtin" });
-    expect(view).toEqual(inboxView(promotion));
-    expect(view).not.toHaveProperty("odds");
-  });
-});
-
-describe("the ledger", () => {
-  it("summarizes an entry by its op and the notes it touched, newest first", () => {
-    const ledger = [entry("1", "create", "Layout Rects.md"), entry("2", "approve", ".staging/x")];
-    expect(ledgerSummary(ledger[0] as LedgerEntry)).toBe("create Layout Rects");
-    expect(ledgerSummary(ledger[1] as LedgerEntry)).toBe("approve .staging/x");
-    expect(newestFirst(ledger).map((item) => item.id)).toEqual(["2", "1"]);
-    expect(entriesTouching(ledger, "Layout Rects.md").map((item) => item.id)).toEqual(["1"]);
-    expect(noteNameOf("entities/people/Ada.md")).toBe("people/Ada");
   });
 });

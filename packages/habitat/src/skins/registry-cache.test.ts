@@ -35,15 +35,6 @@ describe("built-in skin retention", () => {
     expect(builds).toBe(3);
   });
 
-  it("does not retain caller registries even when they contain the shipped factories", () => {
-    const sources = { ...skins };
-    const first = accepted(loadSkin("placeholder", sources));
-    const second = accepted(loadSkin("placeholder", sources));
-    expect(first === second).toBe(false);
-    expect(first.skin === second.skin).toBe(false);
-    expect(first.skin.atlas.indices.buffer === second.skin.atlas.indices.buffer).toBe(false);
-  });
-
   it("invalidates a replaced built-in source and never caches the mutable replacement", () => {
     const original = skins.placeholder;
     if (original === undefined) throw new Error("missing placeholder factory");

@@ -4,13 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserHost } from "../../host/browser.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
-import {
-  acknowledgementUnserved,
-  benchUnserved,
-  emptyStateLine,
-  modelRowFirst,
-  noReportLine,
-} from "./copy.ts";
+import { acknowledgementUnserved, benchUnserved, modelRowFirst, noReportLine } from "./copy.ts";
 import { type MillsSpec, millsActions, millsPane, profilePaneKind } from "./index.tsx";
 import {
   allOperations,
@@ -89,16 +83,6 @@ function cursorName(container: HTMLElement): string {
   );
 }
 
-function rowOf(container: HTMLElement, name: string): HTMLElement | undefined {
-  return [...container.querySelectorAll<HTMLElement>(".kw-mills-row")].find(
-    (row) => row.querySelector("[data-cell='name']")?.firstChild?.textContent === name,
-  );
-}
-
-function cell(row: HTMLElement | undefined, name: string): string {
-  return row?.querySelector(`[data-cell='${name}']`)?.textContent?.trim() ?? "";
-}
-
 function answerAsk(container: HTMLElement, key: string): void {
   fireEvent.keyDown(container.querySelector(".kw-ov-line[data-tone='ask']") as HTMLElement, {
     key,
@@ -114,45 +98,6 @@ describe("the mills pane", () => {
     await settled();
     harness.walkTo("gemma-4-31b preview");
     await expect(paneText(harness.container)).toMatchFileSnapshot("./__goldens__/mills.txt");
-    harness.dispose();
-  });
-
-  it("shows health, residency, classes, license, preview and cost per model", async () => {
-    const harness = await millsHarness();
-    const qwen = rowOf(harness.container, "qwen3.8-27b");
-    expect(cell(qwen, "health")).toBe("up");
-    expect(cell(qwen, "held")).toBe("loaded");
-    expect(cell(qwen, "classes")).toBe("strong vision");
-    expect(cell(qwen, "license")).toBe("Apache-2.0");
-    expect(cell(qwen, "cost")).toBe("0.00/0.00 est");
-    const gemma = rowOf(harness.container, "gemma-4-31b");
-    expect(cell(gemma, "name")).toBe("gemma-4-31b preview");
-    expect(cell(gemma, "held")).toBe("installed");
-    expect(cell(gemma, "license")).toBe("Gemma · needs ack");
-    expect(gemma?.dataset.tone).toBe("ask");
-    expect(cell(rowOf(harness.container, "glm-5"), "cost")).toBe("unknown");
-    expect(cell(rowOf(harness.container, "jev-1.14"), "license")).toBe("proprietary · acked");
-    expect(cell(rowOf(harness.container, "jev-1.14"), "cost")).toBe("0.12/0.00");
-    const spark = rowOf(harness.container, "ollama :11434");
-    expect(spark?.dataset.tone).toBe("error");
-    expect(harness.container.textContent).toContain("connect ECONNREFUSED 100.101.1.20:11434");
-    expect(harness.container.textContent).toContain(
-      "no mill found · install Ollama on port 11434 or llama.cpp on port 9931 here",
-    );
-    harness.dispose();
-  });
-
-  it("names the missing capability for each class the model at the cursor misses", async () => {
-    const harness = await millsHarness();
-    harness.walkTo("qwen3.8-27b");
-    const details = [...harness.container.querySelectorAll(".kw-mills-sub")].map(
-      (line) => line.textContent,
-    );
-    expect(details).toContain("not loop: needs decode measured on this node");
-    expect(details).toContain("not decide: needs a decision endpoint or logprobs");
-    expect(details).toContain("context allocated 131,072 tokens");
-    harness.walkTo("qwen3.8-flash-next");
-    expect(harness.container.textContent).toContain("classes unknown until probed · p probes");
     harness.dispose();
   });
 
@@ -300,34 +245,6 @@ describe("the mills pane", () => {
       "GET /models",
       "GET /creatures",
     ]);
-    harness.dispose();
-  });
-
-  it("opens on the parcel the spec names", async () => {
-    const harness = await millsHarness({ spec: { kind: "mills", node: "spark-ad4d" } });
-    expect(cursorName(harness.container)).toBe("spark-ad4d");
-    expect(millsPane.title({ kind: "mills", node: "spark-ad4d" }, {} as ShellSeams)).toBe(
-      "mills · spark-ad4d",
-    );
-    harness.dispose();
-  });
-
-  it("teaches from the empty state with the installer hint for a local server", async () => {
-    const harness = await millsHarness({
-      prepare: (server) => {
-        server.report = {
-          generatedAt: "2026-11-05T09:00:00.000Z",
-          nodes: [{ node: "moak-main", servers: [] }],
-        };
-      },
-    });
-    expect(harness.container.querySelector(".kw-empty")?.textContent).toBe(emptyStateLine("p"));
-    expect(emptyStateLine("p")).toBe(
-      "No mill on any parcel · install Ollama on port 11434 or llama.cpp on port 9931, then look again with p",
-    );
-    harness.act(millsActions.probe);
-    await settled();
-    expect(harness.server.calls.filter((call) => call === "GET /models")).toHaveLength(2);
     harness.dispose();
   });
 

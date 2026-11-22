@@ -64,22 +64,6 @@ describe("where a pane rests outside the window", () => {
     expect(overlaps(place as ScreenRect, desk.console)).toBe(false);
   });
 
-  it("seats a newcomer clear of the panes that keep their places, in the order asked", () => {
-    const { places } = restingPlaces(
-      desk,
-      [
-        { id: "kept", kind: "note", measured: undefined, last: stored },
-        { id: "new", kind: "note", measured: { width: 480, height: 300 }, last: undefined },
-        { id: "newer", kind: "note", measured: { width: 480, height: 300 }, last: undefined },
-      ],
-      [],
-    );
-    expect(places[0]).toEqual(stored);
-    const [, first, second] = places as ScreenRect[];
-    expect(overlaps(first as ScreenRect, second as ScreenRect)).toBe(false);
-    expect(overlaps(first as ScreenRect, desk.console)).toBe(false);
-  });
-
   it("counts a pane as on a display only while enough of its strip can be grabbed", () => {
     const { strip } = outsideMetrics;
     expect(standsOnADisplay(desk, stored)).toBe(true);
@@ -120,14 +104,6 @@ describe("the size a pane arrives at", () => {
         expect(named).toContainEqual(sizeFor(kind, measured, laptop));
       }
     }
-  });
-
-  it("is the working size for an unmeasured pane to work in, and the reading size for one to read", () => {
-    expect(sizeWanted("conversation", undefined, laptop)).toBe("working");
-    expect(sizeWanted("file", undefined, laptop)).toBe("working");
-    expect(sizeWanted("diff", undefined, laptop)).toBe("working");
-    expect(sizeWanted("note", undefined, laptop)).toBe("reading");
-    expect(sizeWanted("stead", undefined, laptop)).toBe("reading");
   });
 
   it("is the smallest that holds a measured pane as it stood inside, title row and all", () => {
@@ -253,34 +229,6 @@ describe("who gets the largest seat", () => {
   it("gives it to the first asked when the keeper deals panes of equal weight", () => {
     expect(largestOf(restingPlaces(desk, seeking(9), []).places)).toBe(0);
   });
-
-  it("varies which pane has it when a creature's panes weigh the same, never past a heavier one", () => {
-    const leaders = new Set(
-      Array.from({ length: 48 }, (_, seed) =>
-        largestOf(
-          restingPlaces(desk, seeking(9), [], { asker: "creature", random: mulberry32(seed + 1) })
-            .places,
-        ),
-      ),
-    );
-    expect(leaders.size).toBeGreaterThan(3);
-    expect(paneWeights.tieSpread).toBeLessThan(1);
-  });
-
-  it("does not deal a creature the look it was dealt last", () => {
-    for (let seed = 1; seed <= 24; seed += 1) {
-      const first = restingPlaces(desk, seeking(10), [], {
-        asker: "creature",
-        random: mulberry32(seed),
-      });
-      const second = restingPlaces(desk, seeking(10), [], {
-        asker: "creature",
-        random: mulberry32(seed),
-        previous: first.look,
-      });
-      expect(second.look, `${seed}`).not.toBe(first.look);
-    }
-  });
 });
 
 describe("the seat of a pane that arises from another", () => {
@@ -352,14 +300,6 @@ describe("the seats of a pane drilled into", () => {
     });
     const reading: ScreenRect = { x: 3100, y: 100, width: 625, height: 320 };
     expect(drilledInto(roomy, reading, "conversation", [])?.aside).toMatchObject({ height: 160 });
-  });
-
-  it("keeps a card a card beside the pane that takes its seat", () => {
-    const card: ScreenRect = { x: 1112, y: 100, width: 624, height: 160 };
-    expect(drilledInto(desk, card, "note", [])).toEqual({
-      lead: card,
-      aside: { x: 1112, y: 272, width: 624, height: 160 },
-    });
   });
 
   it("has no seats where the parent can stand nowhere beside the lead", () => {

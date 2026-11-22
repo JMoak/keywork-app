@@ -31,18 +31,6 @@ describe("trayModel", () => {
     ]);
   });
 
-  it("stays quiet with nothing pending and nothing open", () => {
-    const model = trayModel([]);
-    expect(model.tooltip).toBe("keywork");
-    expect(model.badge).toBeUndefined();
-    expect(model.menu.map((item) => (item.kind === "action" ? item.action : item.kind))).toEqual([
-      "open-folder",
-      "separator",
-      "quit",
-    ]);
-    expect(trayModel([{ workspace: "C:/w", windows: 1, needsYou: 1 }]).badge).toBe("1 needs you");
-  });
-
   it("follows the queue length a window reports as items arrive and are answered", () => {
     const registry = windowRegistry();
     registry.add(7, "C:/work/app");
@@ -64,19 +52,6 @@ describe("trayMarkPng", () => {
       height: 32,
     });
     expect(decodePngHeader(new Uint8Array([1, 2, 3]))).toBeUndefined();
-  });
-
-  it("draws a monochrome ring, filled at the core only when asked", () => {
-    const hollow = pixelsOf(trayMarkPng({ size: 16, filled: false, ink: "white" }), 16);
-    const filled = pixelsOf(trayMarkPng({ size: 16, filled: true, ink: "black" }), 16);
-    expect(hollow(0, 0)).toEqual([0, 0, 0, 0]);
-    expect(hollow(1, 1)).toEqual([255, 255, 255, 255]);
-    expect(hollow(2, 8)).toEqual([255, 255, 255, 255]);
-    expect(hollow(3, 8)).toEqual([0, 0, 0, 0]);
-    expect(hollow(8, 8)).toEqual([0, 0, 0, 0]);
-    expect(filled(1, 1)).toEqual([0, 0, 0, 255]);
-    expect(filled(4, 8)).toEqual([0, 0, 0, 0]);
-    expect(filled(8, 8)).toEqual([0, 0, 0, 255]);
   });
 
   it("round-trips arbitrary pixels through the encoder", () => {

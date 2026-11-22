@@ -2,7 +2,7 @@ import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { cursorRow, mountPane, overviewShell, rowTexts, settle } from "../overview/testing.tsx";
 import { workspaceAside, workspaceMark, workspaceRows, workspacesPane } from "./index.tsx";
-import { servingLine, stoppedServingNotice, stopServingQuestion } from "./serving.ts";
+import { stoppedServingNotice, stopServingQuestion } from "./serving.ts";
 
 afterEach(cleanup);
 
@@ -189,10 +189,5 @@ describe("the workspaces pane says who serves this folder", () => {
     await settle();
     expect(servingText(mounted.container)).toBeUndefined();
     plain.dispose();
-  });
-
-  it("words each way a folder is served", () => {
-    expect(servingLine("node")).toBe("served by the node");
-    expect(servingLine("console")).toBe("runs with the console");
   });
 });

@@ -84,12 +84,6 @@ describe("isNotice", () => {
 describe("the Windows toast identity", () => {
   const electron = "C:/src/keywork-app/node_modules/electron/dist/electron.exe";
 
-  it("names an unpackaged Windows build by its executable, so its toasts show without a Start Menu shortcut", () => {
-    expect(appUserModelIdFor({ platform: "win32", packaged: false, execPath: electron })).toBe(
-      electron,
-    );
-  });
-
   it("names a packaged Windows build by the installer's appId, and leaves other platforms alone", () => {
     expect(appUserModelIdFor({ platform: "win32", packaged: true, execPath: electron })).toBe(
       packagedAppUserModelId,
@@ -102,18 +96,6 @@ describe("the Windows toast identity", () => {
     expect(appUserModelIdFor({ platform: "linux", packaged: true, execPath: electron })).toBe(
       undefined,
     );
-  });
-
-  it("raises a chore toast while the console is unfocused and holds it while focused", () => {
-    const chore: NeedsYouTrigger = {
-      kind: "chore",
-      workspace: "C:/w",
-      creature: "vey",
-      routineId: "stamp-note",
-    };
-    expect(shouldNotify(chore, false)).toBe(true);
-    expect(shouldNotify(chore, true)).toBe(false);
-    expect(isNotice({ title: "vey · stamp-note", body: "accept", trigger: chore })).toBe(true);
   });
 });
 

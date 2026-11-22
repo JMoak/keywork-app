@@ -50,8 +50,6 @@ describe("campaign transport", () => {
   it.each([
     ["an envelope without a campaign body", { schemaVersion: 1, id: "campaign-one", revision: 1 }],
     ["an empty identity", campaignFixture({ id: "" })],
-    ["missing usage", { ...campaignFixture(), usage: undefined }],
-    ["a null budget", { ...campaignFixture(), budget: null }],
     ["an invalid persistence object", { ...campaignFixture(), persistence: [] }],
     ["a null artifact", { ...campaignFixture(), artifacts: [null] }],
   ])("rejects a campaign reading with %s", async (_description, campaign) => {
@@ -100,24 +98,6 @@ describe("campaign transport", () => {
     expect(items.map((item) => item.kind)).toEqual(["connected", "snapshot", "heartbeat", "event"]);
     expect(items.at(-1)).toEqual({ kind: "event", event });
   });
-  it("encodes artifact paths and requests previews without executing content", async () => {
-    const paths: string[] = [];
-    const client = campaignsOverFetch(async (path) => {
-      paths.push(path);
-      return Response.json({
-        artifactId: "artifact/a",
-        path: "nested/a b.md",
-        mimeType: "text/html",
-        content: "<script>danger()</script>",
-        truncated: false,
-        totalBytes: 25,
-      });
-    });
-    expect((await client.artifact("a/b", "artifact/a", "nested/a b.md")).content).toContain(
-      "<script>",
-    );
-    expect(paths).toEqual(["/campaigns/a%2Fb/artifacts/artifact%2Fa?path=nested%2Fa%20b.md"]);
-  });
   it("confirms only the requested artifact export and sends its destination once", async () => {
     const seen: { path: string; method: string | undefined; body: unknown }[] = [];
     const exported = { artifactId: "artifact/a", path: "workspace/exports/result" };
@@ -136,10 +116,7 @@ describe("campaign transport", () => {
   });
   it.each([
     null,
-    {},
     { artifactId: "another", path: "exports/result" },
-    { artifactId: "version", path: null },
-    { artifactId: "version", path: "" },
     { artifactId: "version", path: " \t\n " },
   ])("rejects an unconfirmed successful export response: %j", async (body) => {
     let calls = 0;

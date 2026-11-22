@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { forgetApplyPath, forgetPreviewPath } from "../memory/forget.ts";
 import { mountPane, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
-import { craftRows, craftSource, nothingLearned } from "./craft.tsx";
+import { craftRows, craftSource } from "./craft.tsx";
 import { type CreatureSpec, creaturePane } from "./index.tsx";
-import { type CreatureHarness, creatureHarness, flat } from "./testing.ts";
+import { type CreatureHarness, creatureHarness } from "./testing.ts";
 
 afterEach(cleanup);
 
@@ -127,22 +127,6 @@ function noticeText(container: HTMLElement): string {
 }
 
 describe("craft memory in the profile", () => {
-  it("shows only the creature's craft section, apart from the keeper's notes, with first lines", async () => {
-    const { container } = await open();
-    expect(craftNames(container)).toEqual(["Triage Order", "Label Words"]);
-    const rows = container.querySelector(".kw-creature-craft") as HTMLElement;
-    expect(flat(rows)).toContain("Triage Order Oldest first, then by label. agent");
-    expect(container.textContent).toContain(
-      "l next lesson · o edits it · x forgets it after a dry run",
-    );
-  });
-
-  it("says so when nothing has been learned yet", async () => {
-    const { container } = await open([lessons[2] as MemoryNote]);
-    expect(craftNames(container)).toEqual([]);
-    expect(container.textContent).toContain(nothingLearned);
-  });
-
   it("moves between lessons and opens the focused one in the editor", async () => {
     const { container, act, harness } = await open();
     expect(focusedCraft(container)).toBe("Triage Order");

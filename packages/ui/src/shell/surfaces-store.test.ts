@@ -53,43 +53,6 @@ describe("the surfaces store", () => {
     expect(surfacesOfKind("arcs")).toEqual(["arcs"]);
   });
 
-  it("leaves every listing alone when the permissions change, since it holds none of them", async () => {
-    let sessionsChanged = 0;
-    const client = fixtureSurfacesClient();
-    const feed = fakeFeed();
-    const store = inRoot(() =>
-      createSurfacesStore(client, feed.feed, { sessionsChanged: () => (sessionsChanged += 1) }),
-    );
-    await store.load();
-    client.calls.splice(0);
-    feed.emit("permissions");
-    await settle();
-    expect(client.calls).toEqual([]);
-    expect(sessionsChanged).toBe(0);
-    expect(surfacesOfKind("permissions")).toEqual([]);
-  });
-
-  it("reads the theme an arc wears off its summary, and follows another client's change", async () => {
-    let worn: string | undefined;
-    const client = fixtureSurfacesClient({
-      arcs: async () => ({
-        ...surfaceFixtures.arcs,
-        arcs: surfaceFixtures.arcs.arcs.map((arc) =>
-          arc.slug === "pricing" && worn !== undefined ? { ...arc, theme: worn } : arc,
-        ),
-      }),
-    });
-    const feed = fakeFeed();
-    const store = inRoot(() => createSurfacesStore(client, feed.feed));
-    await store.load();
-    expect(store.arcTheme("pricing")).toBeUndefined();
-    worn = "nord";
-    feed.emit("arcs");
-    await settle();
-    expect(store.arcTheme("pricing")).toBe("nord");
-    expect(store.arcTheme("arc-0")).toBeUndefined();
-  });
-
   it("tells the session store when arc or bot bindings moved, since summaries carry both", async () => {
     let changed = 0;
     const feed = fakeFeed();

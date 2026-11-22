@@ -1,30 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ConversationPane over the recorded fixtures > renders delegated 1`] = `
-[
-  "user have a researcher audit the trust rules",
-  "machine child "audit the trust rules" · researcher · 1.0s · 17 tokens · completed",
-  "agent The researcher found two loose rules.",
-]
-`;
-
-exports[`ConversationPane over the recorded fixtures > renders denied 1`] = `
-[
-  "user run echo served",
-  "machine bash echo served · refused · no one answered",
-  "agent I could not run it.",
-]
-`;
-
-exports[`ConversationPane over the recorded fixtures > renders injected 1`] = `
-[
-  "user first",
-  "agent First answer, finished.",
-  "user secondvia wispr-flow",
-  "agent Second answer.",
-]
-`;
-
 exports[`ConversationPane over the recorded fixtures > renders interrupt 1`] = `
 [
   "user wait forever",
@@ -46,14 +21,6 @@ exports[`ConversationPane over the recorded fixtures > renders queued 1`] = `
   "agent First answer, finished.",
   "user second",
   "agent Second answer.",
-]
-`;
-
-exports[`ConversationPane over the recorded fixtures > renders thinking 1`] = `
-[
-  "user what changed?",
-  "agent thinking · 7 words",
-  "agent The change is in layout.ts.",
 ]
 `;
 

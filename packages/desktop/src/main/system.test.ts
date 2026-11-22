@@ -2,12 +2,10 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  appRepoRoot,
   bundledBinary,
   keyworkTickets,
   launchableOf,
   siblingCheckout,
-  siblingKeyworkRepo,
   spawnsThroughShell,
 } from "./system.ts";
 
@@ -34,17 +32,6 @@ describe("system paths", () => {
 });
 
 describe("the sibling checkout", () => {
-  const desktop = resolve("/src/stead/repos/keywork-app/packages/desktop");
-  const repoRoot = resolve("/src/stead/repos/keywork-app");
-
-  it("sits beside the app repo as ../keywork unless KEYWORK_REPO says otherwise, as check:contract finds it", () => {
-    expect(appRepoRoot(desktop)).toBe(repoRoot);
-    expect(siblingKeyworkRepo(repoRoot, {})).toBe(resolve("/src/stead/repos/keywork"));
-    expect(siblingKeyworkRepo(repoRoot, { KEYWORK_REPO: "/elsewhere/keywork" })).toBe(
-      resolve("/elsewhere/keywork"),
-    );
-  });
-
   it("counts only when its CLI entry is on disk", async () => {
     const root = resolve("/src/stead/repos/keywork");
     const cli = join(root, "packages/cli/src/main.ts");

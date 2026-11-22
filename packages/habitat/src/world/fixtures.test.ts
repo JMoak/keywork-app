@@ -103,51 +103,6 @@ describe("the stead against every recorded scenario", () => {
     }
   });
 
-  it("keeps a stable picture of every scenario's threads", async () => {
-    for (const name of recorded) {
-      const state = projectAll(emptyHabitat(), await envelopes(name));
-      expect({
-        threads: state.threads,
-        porch: state.porch,
-        history: state.history,
-      }).toMatchSnapshot(name);
-    }
-  });
-
-  it("asks ring while the ask is open and fall silent on the answer, whoever answers", async () => {
-    for (const name of ["denied", "asked-granted", "asked-denied"]) {
-      const stream = await envelopes(name);
-      const asked = stream.findIndex((envelope) => envelope.type === "gate.ask");
-      const ringing = projectAll(emptyHabitat(), stream.slice(0, asked + 1));
-      expect(ringingTheBell(ringing), name).toEqual([
-        expect.objectContaining({
-          kind: "ask",
-          callId: "c1",
-          tool: "bash",
-          subject: "echo served",
-        }),
-      ]);
-      expect(ringingTheBell(projectAll(ringing, stream.slice(asked + 1))), name).toEqual([]);
-    }
-  });
-
-  it("counts the memory inbox from the tally and settles on the last count", async () => {
-    const state = projectAll(emptyHabitat(), await envelopes("memory"));
-    expect(state.porch.inbox?.count).toBe(2);
-    expect(ringingTheBell(state)).toEqual([{ kind: "inbox", key: "inbox", count: 2 }]);
-  });
-
-  it("carries the delegated child as a loft lantern that goes out when the child finishes", async () => {
-    const stream = await envelopes("delegated");
-    const started = stream.findIndex((envelope) => envelope.type === "child.started");
-    const lit = projectAll(emptyHabitat(), stream.slice(0, started + 1));
-    expect(lit.threads.q2?.turn).toBeDefined();
-    expect(lit.threads.s1?.children).toEqual(["q2"]);
-    const done = projectAll(lit, stream.slice(started + 1));
-    expect(done.threads.q2).toMatchObject({ turn: undefined, outcome: "completed", kind: "child" });
-    expect(done.threads.s1?.turn).toBeUndefined();
-  });
-
   it("brings a crate back from the changes scenario and puts it back on the restore", async () => {
     const changed = projectAll(emptyHabitat(), await envelopes("changes"));
     expect(changed.threads.s1?.back).toMatchObject({

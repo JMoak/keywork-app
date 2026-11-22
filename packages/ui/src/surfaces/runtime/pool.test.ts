@@ -49,18 +49,6 @@ describe("the warm window pool", () => {
     expect((await taking).id).toBe("1");
   });
 
-  it("counts the windows standing warm, down as each is taken and up as the pool refills", async () => {
-    const { pool } = bench();
-    expect(pool.warmCount()).toBe(0);
-    pool.warm(2);
-    await turn();
-    expect(pool.warmCount()).toBe(2);
-    await pool.take();
-    expect(pool.warmCount()).toBe(1);
-    await turn();
-    expect(pool.warmCount()).toBe(2);
-  });
-
   it("keeps an announcement that arrives while the window is still opening", async () => {
     const desktop = fakeDesktop({ announces: false });
     const pool = createWindowPool({

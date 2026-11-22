@@ -116,69 +116,6 @@ describe("the session verbs", () => {
     }
   });
 
-  it("returns the undone prompt and tells nothing-to-undo from a busy session", async () => {
-    const undone = {
-      prompt: { entryId: "e3", text: "say hello" },
-      filesNote: "files put back",
-      undoable: false,
-      redoable: true,
-    };
-    let turn = 0;
-    const { client } = serverAnswering(({ path }) => {
-      turn += 1;
-      if (path.endsWith("/redo")) return json(404, { error: "nothing to redo" });
-      if (turn === 1) return json(200, undone);
-      if (turn === 2) {
-        return json(409, {
-          error: "a turn is running",
-        });
-      }
-      return json(404, { error: "nothing to undo" });
-    });
-    expect(await client.undo("s1")).toEqual(undone);
-    expect(await client.undo("s1")).toEqual({ refused: "busy", detail: "a turn is running" });
-    expect(await client.undo("s1")).toEqual({ refused: "nothing", detail: "nothing to undo" });
-    expect(await client.redo("s1")).toEqual({ refused: "nothing", detail: "nothing to redo" });
-  });
-
-  it("reads the context and cost reports as the server sends them", async () => {
-    const estimated = (tokens: number) => ({ tokens, basis: "estimated" });
-    const context = {
-      used: 40,
-      window: 200_000,
-      flushAt: 175_424,
-      compactAt: 183_616,
-      declared: false,
-      parts: {
-        system: estimated(137),
-        tools: estimated(1728),
-        injected: estimated(0),
-        conversation: { tokens: 40, basis: "reported" },
-        free: estimated(198_095),
-      },
-      thresholds: { flushAt: 177_289, compactAt: 185_481 },
-      fullness: 0.0002,
-      flushDue: false,
-      compactionDue: false,
-      basis: "estimated",
-    };
-    const cost = {
-      rollup: { nanos: 0, pricedTurns: 0, meteredTurns: 0, unpricedTurns: 1 },
-      usage: { inputTokens: 12, outputTokens: 5 },
-      basis: "metered by the provider",
-      models: [],
-    };
-    const { client, sent } = serverAnswering(({ path }) =>
-      json(200, path.endsWith("/context") ? context : cost),
-    );
-    expect(await client.context("s1")).toEqual(context);
-    expect(await client.cost("s1")).toEqual(cost);
-    expect(sent.map((call) => `${call.method} ${call.path}`)).toEqual([
-      "GET /sessions/s1/context",
-      "GET /sessions/s1/cost",
-    ]);
-  });
-
   it("exports inline as html, to a file as its path, and types a refused path", async () => {
     const { client, sent } = serverAnswering(({ body }) => {
       const out = (body as { out?: string }).out;

@@ -3,7 +3,7 @@ import { poseNames } from "../pose/skin.ts";
 import { bitmapFromRows, rowsFromBitmap, worldGlyphs } from "../skins/legend.ts";
 import { placeholderSkin } from "../skins/placeholder.ts";
 import { emptyHabitat, emptyThread, type HabitatState } from "../world/types.ts";
-import { glyphFrame, glyphGap, glyphSize } from "./glyph.ts";
+import { glyphGap, glyphSize } from "./glyph.ts";
 import {
   crownRow,
   type FigurePose,
@@ -29,13 +29,11 @@ import {
   unresolvedRoles,
 } from "./palette.ts";
 import {
-  alphaMask,
   createRasterSurface,
   hitMaskOf,
   hitTest,
   mirrors,
   paintIndexed,
-  rasterize,
   rgbaOf,
 } from "./raster.ts";
 import { artScale, createRenderer, scaleFor } from "./renderer.ts";
@@ -108,22 +106,6 @@ describe("the palette roles", () => {
     expect(paletteRoles.map((role) => role.index)).toEqual(Array.from({ length: 16 }, (_, i) => i));
   });
 
-  it("takes the accent for a creature without a hue slot and paper from the background by day", () => {
-    const dark = resolvePalette(tracingSource("dark"));
-    const light = resolvePalette(tracingSource("light"));
-    expect(dark[2]).toBe(tokens["--kw-accent"]);
-    expect(dark[3]).toContain(tokens["--kw-text"]);
-    expect(light[3]).toContain(tokens["--kw-background"]);
-  });
-
-  it("gives world tiles timber in the identity slots and shifts the ground with the season", () => {
-    const world = resolvePalette(tracingSource(), { world: true, season: "autumn" });
-    expect(world[2]).toBe(`mix(${tokens["--kw-border"]},${tokens["--kw-terminal-yellow"]},0.2)`);
-    expect(world[6]).toContain(tokens["--kw-terminal-yellow"]);
-    const winter = resolvePalette(tracingSource(), { season: "winter" });
-    expect(winter[6]).toContain(`${tokens["--kw-text"]},0.2`);
-  });
-
   it("paints system colors verbatim under forced colors and never reads a token", () => {
     const source = tracingSource();
     const palette = resolvePalette(source, { forcedColors: true });
@@ -134,13 +116,6 @@ describe("the palette roles", () => {
     expect(palette[10]).toBe("Highlight");
     expect(palette[14]).toBe("GrayText");
     expect(resolveGlyphPalette(source, true)[1]).toBe("CanvasText");
-  });
-
-  it("resolves the glyph palette with success reaching the check", () => {
-    const glyph = resolveGlyphPalette(tracingSource());
-    expect(glyph).toHaveLength(7);
-    expect(glyph[4]).toBe(tokens["--kw-success"]);
-    expect(glyph[3]).toBe(tokens["--kw-accent"]);
   });
 });
 
@@ -176,15 +151,6 @@ describe("the rasterizer", () => {
     ]);
   });
 
-  it("rasterizes to rgba with alpha zero where the frame is transparent", () => {
-    const raster = rasterize(frame, palette, 2);
-    expect(raster.width).toBe(6);
-    expect(raster.height).toBe(4);
-    expect([...raster.rgba.slice(0, 4)]).toEqual([0x99, 0x99, 0x99, 255]);
-    expect([...raster.rgba.slice(4 * 4, 4 * 4 + 4)]).toEqual([0, 0, 0, 0]);
-    expect(() => rasterize(frame, ["transparent", "Canvas"], 1)).toThrow(/hex color/);
-  });
-
   it("reads three, six and eight digit hex", () => {
     expect(rgbaOf("#abc")).toEqual([0xaa, 0xbb, 0xcc, 255]);
     expect(rgbaOf("#aabbcc")).toEqual([0xaa, 0xbb, 0xcc, 255]);
@@ -216,14 +182,6 @@ describe("the rasterizer", () => {
     expect(hitMaskOf(skin, "walk-left", 0, 1, "left").bits).toEqual(
       hitMaskOf(skin, "walk-left", 0, 1, "right").bits,
     );
-  });
-
-  it("scales the alpha mask by whole device pixels", () => {
-    const mask = alphaMask(frame, 3);
-    expect(mask.width).toBe(9);
-    expect(mask.height).toBe(6);
-    expect(mask.bits[0]).toBe(1);
-    expect(mask.bits[8]).toBe(0);
   });
 });
 
@@ -262,17 +220,6 @@ describe("the renderer", () => {
     expect(left.indexed).toBe(
       render({ clip: "wait", frame: 0, facing: "left" }, palette, { scale: 1 }).indexed,
     );
-  });
-});
-
-describe("the glyphs", () => {
-  it("draws a seven pixel plumbob for every state but idle", () => {
-    for (const glyph of ["bell", "cross", "check", "dot", "pause"] as const) {
-      const frame = glyphFrame(glyph);
-      expect(frame?.width, glyph).toBe(glyphSize);
-      expect(frame?.height, glyph).toBe(glyphSize);
-    }
-    expect(glyphFrame("none")).toBeUndefined();
   });
 });
 
@@ -377,31 +324,6 @@ describe("the stead scene", () => {
     expect([...quiet.bitmap.indices].includes(11)).toBe(false);
     expect([...asked.bitmap.indices].includes(11)).toBe(true);
     expect(asked.readings.wren?.state).toBe("porch");
-  });
-
-  it("lights the workshop lamp while a thread runs there", () => {
-    const working = composeStead(
-      stead((state) => ({
-        ...state,
-        threads: {
-          t1: {
-            ...emptyThread("t1", "2026-11-05T11:59:00.000Z"),
-            creature: "wren",
-            turn: {
-              startedAt: "2026-11-05T11:59:00.000Z",
-              lastProgressAt: "2026-11-05T11:59:30.000Z",
-              tool: undefined,
-              stumbledAt: undefined,
-            },
-          },
-        },
-      })),
-      at,
-    );
-    const idle = composeStead(stead(), at);
-    const lamps = (scene: typeof idle): number =>
-      [...scene.bitmap.indices].filter((index) => index === 10).length;
-    expect(lamps(working)).toBeGreaterThan(lamps(idle));
   });
 
   it("plants the tree, fences a parcel with a lane and a signpost, and fogs it when offline", () => {

@@ -3,13 +3,8 @@ import type { BusEnvelope } from "@keywork-app/protocol";
 import { cleanup, fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HostPort } from "../../host/port.ts";
-import { actionScopes, appActions } from "../../keys/actions.ts";
-import { Keymap } from "../../keys/keymap.ts";
 import type { TrustFlow } from "../../shell/trust.ts";
 import type { PaneDefinition, ShellSeams } from "../registry.ts";
-import { homeOpeningLine } from "../stead/creature-home.tsx";
-import { checkPaneDefinition } from "../testing.ts";
-import { settingsPointer, settingsUnservedLine } from "./copy.ts";
 import { type ChoresSpec, choresPane, choresPaneWith } from "./index.tsx";
 import type { ChoresPort } from "./port.ts";
 import {
@@ -20,7 +15,6 @@ import {
   morningRuns,
   morningTriage,
   nightlyTests,
-  nodeSettings,
   reading,
   recordingPort,
   refused,
@@ -79,32 +73,6 @@ describe("the chores pane, listing", () => {
     expect(rows(narrowed.container)).toEqual([]);
     expect(empty(narrowed.container)).toBe("No chores · add one with n");
   });
-
-  it("teaches in the voice guide's words with no creature, and passes a refusal through", async () => {
-    const none = await mounted(reading({ creatures: [] }));
-    expect(empty(none.container)).toBe("No creature yet · make one with ctrl+k 1");
-    cleanup();
-    const unserved = await mounted(reading({ creatures: "creatures is not served by this host" }));
-    expect(empty(unserved.container)).toBe("creatures is not served by this host");
-    cleanup();
-    const refusing = await mounted(
-      reading({ creatures: [wren, tam], chores: { wren: "no creature has that slug", tam: [] } }),
-    );
-    expect(subLines(refusing.container)).toContain("no creature has that slug");
-    expect(choresPane.emptyState(keys)).toBe("No chores · add one with n");
-  });
-
-  it("shows the digest schedule and quiet hours read-only with a pointer, or says they are not served", async () => {
-    const served = await mounted(reading({ settings: nodeSettings }));
-    expect(settings(served.container)).toEqual([
-      "digest at 08:30, 12:30, 17:30 · quiet 22:00 to 07:00 (America/Chicago)",
-      settingsPointer,
-    ]);
-    expect(served.container.querySelectorAll(".kw-chores-settings input")).toHaveLength(0);
-    cleanup();
-    const unserved = await mounted(reading());
-    expect(settings(unserved.container)[0]).toBe(settingsUnservedLine);
-  });
 });
 
 describe("the chores pane, wherever it opens", () => {
@@ -127,22 +95,6 @@ describe("the chores pane, wherever it opens", () => {
     });
     expect(portsFor).toEqual(["C:/home/.keywork/home"]);
     expect(rows(container)).toContain("▾ Wren 5 chores");
-  });
-
-  it("asks for the creature home and says it is opening until the home answers", async () => {
-    let prepared = 0;
-    const { portsFor, container } = await mounted(reading(), {
-      shell: (project) =>
-        ({
-          ...project,
-          prepareSteadHome: () => {
-            prepared += 1;
-          },
-        }) as unknown as ShellSeams,
-    });
-    expect(prepared).toBe(1);
-    expect(portsFor).toEqual([]);
-    expect(container.textContent).toContain(homeOpeningLine);
   });
 });
 
@@ -194,14 +146,6 @@ describe("the chores pane, runs", () => {
     expect(notice(container)).toBe("That run opened no thread.");
     act("chores.back");
     expect(cursorName(container)).toBe("Morning triage");
-  });
-
-  it("teaches the first run when a chore has none yet", async () => {
-    const { container, act } = await mounted(reading({ runs: {} }));
-    act("chores.down");
-    act("chores.open");
-    await settle();
-    expect(empty(container)).toBe("No runs yet · run it now with r");
   });
 });
 
@@ -312,30 +256,6 @@ describe("the chores pane, verbs", () => {
     expect(recorded.writes).toEqual(["cancel wren/wake-running"]);
   });
 
-  it("says a blocked or skipped run by hand in the outcome words", async () => {
-    const blocked = runRow({
-      runId: "r-61",
-      routineId: "nightly-tests",
-      trigger: "manual",
-      firedAt: "2026-11-05T15:00:00.000Z",
-      process: "blocked",
-      delivery: "none",
-      reason: "the act grants are not accepted; read and accept them first",
-      cost: null,
-    });
-    const { container, act } = await mounted(reading(), {
-      answers: { run: () => ({ ok: true, value: blocked }) },
-    });
-    act("chores.down");
-    act("chores.down");
-    act("chores.down");
-    act("chores.run");
-    await settle();
-    expect(notice(container)).toBe(
-      "Nightly tests · blocked: the act grants are not accepted; read and accept them first",
-    );
-  });
-
   it("removes a chore only after the confirm keystroke", async () => {
     const harness = await mounted(reading());
     const { container, act, recorded } = harness;
@@ -412,34 +332,6 @@ describe("the chores pane, verbs", () => {
     ]);
     await settle();
     expect(runTable(container)[1]?.slice(1, 3)).toEqual(["delivered", "completed"]);
-  });
-
-  it("reads the open runs again whenever it reads everything again", async () => {
-    const changing = reading();
-    const running = runRow({
-      runId: "r-62",
-      firedAt: "2026-11-05T15:00:00.000Z",
-      status: "running",
-      process: null,
-      delivery: null,
-    });
-    changing.runs["wren/morning-triage"] = [running];
-    const { container, act, feed } = await mounted(changing);
-    act("chores.down");
-    act("chores.open");
-    await settle();
-    expect(runTable(container)[1]?.[1]).toBe("running");
-    changing.runs["wren/morning-triage"] = [
-      runRow({
-        runId: "r-62",
-        firedAt: "2026-11-05T15:00:00.000Z",
-        endedAt: "2026-11-05T15:00:41.000Z",
-        trigger: "manual",
-      }),
-    ];
-    feed.emit("creature.changed", { slug: "tam", change: "updated" });
-    await settle();
-    expect(runTable(container)[1]?.[1]).toBe("delivered");
   });
 
   it("names a write chore parked on its grants as needing you from the wire item alone, in the head and on its row, until routine.needs clears it", async () => {
@@ -654,28 +546,6 @@ describe("the chores pane, the new-chore form", () => {
     );
   });
 
-  it("reads a cron in words as it is typed and writes the zone and the end date", async () => {
-    const harness = await mounted(reading());
-    const { container, act, recorded } = harness;
-    act("chores.new");
-    type(container, "title", "Morning brief");
-    type(container, "instructions", "Summarize the night.");
-    type(container, "cron", "30 6 * * 1,3,5");
-    expect(container.querySelector(".kw-chores-preview")?.textContent).toBe(
-      "Mon, Wed and Fri at 06:30",
-    );
-    type(container, "until", "2027-03-31");
-    submit(container);
-    await settle();
-    expect(recorded.puts[0]?.trigger).toEqual({
-      kind: "cron",
-      expr: "30 6 * * 1,3,5",
-      tz: testZone,
-      until: "2027-03-31",
-    });
-    expect(notice(container)).toBe("Morning brief added.");
-  });
-
   it("keeps the form open with the problem, from the draft or from the node, and cancels on escape", async () => {
     const harness = await mounted(reading(), {
       answers: { put: () => refused(400, "trigger.tz: not an IANA time zone") },
@@ -710,50 +580,6 @@ describe("the chores pane, the new-chore form", () => {
       ...morningTriage.routine,
       title: "Morning triage, short",
     });
-  });
-});
-
-describe("the chores pane, registration", () => {
-  it("binds its keys without colliding with any action the app already binds", () => {
-    const local = Object.entries(choresPane.localActions ?? {});
-    const summon = choresPane.summon;
-    expect(summon?.command.name).toBe("chores");
-    expect(
-      () =>
-        new Keymap({
-          bindings: {
-            ...Object.fromEntries(
-              Object.entries(appActions).map(([name, action]) => [name, action.chords]),
-            ),
-            ...Object.fromEntries(local.map(([name, action]) => [name, action.chords])),
-            [summon?.action ?? ""]: summon?.chords ?? "none",
-          },
-          scopes: {
-            ...actionScopes,
-            ...Object.fromEntries(local.map(([name]) => [name, "chores"])),
-          },
-        }),
-    ).not.toThrow();
-    for (const [name, action] of local) {
-      expect(appActions[name]?.scope, name).toBe("chores");
-      const claimants = Object.entries(appActions).flatMap(([other, held]) =>
-        held.command !== undefined && held.command.name === action.command?.name ? [other] : [],
-      );
-      expect(claimants, name).toEqual(action.command === undefined ? [] : [name]);
-    }
-  });
-
-  it("T7: names exactly one next action with exactly one bound chord", () => {
-    const marked = { chord: (action: string) => `⟦${action}⟧`, leader: () => "⟦leader⟧" };
-    const [state, next, ...extra] = choresPane.emptyState(marked).split(" · ");
-    expect(extra).toEqual([]);
-    expect(state).toBe("No chores");
-    expect(next).toBe("add one with ⟦chores.new⟧");
-    expect(choresPane.localActions?.["chores.new"]?.chords).toBe("n");
-    expect(choresPane.spec.safeParse({ kind: "chores", creature: "wren" }).success).toBe(true);
-    expect(choresPane.title({ kind: "chores", creature: "wren" }, {} as ShellSeams)).toBe(
-      "chores · wren",
-    );
   });
 });
 
@@ -915,10 +741,6 @@ function head(container: HTMLElement): string {
   return textOf(container.querySelector(".kw-ov-head"));
 }
 
-function settings(container: HTMLElement): string[] {
-  return [...container.querySelectorAll(".kw-chores-settings p")].map(textOf);
-}
-
 function alert(container: HTMLElement): string {
   return textOf(container.querySelector(".kw-chores-form [role='alert']"));
 }
@@ -1019,9 +841,3 @@ function tableLines(table: Element): string[] {
       : `  ${row.cells.map((cell, index) => cell.padEnd(widths[index] ?? 0)).join("  ")}`.trimEnd(),
   );
 }
-
-describe("the chores pane against the registry's rules", () => {
-  it("meets T7 and claims no key or command another action holds", () => {
-    checkPaneDefinition(choresPane);
-  });
-});

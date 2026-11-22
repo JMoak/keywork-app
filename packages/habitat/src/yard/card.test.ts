@@ -5,7 +5,6 @@ import { projectAll } from "../world/project.ts";
 import { emptyHabitat } from "../world/types.ts";
 import { yardCard } from "./card.ts";
 import { admitUnfold, unfoldBudget, unfoldsSpent } from "./gate.ts";
-import { yardIds } from "./place.ts";
 import { stepYard } from "./step.ts";
 import { aSetting, askedIn, calm, isoAt, noon, proposed } from "./testing.ts";
 import { emptyYard, type YardBudget, type YardOwner, type YardState, yardOf } from "./types.ts";
@@ -17,19 +16,6 @@ function withBudget(budget: YardBudget): YardState {
 }
 
 describe("the yard's own card", () => {
-  it("reads an untouched yard as every unfold free now, with nothing decided", () => {
-    expect(yardCard(emptyYard, noon)).toEqual({
-      id: yardIds.card,
-      used: 0,
-      limit: unfoldBudget.unfolds,
-      windowMs: unfoldBudget.windowMs,
-      nextFreeAt: noon,
-      cooldowns: [],
-      decisions: [],
-      attended: [],
-    });
-  });
-
   it("shows the unfolds spent, the cooling owners and the last decisions after a step", () => {
     const stream = [
       proposed(1, aSetting({ id: "a", rung: "unfold", at: isoAt(noon) })),
@@ -49,13 +35,6 @@ describe("the yard's own card", () => {
       "its owner just opened another",
     ]);
     expect(yardCard(yard, noon + 5 * second + unfoldBudget.cooldownMs).cooldowns).toEqual([]);
-  });
-
-  it("names when the next unfold is free once the ceiling is reached", () => {
-    const six = Array.from({ length: 6 }, (_, index) => noon - 9 * minute + index * minute);
-    const card = yardCard(withBudget({ played: six }), noon);
-    expect(card.used).toBe(6);
-    expect(card.nextFreeAt).toBe(noon + minute);
   });
 });
 

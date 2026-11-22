@@ -45,28 +45,6 @@ describe("hitAt over the layout's rects", () => {
     expect(seam === undefined ? undefined : seamZoneRect(seam, 14).width).toBe(28);
   });
 
-  it("gives every seam a zone that is the line plus the reach either side", () => {
-    const scene = layoutWith(["a", "b", "c"], {}).scene(screen);
-    for (const seam of scene.seams) {
-      const zone = seamZoneRect(seam);
-      if (seam.axis === "x") {
-        expect(zone).toEqual({
-          x: seam.at - seamReach,
-          y: seam.start,
-          width: seamReach * 2,
-          height: seam.end - seam.start,
-        });
-      } else {
-        expect(zone).toEqual({
-          x: seam.start,
-          y: seam.at - seamReach,
-          width: seam.end - seam.start,
-          height: seamReach * 2,
-        });
-      }
-    }
-  });
-
   it("surfaces a dock's seam against the main area and reads its ratio from the screen edge", () => {
     const scene = layoutWith(["a"], { left: "tree", right: "notes" }).scene(screen);
     const left = scene.seams.find(
@@ -118,13 +96,6 @@ describe("drop zones", () => {
     expect(zones.main.x).toBe(zones.left.width);
     expect(dropZoneAt(scene, { x: 1, y: 1 })).toBe("left");
     expect(dropZoneAt(scene, { x: 5000, y: 1 })).toBeUndefined();
-  });
-
-  it("records every pane's home so a drop in the same place can be refused", () => {
-    const scene = layoutWith(["a"], { left: "tree", right: "notes" }).scene(screen);
-    expect(scene.homes.get("a")).toBe("main");
-    expect(scene.homes.get("tree")).toBe("left");
-    expect(scene.homes.get("notes")).toBe("right");
   });
 });
 

@@ -137,46 +137,6 @@ describe("the body never lies about the state", () => {
       place: "bench",
     },
     {
-      name: "hammering while bash runs",
-      inputs: [
-        envelope("turn.started", { userText: "go" }, t0),
-        envelope("tool.started", { call: call("c1", "bash", { command: "make" }) }, t0 + 1),
-      ],
-      clip: "hammer",
-      glyph: "dot",
-      place: "bench",
-    },
-    {
-      name: "reading while read runs",
-      inputs: [
-        envelope("turn.started", { userText: "go" }, t0),
-        envelope("tool.started", { call: call("c1", "read", { path: "a" }) }, t0 + 1),
-      ],
-      clip: "read",
-      glyph: "dot",
-      place: "bench",
-    },
-    {
-      name: "carving while edit runs",
-      inputs: [
-        envelope("turn.started", { userText: "go" }, t0),
-        envelope("tool.started", { call: call("c1", "edit", { path: "a" }) }, t0 + 1),
-      ],
-      clip: "carve",
-      glyph: "dot",
-      place: "bench",
-    },
-    {
-      name: "blocked after an error",
-      inputs: [
-        envelope("turn.started", { userText: "go" }, t0),
-        envelope("engine.error", { error: { name: "E", message: "boom" } }, t0 + 1),
-      ],
-      clip: "blocked",
-      glyph: "cross",
-      place: "bench",
-    },
-    {
       name: "waiting at the porch on an ask",
       inputs: [
         envelope("turn.started", { userText: "go" }, t0),
@@ -196,23 +156,6 @@ describe("the body never lies about the state", () => {
       clip: "wait",
       glyph: "bell",
       place: "porch",
-    },
-    {
-      name: "paused on the stool when the provider says wait",
-      inputs: [
-        envelope("turn.started", { userText: "go" }, t0),
-        ranch("turn.waiting", { sessionId: "s1", reason: "overloaded" }, t0 + 1),
-      ],
-      clip: "sit",
-      glyph: "pause",
-      place: "bench",
-    },
-    {
-      name: "idle when nothing holds",
-      inputs: [],
-      clip: "idle",
-      glyph: "none",
-      place: "bench",
     },
   ];
 
@@ -358,16 +301,6 @@ describe("arrivals", () => {
     expect(places.lastIndexOf("porch")).toBeGreaterThan(left);
   });
 
-  it("carries and delivers a crate for a finished turn even when nothing changed", () => {
-    const world = stead([
-      envelope("turn.started", { userText: "say hi" }, t0),
-      envelope("turn.completed", { message: said("Hi."), usage }, t0 + 1),
-    ]);
-    const poses = trace(createCreature("tinker", t0), world, t0, 10 * second);
-    expect(clipsOf(poses)).toEqual(["idle", "carry", "deliver", "celebrate", "idle"]);
-    expect(poses.at(-1)).toMatchObject({ place: "porch", glyph: "check", state: "back" });
-  });
-
   it("shows a sub-second tool for a full beat where it stands before walking back to the bench", () => {
     const asked = stead([
       envelope("turn.started", { userText: "go" }, t0),
@@ -394,21 +327,6 @@ describe("arrivals", () => {
     expect(hammering.length * 50).toBeGreaterThanOrEqual(toolBeatMs - quickMs);
     expect(hammering.every((pose) => pose.x === slotOf("porch"))).toBe(true);
     expect(poses.at(-1)).toMatchObject({ clip: "work", place: "bench" });
-  });
-
-  it("draws a hundred-millisecond read at the bench for a beat, then works on", () => {
-    const working = stead([envelope("turn.started", { userText: "go" }, t0)]);
-    const atTheBench = settle(createCreature("tinker", t0), working, t0, 3 * second);
-    const readAt = t0 + 3 * second;
-    const read = projectAll(working, [
-      envelope("tool.started", { call: call("c2", "read", { path: "a.md" }) }, readAt),
-      envelope("tool.finished", { callId: "c2", output: "...", isError: false }, readAt + 100),
-    ]);
-    const poses = trace(atTheBench, read, readAt, 3 * second, quietContext, 50);
-    expect(clipsOf(poses)).toEqual(["work", "read", "work"]);
-    expect(poses.filter((pose) => pose.clip === "read").length * 50).toBeGreaterThanOrEqual(
-      toolBeatMs - quickMs,
-    );
   });
 
   it("stumbles once on a tool error and goes on working", () => {
@@ -484,24 +402,6 @@ describe("idle is where the character lives", () => {
     expect(creature.decisions.length).toBeLessThanOrEqual(32);
     expect(creature.decisions.every((decision) => decision.verdict === "play")).toBe(true);
     expect(creature.beats).toBeGreaterThanOrEqual(starts.length);
-  });
-
-  it("keeps living on the rest tier: an unfocused, still pane sees the same beats, each passing the gate", () => {
-    const resting: StepContext = { ...quietContext, focused: false, tier: "rest" };
-    const world = stead();
-    let creature = createCreature("tinker", t0);
-    const starts: IdleKind[] = [];
-    for (let at = t0 + second; at <= t0 + 10 * minute; at += second) {
-      const next = step(creature, world, at, resting);
-      if (next.activity !== undefined && next.activity !== creature.activity) {
-        starts.push(next.activity.choice.kind);
-      }
-      creature = next;
-    }
-    expect(starts.length).toBeGreaterThanOrEqual(5);
-    expect(new Set(starts).size).toBeGreaterThanOrEqual(2);
-    expect(creature.decisions.every((decision) => decision.verdict === "play")).toBe(true);
-    expect(creature.decisions.some((decision) => decision.lane === "ambient")).toBe(true);
   });
 
   it("wanders only through open gates, never a latched one", () => {

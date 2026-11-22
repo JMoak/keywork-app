@@ -19,10 +19,6 @@ function eventsOf(console: FakeConsoleWindow, kind: SurfaceEvent["kind"]): Surfa
   return console.events().filter((event) => event.kind === kind);
 }
 
-function aTurn(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 describe("a window the console opens for a pane", () => {
   it("is registered under its frame name, kept hidden, and announced ready to its console", () => {
     const bench = surfaceBench();
@@ -61,16 +57,6 @@ describe("a window the console opens for a pane", () => {
       bench.ports.ipc.invoke(surfaceChannels.show, { id: 999 }, { id: "kw-surface:1" }),
     ).rejects.toThrow("only a console window keeps panes outside itself");
     await expect(bench.ports.ipc.invoke(surfaceChannels.desk, { id: 999 })).rejects.toThrow();
-  });
-
-  it("refuses to show or focus a pane it does not hold, and shrugs at hiding or closing one", async () => {
-    const bench = surfaceBench();
-    await expect(bench.show({ id: "kw-surface:9" })).rejects.toThrow(
-      'no pane outside the window answers to "kw-surface:9"',
-    );
-    await expect(bench.ask(surfaceChannels.focus, "kw-surface:9")).rejects.toThrow();
-    await expect(bench.ask(surfaceChannels.hide, "kw-surface:9")).resolves.toBeUndefined();
-    await expect(bench.ask(surfaceChannels.close, "kw-surface:9")).resolves.toBeUndefined();
   });
 });
 
@@ -120,18 +106,6 @@ describe("showing a pane outside", () => {
     expect(window.getBounds()).toEqual({ x: 1500, y: 200, width: 400, height: 300 });
   });
 
-  it("hides back to a live hidden window that can be shown again", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1" });
-    await bench.ask(surfaceChannels.hide, "kw-surface:1");
-    expect(window.visible).toBe(false);
-    expect(window.destroyed).toBe(false);
-    await bench.show({ id: "kw-surface:1" });
-    expect(window.visible).toBe(true);
-    expect(eventsOf(bench.console, "closed")).toEqual([]);
-  });
-
   it("focuses a pane or the console when asked, and relays focus coming and going", async () => {
     const bench = surfaceBench();
     const window = bench.open("kw-surface:1");
@@ -161,79 +135,6 @@ describe("gliding", () => {
     expect(window.calls.slice(1).every((call) => call.startsWith("setPosition:"))).toBe(true);
     expect(window.calls.length).toBeGreaterThan(10);
     expect(window.getBounds()).toEqual(beside);
-  });
-
-  it("answers only once every pane in it has come to rest", async () => {
-    const bench = surfaceBench();
-    bench.open("kw-surface:1");
-    let settled = false;
-    void bench
-      .ask(surfaceChannels.glide, {
-        moves: [{ id: "kw-surface:1", bounds: beside }],
-        durationMs: 200,
-      })
-      .then(() => {
-        settled = true;
-      });
-    bench.ports.clock.advance(190);
-    await aTurn();
-    expect(settled).toBe(false);
-    bench.ports.clock.advance(20);
-    await aTurn();
-    expect(settled).toBe(true);
-  });
-
-  it("moves every pane of the request together and skips one it does not hold", async () => {
-    const bench = surfaceBench();
-    const first = bench.open("kw-surface:1");
-    const second = bench.open("kw-surface:2");
-    const home = { x: 300, y: 300, width: 500, height: 400 };
-    const settled = bench.ask(surfaceChannels.glide, {
-      moves: [
-        { id: "kw-surface:1", bounds: beside },
-        { id: "kw-surface:gone", bounds: beside },
-        { id: "kw-surface:2", bounds: home },
-      ],
-      durationMs: 160,
-    });
-    bench.ports.clock.advance(200);
-    await settled;
-    expect(first.getBounds()).toEqual(beside);
-    expect(second.getBounds()).toEqual(home);
-  });
-
-  it("jumps when given no time", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: beside }],
-      durationMs: 0,
-    });
-    expect(window.getBounds()).toEqual(beside);
-    expect(window.calls).toEqual([
-      `setBounds:${spawnBounds.x},${spawnBounds.y},400x300`,
-      "setPosition:1500,200",
-    ]);
-  });
-
-  it("hands a pane to its newest glide and lets the older one answer", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    const out = bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: beside }],
-      durationMs: 200,
-    });
-    bench.ports.clock.advance(40);
-    const turnedAt = window.getBounds();
-    const home = bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: { ...beside, x: 300, y: 300 } }],
-      durationMs: 200,
-    });
-    await out;
-    bench.ports.clock.advance(250);
-    await home;
-    expect(turnedAt.x).toBeGreaterThan(spawnBounds.x);
-    expect(window.getBounds()).toEqual({ ...beside, x: 300, y: 300 });
   });
 
   it("reports where the host moved a pane, a few times on the way and once at rest", async () => {
@@ -277,22 +178,6 @@ describe("gliding", () => {
     expect(shown.getBounds()).toEqual(paneBounds);
     expect(closed.destroyed).toBe(true);
   });
-
-  it("lets go of a pane the keeper grabs on the way, and carries the others on", async () => {
-    const bench = surfaceBench();
-    const grabbed = bench.open("kw-surface:1");
-    const other = bench.open("kw-surface:2");
-    const settled = bench.ask(surfaceChannels.glide, {
-      moves: ["kw-surface:1", "kw-surface:2"].map((id) => ({ id, bounds: beside })),
-      durationMs: 200,
-    });
-    bench.ports.clock.advance(40);
-    grabbed.keeperDragsTo({ x: 40, y: 60 });
-    bench.ports.clock.advance(300);
-    await settled;
-    expect(grabbed.getBounds()).toMatchObject({ x: 40, y: 60 });
-    expect(other.getBounds()).toEqual(beside);
-  });
 });
 
 describe("a pane the keeper moves", () => {
@@ -318,16 +203,6 @@ describe("a pane the keeper moves", () => {
     });
   });
 
-  it("is the keeper's when the desktop moves it with no grab the host could see", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1" });
-    bench.ports.clock.advance(newsEveryMs);
-    window.desktopMovesTo({ x: 2200, y: 300 });
-    bench.ports.clock.advance(newsEveryMs);
-    expect(eventsOf(bench.console, "moved").at(-1)).toMatchObject({ by: "keeper" });
-  });
-
   it("is the keeper's when a host placement and a keeper move share one report", async () => {
     const bench = surfaceBench();
     const window = bench.open("kw-surface:1");
@@ -336,32 +211,6 @@ describe("a pane the keeper moves", () => {
     bench.ports.clock.advance(newsEveryMs);
     expect(eventsOf(bench.console, "moved")).toEqual([
       { kind: "moved", id: "kw-surface:1", bounds: { ...paneBounds, x: 80, y: 80 }, by: "keeper" },
-    ]);
-  });
-
-  it("reports a resize by its edges the same way", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1" });
-    bench.ports.clock.advance(newsEveryMs);
-    const wider = { ...paneBounds, width: 640 };
-    window.keeperResizesTo(wider);
-    window.keeperLetsGo();
-    expect(eventsOf(bench.console, "moved").at(-1)).toEqual({
-      kind: "moved",
-      id: "kw-surface:1",
-      bounds: wider,
-      by: "keeper",
-    });
-  });
-
-  it("reports a placement of the host's as the host's", async () => {
-    const bench = surfaceBench();
-    bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1", bounds: beside });
-    bench.ports.clock.advance(newsEveryMs);
-    expect(eventsOf(bench.console, "moved")).toEqual([
-      { kind: "moved", id: "kw-surface:1", bounds: beside, by: "host" },
     ]);
   });
 });
@@ -407,17 +256,6 @@ describe("a pane that follows the console", () => {
     expect(follower.getBounds()).toMatchObject({ x: 900, y: 500 });
   });
 
-  it("follows again when it is shown again as a follower", async () => {
-    const bench = surfaceBench();
-    const follower = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1", follows: true });
-    follower.keeperDragsTo({ x: 900, y: 500 });
-    follower.keeperLetsGo();
-    await bench.show({ id: "kw-surface:1", follows: true });
-    bench.console.movesTo({ x: consoleBounds.x + 10, y: consoleBounds.y });
-    expect(follower.getBounds().x).toBe(paneBounds.x + 10);
-  });
-
   it("stays put while hidden, when the console only changes size, or while it is minimised", async () => {
     const bench = surfaceBench();
     const hidden = bench.open("kw-surface:1");
@@ -445,17 +283,6 @@ describe("a pane that follows the console", () => {
 });
 
 describe("the desk", () => {
-  it("is read on request: the console, its work area, the displays and the cursor", async () => {
-    const bench = surfaceBench();
-    await expect(bench.ask(surfaceChannels.desk)).resolves.toEqual({
-      console: consoleSeen,
-      consoleMaximized: false,
-      workArea: laptop.workArea,
-      displays: bench.ports.screen.displays(),
-      cursor: { x: 640, y: 480 },
-    });
-  });
-
   it("is pushed once per beat while the console is dragged, with where it ended up", async () => {
     const bench = surfaceBench();
     await bench.ask(surfaceChannels.desk);
@@ -486,29 +313,9 @@ describe("the desk", () => {
     bench.ports.clock.advance(newsEveryMs);
     expect(bench.console.desks()).toHaveLength(1);
   });
-
-  it("costs no timer while nothing moves", async () => {
-    const bench = surfaceBench();
-    bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1", follows: true });
-    bench.ports.clock.advance(60_000);
-    const quiet = bench.console.sent.length;
-    bench.ports.clock.advance(60_000);
-    expect(bench.console.sent).toHaveLength(quiet);
-  });
 });
 
 describe("the end of a pane outside", () => {
-  it("keeps the window when the desktop asks to close it: hidden, alive, and reported closed", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1" });
-    expect(window.desktopAsksToClose()).toBe("kept");
-    expect(window.visible).toBe(false);
-    expect(window.destroyed).toBe(false);
-    expect(eventsOf(bench.console, "closed")).toEqual([{ kind: "closed", id: "kw-surface:1" }]);
-  });
-
   it("lets that window go once the page says its pane is home, and not before", async () => {
     const bench = surfaceBench();
     const leaving = bench.open("kw-surface:1");
@@ -544,14 +351,6 @@ describe("the end of a pane outside", () => {
     await expect(bench.show({ id: "kw-surface:1" })).rejects.toThrow();
   });
 
-  it("reports a window that was destroyed behind its back", () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    window.destroy();
-    expect(eventsOf(bench.console, "closed")).toEqual([{ kind: "closed", id: "kw-surface:1" }]);
-    expect(bench.service.holds(window.contentsId)).toBe(false);
-  });
-
   it("closes every pane of a console whose page reloads or crashes, and serves the new page", () => {
     const bench = surfaceBench();
     const other = bench.openConsole();
@@ -564,18 +363,6 @@ describe("the end of a pane outside", () => {
     const fresh = bench.open("kw-surface:1");
     expect(fresh.destroyed).toBe(false);
     expect(eventsOf(bench.console, "ready")).toHaveLength(3);
-  });
-
-  it("closes every pane when its console closes, and lets them go without a fight", async () => {
-    const bench = surfaceBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show({ id: "kw-surface:1", follows: true });
-    bench.console.movesTo({ x: 300, y: 100 });
-    const said = bench.console.sent.length;
-    bench.console.closes();
-    expect(window.destroyed).toBe(true);
-    bench.ports.clock.advance(10 * newsEveryMs);
-    expect(bench.console.sent).toHaveLength(said);
   });
 
   it("stops keeping windows open once the app is quitting", async () => {
@@ -713,46 +500,6 @@ describe("gliding with the helper in use", () => {
     expect(window.calls).toHaveLength(1);
   });
 
-  it("answers only once the helper says every pane has come to rest", async () => {
-    const bench = helpedBench();
-    bench.open("kw-surface:1");
-    let settled = false;
-    void bench
-      .ask(surfaceChannels.glide, {
-        moves: [{ id: "kw-surface:1", bounds: beside }],
-        durationMs: 200,
-      })
-      .then(() => {
-        settled = true;
-      });
-    bench.ports.clock.advance(210);
-    await aTurn();
-    expect(settled).toBe(false);
-    bench.helperLands();
-    await aTurn();
-    expect(settled).toBe(true);
-  });
-
-  it("asks the helper to jump when given no time, and leaves a maximised pane out", async () => {
-    const bench = helpedBench();
-    const maximised = bench.open("kw-surface:1");
-    const other = bench.open("kw-surface:2");
-    await bench.show({ id: "kw-surface:1" });
-    await bench.show({ id: "kw-surface:2" });
-    maximised.keeperMaximisesOver(laptop.workArea);
-    const settled = bench.ask(surfaceChannels.glide, {
-      moves: ["kw-surface:1", "kw-surface:2"].map((id) => ({ id, bounds: beside })),
-      durationMs: 0,
-    });
-    expect(bench.pipes.written.filter((line) => line.startsWith("glide "))).toEqual([
-      `glide 1 0 ${other.nativeHandle()}@${paneBounds.x},${paneBounds.y}>${beside.x},${beside.y}`,
-    ]);
-    bench.helperLands();
-    await settled;
-    expect(other.getBounds()).toEqual(beside);
-    expect(maximised.getBounds()).toEqual(laptop.workArea);
-  });
-
   it("reports the helper's moves as the host's, on the way and at rest", async () => {
     const bench = helpedBench();
     bench.open("kw-surface:1");
@@ -811,25 +558,6 @@ describe("gliding with the helper in use", () => {
     );
   });
 
-  it("lets go of a pane that is hidden, shown elsewhere or closed on the way", async () => {
-    const bench = helpedBench();
-    const hidden = bench.open("kw-surface:1");
-    const shown = bench.open("kw-surface:2");
-    const closed = bench.open("kw-surface:3");
-    const releases = [hidden, shown, closed].map((window) => `release ${window.nativeHandle()}`);
-    const settled = bench.ask(surfaceChannels.glide, {
-      moves: ["kw-surface:1", "kw-surface:2", "kw-surface:3"].map((id) => ({ id, bounds: beside })),
-      durationMs: 200,
-    });
-    await bench.ask(surfaceChannels.hide, "kw-surface:1");
-    await bench.show({ id: "kw-surface:2", bounds: paneBounds });
-    await bench.ask(surfaceChannels.close, "kw-surface:3");
-    await settled;
-    expect(bench.pipes.written.filter((line) => line.startsWith("release "))).toEqual(releases);
-    expect(shown.getBounds()).toEqual(paneBounds);
-    expect(closed.destroyed).toBe(true);
-  });
-
   it("puts a pane back where it was shown when a move the helper had already made lands late", async () => {
     const bench = helpedBench();
     const window = bench.open("kw-surface:1");
@@ -861,63 +589,10 @@ describe("gliding with the helper in use", () => {
     bench.pipes.says("stats frames=3 missed=0 mean_us=90 worst_us=120");
     expect(window.getBounds()).toMatchObject({ x: 40, y: 60 });
   });
-
-  it("carries a glide on itself, from where each pane stands, when the helper goes away", async () => {
-    const bench = helpedBench();
-    const window = bench.open("kw-surface:1");
-    const settled = bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: beside }],
-      durationMs: 200,
-    });
-    bench.ports.clock.advance(60);
-    bench.helperCarries(bench.lastGlide(), 0.4);
-    const stoodAt = window.getBounds();
-    bench.pipes.ends();
-    bench.ports.clock.advance(200);
-    await settled;
-    expect(window.getBounds()).toEqual(beside);
-    const placed = window.calls.filter((call) => call.startsWith("setPosition:"));
-    expect(placed.length).toBeGreaterThan(3);
-    expect(Number(placed[0]?.slice("setPosition:".length).split(",")[0])).toBeGreaterThanOrEqual(
-      stoodAt.x,
-    );
-    expect(bench.said).toEqual(["the panes mover is retired for this session: its process ended"]);
-
-    const again = bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: paneBounds }],
-      durationMs: 160,
-    });
-    bench.ports.clock.advance(200);
-    await again;
-    expect(window.getBounds()).toEqual(paneBounds);
-    expect(bench.pipes.written.filter((line) => line.startsWith("glide "))).toHaveLength(1);
-  });
-
-  it("releases every gliding pane when the app is quitting", async () => {
-    const bench = helpedBench();
-    const window = bench.open("kw-surface:1");
-    const release = `release ${window.nativeHandle()}`;
-    const gliding = bench.ask(surfaceChannels.glide, {
-      moves: [{ id: "kw-surface:1", bounds: beside }],
-      durationMs: 200,
-    });
-    bench.service.dispose();
-    await gliding;
-    expect(bench.pipes.written.at(-1)).toBe(release);
-    expect(window.destroyed).toBe(true);
-  });
 });
 
 describe("the colour of a pane's frame", () => {
   const framed = { id: "kw-surface:1", frame: "#FF8800" };
-
-  it("is set on the window through the helper when a pane is shown with one", async () => {
-    const bench = helpedBench();
-    const window = bench.open("kw-surface:1");
-    await bench.show(framed);
-    expect(bench.pipes.written).toEqual([`border ${window.nativeHandle()} ff8800`]);
-    expect(window.visible).toBe(true);
-  });
 
   it("is none at all when a pane is shown with none, and given back to the system when it is hidden", async () => {
     const bench = helpedBench();
@@ -1124,18 +799,6 @@ describe("a window that is gone", () => {
     expect(bench.said).toEqual([]);
   });
 
-  it("is never touched when the helper goes away with a glide half done", async () => {
-    const bench = helpedBench();
-    const gone = bench.open("kw-surface:1");
-    const other = bench.open("kw-surface:2");
-    const settled = bench.ask(surfaceChannels.glide, { moves: everywhere, durationMs: 200 });
-    gone.destroy();
-    bench.pipes.ends();
-    expect(() => bench.ports.clock.advance(400)).not.toThrow();
-    await settled;
-    expect(other.getBounds()).toEqual(beside);
-  });
-
   it("is never touched when its console closes with a glide running and news still to tell", async () => {
     for (const bench of [surfaceBench(), helpedBench()]) {
       const window = bench.open("kw-surface:1");
@@ -1298,21 +961,5 @@ describe("playing a whole arrangement", () => {
     await settled;
     expect(first.getBounds()).toEqual(beside);
     expect(second.getBounds()).toEqual(wide);
-  });
-
-  it("reports the helper's sizing and moving as the host's", async () => {
-    const bench = helpedBench();
-    const window = bench.open("kw-surface:1");
-    const settled = bench.ask(surfaceChannels.play, { parts: [play.parts[0]] });
-    window.desktopShapesTo({ x: 900, y: 220, width: 600, height: 450 });
-    bench.ports.clock.advance(newsEveryMs);
-    bench.pipes.says("settled 1");
-    await settled;
-    bench.ports.clock.advance(newsEveryMs);
-    const movers = eventsOf(bench.console, "moved").map(
-      (event) => event.kind === "moved" && event.by,
-    );
-    expect(movers.length).toBeGreaterThan(0);
-    expect(new Set(movers)).toEqual(new Set(["host"]));
   });
 });

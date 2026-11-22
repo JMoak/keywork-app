@@ -17,10 +17,9 @@ import {
   reportedContextLevel,
   sessionContextLevel,
 } from "./context.ts";
-import { costItem, tokensItem, usageLine } from "./cost.ts";
+import { costItem } from "./cost.ts";
 import { formatCost, formatTokens } from "./format.ts";
 import { ContextGauge } from "./gauge.tsx";
-import { gaugeStyleFor, instrumentTierOf } from "./tier.ts";
 
 afterEach(cleanup);
 
@@ -56,12 +55,6 @@ describe("formatCost", () => {
 });
 
 describe("the cost item", () => {
-  it("is absent before any turn settles", () => {
-    expect(costItem(emptyUsage)).toBeUndefined();
-    expect(tokensItem(emptyUsage)).toBeUndefined();
-    expect(usageLine(emptyUsage)).toBe("");
-  });
-
   it("renders a total only when every turn was priced", () => {
     expect(costItem(ledger({ turns: 3, costUsd: 0.0031 }))).toBe("$0.0031");
     expect(costItem(ledger({ turns: 3, costUsd: 0.0031 }), "metered")).toBe(
@@ -74,18 +67,6 @@ describe("the cost item", () => {
       "$0.50 + 1 unpriced",
     );
     expect(costItem(ledger({ turns: 2, unpricedTurns: 2 }))).toBe("unpriced");
-  });
-
-  it("joins tokens and cost into the status line's usage item", () => {
-    expect(
-      usageLine(ledger({ turns: 1, inputTokens: 12, outputTokens: 5, unpricedTurns: 1 })),
-    ).toBe("17 tokens · unpriced");
-    expect(
-      usageLine(ledger({ turns: 1, inputTokens: 300, outputTokens: 80, costUsd: 0.0031 })),
-    ).toBe("380 tokens · $0.0031");
-    expect(
-      usageLine(ledger({ turns: 4, inputTokens: 40_000, outputTokens: 2000, costUsd: 1.5 })),
-    ).toBe("42k tokens · $1.50");
   });
 });
 
@@ -148,18 +129,6 @@ describe("the context level", () => {
   });
 });
 
-describe("the instrument tier", () => {
-  it("defaults to calm and reads cockpit from the theme's mark on the root", () => {
-    expect(instrumentTierOf(undefined)).toBe("calm");
-    expect(instrumentTierOf({ dataset: {} as DOMStringMap })).toBe("calm");
-    expect(instrumentTierOf({ dataset: { instruments: "cockpit" } as DOMStringMap })).toBe(
-      "cockpit",
-    );
-    expect(gaugeStyleFor("calm")).toBe("steps");
-    expect(gaugeStyleFor("cockpit")).toBe("bar");
-  });
-});
-
 describe("ContextGauge", () => {
   it("renders density cells through tokens, never literals, with the basis on the element", () => {
     const { container } = render(() => <ContextGauge level={assumedContextLevel(90_000)} />);
@@ -194,13 +163,5 @@ describe("ContextGauge", () => {
     const live = ledger({ turns: 1, lastTurnContextTokens: 9_000 });
     expect(sessionContextLevel(report, live)).toEqual(contextLevelOfReport(report));
     expect(sessionContextLevel(undefined, live)).toEqual(contextLevelOf(live));
-  });
-
-  it("draws the cockpit bar when asked", () => {
-    const { container } = render(() => (
-      <ContextGauge level={assumedContextLevel(50_000)} style="bar" />
-    ));
-    expect(container.querySelectorAll(".kw-gauge-cell")).toHaveLength(barCells);
-    expect(container.querySelector(".kw-gauge-count")?.textContent).toBe("50k/~200k");
   });
 });

@@ -8,13 +8,9 @@ import {
   commandLine,
   defaultShell,
   findOnPath,
-  idMinter,
-  launchFor,
   type PtyLaunch,
   type PtyProcess,
   type PtySeams,
-  processListing,
-  programsUnder,
   ptyHost,
   scrubEnv,
   windowsTreeKill,
@@ -40,21 +36,6 @@ describe("the default shell", () => {
   it("uses $SHELL elsewhere and falls back to /bin/sh", () => {
     expect(defaultShell("linux", { SHELL: "/usr/bin/fish" }, () => true)).toBe("/usr/bin/fish");
     expect(defaultShell("darwin", {}, () => true)).toBe("/bin/sh");
-  });
-
-  it("walks PATH entries in order and skips empty ones", () => {
-    const seen: string[] = [];
-    const found = findOnPath(
-      "pwsh.exe",
-      { PATH: `;${windowsPath};` },
-      (path) => {
-        seen.push(path);
-        return false;
-      },
-      "win32",
-    );
-    expect(found).toBeUndefined();
-    expect(seen).toHaveLength(2);
   });
 });
 
@@ -94,14 +75,6 @@ describe("target platform PATH lookup", () => {
       expect(seen).toEqual(["/opt/tools;beta/fish", "/usr/local/bin/fish"]);
     },
   );
-
-  it("keeps native platform behavior for callers that omit the platform", () => {
-    const directory = process.platform === "win32" ? "C:\\tools" : "/opt/tools";
-    const expected = process.platform === "win32" ? "C:\\tools\\shell" : "/opt/tools/shell";
-    const exists = vi.fn(() => true);
-    expect(findOnPath("shell", { PATH: directory }, exists)).toBe(expected);
-    expect(exists).toHaveBeenCalledExactlyOnceWith(expected);
-  });
 });
 
 describe("the command line", () => {
@@ -189,11 +162,6 @@ describe("chunk batching", () => {
 });
 
 describe("ids and tree kill", () => {
-  it("mints increasing ids from one", () => {
-    const ids = idMinter();
-    expect([ids.next(), ids.next(), ids.next()]).toEqual([1, 2, 3]);
-  });
-
   it("kills the whole tree with taskkill on Windows", () => {
     const run = vi.fn();
     windowsTreeKill(4242, run);
@@ -360,25 +328,6 @@ describe("the pty host", () => {
     const host = ptyHost(fake.seams);
     await host.open({ workspace: "/w", program: "shell", args: [], cols: 1, rows: 1 }, 1, silent);
     expect(await host.running(1, 1)).toEqual([]);
-  });
-
-  it("lists processes with ps outside Windows and through CIM on Windows", () => {
-    expect(processListing("linux")).toEqual({
-      command: "ps",
-      args: ["-A", "-o", "pid=,ppid=,comm="],
-    });
-    expect(processListing("win32").command).toBe("powershell.exe");
-    expect(programsUnder(12, "  30   12 /usr/bin/python3\n  31   13 less\n")).toEqual(["python3"]);
-  });
-
-  it("names the launch after the shell binary", async () => {
-    const fake = fakeSeams("linux");
-    fake.seams.env = { SHELL: "/usr/bin/zsh" };
-    const launch = await launchFor(
-      { workspace: "/w", program: "shell", args: [], cols: 1, rows: 1 },
-      fake.seams,
-    );
-    expect(launch.file).toBe("/usr/bin/zsh");
   });
 });
 

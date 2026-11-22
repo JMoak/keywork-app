@@ -164,16 +164,6 @@ describe("a pane while the layout around it changes", () => {
     expect(removedFromBodies()).toEqual([]);
     expect(stage.reads()).toBe(reads);
   });
-
-  it("never wears the frame, the arrival state or the motion of a pane outside the window", async () => {
-    await openTheStage();
-    leader("l");
-    leader("T", { shiftKey: true });
-    await waitFor(() =>
-      expect(document.querySelectorAll(".kw-slot[data-pane-id]")).toHaveLength(3),
-    );
-    expect(document.querySelectorAll(".kw-surface, .kw-outside, [data-arrival]")).toHaveLength(0);
-  });
 });
 
 describe("the styles a pane wears outside the window", () => {

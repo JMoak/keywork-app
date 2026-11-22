@@ -3,25 +3,13 @@ import { join } from "node:path";
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
-import { assumedContextLevel } from "../instruments/context.ts";
 import type { Outfit } from "../theme/attire.ts";
 import { keyworkDay, keyworkNight } from "../theme/themes.ts";
-import { hueStop, type LifecycleState, PaneFrame, stampGlyph, tileFill } from "./pane-frame.tsx";
-import { chromeWeights } from "./root-attributes.ts";
-import { paneMark, quietMark, TitleRow } from "./title-row.tsx";
+import { hueStop, PaneFrame } from "./pane-frame.tsx";
 
 afterEach(cleanup);
 
-const states: LifecycleState[] = ["idle", "working", "needs-you", "finished-unseen", "failed"];
-
 describe("stampGlyph", () => {
-  it("gives every lifecycle state a mark that reads in monochrome", () => {
-    const marks = states.map((state) => stampGlyph(state));
-    expect(marks).toEqual([" ", "▌", "█", "█", "▛"]);
-    expect(stampGlyph("working", 3)).toBe("█");
-    expect(tileFill.at(-1)).toBe("█");
-  });
-
   it("sweeps the ramp by spawn rank and wraps", () => {
     expect([0, 1, 2, 3, 4, 7, 8, 9].map(hueStop)).toEqual([1, 2, 3, 4, 5, 8, 1, 2]);
   });
@@ -79,17 +67,6 @@ describe("PaneFrame", () => {
     expect(heading.getAttribute("title")).toBe("a long session name");
   });
 
-  it("omits the mode word and telemetry when absent and blanks the idle stamp", () => {
-    const { container } = render(() => (
-      <PaneFrame name="quiet" state="idle" focused={false} spawnRank={0}>
-        <p>body</p>
-      </PaneFrame>
-    ));
-    expect(container.querySelector(".kw-frame-mode")).toBeNull();
-    expect(container.querySelector(".kw-frame-telemetry")).toBeNull();
-    expect(container.querySelector(".kw-frame-stamp")?.textContent).toBe(" ");
-  });
-
   it("outlines a signalled setting in the signal's colour, and draws nothing extra at rest", () => {
     const [signal, setSignal] = createSignal<"needs-you" | "critical" | undefined>("needs-you");
     const { container } = render(() => (
@@ -109,15 +86,6 @@ describe("PaneFrame", () => {
     expect(frame.querySelector(".kw-frame-signal")).toBeNull();
   });
 
-  it("inks a signal amber, and red only when it is critical", () => {
-    const css = readFileSync(join(process.cwd(), "packages/ui/src/chrome/pane-frame.css"), "utf8");
-    expect(css).toMatch(/\.kw-frame \{\s*--kw-frame-signal-ink: var\(--kw-terminal-yellow\);/);
-    expect(css).toMatch(
-      /\.kw-frame\[data-signal="critical"\] \{\s*--kw-frame-signal-ink: var\(--kw-error\);/,
-    );
-    expect(css).toMatch(/box-shadow: inset 0 0 0 2px var\(--kw-frame-signal-ink\);/);
-  });
-
   it("calls onFocus when the frame is pressed", () => {
     let focused = 0;
     const { container } = render(() => (
@@ -132,77 +100,11 @@ describe("PaneFrame", () => {
   });
 });
 
-describe("PaneFrame instruments", () => {
-  it("draws the context gauge in the telemetry slot beside the usage text", () => {
-    const { container } = render(() => (
-      <PaneFrame
-        name="fix the tests"
-        state="idle"
-        focused={false}
-        spawnRank={0}
-        telemetry="380 tokens · $0.0031"
-        context={assumedContextLevel(90_000)}
-      >
-        <p>body</p>
-      </PaneFrame>
-    ));
-    const slot = container.querySelector(".kw-frame-telemetry") as HTMLElement;
-    const gauge = slot.querySelector(".kw-gauge") as HTMLElement;
-    expect(gauge.querySelector(".kw-gauge-cells")?.textContent).toBe("░▒··");
-    expect(gauge.querySelector(".kw-gauge-count")?.textContent).toBe("90k");
-    expect(gauge.querySelector(".kw-gauge-unit")?.textContent).toBe("in context");
-    expect(slot.textContent).toContain("380 tokens · $0.0031");
-  });
-
-  it("keeps the telemetry slot for the gauge alone when there is no usage text", () => {
-    const { container } = render(() => (
-      <PaneFrame
-        name="quiet"
-        state="idle"
-        focused={false}
-        spawnRank={0}
-        context={assumedContextLevel(1)}
-      >
-        <p>body</p>
-      </PaneFrame>
-    ));
-    expect(container.querySelector(".kw-frame-telemetry .kw-gauge")).toBeTruthy();
-  });
-});
-
 describe("PaneFrame chrome weights", () => {
   afterEach(async () => {
     document.documentElement.removeAttribute("data-chrome");
     await settled();
   });
-
-  for (const weight of chromeWeights) {
-    it(`renders the ${weight} weight the root asks for`, async () => {
-      document.documentElement.setAttribute("data-chrome", weight);
-      await settled();
-      const { container } = render(() => (
-        <>
-          <PaneFrame
-            name="focused"
-            state="needs-you"
-            focused
-            spawnRank={0}
-            modeWord="plan"
-            arc="pricing-v2"
-            bot={{ sigil: "◆", name: "reviewer" }}
-          >
-            <p>body</p>
-          </PaneFrame>
-          <PaneFrame name="resting" state="finished-unseen" focused={false} spawnRank={1}>
-            <p>body</p>
-          </PaneFrame>
-        </>
-      ));
-      const frames = [...container.querySelectorAll<HTMLElement>(".kw-frame")];
-      expect(frames.map((frame) => frame.dataset.chrome)).toEqual([weight, weight]);
-      expect(container.innerHTML).toMatchSnapshot();
-    });
-  }
 
   it("follows a weight change without remounting", async () => {
     const { container } = render(() => (
@@ -239,19 +141,6 @@ describe("PaneFrame outfits", () => {
     const mark = container.querySelector(".kw-frame-theme") as HTMLElement;
     expect(mark.textContent).toBe(keyworkDay.name);
     expect(mark.dataset.source).toBe("pane");
-  });
-
-  it("wears the house theme from the root and shows no theme mark", () => {
-    const { container } = render(() => (
-      <PaneFrame name="a" state="idle" focused={false} spawnRank={0} outfit={house}>
-        <p>body</p>
-      </PaneFrame>
-    ));
-    const frame = container.querySelector(".kw-frame") as HTMLElement;
-    expect(frame.hasAttribute("data-attire")).toBe(false);
-    expect(frame.hasAttribute("data-theme")).toBe(false);
-    expect(frame.style.getPropertyValue("--kw-panel")).toBe("");
-    expect(container.querySelector(".kw-frame-theme")).toBeNull();
   });
 
   it("undresses when the pane returns to the house theme and keeps its hue", () => {
@@ -291,55 +180,6 @@ describe("PaneFrame outfits", () => {
     expect(frame.style.getPropertyValue("--kw-house-border")).toBe("");
     document.documentElement.removeAttribute("data-chrome");
     await settled();
-  });
-
-  it("hides the theme mark below the column tier", () => {
-    const { container } = render(() => (
-      <TitleRow
-        name="a"
-        state="idle"
-        step={0}
-        focused
-        tier="clipping"
-        weight="seams"
-        themeMark={{ name: "nord", source: "pane" }}
-      />
-    ));
-    expect(container.querySelector(".kw-frame-theme")).toBeNull();
-  });
-
-  it("marks a marked pane before its name", () => {
-    const { container } = render(() => (
-      <PaneFrame name="a" state="idle" focused={false} spawnRank={0} marked>
-        <p>body</p>
-      </PaneFrame>
-    ));
-    const mark = container.querySelector(".kw-frame-mark") as HTMLElement;
-    expect(mark.getAttribute("aria-label")).toBe("marked");
-    expect(mark.textContent).toBe(paneMark);
-    expect(mark.nextElementSibling?.className).toBe("kw-frame-name");
-  });
-
-  it("carries the quiet mark in its title row when its session is quiet", () => {
-    const { container } = render(() => (
-      <PaneFrame name="a" state="needs-you" focused spawnRank={0} quiet>
-        <p>body</p>
-      </PaneFrame>
-    ));
-    const quiet = container.querySelector(".kw-frame-quiet") as HTMLElement;
-    expect(quiet.textContent).toBe(quietMark);
-    expect(quiet.nextElementSibling?.className).toBe("kw-frame-name");
-  });
-
-  it("carries its conversation's turn ribbon to the end of its title row's facts", () => {
-    const { container } = render(() => (
-      <PaneFrame name="a" state="idle" focused spawnRank={0} ribbon="turn 2 · $0.01">
-        <p>body</p>
-      </PaneFrame>
-    ));
-    const detail = container.querySelector(".kw-frame-detail") as HTMLElement;
-    expect(detail.lastElementChild?.className).toBe("kw-frame-turn");
-    expect(detail.lastElementChild?.textContent).toBe("turn 2 · $0.01");
   });
 });
 

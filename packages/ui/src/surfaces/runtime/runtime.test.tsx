@@ -178,18 +178,6 @@ describe("bringing a pane inside", () => {
     expect(desktop.calls).toEqual(calls);
     expect(pane.slot.contains(pane.body)).toBe(true);
   });
-
-  it("reuses the window for the next pane that leaves", async () => {
-    const { desktop, runtime } = bench();
-    const first = mountPane("thread-7");
-    const second = mountPane("file-2");
-    const outside = await sent(runtime, first.body);
-    runtime.bringInside(outside);
-    const again = await sent(runtime, second.body);
-    expect(again.window).toBe(outside.window);
-    expect(again.mount.getAttribute("data-pane-id")).toBe("file-2");
-    expect(desktop.opened).toHaveLength(1);
-  });
 });
 
 describe("a window that closes underneath its pane", () => {
@@ -238,16 +226,6 @@ describe("a window that closes underneath its pane", () => {
     expect(styledOnLeaving).toEqual([true]);
     expect(stylesOutside()).toBe(false);
   });
-
-  it("opens a fresh window for the pane when it leaves again", async () => {
-    const { desktop, runtime } = bench();
-    const pane = mountPane("thread-7");
-    const lost = await sent(runtime, pane.body);
-    desktop.emit({ kind: "closed", id: lost.id });
-    const again = await sent(runtime, pane.body);
-    expect(again.id).toBe("kw-surface:2");
-    expect(pane.body.ownerDocument).toBe(again.window.document);
-  });
 });
 
 describe("what a pane outside still shares with the console", () => {
@@ -294,16 +272,6 @@ describe("what a pane outside still shares with the console", () => {
     expect(second.slot.contains(second.body)).toBe(true);
     expect(desktop.opened.every((child) => child.closed)).toBe(true);
     await expect(runtime.sendOutside(first.body)).rejects.toBeInstanceOf(WindowRefused);
-  });
-
-  it("warms windows ahead of need and hands one out without opening another", async () => {
-    const { desktop, runtime } = bench();
-    runtime.warm(2);
-    await turn();
-    expect(desktop.opened).toHaveLength(2);
-    const outside = await sent(runtime, mountPane("thread-7").body);
-    expect(outside.window).toBe(desktop.opened[0]);
-    expect(desktop.opened).toHaveLength(2);
   });
 });
 

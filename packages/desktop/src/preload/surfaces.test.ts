@@ -4,14 +4,13 @@ import * as mirror from "../main/surfaces/channels.ts";
 import { surfaceChannels } from "../main/surfaces/channels.ts";
 import { type SurfacesIpc, surfacesPort } from "./surfaces.ts";
 
-function fakeIpc(answer: unknown = undefined) {
+function fakeIpc() {
   const invoked: Array<[string, unknown[]]> = [];
   const sent: Array<[string, unknown[]]> = [];
   const listeners = new Map<string, Set<(event: unknown, payload: unknown) => void>>();
   const ipc = {
     invoke: async (channel: string, ...payload: unknown[]) => {
       invoked.push([channel, payload]);
-      return answer;
     },
     send: (channel: string, ...payload: unknown[]) => void sent.push([channel, payload]),
     on: (channel: string, listener: (event: unknown, payload: unknown) => void) => {
@@ -81,11 +80,6 @@ describe("surfacesPort", () => {
     push(surfaceChannels.leaving, null);
     expect(invoked).toEqual([[surfaceChannels.moveConsole, [move]]]);
     expect(leaving).toBe(1);
-  });
-
-  it("answers with what main answered", async () => {
-    const desk = { console: show.bounds, consoleMaximized: true };
-    await expect(surfacesPort(fakeIpc(desk).ipc).desk()).resolves.toBe(desk);
   });
 
   it("relays pane events until unsubscribed", () => {

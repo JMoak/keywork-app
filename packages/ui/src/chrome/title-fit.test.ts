@@ -21,11 +21,6 @@ describe("fitTelemetry", () => {
     const header = titleRow({ room: 50, nameNeeds: { full: 100, compact: 60, hidden: 40 } });
     expect(fitTelemetry(header)).toBe("hidden");
   });
-
-  it("lets a name too long for the whole row ellipsize once the telemetry is gone", () => {
-    const header = titleRow({ room: 30, nameNeeds: { full: 100, compact: 60, hidden: 40 } });
-    expect(fitTelemetry(header)).toBe("hidden");
-  });
 });
 
 describe("keepNameReadable", () => {

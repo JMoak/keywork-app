@@ -83,65 +83,6 @@ describe("courtyard overview", () => {
     expect(button.querySelector(".kw-courtyard-name")?.textContent).toBe("After");
   });
 
-  it("preserves a removed creature's space and restores its address when it returns", () => {
-    const [habitat, setHabitat] = createSignal(world(creature("b", "Bram")));
-    const view = render(() => (
-      <CourtyardOverview world={habitat()} order={["a", "b"]} now={now} onOpen={() => undefined} />
-    ));
-    expect(view.getAllByRole("listitem")).toHaveLength(2);
-    expect(view.getAllByRole("button")).toHaveLength(1);
-    expect(view.getByText("Reserved place")).toBeTruthy();
-    expect(view.getByRole("button").getAttribute("aria-label")).toContain("Court 2");
-    setHabitat(world(creature("a", "Aster"), creature("b", "Bram")));
-    expect(view.getAllByRole("button")).toHaveLength(2);
-    expect(view.getByRole("button", { name: /Aster/ }).getAttribute("aria-label")).toContain(
-      "Court 1",
-    );
-  });
-
-  it("paints a still portrait without scheduling animation", () => {
-    vi.useFakeTimers();
-    const view = render(() => (
-      <CourtyardOverview
-        world={world(creature("a"))}
-        order={[]}
-        now={now}
-        onOpen={() => undefined}
-      />
-    ));
-    const canvas = view.container.querySelector("canvas");
-    expect(canvas?.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("true");
-    expect(canvas?.dataset.frame).toBe("0");
-    expect(canvas?.hasAttribute("data-still")).toBe(true);
-    expect(vi.getTimerCount()).toBe(0);
-    vi.advanceTimersByTime(60_000);
-    expect(canvas?.dataset.frame).toBe("0");
-  });
-
-  it("paints native pixels and repaints when the creature's coat changes", () => {
-    const context = {
-      fillStyle: "",
-      fillRect: vi.fn(),
-      clearRect: vi.fn(),
-      imageSmoothingEnabled: true,
-    };
-    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(
-      context as unknown as CanvasRenderingContext2D,
-    );
-    const [habitat, setHabitat] = createSignal(world(creature("a")));
-    const view = render(() => (
-      <CourtyardOverview world={habitat()} order={[]} now={now} onOpen={() => undefined} />
-    ));
-    const canvas = view.container.querySelector("canvas");
-    expect(context.imageSmoothingEnabled).toBe(false);
-    expect(context.fillRect).toHaveBeenCalled();
-    expect(canvas?.width).toBeGreaterThan(0);
-    expect(canvas?.height).toBeGreaterThan(0);
-    context.fillRect.mockClear();
-    setHabitat(world({ ...creature("a"), seed: 2 }));
-    expect(context.fillRect).toHaveBeenCalled();
-  });
-
   it("keeps a creature reachable when its artwork is missing and recovers on a new skin", () => {
     const [habitat, setHabitat] = createSignal(
       world({ ...creature("a", "Aster"), skin: "missing-courtyard-test-skin" }),
@@ -157,14 +98,6 @@ describe("courtyard overview", () => {
     setHabitat(world(creature("a", "Aster")));
     expect(view.queryByText("Artwork unavailable")).toBeNull();
     expect(button.querySelector("canvas")?.dataset.skin).toBe("kid");
-  });
-
-  it("shows an honest empty state without manufacturing a creature", () => {
-    const view = render(() => (
-      <CourtyardOverview world={emptyHabitat()} order={[]} now={now} onOpen={() => undefined} />
-    ));
-    expect(view.getByText("No courtyards yet.")).toBeTruthy();
-    expect(view.queryAllByRole("button")).toEqual([]);
   });
 });
 

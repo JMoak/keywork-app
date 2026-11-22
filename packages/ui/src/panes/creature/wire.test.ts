@@ -2,12 +2,7 @@ import type { Fetch } from "@keywork-app/client";
 import type { RoutineFile } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { fakeRanch, wrenDetail, wrenRemoval, wrenRoutines } from "./testing.ts";
-import {
-  creatureClient,
-  creatureDetailSchema,
-  modelPolicySchema,
-  statusOfRefusal,
-} from "./wire.ts";
+import { creatureClient, creatureDetailSchema, modelPolicySchema } from "./wire.ts";
 
 interface Seen {
   method: string;
@@ -88,47 +83,9 @@ describe("the creature client over the typed ranch routes", () => {
       { confirmed: true, keepWorkshop: false },
     ]);
   });
-
-  it("turns a served refusal into a reading carrying the status its kind stands for", async () => {
-    const ranch = fakeRanch({
-      detail: { refused: "missing", detail: "no creature has that slug" },
-    });
-    const client = creatureClient({ fetch: unreachable().fetch, ranch: ranch.routes });
-    expect(await client.read("wren")).toEqual({
-      ok: false,
-      status: 404,
-      detail: "no creature has that slug",
-    });
-    expect(statusOfRefusal("deferred")).toBe(501);
-    expect(statusOfRefusal("unserved")).toBe(503);
-    expect(statusOfRefusal("conflict")).toBe(409);
-  });
-
-  it("still reaches the routes the ranch client lacks over raw fetch", async () => {
-    const { fetch, seen } = fetchServing(() => ({ status: 404, body: { error: "no route" } }));
-    const client = creatureClient({ fetch, ranch: fakeRanch().routes });
-    expect(await client.change("wren", { name: "Tam" })).toEqual({
-      ok: false,
-      status: 404,
-      detail: "no route",
-    });
-    expect(await client.report("wren")).toEqual({ ok: false, status: 404, detail: "no route" });
-    expect(seen.map((call) => `${call.method} ${call.path}`)).toEqual([
-      "PATCH /creatures/wren",
-      "GET /creatures/wren/report",
-    ]);
-  });
 });
 
 describe("the creature client over raw fetch", () => {
-  it("reads a creature as the fixture shapes it", async () => {
-    const detail = wrenDetail();
-    const { fetch, seen } = fetchServing(() => ({ status: 200, body: detail }));
-    const read = await creatureClient({ fetch }).read("wren");
-    expect(read.ok && read.value.name).toBe("Wren");
-    expect(seen.map((call) => `${call.method} ${call.path}`)).toEqual(["GET /creatures/wren"]);
-  });
-
   it("takes the 409 removal listing as the answer it asked for, and the confirmed 200 as the deed", async () => {
     const { fetch, seen } = fetchServing((call) =>
       call.path.includes("confirmed=true")

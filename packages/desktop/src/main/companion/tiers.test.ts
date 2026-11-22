@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cadenceOf, calmContext, ceilingFor, effectiveTier, tierBudgets } from "./tiers.ts";
+import { calmContext, ceilingFor, effectiveTier } from "./tiers.ts";
 
 describe("ceilingFor", () => {
   it("is ambient at rest, rest when idle or throttled, hidden when tucked or locked", () => {
@@ -21,19 +21,5 @@ describe("effectiveTier", () => {
     expect(effectiveTier("rest", "interact")).toBe("interact");
     expect(effectiveTier("ambient", "active")).toBe("active");
     expect(effectiveTier("hidden", "interact")).toBe("hidden");
-  });
-});
-
-describe("cadenceOf", () => {
-  it("follows the budget table, slower on battery", () => {
-    expect(cadenceOf("interact", false)).toEqual({ kind: "frame", fps: Number.POSITIVE_INFINITY });
-    expect(cadenceOf("active", false)).toEqual({ kind: "frame", fps: 30 });
-    expect(cadenceOf("active", true)).toEqual({ kind: "frame", fps: 24 });
-    expect(cadenceOf("ambient", false)).toEqual({ kind: "event", maxFps: 15 });
-    expect(cadenceOf("ambient", true)).toEqual({ kind: "event", maxFps: 8 });
-    expect(cadenceOf("rest", false)).toEqual({ kind: "timer", minMs: 1000, tolerance: 0.1 });
-    expect(cadenceOf("hidden", true)).toEqual({ kind: "none" });
-    expect(tierBudgets.ambient).toEqual({ cpuPercent: 1, wakeupsPerSecond: 16 });
-    expect(tierBudgets.rest).toEqual({ cpuPercent: 0.2, wakeupsPerSecond: 1 });
   });
 });

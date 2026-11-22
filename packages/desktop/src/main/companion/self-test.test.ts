@@ -99,23 +99,6 @@ const black: Rgb = { r: 0, g: 0, b: 0 };
 const wallpaper: Rgb = { r: 40, g: 90, b: 160 };
 
 describe("readCapture", () => {
-  it("reads clear when the plate shows through the companion's margin", () => {
-    expect(
-      readCapture(
-        capture(() => probePlate),
-        points,
-      ),
-    ).toEqual({
-      verdict: "clear",
-      why: readingWhy.clear,
-    });
-  });
-
-  it("reads opaque when the margin is black over a plate that reads true", () => {
-    const frame = capture((x, y) => (insideCompanion(x, y) ? black : probePlate));
-    expect(readCapture(frame, points)).toEqual({ verdict: "opaque", why: readingWhy.opaque });
-  });
-
   it("is inconclusive, never opaque, when a system dim layer darkens the whole capture", () => {
     const behindDim = (x: number, y: number): Rgb => (insideCompanion(x, y) ? black : probePlate);
     for (const alpha of [0.4, 0.6, 0.85, 1]) {

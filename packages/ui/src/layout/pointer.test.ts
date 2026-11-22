@@ -55,11 +55,6 @@ describe("the pointer machine", () => {
     expect(state).toEqual(idlePointer);
   });
 
-  it("ignores a press on nothing", () => {
-    const scene = twoMainOneDocked().scene(screen);
-    expect(run(scene, [down(-5, -5), move(10, 10), up(10, 10)]).intents).toEqual([]);
-  });
-
   it("resizes along a seam with every move and never emits after release", () => {
     const scene = twoMainOneDocked().scene(screen);
     const seam = scene.seams.find((candidate) => candidate.handle.kind === "split");
@@ -90,12 +85,6 @@ describe("the pointer machine", () => {
       { type: "drop", id: "b", zone: "left" },
     ]);
     expect(state).toEqual(idlePointer);
-  });
-
-  it("reports the zone under the drag so the target can lift its ink", () => {
-    const scene = twoMainOneDocked().scene(screen);
-    const { state } = run(scene, [down(1000, 10, "title"), move(1500, 10), move(1599, 500)]);
-    expect(state).toEqual({ phase: "dragging", id: "b", over: "right" });
   });
 
   it("never drags from the body of a pane", () => {

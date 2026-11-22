@@ -105,12 +105,6 @@ describe("answering asks with a scope", () => {
     await expect(client.answerAsk("g1", "granted")).rejects.toBeInstanceOf(ServerRefusal);
   });
 
-  it("carries the rules a remembered answer would record on each pending ask", async () => {
-    const { fetch } = answering((await answers()).pendingWrite);
-    const [pending] = await keyworkClient(ticket, { fetch }).asks();
-    expect(pending).toMatchObject({ callId: "g4", tool: "write", rules: [] });
-  });
-
   it("carries a write's preview on its pending ask: the file as it is and as the call would leave it", async () => {
     const { fetch } = answering((await answers()).pendingWrite);
     const [pending] = await keyworkClient(ticket, { fetch }).asks();

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   fileUrlOf,
   isWholeFile,
-  lineLabel,
   openingRange,
   rangeAfter,
   rangeBefore,
@@ -53,11 +52,6 @@ describe("file range math", () => {
       sliceFacts({ from: 0, to: maxFileSliceBytes, bytes: 3 * maxFileSliceBytes, truncated: true }),
     ).toBe("bytes 0..1048576 of 3.0 MiB · cut to fit");
     expect(sizeText(2048)).toBe("2.0 KiB");
-  });
-
-  it("numbers lines from one at the start and relatively inside a slice", () => {
-    expect(lineLabel({ from: 0 }, 0)).toBe("1");
-    expect(lineLabel({ from: 34 }, 0)).toBe("+1");
   });
 
   it("builds a file url inside the workspace root with an optional line", () => {

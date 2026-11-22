@@ -1,7 +1,7 @@
 import type { ServerDocument, ServerTicket } from "@keywork-app/client";
 import { keyworkProfile } from "@keywork-app/product";
 import { describe, expect, it } from "vitest";
-import { nodeConsentCard, sidecarNodeServing } from "./node-consent.ts";
+import { sidecarNodeServing } from "./node-consent.ts";
 import { type FileSeams, recentStore } from "./recents.ts";
 import {
   bundledEngineVersion,
@@ -234,7 +234,6 @@ describe("workspaceHost: attach first, spawn second", () => {
 
   it.each([
     ["absent", {}],
-    ["dead", { ticket: terminalTicket, ticketAnswers: "dead" as const }],
     ["corrupt", { ticket: "corrupt" as const }],
   ])("spawns its own server when the ticket is %s", async (_case, options) => {
     const h = harness(options);
@@ -414,15 +413,6 @@ describe("workspaceHost: attach first, spawn second", () => {
     expect(h.processes).toHaveLength(0);
   });
 
-  it("closes everything it holds on closeAll", async () => {
-    const h = harness({});
-    const host = workspaceHost(h.seams);
-    await host.open("/a");
-    await host.open("/b");
-    await host.closeAll();
-    expect(h.processes.map((process) => process.stopped)).toEqual([1, 1]);
-  });
-
   it("makes closeAll wait for a close already in flight, so quit cannot outrun a stopping server", async () => {
     const h = harness({});
     let finishStop: () => void = () => undefined;
@@ -495,34 +485,6 @@ describe("workspaceHost: the contract is the identity of an engine", () => {
     });
     expect(h.processes[0]?.stopped).toBe(1);
     expect(await host.recent()).toEqual([]);
-  });
-
-  it("runs the sibling checkout through bun, its CLI ahead of the serve verb, and reports that file as the binary", async () => {
-    const h = harness({ engine: sibling });
-    expect(await workspaceHost(h.seams).open("/work")).toMatchObject({
-      ok: true,
-      opened: { attached: false, binary: checkout.cli },
-    });
-    expect(h.processes[0]?.spec).toEqual({ binary: "bun", cwd: "/work", entry: [checkout.cli] });
-  });
-
-  it("names the engine a later contract loss came from", async () => {
-    const h = harness({ engine: sibling });
-    const host = workspaceHost(h.seams);
-    const losses: ServerLoss[] = [];
-    host.onServerLost((loss) => losses.push(loss));
-    await host.open("/work");
-    h.processes[0]?.listeners[0]?.({ kind: "failed", failure: otherContract(spawnedTicket) });
-    expect(losses).toEqual([
-      {
-        workspace: "/work",
-        failure: {
-          ...otherContract(spawnedTicket),
-          source: { origin: "sibling repo", from: checkout.cli },
-        },
-        reattaching: false,
-      },
-    ]);
   });
 });
 
@@ -631,19 +593,6 @@ describe("the refusal in the keeper's words", () => {
     expect(refusal(undefined)).toEqual({
       message: `the engine speaks contract 1.7; ${keyworkProfile.name} was built for contract 1.25`,
       nextAction: "",
-    });
-  });
-
-  it("offers the restart for the node this console installed, and names a node it did not", () => {
-    const fromTheNode = (node: "this-install" | "another-install") =>
-      refusal({ origin: "ticket", from: terminalTicket.url, node });
-    expect(fromTheNode("this-install")).toEqual({
-      message: `the node ${keyworkProfile.name} installed, serving this folder (127.0.0.1:4770), speaks contract 1.7; ${keyworkProfile.name} was built for contract 1.25`,
-      nextAction: `restart the node on the engine ${keyworkProfile.name} ships (\`keywork node restart\`); ${keyworkProfile.name} asks before it does`,
-    });
-    expect(fromTheNode("another-install")).toEqual({
-      message: `the node serving this folder (127.0.0.1:4770), which ${keyworkProfile.name} did not install, speaks contract 1.7; ${keyworkProfile.name} was built for contract 1.25`,
-      nextAction: `${keyworkProfile.name} never restarts a node it did not install; run \`keywork node restart\` with the engine that installed it, then open the folder again`,
     });
   });
 });
@@ -919,20 +868,6 @@ describe("the node the packaged console hands folders to", () => {
     expect(await servesWhen(true, "absent")).toBe(false);
     expect(await servesWhen(true, "stale")).toBe(false);
     expect(await servesWhen(false, "running")).toBe(false);
-  });
-
-  it("keeps home and project permission scopes explicit before any folder is selected", () => {
-    const why = (folder: string | undefined) =>
-      nodeConsentCard({
-        platform: "win32",
-        machine: "moak-main",
-        account: "moakj",
-        folder,
-      }).detail.split("\n\n")[1];
-    expect(why(undefined)).toBe(
-      "Your creature can have a private home before you choose a project. Opening a project grants only the access you approve.",
-    );
-    expect(why("C:/src/stead")).toBe(why(undefined));
   });
 });
 describe("managed home and client leases", () => {

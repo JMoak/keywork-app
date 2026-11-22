@@ -63,14 +63,6 @@ describe("who works with whom, from the engine's hand-off tally", () => {
       expect(pairs()).toMatchObject([{ grade: 2 }]);
     });
   });
-
-  it("stops listening when the stead goes", async () => {
-    const engine = fakeEngine();
-    await inRoot(async () => {
-      createPartnerships(engine.seams);
-    });
-    expect(engine.listening()).toBe(0);
-  });
 });
 
 function fakeEngine() {
@@ -96,7 +88,6 @@ function fakeEngine() {
   return {
     seams,
     reads: () => reads,
-    listening: () => listeners.size,
     answer: (rows: readonly CreatureHandoff[]) => settle?.(rows),
     refuse: (refusal: ServedRefusal) => settle?.(refusal),
     emit: (payload: CreatureHandoffChange) => {

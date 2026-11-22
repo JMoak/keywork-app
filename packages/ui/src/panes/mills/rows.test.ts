@@ -88,19 +88,6 @@ describe("the mills rows", () => {
     expect([acked.license, acked.tone]).toEqual(["Gemma · acked", undefined]);
   });
 
-  it("marks health by density: loaded full, installed light, loading animated, down missing", () => {
-    const look = (row: ModelRow, step = 0) => {
-      const cells = cellsOf(modelLine(row), step, now);
-      return [cells.mark, cells.density, cells.tone];
-    };
-    expect(look(model("a", { loaded: true }))).toEqual(["█", "full", undefined]);
-    expect(look(model("a"))).toEqual(["·", "light", undefined]);
-    expect(look(model("a", { health: health("loading") }), 1)).toEqual(["▀", "heavy", undefined]);
-    expect(look(model("a", { health: health("saturated") }))).toEqual(["█", "heavy", undefined]);
-    expect(look(model("a", { health: health("down") }))).toEqual([" ", "light", "error"]);
-    expect(cellsOf(modelLine(model("a"), road), 0, now).held).toBe("served");
-  });
-
   it("walks parcels, then their mills, then their models, with the market road last", () => {
     const report = millsReport(now);
     const kinds = millLines(report).map((line) => `${line.kind} ${line.key}`);

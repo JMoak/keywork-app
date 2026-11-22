@@ -6,7 +6,6 @@ import type { Desk, ScreenRect } from "../port.ts";
 import {
   type LatticeSeat,
   namedSeats,
-  placeWords,
   seatOnTheLattice,
   shareOnTheStage,
   stageFacts,
@@ -54,13 +53,6 @@ describe("a seat on the stage's lattice", () => {
     const { said, back } = madeARectangle(beside, { x: 0, y: 0, w: 1, h: 12 });
     expect(said).toContain("seat 1 was too narrow to read and was widened");
     expect(back).toEqual({ x: 0, y: 0, w: 3, h: 12 });
-  });
-
-  it("is spoken of by its name, or by the lattice lines it lies between", () => {
-    expect(placeWords(namedSeats.full as LatticeSeat)).toBe("full");
-    expect(placeWords(namedSeats["right-two-thirds"] as LatticeSeat)).toBe("right-two-thirds");
-    expect(placeWords({ x: 4, y: 0, w: 4, h: 6 })).toBe("columns 4 to 8, rows 0 to 6");
-    expect(placeWords({ x: 9, y: 9, w: 3, h: 3 })).toBe("columns 9 to 12, rows 9 to 12");
   });
 });
 

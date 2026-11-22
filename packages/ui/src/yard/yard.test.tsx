@@ -29,12 +29,6 @@ describe("a setting withdrawn while the keeper is inside it", () => {
     expect(cardTitled("first")?.dataset.withdrawn).toBe("");
   });
 
-  it("folds at once when the keeper's own answer settled it", () => {
-    const yard = renderYard([card("first", 5), card("second", 3)]);
-    yard.settle("first");
-    expect(cardTitled("first")).toBeUndefined();
-  });
-
   it("stays as a pane while the keeper's focus is inside the panel, and folds when focus leaves", async () => {
     const yard = renderYard([card("panel", 9, "unfold")], { railActive: false });
     const satellite = satelliteOf("panel");
@@ -125,17 +119,6 @@ describe("the yard's own card", () => {
     keyOnRail("Enter");
     expect(decisionLines()).toEqual([]);
     expect(cardTitled("a")).toBeTruthy();
-  });
-});
-
-describe("the attention the yard's own card reports", () => {
-  it("lists what the keeper attended, with its size and a plain reason, above the decisions", () => {
-    const attended = [{ id: "a", size: "working" as const, score: 9, reason: "you are in it" }];
-    renderYard([card("a", 5)], { card: { ...spentCard, attended } });
-    keyOnRail("k");
-    keyOnRail("Enter");
-    expect(decisionLines()[0]).toBe("attended · a · working · you are in it");
-    expect(decisionLines()).toHaveLength(3);
   });
 });
 

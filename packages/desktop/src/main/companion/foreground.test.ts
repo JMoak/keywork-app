@@ -80,15 +80,6 @@ describe("windowsForegroundProbe", () => {
 });
 
 describe("the OS foreground window", () => {
-  it("asks GetForegroundWindow in the same loop and prints only changes", () => {
-    const script = probeScript(5);
-    expect(script).toContain("GetForegroundWindow");
-    expect(script).toContain("$window -ne $lastWindow");
-    expect(parseWindowLine("window 1311054\r")).toEqual({ handle: "1311054", bounds: undefined });
-    expect(parseWindowLine("5")).toBeUndefined();
-    expect(parseProbeLine("window 1311054")).toBeUndefined();
-  });
-
   it("prints the foreground window's rectangle in physical pixels, per-monitor DPI aware", () => {
     const script = probeScript(5);
     expect(script).toContain("SetThreadDpiAwarenessContext");

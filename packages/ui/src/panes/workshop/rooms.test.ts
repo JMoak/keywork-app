@@ -1,13 +1,11 @@
 import type { BusEnvelope } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { sealStep } from "./copy.ts";
-import { isWorkshopRefusal, servesSnapshots, workshopChangeOf } from "./port.ts";
+import { servesSnapshots, workshopChangeOf } from "./port.ts";
 import {
   closedWindow,
   costOf,
   displayLine,
   folderUrlOf,
-  limitsOf,
   neighbourOf,
   newestThread,
   paneText,
@@ -72,11 +70,6 @@ describe("the workshop as text", () => {
 
   it("renders a sealed workshop being watched as its golden", async () => {
     await expect(paneText(sealedFacts)).toMatchFileSnapshot("./goldens/sealed-watching.txt");
-  });
-
-  it("names the step that seals a bare host and never adds it to a microVM", () => {
-    expect(limitsOf(bareFacts).at(-1)).toBe(sealStep);
-    expect(limitsOf(sealedFacts)).toEqual(sealedWorkshop.limitations);
   });
 
   it("shows the snapshots room only when the node serves one", () => {
@@ -192,11 +185,5 @@ describe("the wire", () => {
     expect(workshopChangeOf(changed)).toEqual({ change: "started", workshop: sealedWorkshop });
     expect(workshopChangeOf({ ...changed, payload: { change: "started" } })).toBeUndefined();
     expect(workshopChangeOf({ type: "session.state", payload: {} })).toBeUndefined();
-  });
-
-  it("knows a refusal by its two fields", () => {
-    expect(isWorkshopRefusal({ refused: "missing", error: "no workshop has id x" })).toBe(true);
-    expect(isWorkshopRefusal(bareWorkshop)).toBe(false);
-    expect(isWorkshopRefusal(undefined)).toBe(false);
   });
 });

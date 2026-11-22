@@ -13,10 +13,6 @@ import {
 const hour = 60 * 60 * 1000;
 
 describe("shouldCheck", () => {
-  it("checks when nothing has been checked yet", () => {
-    expect(shouldCheck(0, undefined)).toBe(true);
-  });
-
   it("waits six hours between checks", () => {
     expect(shouldCheck(5 * hour, 0)).toBe(false);
     expect(shouldCheck(6 * hour, 0)).toBe(true);
@@ -25,10 +21,6 @@ describe("shouldCheck", () => {
 });
 
 describe("scheduleOf", () => {
-  it("delays the launch check so startup stays quiet", () => {
-    expect(scheduleOf(1000, undefined)).toEqual({ dueInMs: launchCheckDelayMs });
-  });
-
   it("measures the next check from the last one and never goes negative", () => {
     expect(scheduleOf(2 * hour, 0)).toEqual({ dueInMs: 4 * hour });
     expect(scheduleOf(9 * hour, 0)).toEqual({ dueInMs: 0 });

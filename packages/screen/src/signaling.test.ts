@@ -3,7 +3,6 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SignalMessage } from "./messages.ts";
 import {
-  type Delivery,
   httpSignalingTransport,
   readEventStream,
   type SignalingTransport,
@@ -159,25 +158,6 @@ describe("the HTTP signaling transport against a fake listener", () => {
       transport.listen({ message: () => {}, closed: resolve }),
     );
     expect(problem).toBe("signaling stream refused: 403");
-  });
-
-  it("feeds a viewer signaler from the stream end to end", async () => {
-    const url = await fakeListener((_request, response) => {
-      response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end(`data: ${JSON.stringify(signal.granted())}\n\n`);
-    });
-    const transport = httpSignalingTransport({ url, token: "t" });
-    const viewer = signaler("viewer", signal.request().sessionId, recordingTransport().transport);
-    await viewer.send(signal.request());
-    const deliveries: Delivery[] = [];
-    await new Promise<void>((resolve) =>
-      transport.listen({
-        message: (raw) => deliveries.push(viewer.receive(raw)),
-        closed: () => resolve(),
-      }),
-    );
-    expect(deliveries.map((delivery) => delivery.kind)).toEqual(["accepted"]);
-    expect(viewer.session()).toMatchObject({ phase: "awaiting-offer", grantId: grantA });
   });
 
   it("parses multi-line data fields", async () => {

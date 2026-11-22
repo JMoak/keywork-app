@@ -45,10 +45,6 @@ describe("check:guardrails", () => {
     ).toEqual([]);
   });
 
-  it("scans prose only for the everywhere patterns", () => {
-    expect(findGuardrailViolations("we read the x-api-key header", "prose")).toEqual([]);
-  });
-
   it("scans source and config, not the docs or the pattern table", () => {
     expect(scannedPath("packages/ui/src/app.tsx")).toBe(true);
     expect(scannedPath("scripts/guardrail-patterns.json")).toBe(false);

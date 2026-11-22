@@ -27,13 +27,6 @@ describe("moving a pane body into another document and back", () => {
     expect([...slot.children]).toEqual([before, body, after]);
   });
 
-  it("starts from a scroller that drops its offsets on leaving the tree, as Chromium does", () => {
-    const child = secondWindow();
-    const dropped = scroller(document.body, 240, 12);
-    child.document.body.append(dropped);
-    expect(offsets(dropped)).toEqual([0, 0]);
-  });
-
   it("keeps the scroll offsets of every scrolled descendant, which the platform drops", () => {
     const child = secondWindow();
     const { body } = paneBody();

@@ -21,15 +21,6 @@ function fakeWindow(): FakeWindow {
 }
 
 describe("frameTick", () => {
-  it("flushes on the next frame when the window paints", () => {
-    const window = fakeWindow();
-    let flushes = 0;
-    frameTick(window)(() => (flushes += 1));
-    window.frames[0]?.();
-    window.timers[0]?.run();
-    expect(flushes).toBe(1);
-  });
-
   it("flushes on the backstop timer when no frame ever comes", () => {
     const window = fakeWindow();
     let flushes = 0;

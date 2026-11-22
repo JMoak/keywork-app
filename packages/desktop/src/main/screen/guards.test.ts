@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import { keeperOnSpark, primary } from "./fakes.ts";
 import {
   answersCheck,
-  applyScreenSwitches,
   captureStreams,
   defaultKillChord,
   fileSessionLog,
@@ -74,33 +73,6 @@ describe("capture in main", () => {
     ]);
     expect(switches.get("disable-features")).toBe("WebRtcHideLocalIpsWithMdns");
     expect(senderPage).toContain("default-src 'none'");
-  });
-});
-
-describe("the mDNS switch", () => {
-  it("merges into the single disable-features value before ready", () => {
-    const switches = new Map<string, string>([["disable-features", "CalculateNativeWinOcclusion"]]);
-    const merged = applyScreenSwitches({
-      getSwitchValue: (name) => switches.get(name) ?? "",
-      appendSwitch: (name, value) => {
-        switches.set(name, value ?? "");
-      },
-    });
-    expect(merged).toBe("CalculateNativeWinOcclusion,WebRtcHideLocalIpsWithMdns");
-    expect(switches.get("disable-features")).toBe(merged);
-  });
-
-  it("forces zero playout delay and bounded video pacing beside any trial already forced", () => {
-    const switches = new Map<string, string>([["force-fieldtrials", "Other/On/"]]);
-    applyScreenSwitches({
-      getSwitchValue: (name) => switches.get(name) ?? "",
-      appendSwitch: (name, value) => {
-        switches.set(name, value ?? "");
-      },
-    });
-    expect(switches.get("force-fieldtrials")).toBe(
-      "Other/On/WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/WebRTC-Video-Pacing/factor:2.5,max_delay:50ms/",
-    );
   });
 });
 

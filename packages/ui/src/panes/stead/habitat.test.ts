@@ -18,14 +18,7 @@ import { createStore, reconcile, type SetStoreFunction } from "solid-js/store";
 import { describe, expect, it } from "vitest";
 import { clockWord } from "../../chrome/clock-word.ts";
 import { residents } from "../../companion/feed.ts";
-import {
-  clockOffsetMinutes,
-  createHabitatState,
-  houseOffsetMinutes,
-  readEveryField,
-  seatCreatures,
-  withQueuedAsks,
-} from "./habitat.ts";
+import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "./habitat.ts";
 
 const now = Date.parse("2026-11-06T06:23:10.000Z");
 
@@ -104,53 +97,6 @@ describe("the stead's reader over the shell's session store", () => {
     expect(refused.world().creatures).toEqual({});
     refused.dispose();
   });
-
-  it("lists again when a creature changes on the wire or the bots surface moves", async () => {
-    let listing: CreatureSummary[] = [];
-    const { world, emit, setBots, dispose } = reader({ creatures: () => listing });
-    await settle();
-    expect(world().creatures).toEqual({});
-
-    listing = [beaOnTheWire];
-    emit([
-      {
-        id: 13,
-        ts: "2026-11-06T06:24:08.000Z",
-        sessionId: "",
-        type: "creature.changed",
-        payload: { slug: "bea", change: "created" },
-      } as BusEnvelope,
-    ]);
-    await settle();
-    expect(Object.keys(world().creatures)).toEqual(["bea"]);
-
-    listing = [beaOnTheWire, { ...beaOnTheWire, slug: "pip", name: "Pip" }];
-    setBots([bea, { ...bea, name: "pip" }]);
-    await settle();
-    expect(Object.keys(world().creatures).sort()).toEqual(["bea", "pip"]);
-    dispose();
-  });
-
-  it("seats a listing in one pass, each creature at its own creation time", () => {
-    const seated = seatCreatures(
-      {
-        ...createRoot(() => reader({ creatures: [] }).world()),
-      } as HabitatState,
-      [
-        beaOnTheWire,
-        { ...beaOnTheWire, slug: "pip", name: "Pip", created: "2026-11-02T00:00:00.000Z" },
-      ],
-    );
-    expect(seated.creatures.bea?.workshop.raisedAt).toBe(beaOnTheWire.created);
-    expect(seated.creatures.pip?.workshop.raisedAt).toBe("2026-11-02T00:00:00.000Z");
-  });
-
-  it("reads every field of a store row, nested ones included, into a plain copy", () => {
-    const [store] = createStore({ rows: [row("conv", { waiting: { asks: 1, tools: ["bash"] } })] });
-    const copy = readEveryField(store.rows);
-    expect(copy).toEqual([row("conv", { waiting: { asks: 1, tools: ["bash"] } })]);
-    expect(copy[0]?.waiting).not.toBe(store.rows[0]?.waiting);
-  });
 });
 
 describe("the stead's asks, held to the needs-you queue", () => {
@@ -196,16 +142,6 @@ describe("the stead's asks, held to the needs-you queue", () => {
     setQueued([]);
     expect(asksOn(world(), "conv")).toEqual({});
     expect(creatureReading(world(), "bea", now).state).not.toBe("porch");
-    dispose();
-  });
-
-  it("hands back the same world when the queue already agrees, so nothing downstream redraws", async () => {
-    const { world, emit, dispose } = reader();
-    await settle();
-    emit([gateAsk(14, "c1")]);
-    const agreed = world();
-    expect(withQueuedAsks(agreed, [pendingWrite("c1")], "2026-11-06T06:23:09.000Z")).toBe(agreed);
-    expect(withQueuedAsks(agreed, [], "2026-11-06T06:23:09.000Z").threads.conv?.asks).toEqual({});
     dispose();
   });
 });

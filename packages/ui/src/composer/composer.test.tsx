@@ -86,11 +86,6 @@ describe("Composer", () => {
     expect(composer.input.value.split("\n")).toHaveLength(3);
   });
 
-  it("renders the queue as quiet rows", () => {
-    const composer = mount();
-    expect(composer.container.querySelector(".kw-queue-item")?.textContent).toBe("░later");
-  });
-
   it("tags a queued prompt another client injected", () => {
     const { container } = render(() => (
       <Composer

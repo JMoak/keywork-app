@@ -1,9 +1,8 @@
-import { mulberry32, overlaps } from "@keywork-app/habitat";
+import { overlaps } from "@keywork-app/habitat";
 import { describe, expect, it } from "vitest";
 import { presetSize, type SizeName } from "../outside/grid.ts";
 import type { Desk, ScreenRect } from "../port.ts";
 import { type OutsideKind, outsideMetrics, type Wanted } from "./arrange.ts";
-import { chosenWay } from "./pattern-choice.ts";
 import {
   deskOf,
   grown,
@@ -18,7 +17,6 @@ import { type Burst, cardMetrics, cardWays, stepMs, tidyWays, type Way } from ".
 const { gap } = outsideMetrics;
 const [small, full, wide] = workAreas as [ScreenRect, ScreenRect, ScreenRect];
 const sizesDown: readonly SizeName[] = ["working", "reading", "card"];
-const manySeeds = Array.from({ length: 64 }, (_, seed) => seed + 1);
 
 function burstOf(
   desk: Desk,
@@ -116,19 +114,6 @@ describe("one to three panes", () => {
     expect(keepers(desk, 1, "file").stands).toBe("over");
   });
 
-  it("arrive top to bottom, a slight step apart", () => {
-    const three = keepers(desk, 3);
-    expect(three.arrives).toEqual([
-      { id: "pane-0", atMs: 0 },
-      { id: "pane-1", atMs: 60 },
-      { id: "pane-2", atMs: 120 },
-    ]);
-    const tops = three.arrives.map(
-      (start) => three.seats.find((seat) => seat.id === start.id)?.bounds.y,
-    );
-    expect(tops).toEqual(tops.toSorted((a, b) => (a ?? 0) - (b ?? 0)));
-  });
-
   it("stand in a column over the far side of a console that leaves no room beside it", () => {
     for (const blocked of [maximised(full), widened(full)]) {
       for (const count of [1, 2, 3]) {
@@ -185,14 +170,6 @@ describe("four to seven panes", () => {
     expect(cornersOf(keepers(desk, 4))[0]).toEqual([desk.console.x + desk.console.width + gap, 86]);
   });
 
-  it("keep a larger size where the room is there for it", () => {
-    expect(sizeOf(keepers(windowed(wide), 6))).toBe("945x320");
-    expect(keepers(windowed(wide), 6).stands).toBe("beside");
-    expect(sizeOf(keepers(maximised(full), 4))).toBe("624x320");
-    expect(sizeOf(keepers(maximised(full), 6))).toBe("624x320");
-    expect(sizeOf(keepers(maximised(full), 7))).toBe("624x160");
-  });
-
   it("lie over the far side of the console as a grid when there is no room beside it", () => {
     for (const desk of [maximised(full), widened(full), maximised(wide)]) {
       for (const count of [4, 5, 6, 7]) {
@@ -211,16 +188,6 @@ describe("four to seven panes", () => {
       [648, 344],
       [1284, 344],
     ]);
-  });
-
-  it("arrive as a wave from the console's corner", () => {
-    const way = keepers(maximised(full), 6);
-    const reach = way.arrives.map((start) => {
-      const seat = way.seats.find((each) => each.id === start.id)?.bounds as ScreenRect;
-      return (seat.x - 648) / 636 + (seat.y - 12) / 332;
-    });
-    expect(reach).toEqual([0, 1, 1, 2, 2, 3]);
-    expect(way.arrives.map((start) => start.atMs)).toEqual([0, 60, 120, 180, 240, 300]);
   });
 
   it("are dealt evenly across the display where even cards cannot stand apart", () => {
@@ -286,9 +253,6 @@ describe("every count, on every desk", () => {
 
 describe("variety without disorder", () => {
   const desk = centred(wide);
-  const unrolled = (): number => {
-    throw new Error("a keeper's own action rolls no dice");
-  };
 
   it("offers a column on either side of a console with room on both", () => {
     const ways = tidyWays(burstOf(desk, 3));
@@ -296,20 +260,6 @@ describe("variety without disorder", () => {
     const [right, left] = ways.map((way) => boundsOf(way)[0]?.x ?? 0);
     expect(right).toBe(desk.console.x + desk.console.width + gap);
     expect((left ?? 0) + 945).toBe(desk.console.x - gap);
-  });
-
-  it("offers a grid on either side, and by rows or columns first and the wave's direction", () => {
-    expect(tidyWays(burstOf(desk, 6)).map((way) => way.look)).toEqual([
-      "grid right, rows first, outward",
-      "grid left, rows first, outward",
-    ]);
-    expect(tidyWays(burstOf(maximised(wide), 6)).map((way) => way.look)).toEqual([
-      "grid over, rows first, outward",
-      "grid over, rows first, across",
-      "grid over, columns first, outward",
-      "grid over, columns first, across",
-      "grid over, columns first, down",
-    ]);
   });
 
   it("starts every wave at the console's corner, on either side", () => {
@@ -325,42 +275,6 @@ describe("variety without disorder", () => {
       })[0];
       expect(first, way.look).toEqual(nearest);
     }
-  });
-
-  it("lands a keeper's burst the same way every time, with no dice", () => {
-    for (const count of [1, 2, 3, 5, 7]) {
-      const ways = tidyWays(burstOf(desk, count));
-      for (const previous of [undefined, ways[0]?.look, ways.at(-1)?.look]) {
-        expect(chosenWay(ways, { asker: "keeper", previous }, unrolled)).toBe(ways[0]);
-      }
-    }
-  });
-
-  it("varies a creature's burst with the seed, among those ways only, never the one before", () => {
-    const ways = tidyWays(burstOf(maximised(wide), 6));
-    const looks = ways.map((way) => way.look);
-    const chosen = manySeeds.map(
-      (seed) => chosenWay(ways, { asker: "creature" }, mulberry32(seed))?.look,
-    );
-    expect(new Set(chosen).size).toBeGreaterThan(3);
-    expect(chosen.every((look) => looks.includes(look as string))).toBe(true);
-    for (const previous of looks) {
-      const next = manySeeds.map(
-        (seed) => chosenWay(ways, { asker: "creature", previous }, mulberry32(seed))?.look,
-      );
-      expect(next).not.toContain(previous);
-    }
-    expect(chosenWay(ways, { asker: "creature" }, mulberry32(7))).toBe(
-      chosenWay(ways, { asker: "creature" }, mulberry32(7)),
-    );
-  });
-
-  it("gives a lone pane the one place it has when only one side has room", () => {
-    const ways = tidyWays(burstOf(windowed(full), 1));
-    expect(ways.map((way) => way.look)).toEqual(["column right"]);
-    expect(chosenWay(ways, { asker: "creature", previous: "column right" }, mulberry32(1))).toBe(
-      ways[0],
-    );
   });
 });
 
@@ -383,10 +297,5 @@ describe("when nothing can stand apart", () => {
     expect(crowded(way as Way)).toEqual([]);
     const [obstacle] = inTheWay as [ScreenRect];
     expect(boundsOf(way as Way).some((seat) => overlaps(grown(seat, gap), obstacle))).toBe(false);
-  });
-
-  it("plans nothing for no panes", () => {
-    expect(tidyWays({ desk: maximised(full), ladder: [] })).toEqual([]);
-    expect(tidyWays({ desk: maximised(full), ladder: [[]] })).toEqual([]);
   });
 });

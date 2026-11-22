@@ -92,34 +92,6 @@ describe("serverFeed", () => {
     hold.resolve();
   });
 
-  it("survives a dropped stream by resuming, and reports a gap notice", async () => {
-    let streams = 0;
-    const hold = deferred();
-    const fetch: Fetch = async (_url, init) => {
-      streams += 1;
-      const headers = (init?.headers ?? {}) as Record<string, string>;
-      if (streams === 1) return streaming([frame(envelope(1))], Promise.resolve());
-      expect(headers["last-event-id"]).toBe("1");
-      return streaming(
-        [": resumed with a gap, events 2 to 2 are gone\n\n", frame(envelope(3))],
-        hold.promise,
-      );
-    };
-    const feed = serverFeed(keyworkClient(ticket, { fetch, delay: async () => undefined }), {
-      tick: (flush) => flush(),
-    });
-    const seen: number[] = [];
-    const notices: StreamNotice[] = [];
-    feed.onNotice((notice) => notices.push(notice));
-    feed.subscribe((batch) => seen.push(...batch.map((item) => item.id)));
-    await feed.open();
-    await settle();
-    expect(seen).toEqual([1, 3]);
-    expect(notices).toEqual([{ kind: "gap", from: 2, to: 2 }]);
-    feed.close();
-    hold.resolve();
-  });
-
   it("is lost, not retried, when the server refuses the token", async () => {
     const fetch: Fetch = async () => new Response("", { status: 401 });
     const feed = serverFeed(keyworkClient(ticket, { fetch }), { tick: (flush) => flush() });

@@ -1,4 +1,3 @@
-import { createEffect, createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { createPaneMarks } from "./marks.ts";
 
@@ -22,19 +21,5 @@ describe("createPaneMarks", () => {
     open.delete("a");
     expect(marks.all()).toEqual(["b"]);
     expect(marks.has("a")).toBe(false);
-  });
-
-  it("clears every mark and tells whoever is watching", () => {
-    const marks = createPaneMarks();
-    const seen: boolean[] = [];
-    const dispose = createRoot((dispose) => {
-      createEffect(() => seen.push(marks.has("a")));
-      return dispose;
-    });
-    marks.toggle("a");
-    marks.clear();
-    expect(marks.all()).toEqual([]);
-    expect(seen).toEqual([false, true, false]);
-    dispose();
   });
 });

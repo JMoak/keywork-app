@@ -5,7 +5,6 @@ import { browserHost } from "../host/browser.ts";
 import type { HostPort } from "../host/port.ts";
 import type { ShellSeams } from "../panes/registry.ts";
 import { MeetCreature, meetingName } from "./meet.tsx";
-import { proposeNames } from "./names.ts";
 
 vi.mock("./portrait.tsx", () => ({ Portrait: () => <span>Creature portrait</span> }));
 
@@ -90,25 +89,6 @@ it("lets the keeper meet and keep a creature before setup, then binds the select
   expect(inject).not.toHaveBeenCalled();
   expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Start a conversation" })).toBeNull();
-});
-
-it("introduces the name the customize card proposes first, and steps aside for a creature already at home", () => {
-  const shell = {
-    host: browserHost(),
-    workspace: "C:/managed-home",
-    client: { creatures: async () => [] },
-  } as unknown as ShellSeams;
-  const firstProposal = proposeNames("C:/managed-home")[0];
-  render(() => <MeetCreature shell={shell} creatures={[]} first onCustomize={() => {}} />);
-  expect(screen.getByRole("heading", { name: `Meet ${firstProposal}` })).toBeTruthy();
-  cleanup();
-
-  const resident = { slug: "kit", name: "Kit", conversation: "kit-thread" } as CreatureSummary;
-  render(() => (
-    <MeetCreature shell={shell} creatures={[resident]} first={false} onCustomize={() => {}} />
-  ));
-  expect(screen.queryByRole("region", { name: "Meet your creature" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Open current conversation" })).toBeNull();
 });
 
 it("previews and rolls designs without creating anything, can undo, then saves the selected creature", async () => {

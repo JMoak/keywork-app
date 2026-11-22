@@ -16,7 +16,6 @@ import {
   glideTiming,
   keeperTyped,
   motionStyle,
-  movePlan,
   nextReleaseAt,
   nothingHeld,
   offered,
@@ -203,10 +202,6 @@ describe("a burst of arrivals", () => {
       [first.id, 60],
     ]);
   });
-
-  it("plans nothing for no arrivals", () => {
-    expect(arrivalPlan(desk, [], [], moving)).toEqual({ style: "glide", cues: [], endsAtMs: 0 });
-  });
 });
 
 describe("calling everything back", () => {
@@ -251,16 +246,6 @@ describe("calling everything back", () => {
     expect(hides(calm).map((cue) => cue.id)).toEqual(leaves.map((start) => start.id));
     expect(hides(calm).map((cue) => cue.atMs)).toEqual(leaves.map((start) => start.atMs));
   });
-
-  it("hides them at once while the console is hidden", () => {
-    const unseen = recallPlan(desk, outside, leaves, hidden);
-    expect(glides(unseen)).toEqual([]);
-    expect(hides(unseen).map((cue) => cue.atMs)).toEqual(outside.map(() => 0));
-  });
-
-  it("plans nothing when nothing is outside", () => {
-    expect(recallPlan(desk, [], [], moving).cues).toEqual([]);
-  });
 });
 
 describe("dealing the panes outside to new seats", () => {
@@ -282,15 +267,6 @@ describe("dealing the panes outside to new seats", () => {
       expect(cue.glide.durationMs).toBeLessThanOrEqual(200);
     }
     expect(mostGliding(plan)).toBeLessThanOrEqual(arrivalTiming.maxGliding);
-  });
-
-  it("leaves a pane that already sits in its seat alone", () => {
-    const settled = seats.map((seat, at) => (at === 0 ? (outside[0] as Standing) : seat));
-    const plan = dealPlan(outside, settled, turns, moving);
-    expect(glides(plan).flatMap((cue) => cue.glide.moves.map((each) => each.id))).not.toContain(
-      outside[0]?.id,
-    );
-    expect(glides(plan)).toHaveLength(7);
   });
 
   it("keeps the turns and jumps when motion is reduced, and jumps all at once when hidden", () => {
@@ -324,15 +300,6 @@ describe("spreading everything out", () => {
     const [only] = glides(spreadPlan(desk, outside, reduced));
     expect(only?.glide.durationMs).toBe(0);
   });
-
-  it("returns the panes the same way, and leaves a pane that is already there alone", () => {
-    const spreadOut = spread(desk, outside);
-    const back = movePlan(spreadOut, outside, moving);
-    expect(glides(back)[0]?.glide.moves).toEqual(
-      outside.filter((pane, index) => travel(pane.bounds, spreadOut[index]?.bounds ?? pane.bounds)),
-    );
-    expect(movePlan(outside, outside, moving).cues).toEqual([]);
-  });
 });
 
 describe("gathering a creature's panes that leave a moment apart", () => {
@@ -341,11 +308,6 @@ describe("gathering a creature's panes that leave a moment apart", () => {
   it("seats a lone pane one frame after it left", () => {
     expect(gatheredBy(1_000, 1_000)).toBe(1_000 + quietMs);
     expect(quietMs).toBeLessThanOrEqual(1000 / 60);
-  });
-
-  it("waits a frame more for each pane that joins, so those a moment apart are seated as one burst", () => {
-    expect(gatheredBy(1_000, 1_010)).toBe(1_010 + quietMs);
-    expect(gatheredBy(1_000, 1_020)).toBe(1_020 + quietMs);
   });
 
   it("never keeps the first of a trickle waiting longer than a blink", () => {

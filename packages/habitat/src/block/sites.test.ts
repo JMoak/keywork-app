@@ -46,20 +46,6 @@ describe("project buildings from the directories a creature has worked in", () =
     expect(sites[slugOf(0)]?.map((site) => site.conversations)).toEqual([1]);
     expect(Object.keys(sites)).toEqual([slugOf(0)]);
   });
-
-  it("counts eight conversations in one directory as a building of three floors", () => {
-    const ids = Array.from({ length: 8 }, (_, index) => `t${index}`);
-    const state = withThreads(
-      sketchTown(1),
-      ids.map((id) => thread(id, slugOf(0))),
-    );
-    const places = Object.fromEntries(
-      ids.map((id) => [id, place("/work/lamps", "2026-01-01T00:00:00.000Z")]),
-    );
-    expect(projectSitesOf(state, places)[slugOf(0)]).toMatchObject([
-      { id: "/work/lamps", floors: 3, conversations: 8 },
-    ]);
-  });
 });
 
 function withThreads(state: HabitatState, threads: readonly Thread[]): HabitatState {

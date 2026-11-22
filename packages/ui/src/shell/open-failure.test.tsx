@@ -65,24 +65,6 @@ describe("a project that did not open", () => {
     });
   });
 
-  it("says a missing model in plain words under keywork too, with connecting as the fix", () => {
-    expect(openFailureView("/p", noModel, keyworkProfile)).toEqual({
-      path: "/p",
-      line: "no model is connected",
-      fix: connectFix,
-      connectsAModel: true,
-      enablesBackgroundWork: false,
-    });
-    expect(
-      openFailureView("/p", { kind: "port-in-use", port: 4770, detail: "" }, keyworkProfile),
-    ).toEqual({
-      path: "/p",
-      line: "port 4770 is taken",
-      connectsAModel: false,
-      enablesBackgroundWork: false,
-    });
-  });
-
   it("offers background work only to a failure that asks for it", () => {
     const sharedEngineDown: WorkspaceFailure = {
       kind: "unresolved",

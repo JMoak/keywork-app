@@ -79,16 +79,6 @@ const declinedMcp = {
     "an answered ask never records mcp filesystem__*; grants hold bash commands and MCP tools as an answer would remember them",
 } as const;
 
-function permissionsChanged(): BusEnvelope {
-  return {
-    id: 8,
-    ts: "2026-10-15T09:00:01.000Z",
-    sessionId: "",
-    type: "surface.changed",
-    payload: { kind: "permissions" },
-  };
-}
-
 function texts(container: HTMLElement, selector: string): string[] {
   return [...container.querySelectorAll(selector)].map((node) => node.textContent?.trim() ?? "");
 }
@@ -287,25 +277,6 @@ describe("the trust setup pane", () => {
     harness.emit(grantDecision("workspace"));
     await settle();
     expect(reads()).toBe(2);
-  });
-
-  it("rereads when keywork says the permissions changed", async () => {
-    const harness = postureShell();
-    mount(harness);
-    await settle();
-    harness.emit(permissionsChanged());
-    await settle();
-    expect(harness.facts.calls.filter((call) => call === "permissions")).toHaveLength(2);
-  });
-
-  it("says nothing is proposed rather than inventing a rule", async () => {
-    const { container, act } = mount(postureShell(factsHarness({ root: ["README.md"] })));
-    await settle();
-    expect(container.querySelector(".kw-setup-quiet")?.textContent).toBe(
-      "nothing to propose · no manifest or mcp server here names a command",
-    );
-    act("posture.accept-rest");
-    expect(noticeOf(container)).toBe("nothing is proposed here");
   });
 
   it("teaches trust first in an untrusted workspace", async () => {

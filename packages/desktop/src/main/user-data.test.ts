@@ -31,22 +31,9 @@ describe("userDataDirFor", () => {
     expect(userDataDirFor(unpackaged, keyworkProfile)).toBe(join(appData, "keywork-dev"));
   });
 
-  it("lets an explicit folder win over the dev default too", () => {
-    const scratch = resolve("scratch", "profile");
-    expect(userDataDirFor(launch({ packaged: false, switchValue: scratch }), steadProfile)).toBe(
-      scratch,
-    );
-  });
-
   it("honours --user-data-dir before the product default", () => {
     const scratch = resolve("scratch", "profile");
     expect(userDataDirFor(launch({ switchValue: scratch }), steadProfile)).toBe(scratch);
-  });
-
-  it(`honours ${userDataDirVariable} when no switch names a folder`, () => {
-    const scratch = resolve("scratch", "from-env");
-    const environment = { [userDataDirVariable]: scratch };
-    expect(userDataDirFor(launch({ environment }), steadProfile)).toBe(scratch);
   });
 
   it("prefers the switch to the environment", () => {

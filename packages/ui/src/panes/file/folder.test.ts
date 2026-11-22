@@ -1,7 +1,6 @@
 import type { TreeEntry, TreeReading } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { bareFolderLine, folderOpening, pathTitle, readmeIn } from "./folder.ts";
-import { pathToOpen, rememberAgentFile } from "./recent.ts";
+import { folderOpening, readmeIn } from "./folder.ts";
 
 const file = (name: string): TreeEntry => ({ name, kind: "file", ignored: false, hidden: false });
 const dir = (name: string): TreeEntry => ({ name, kind: "dir", ignored: false, hidden: false });
@@ -35,24 +34,5 @@ describe("a folder's README", () => {
     expect(await folderOpening({ tree: listing("missing") }, "gone")).toEqual({
       kind: "not-a-folder",
     });
-  });
-
-  it("names the workspace root as the workspace in the title and the line", () => {
-    expect(pathTitle("")).toBe("workspace");
-    expect(pathTitle("src/a.ts")).toBe("src/a.ts");
-    expect(bareFolderLine("", "leader f")).toBe(
-      "the workspace has no README · leader f browses the files",
-    );
-    expect(bareFolderLine("src", "leader f")).toBe(
-      "src has no README · leader f browses the files",
-    );
-  });
-});
-
-describe("the path /open reaches for", () => {
-  it("is the workspace root until the agent touches a file, then that file", () => {
-    expect(pathToOpen()).toBe("");
-    rememberAgentFile("src/index.ts");
-    expect(pathToOpen()).toBe("src/index.ts");
   });
 });

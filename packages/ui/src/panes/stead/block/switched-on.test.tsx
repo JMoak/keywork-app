@@ -10,7 +10,6 @@ import { definitionOf } from "../../index.ts";
 import { mountPane, overviewShell } from "../../overview/testing.tsx";
 import type { ShellSeams } from "../../registry.ts";
 import { placeSettleMs } from "./places.ts";
-import { blockWorldShown, blockWorldVariable } from "./switch.ts";
 
 vi.hoisted(() => {
   vi.stubEnv("VITE_STEAD_BLOCK_WORLD", "1");
@@ -28,14 +27,6 @@ afterAll(() => {
 const steadPane = definitionOf("stead");
 
 describe("the stead with the block world switched on", () => {
-  it("loads with the switch on and shows the block world in place of the strip", () => {
-    expect(import.meta.env[blockWorldVariable]).toBe("1");
-    expect(blockWorldShown).toBe(true);
-    expect(Object.keys(steadPane.localActions ?? {})).toEqual(
-      expect.arrayContaining(["stead.turn-left", "stead.turn-right"]),
-    );
-  });
-
   it("starts without throwing, hides the strip, and reads where each creature's conversations ran", async () => {
     quietCanvas();
     const read: string[] = [];

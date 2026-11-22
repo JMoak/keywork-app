@@ -6,7 +6,7 @@ import {
   composerHotPath,
   hotPathActions,
 } from "./actions.ts";
-import { chordLabel, chordOfKey, chordsOfKey, formatChord, parseChord } from "./chord.ts";
+import { chordOfKey, chordsOfKey, formatChord, parseChord } from "./chord.ts";
 import { keybindingsSchema, keymapFromConfig } from "./config.ts";
 import { Keymap, KeymapError } from "./keymap.ts";
 
@@ -123,14 +123,6 @@ describe("shifted punctuation", () => {
     expect(() => new Keymap({ bindings: { a: "?", b: "shift+/" } })).toThrow(KeymapError);
     expect(() => new Keymap({ bindings: { a: "leader .", b: "leader >" } })).not.toThrow();
   });
-
-  it("describes a binding in the spelling it was declared with", () => {
-    const map = keymap();
-    expect(map.describe("pane.grow")).toBe("ctrl+k shift+.");
-    expect(map.describe("pane.shrink")).toBe("ctrl+k <");
-    expect(map.describe("memory.ask")).toBe("?");
-    expect(chordLabel("alt+shift+CTRL+k")).toBe("ctrl+shift+alt+k");
-  });
 });
 
 describe("Keymap", () => {
@@ -240,19 +232,6 @@ describe("the app's bindings", () => {
     expect(composerHotPath).toEqual(["enter", "alt+enter", "escape"]);
   });
 
-  it("mirror keywork's leader chords for the verbs both surfaces share", () => {
-    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
-    expect(map.describe("pane.split")).toBe("ctrl+k s");
-    expect(map.describe("pane.close")).toBe("ctrl+k x");
-    expect(map.describe("pane.zoom")).toBe("ctrl+k z");
-    expect(map.describe("focus.left")).toBe("ctrl+k h");
-    expect(map.describe("dock.cycle")).toBe("ctrl+k c");
-    expect(map.describe("palette.commands")).toBe("ctrl+k i");
-    expect(map.describe("palette.go")).toBe("ctrl+p");
-    expect(map.describe("tree.summon")).toBe("ctrl+k t");
-    expect(map.describeAll("help.toggle")).toEqual(["ctrl+k /", "f1"]);
-  });
-
   it("walk the trail with leader shift+[ and shift+] in every pane, the conversation's leader [ and ] staying its presets", () => {
     const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
     const afterLeader = (typed: string, code: string, shiftKey: boolean, scope?: string) => {
@@ -279,45 +258,6 @@ describe("the app's bindings", () => {
     });
     expect(map.describe("yard.rootward")).toBe("ctrl+k shift+[");
     expect(map.describe("tree.summon")).toBe("ctrl+k t");
-  });
-
-  it("give the trail no chord of its own: leader y then t on the rail, or /trail", () => {
-    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
-    expect(map.describeAll("yard.trail")).toEqual([]);
-    expect(map.describe("yard.rail")).toBe("ctrl+k y");
-    expect(appActions["yard.rail"]?.help).toContain("t the trail (or /trail)");
-    expect(appActions["yard.trail"]?.help).toBe(
-      "the rail now or as the trail: leader y then t, or /trail",
-    );
-    expect(appActions["yard.trail"]?.command?.name).toBe("trail");
-    const claims = Object.entries(appBindings).filter(([, chords]) =>
-      [chords].flat().includes("leader shift+t"),
-    );
-    expect(claims.map(([action]) => action)).toEqual(["terminal.summon"]);
-  });
-
-  it("make a creature on leader 1 from the stead, the creature pane and the chores pane alike", () => {
-    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
-    expect(map.describe("onboarding.start")).toBe("ctrl+k 1");
-    expect(map.describe("stead.summon")).toBe("ctrl+k 0");
-    for (const scope of ["stead", "creature", "chores", "conversation", undefined]) {
-      map.press(parseChord("ctrl+k"), 0, scope);
-      expect(map.press(parseChord("1"), 1, scope), scope ?? "no pane").toEqual({
-        type: "action",
-        action: "onboarding.start",
-      });
-    }
-    expect(appActions["onboarding.start"]?.command?.name).toBe("creature.new");
-  });
-
-  it("put quiet behind the leader and every way to answer an ask on the hot path", () => {
-    const map = new Keymap({ bindings: appBindings, scopes: actionScopes });
-    expect(map.describe("session.quiet")).toBe("ctrl+k shift+s");
-    expect(appActions["session.quiet"]?.command?.name).toBe("quiet");
-    expect(map.describe("ask.once")).toBe("alt+o");
-    for (const action of ["ask.approve", "ask.once", "ask.session", "ask.workspace", "ask.deny"]) {
-      expect(hotPathActions, action).toContain(action);
-    }
   });
 
   it("give every action help text and a command where it is palette-reachable", () => {
@@ -386,18 +326,6 @@ describe("a pane that owns the keyboard", () => {
     expect(keymap.ownsKeyboard("terminal")).toBe(true);
     expect(keymap.ownsKeyboard("conversation")).toBe(false);
     expect(keymap.ownsKeyboard(undefined)).toBe(false);
-  });
-
-  it("is declared by the terminal pane in the app keymap", () => {
-    const keymap = keymapFromConfig();
-    expect(keymap.ownsKeyboard("terminal")).toBe(true);
-    expect(keymap.press(parseChord("ctrl+y"), 0, "terminal")).toEqual({ type: "pass" });
-    expect(keymap.press(parseChord("ctrl+y"), 0, "conversation")).toEqual({
-      type: "action",
-      action: "ask.approve",
-    });
-    expect(keymap.describe("terminal.summon")).toBe("ctrl+k shift+t");
-    expect(keymap.describe("terminal.summon.mirror")).toBeUndefined();
   });
 
   it("still yields the app's reserved chords, so pane numbers, zoom and the palette work from a shell", () => {

@@ -143,16 +143,6 @@ function mount() {
 afterEach(cleanup);
 
 describe("the companion page", () => {
-  it("paints the idle frame at once, says it is ready once, and names the creature for assistive tech", () => {
-    const { port, host, view, calls } = mount();
-    expect(calls("ready")).toHaveLength(1);
-    port.emitSnapshot(porch);
-    host.advance(100);
-    expect(view.getByRole("button", { name: "pip, at the porch, 2 active threads" })).toBeTruthy();
-    expect(view.getByText("2")).toBeTruthy();
-    expect(calls("ready")).toHaveLength(1);
-  });
-
   it("shows the needs-you bubble with its answer keys; an answer never opens the thread, the title does", () => {
     const { port, view, calls } = mount();
     port.emitSnapshot(porch);
@@ -188,23 +178,6 @@ describe("the companion page", () => {
       ["answer", { callId: "decided:r7", pick: "deny", overturn: { recordId: "r7" } }],
     ]);
     expect(calls("open")).toEqual([]);
-  });
-
-  it("schedules zero wakeups when hidden or still, and stays under the ambient budget otherwise", () => {
-    const { port, host } = mount();
-    port.emitSnapshot(idle);
-    host.advance(60_000);
-    const ambient = host.wakeups;
-    expect(ambient).toBeGreaterThan(0);
-    expect(ambient).toBeLessThanOrEqual(16 * 60);
-    port.emitConditions({ ...restingConditions, ceiling: "hidden" });
-    const before = host.wakeups;
-    host.advance(60_000);
-    expect(host.wakeups).toBe(before);
-    port.emitConditions({ ...restingConditions, still: true });
-    const stillBefore = host.wakeups;
-    host.advance(60_000);
-    expect(host.wakeups).toBe(stillBefore);
   });
 
   it("pauses completely while tucked, holding snapshots, and resumes on untuck with the latest one", () => {

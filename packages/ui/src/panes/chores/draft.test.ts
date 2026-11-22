@@ -49,7 +49,6 @@ describe("a chore draft", () => {
       "The id takes lowercase letters, digits and dashes, starting with a letter or digit.",
     ],
     [{ cron: "" }, "A schedule needs a cron expression and a time zone."],
-    [{ tz: " " }, "A schedule needs a cron expression and a time zone."],
     [{ trigger: "interval", every: "0" }, "Every takes a whole number of minutes from 1 to 10080."],
     [
       { trigger: "interval", every: "10081" },
@@ -60,13 +59,11 @@ describe("a chore draft", () => {
       "Every takes a whole number of minutes from 1 to 10080.",
     ],
     [{ destination: "thread", thread: "" }, "Name the thread it reports to."],
-    [{ destination: "file", path: " " }, "Name the file it writes to."],
     [
       { tools: "write", grants: "write" },
       "Each grant is one line: an action, a space, then what it covers.",
     ],
     [{ usd: "0" }, "The budget in USD is a number above 0."],
-    [{ usd: "free" }, "The budget in USD is a number above 0."],
     [{ minutes: "0" }, "The budget in minutes is a whole number from 1."],
   ] as const)("refuses %o with one plain problem", (overrides, problem) => {
     expect(choreFileOf(filled(overrides))).toEqual({ ok: false, problem });

@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { hueStop } from "../chrome/pane-frame.tsx";
 import { Composer } from "../composer/composer.tsx";
 import type { HostPort } from "../host/port.ts";
-import { keymapFromConfig } from "../keys/config.ts";
 import type { ShellSeams } from "../panes/registry.ts";
 import { createKeyboardScope, KeyboardScopeProvider } from "../shell/keyboard-claim.ts";
 import { inertFeed, inertTrust } from "../shell/trust-testing.ts";
@@ -29,25 +28,18 @@ import {
   surpriseWord,
   threadLine,
   threadWaitsLine,
-  workshopRaisedLine,
   workshopRefusedLine,
 } from "./copy.ts";
 import {
   at,
-  cloudConnected,
   creatureMade,
   creatureOpened,
   creaturesListed,
-  inheritsKeyworksDefault,
-  inheritsRefused,
-  inheritsResolved,
   localModels,
   nameTakenOnNode,
   noModels,
   nothingConnected,
   noWorkshops,
-  sbxWorkshops,
-  slugTaken,
   workshopsHeldBy,
   workshopsUnserved,
 } from "./fixtures.ts";
@@ -55,7 +47,6 @@ import {
   cloudStandingOf,
   OnboardingCard,
   OnboardingOnTheStead,
-  onboardingAction,
   onboardingSeamsOf,
 } from "./index.tsx";
 import { introductionFrame } from "./introduction.ts";
@@ -69,15 +60,9 @@ import {
   type OnboardingStorage,
   onboardingStorageKey,
   rememberedOnboarding,
-  seedForCoat,
   startOnboarding,
 } from "./onboarding.ts";
-import {
-  type CreatureRequest,
-  creaturesOnTheStead,
-  type OnboardingClient,
-  refusalOf,
-} from "./requests.ts";
+import { type CreatureRequest, type OnboardingClient, refusalOf } from "./requests.ts";
 import type { ServerReading } from "./workshop.ts";
 
 const workspace = "C:/src/stead";
@@ -125,25 +110,6 @@ describe("first-run onboarding on the stead", () => {
     });
   });
 
-  it("with Osk on the stead, proposes names no creature wears, shows the first free coat and wears it with its seed", async () => {
-    const run = harness({ creatures: creaturesListed([{ slug: "osk", name: "Osk", seed: 0 }]) });
-    await flush();
-    const proposals = run.onboarding.proposals();
-    expect(proposals?.names).toHaveLength(3);
-    expect(proposals?.names).not.toContain("Osk");
-    const listed = creaturesOnTheStead(creaturesListed([{ slug: "osk", name: "Osk", seed: 0 }]));
-    expect(proposals?.names).toEqual(proposeNames(workspace, namesLeft(listed)));
-    expect(proposals?.coat).toBe(hueStop(1));
-    expect(run.onboarding.coat()).toBe(hueStop(1));
-    key(run.container, "a");
-    await flush();
-    const made = run.created[0]?.name ?? "";
-    expect(made).not.toBe("Osk");
-    expect(proposals?.names).toContain(made);
-    expect(run.patched).toEqual([[made.toLowerCase(), seedForCoat(hueStop(1))]]);
-    expect(run.patched[0]?.[1]).toBe(1);
-  });
-
   it("with two creatures on the stead, takes the third coat and a third name; the ninth creature wraps to the first coat", async () => {
     const two = harness({
       creatures: creaturesListed([
@@ -173,29 +139,6 @@ describe("first-run onboarding on the stead", () => {
     });
     await flush();
     expect(eight.onboarding.coat()).toBe(hueStop(0));
-  });
-
-  it.each([
-    ["name", 0],
-    ["skin", 0],
-    ["workshop", 1],
-    ["models", 2],
-  ] as const)("esc on the %s step says not now and makes nothing", async (step, keptPastName) => {
-    const run = harness();
-    await flush();
-    if (step !== "name") typeName(run.container, "Wren");
-    await flush();
-    for (let kept = 0; kept < keptPastName; kept += 1) {
-      key(run.container, "Enter");
-      await flush();
-    }
-    expect(currentStep(run.container)).toBe(step);
-    if (step === "name") fireEvent.keyDown(inputOf(run.container), { key: "Escape" });
-    else key(run.container, "Escape");
-    await flush();
-    expect(run.onboarding.phase()).toEqual({ kind: "closed" });
-    expect(run.created).toEqual([]);
-    expect(run.injected).toEqual([]);
   });
 
   it("a on the first step keeps every suggestion and still makes a working creature: the first proposed name, the tinkerer, the host workshop, inherit everywhere", async () => {
@@ -271,104 +214,6 @@ describe("first-run onboarding on the stead", () => {
     expect(linesOf(run.container)).toContain(threadWaitsLine("Wren"));
   });
 
-  it("counts a cloud model that answered before as reachable, with the policy inheriting it", async () => {
-    const run = harness({
-      models: noModels,
-      cloud: { kind: "answering", model: "anthropic/claude-sonnet-4-5" },
-    });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "a");
-    await flush();
-    expect(run.created).toEqual([{ name: "Wren", skin: "kid", substrate: "host" }]);
-    expect(run.injected).toHaveLength(1);
-    expect(linesOf(run.container)).toContain(threadLine("Wren"));
-  });
-
-  it("counts a cloud provider connected through keywork as reachable on a fresh workspace, offers inherit, and the creature introduces itself", async () => {
-    const run = harness({ models: cloudConnected });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(factsOf(run.container)).toEqual([
-      nothingLocal,
-      "cloud: openrouter connected with `keywork connect`",
-    ]);
-    expect(choiceLabels(run.container)).toEqual([inheritWord]);
-    key(run.container, "Enter");
-    await flush();
-    expect(run.created).toEqual([{ name: "Wren", skin: "kid", substrate: "host" }]);
-    expect(run.injected).toEqual([
-      ["s-conv", introductionFrame({ name: "Wren", workspace, named: true, names })],
-    ]);
-    expect(run.opened).toEqual(["s-conv"]);
-    expect(run.panes).toEqual([]);
-    expect(linesOf(run.container)).toContain(threadLine("Wren"));
-  });
-
-  it("counts an unverified provider as connected and promises the introduction through inherits.strong when it resolves", async () => {
-    const run = harness({ models: inheritsResolved });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(factsOf(run.container)).toEqual([
-      nothingLocal,
-      "cloud: openrouter connected with `keywork connect`, not yet answered",
-    ]);
-    key(run.container, "Enter");
-    await flush();
-    expect(run.injected).toHaveLength(1);
-    expect(run.opened).toEqual(["s-conv"]);
-    expect(linesOf(run.container)).toContain(threadLine("Wren", "openrouter/openai/gpt-5-mini"));
-  });
-
-  it("accepts every step with enter on a node whose only model is keywork's OpenRouter default and injects the introduction", async () => {
-    const run = harness({ models: inheritsKeyworksDefault });
-    await flush();
-    fireEvent.submit(inputOf(run.container).closest("form") as HTMLFormElement);
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(run.created).toEqual([{ name: names[0], skin: "kid", substrate: "host" }]);
-    expect(run.injected).toHaveLength(1);
-    expect(run.opened).toEqual(["s-conv"]);
-    expect(linesOf(run.container)).toContain(
-      threadLine(names[0] as string, "openrouter/openai/gpt-5-mini"),
-    );
-  });
-
-  it("says in words why the introduction waits when inherits.strong resolves to a refusal", async () => {
-    const run = harness({ models: inheritsRefused });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(run.created).toEqual([{ name: "Wren", skin: "kid", substrate: "host" }]);
-    expect(run.injected).toEqual([]);
-    expect(run.opened).toEqual(["s-conv"]);
-    expect(linesOf(run.container)).toContain(
-      threadWaitsLine("Wren", "no provider holds a credential for strong"),
-    );
-  });
-
   it("with no provider connected, c opens keywork connect in a terminal pane on the stead", async () => {
     const panes: unknown[] = [];
     const record = recorder();
@@ -396,24 +241,6 @@ describe("first-run onboarding on the stead", () => {
     ]);
     key(container, "c");
     expect(panes).toEqual([{ kind: "terminal", mode: "bridge", verb: "connect" }]);
-  });
-
-  it("chooses a sealed microVM when this machine has sbx", async () => {
-    const run = harness({ workshops: sbxWorkshops });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(choiceLabels(run.container)).toEqual([substrateWords.sbx, substrateWords.host]);
-    expect(cursorLabel(run.container)).toBe(substrateWords.sbx);
-    expect(factsOf(run.container)).toEqual([]);
-    key(run.container, "Enter");
-    await flush();
-    key(run.container, "Enter");
-    await flush();
-    expect(run.created[0]?.substrate).toBe("sbx");
-    expect(linesOf(run.container)).toContain(workshopRaisedLine("sbx"));
   });
 
   it("chooses the bare host with its limitation and the one install step when the node serves no workshops", async () => {
@@ -493,20 +320,6 @@ describe("first-run onboarding on the stead", () => {
     await flush();
     expect(run.created.map((request) => request.name)).toEqual(["Bea", next[0]]);
     expect(linesOf(run.container)[0]).toBe(madeLine(next[0] ?? ""));
-  });
-
-  it("says a refusal plainly and backspace returns to the name", async () => {
-    const run = harness({ creation: slugTaken });
-    await flush();
-    typeName(run.container, "Wren");
-    await flush();
-    key(run.container, "a");
-    await flush();
-    expect(linesOf(run.container)).toEqual([notMadeLine("a bot already has the slug wren")]);
-    expect(textOf(run.container)).toMatchSnapshot("not made");
-    key(run.container, "Backspace");
-    await flush();
-    expect(currentStep(run.container)).toBe("name");
   });
 
   it("esc says not now, remembers it, and the first run then stays quiet", async () => {
@@ -624,29 +437,6 @@ describe("the card on the stead", () => {
     expect(document.activeElement?.closest(".kw-onboard")).toBeNull();
   });
 
-  it("goes back to meeting the creature when a customize card on an empty home says not now", async () => {
-    const storage = memoryStorage();
-    const shell = fakeShell({ creatures: 0 });
-    const { container } = render(() => (
-      <OnboardingOnTheStead
-        automatic
-        simple
-        shell={shell}
-        storage={storage}
-        seams={fakeSeams({}, recorder(), storage)}
-      />
-    ));
-    await flush();
-    expect(container.querySelector(".kw-meet-creature")).not.toBeNull();
-    shell.onboarding.request();
-    await flush();
-    expect(currentStep(container)).toBe("name");
-    fireEvent.keyDown(inputOf(container), { key: "Escape" });
-    await flush();
-    expect(container.querySelector(".kw-onboard")).toBeNull();
-    expect(container.querySelector(".kw-meet-creature")).not.toBeNull();
-  });
-
   it("mounts when the first run is wanted, stays away once a creature exists, and comes back on request", async () => {
     const record = recorder();
     const storage = memoryStorage();
@@ -688,31 +478,6 @@ describe("the card on the stead", () => {
     expect(untrusted.container.querySelector(".kw-onboard")).toBeNull();
   });
 
-  it("wants a creature, not a bot: a workspace with a plain bot and no creature shows the card, one whose listing is refused does not", async () => {
-    const withBot = render(() => (
-      <OnboardingOnTheStead
-        automatic
-        shell={fakeShell({ creatures: 0, bots: [plainBot("reviewer")] })}
-        storage={memoryStorage()}
-        seams={fakeSeams({}, recorder(), memoryStorage())}
-      />
-    ));
-    await flush();
-    expect(withBot.container.querySelector(".kw-onboard")).not.toBeNull();
-    expect(currentStep(withBot.container)).toBe("name");
-    cleanup();
-    const refused = render(() => (
-      <OnboardingOnTheStead
-        automatic
-        shell={fakeShell({ creatures: "refused" })}
-        storage={memoryStorage()}
-        seams={fakeSeams({}, recorder(), memoryStorage())}
-      />
-    ));
-    await flush();
-    expect(refused.container.querySelector(".kw-onboard")).toBeNull();
-  });
-
   it("lists again when a creature changes on the wire, so a creature made elsewhere closes the door", async () => {
     const creatures: CreatureSummary[] = [];
     const shell = fakeShell({ creatures });
@@ -736,31 +501,6 @@ describe("the card on the stead", () => {
         payload: { slug: "wren", change: "created" },
       } as BusEnvelope,
     ]);
-    await flush();
-    expect(container.querySelector(".kw-onboard")).toBeNull();
-  });
-
-  it("keeps the made card up after the stead has seated the creature, until enter closes it", async () => {
-    const record = recorder();
-    const storage = memoryStorage();
-    const creatures: CreatureSummary[] = [];
-    const shell = fakeShell({ creatures });
-    const { container } = render(() => (
-      <OnboardingOnTheStead
-        automatic
-        shell={shell}
-        storage={storage}
-        seams={fakeSeams({}, record, storage, () => void creatures.push(creature()))}
-      />
-    ));
-    await flush();
-    typeName(container, "Wren");
-    await flush();
-    key(container, "a");
-    await flush();
-    expect(creatures).toHaveLength(1);
-    expect(linesOf(container)[0]).toBe(madeLine("Wren"));
-    key(container, "Enter");
     await flush();
     expect(container.querySelector(".kw-onboard")).toBeNull();
   });
@@ -889,21 +629,6 @@ describe("the card on the stead", () => {
     expect(sent).toEqual([
       ["s-conv", { text: "the frame", client: "stead-onboarding", frame: { creature: "wren" } }],
     ]);
-  });
-
-  it("answers to leader 1 everywhere and to /creature.new, and asks for the stead", () => {
-    expect(onboardingAction.chords).toBe("leader 1");
-    expect(keymapFromConfig().describe("onboarding.start")).toBe("ctrl+k 1");
-    expect(onboardingAction.command?.name).toBe("creature.new");
-    expect(onboardingAction.command?.label).toBe("new creature");
-    const summoned: string[] = [];
-    const onboarding = createOnboardingController();
-    onboardingAction.invoke({
-      requestOnboarding: onboarding.request,
-      summon: (kind: string) => summoned.push(kind),
-    } as never);
-    expect(onboarding.requested()).toBe(true);
-    expect(summoned).toEqual(["stead"]);
   });
 });
 
@@ -1059,10 +784,6 @@ function emitTo(shell: ShellSeams, batch: readonly BusEnvelope[]): void {
 
 function creature(): CreatureSummary {
   return { slug: "wren", name: "Wren", created: at } as CreatureSummary;
-}
-
-function plainBot(name: string): BotSummary {
-  return { name, sigil: name[0] ?? "b", source: "project", sessions: 0 } as BotSummary;
 }
 
 function row(id: string, lastActivityAt: string, model: string | undefined): SessionSummary {

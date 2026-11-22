@@ -7,7 +7,6 @@ import {
   moverAsset,
   moverAssetName,
   moverDestination,
-  moverRelease,
   shipsTheMover,
 } from "./fetch-mover.ts";
 import { digestOf } from "./fetch-sidecar.ts";
@@ -35,15 +34,6 @@ function published(bytes: Uint8Array, checksumOf: Uint8Array = bytes) {
 }
 
 describe("the pinned pane mover", () => {
-  it("is one asset of a Vignette release, with its checksum beside it", () => {
-    expect(moverAsset()).toEqual({
-      name: "kw-panes-mover-windows-x64.exe",
-      url: `https://github.com/JMoak/vignette-mcp/releases/download/v${moverRelease.version}/kw-panes-mover-windows-x64.exe`,
-      checksumUrl: `https://github.com/JMoak/vignette-mcp/releases/download/v${moverRelease.version}/kw-panes-mover-windows-x64.exe.sha256`,
-    });
-    expect(moverRelease.version).toMatch(/^\d+\.\d+\.\d+$/);
-  });
-
   it("goes beside the engine, and only where it can run", () => {
     expect(moverDestination(join("x", "desktop"))).toBe(
       join("x", "desktop", "sidecar", "kw-panes-mover.exe"),

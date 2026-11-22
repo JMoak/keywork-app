@@ -34,10 +34,6 @@ function shownOf(state: HabitatState, id: string): string | undefined {
 const shaped = withYardStep(project(emptyHabitat(), proposed(1, notes("a"))), present, noon);
 
 describe("a keeper's while-present rule and the replacement of the same thing", () => {
-  it("marks a setting the keeper's rule shaped", () => {
-    expect(yardOf(shaped).settings.a).toMatchObject({ shown: "lantern", ruled: true });
-  });
-
   it("carries the rule to the replacement even while the keeper is away", () => {
     const later = replaced(shaped, "creature", notes("b", noon + minute));
     const stepped = withYardStep(later, away, noon + minute);
@@ -83,13 +79,6 @@ describe("a keeper's while-present rule and the replacement of the same thing", 
       expect(yardOf(later).ruledThings ?? []).toEqual([]);
       expect(shownOf(withYardStep(later, away, noon + minute), "b")).toBe("card");
     }
-  });
-
-  it("carries nothing for a setting no rule shaped", () => {
-    const plain = withYardStep(project(emptyHabitat(), proposed(1, notes("a"))), calm, noon);
-    const later = replaced(plain, "creature", notes("b", noon + minute));
-    expect(yardOf(later).ruledThings).toBeUndefined();
-    expect(shownOf(withYardStep(later, away, noon + minute), "b")).toBe("card");
   });
 
   it("remembers no more things than the decision log keeps", () => {

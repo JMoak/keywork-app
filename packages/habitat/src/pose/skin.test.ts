@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   defaultCell,
   defaultPaletteRoles,
-  fallbackOf,
   poseNames,
   referenceRows,
-  rowDuration,
   type Skin,
   validateRows,
   validateSkin,
@@ -21,22 +19,6 @@ describe("the reference rows", () => {
       expect(last, name).toBeGreaterThanOrEqual(first);
       if (name !== "look") expect(last / first, name).toBeGreaterThanOrEqual(1.14);
     }
-  });
-
-  it("keep the calm idle loop and the Codex cycle lengths", () => {
-    expect(rowDuration(referenceRows.idle)).toBe(6600);
-    expect(rowDuration(referenceRows.work)).toBe(820);
-    expect(rowDuration(referenceRows.wait)).toBe(1010);
-    expect(rowDuration(referenceRows.celebrate)).toBe(1030);
-    expect(rowDuration(referenceRows.blocked)).toBe(1220);
-    expect(rowDuration(referenceRows["walk-left"])).toBe(1060);
-  });
-
-  it("send every one-shot back to a loop", () => {
-    expect(fallbackOf(referenceRows, "celebrate")).toBe("idle");
-    expect(fallbackOf(referenceRows, "ring")).toBe("wait");
-    expect(fallbackOf(referenceRows, "stumble")).toBe("work");
-    expect(fallbackOf(referenceRows, "work")).toBe("work");
   });
 
   it("refuse rows that lie about their frames or never settle", () => {

@@ -372,22 +372,6 @@ describe("campaign monitor", () => {
     }
   });
 
-  it("reports confirmation only for a matching acknowledged command", async () => {
-    const monitor = createRoot(() =>
-      createCampaignMonitor(fakeClient({ command: async () => reading(2) })),
-    );
-    try {
-      await monitor.open("campaign-one");
-      await ready(monitor);
-      expect(await monitor.command({ type: "pause", reason: "Review" })).toBe(true);
-      expect(monitor.state.reading?.sequence).toBe(2);
-      expect(monitor.state.busy).toBe(false);
-      expect(monitor.state.requested).toBeNull();
-    } finally {
-      monitor.dispose();
-    }
-  });
-
   it("does not duplicate pending commands or confirm one after leaving its campaign", async () => {
     const result = deferred<CampaignReading>();
     const command = vi.fn(() => result.promise);

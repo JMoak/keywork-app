@@ -70,27 +70,6 @@ describe("the rail", () => {
     expect(run.cursor()).toBe("first");
   });
 
-  it("draws the cards at their placements and says how many folded", () => {
-    const run = rail(true);
-    const drawn = [...run.container.querySelectorAll<HTMLElement>(".kw-yard-card")];
-    expect(drawn.map((card) => card.querySelector(".kw-yard-card-title")?.textContent)).toEqual([
-      "first",
-      "second",
-    ]);
-    expect(drawn[1]?.style.top).toBe("128px");
-    expect(drawn[1]?.dataset.pinned).toBe("");
-    expect(run.container.querySelector(".kw-yard-folded")?.textContent).toBe(
-      "3 more below · j reaches them",
-    );
-  });
-
-  it("heads the rail with what was held back while the keeper was away", () => {
-    const run = rail(false, 2);
-    expect(run.container.querySelector(".kw-yard-rail-head")?.textContent).toBe(
-      "while you were away · 2 held back as cards",
-    );
-  });
-
   it("outlines a card that needs the keeper and names its signal with its reason", () => {
     const signalled = { ...entry("deploy", "card", false), signal: "critical" as const };
     const { container } = render(() => (
@@ -140,18 +119,6 @@ describe("the rail lying along the top as a band", () => {
     expect(run.container.querySelector(".kw-yard-rail-head")?.textContent).toBe(
       "← → · enter · esc",
     );
-  });
-
-  it("leaves left and right alone while it stands as a column", () => {
-    const run = rail(true);
-    const pressed = new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      bubbles: true,
-      cancelable: true,
-    });
-    run.list().dispatchEvent(pressed);
-    expect(pressed.defaultPrevented).toBe(false);
-    expect(run.cursor()).toBe("open");
   });
 });
 

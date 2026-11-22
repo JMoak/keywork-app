@@ -53,16 +53,6 @@ describe("atlas cache identity", () => {
     }
   });
 
-  it("shares equivalent manifests regardless of row object insertion order", () => {
-    const first = sample();
-    const reversed = {
-      ...sample(),
-      rows: Object.fromEntries(Object.entries(first.rows).reverse()) as Skin["rows"],
-    };
-    expect(sliceSkin(first)).toBe(sliceSkin(reversed));
-    expect(sliceCacheSize()).toBe(1);
-  });
-
   it("compares actual pixels when the short content hashes collide", () => {
     const first = sample();
     const second = sample();
@@ -114,15 +104,6 @@ describe("atlas cache retention", () => {
     expect(sliced.frame("idle", 0).indices[0]).toBe(1);
     expect(sliceCacheSize()).toBe(0);
     expect(sliceSkin(skin)).toBe(sliced);
-  });
-
-  it("clears both content and identity lookups", () => {
-    const skin = sample();
-    const previous = sliceSkin(skin);
-    clearSliceCache();
-    expect(sliceCacheSize()).toBe(0);
-    expect(sliceSkin(skin)).not.toBe(previous);
-    expect(sliceCacheSize()).toBe(1);
   });
 });
 

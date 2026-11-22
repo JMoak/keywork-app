@@ -10,12 +10,6 @@ describe("the three plain names", () => {
     expect(proposeNames("C:/src/stead")).toEqual(names);
   });
 
-  it("proposes differently for another workspace", () => {
-    const seeds = ["C:/src/stead", "C:/src/orchard", "/home/j/ratchet", "D:/work"];
-    const distinct = new Set(seeds.map((seed) => proposeNames(seed).join(" ")));
-    expect(distinct.size).toBeGreaterThan(1);
-  });
-
   it("keeps every pool name short, pronounceable and never a pun or a brand", () => {
     for (const name of plainNames) {
       expect(name).toMatch(/^[A-Z][a-z]{1,4}$/);

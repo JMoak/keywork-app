@@ -92,24 +92,6 @@ describe("children beside their parent", () => {
   it("wait on the rail as a card in their plot when the ring is full", () => {
     expect(find(place(plot), "t")).toMatchObject({ rung: "card", parent: "f", layer: "front" });
   });
-
-  it("never move a satellite of another plot to make room", () => {
-    const other = satellite("o", 1, {
-      unfolded: { at: 0, slot: 1, focus: undefined, byHand: true },
-    });
-    const alone = place([satellite("d", 9), other]);
-    const withChild = place([satellite("d", 9), other, child("f", "d", 8, 2)]);
-    expect(find(withChild, "o").rect).toEqual(find(alone, "o").rect);
-    expect(find(withChild, "f").rung).toBe("card");
-  });
-  it("are never displaced by a newcomer: a seed finding no free space waits on the rail", () => {
-    const settings = [satellite("d", 9), child("f", "d", 8, 1, 1)];
-    const before = find(place(settings, laptop), "f");
-    expect(before).toMatchObject({ rung: "unfold", parent: "d", rect: { x: 784, y: 348 } });
-    const after = place([...settings, seed("n", 1, 1)], laptop);
-    expect(find(after, "f")).toEqual(before);
-    expect(find(after, "n")).toMatchObject({ rung: "card", layer: "front" });
-  });
 });
 
 describe("space within a plot", () => {
@@ -129,12 +111,6 @@ describe("space within a plot", () => {
       rect: { x: 784, y: 424, width: 480, height: 244 },
     });
     expect(find(placed, "d")).toMatchObject({ size: "readable", rect: { x: 784, y: 16 } });
-  });
-
-  it("restores the previous arrangement when the keeper leaves", () => {
-    expect(place(plot, laptop, undefined)).toEqual(place(plot, laptop, "d"));
-    expect(find(place(plot, laptop), "f")).toMatchObject({ size: "readable", rect: { y: 348 } });
-    expect(find(place(plot, laptop), "t")).toMatchObject({ rung: "card", parent: "f" });
   });
 
   it("hands a deeper member the nearest seated ancestor's space", () => {
@@ -158,25 +134,6 @@ describe("plot cards on the rail", () => {
     expect(rail).toEqual([yardIds.card, "plot:d", "c"]);
     expect(find(placed, "plot:d")).toMatchObject({ size: "card", parent: null });
     expect(foldedOf(placed, settings)).toEqual([]);
-  });
-
-  it("count their members as folded when the rail has no room for the card", () => {
-    const cards = Array.from({ length: 6 }, (_, index) =>
-      aYardSetting({
-        id: `c${index}`,
-        shown: "card",
-        depth: 20 + index,
-        what: { kind: "note", ref: `${index}` },
-      }),
-    );
-    const settings = [...plot.map(folded), ...cards];
-    const placed = place(settings);
-    expect(placed.map((p) => p.id)).not.toContain("plot:d");
-    expect(
-      foldedOf(placed, settings)
-        .map((s) => s.id)
-        .toSorted(),
-    ).toEqual(["c0", "d", "f", "t"]);
   });
 });
 
@@ -228,15 +185,6 @@ describe("sizes in the yard", () => {
   it("send a yielding panel with no free corner to the rail", () => {
     const settings = [working(satellite("d", 9)), seed("f", 8, 1)];
     expect(find(place(settings, laptop), "f")).toMatchObject({ rung: "card", layer: "front" });
-  });
-
-  it("read the hub as working, the rail as cards, a stage as working and the corner hub as a card", () => {
-    const placed = place(plot);
-    expect(find(placed, yardIds.hub).size).toBe("working");
-    expect(find(placed, yardIds.card).size).toBe("card");
-    const staged = place([satellite("s", 3, { shown: "stage" }), ...plot]);
-    expect(find(staged, "s").size).toBe("working");
-    expect(find(staged, yardIds.hub).size).toBe("card");
   });
 });
 

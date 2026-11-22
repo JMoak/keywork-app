@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { keyworkProfile, steadProfile } from "@keywork-app/product";
 import { describe, expect, it } from "vitest";
-import { aboutBox, windowTitle } from "./product.ts";
-import { bundledEngineVersion } from "./serve-process.ts";
+import { windowTitle } from "./product.ts";
 
 const builder = readFileSync(
   join(import.meta.dirname, "../../electron-builder.yml"),
@@ -11,29 +10,10 @@ const builder = readFileSync(
 ).replaceAll("\r\n", "\n");
 
 describe("the product name", () => {
-  it("titles a console window keywork, with the needs-you count in front when something waits", () => {
-    expect(windowTitle(0)).toBe("keywork");
-    expect(windowTitle(3)).toBe("(3) keywork");
-  });
-
   it("names the workspace folder a window shows ahead of the product", () => {
     expect(windowTitle(0, keyworkProfile, "C:\\work\\rig-sample")).toBe("rig-sample · keywork");
     expect(windowTitle(2, steadProfile, "/home/me/garden/")).toBe("(2) garden · stead");
     expect(windowTitle(0, keyworkProfile, "C:\\")).toBe("C: · keywork");
-  });
-
-  it("says keywork in the about box and names the keywork engine inside", () => {
-    const box = aboutBox({ shell: "electron", platform: "win32", version: "0.1.0" });
-    expect(box.title).toBe("About keywork");
-    expect(box.message).toBe("keywork 0.1.0");
-    expect(box.detail).toBe(`keywork ${bundledEngineVersion} inside · electron on win32`);
-  });
-
-  it("uses an explicitly selected Stead name in native titles and dialogs", () => {
-    expect(windowTitle(2, steadProfile)).toBe("(2) stead");
-    expect(
-      aboutBox({ shell: "electron", platform: "linux", version: "0.1.0" }, steadProfile).title,
-    ).toBe("About stead");
   });
 
   it("keeps two immutable product profiles with separate OS identities and feeds", () => {
@@ -56,12 +36,6 @@ describe("the product name", () => {
     expect(builder).toMatch(
       /^artifactName: \$\{productName\}-app-\$\{version\}-\$\{os\}-\$\{arch\}\.\$\{ext\}$/m,
     );
-  });
-
-  it("builds the canonical targets for Windows, macOS and Linux", () => {
-    expect(builder).toMatch(/^win:\n {2}target: nsis$/m);
-    expect(builder).toMatch(/^mac:\n {2}target: dmg$/m);
-    expect(builder).toMatch(/^linux:\n {2}target:\n {4}- AppImage\n {4}- deb$/m);
   });
 
   it("carries the keywork sidecar as a resource, never inside the asar", () => {

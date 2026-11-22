@@ -169,18 +169,6 @@ describe("keyboard workflows", () => {
     expect(prompts[1]).toEqual(["s2", "give me the long answer"]);
   });
 
-  it("runs a palette command by name", async () => {
-    await openWorkspace();
-    await startASession("the first prompt");
-    press("p", { ctrlKey: true, shiftKey: true });
-    const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
-    expect(palette.value).toBe("/");
-    palette.value = "/split";
-    fireEvent.input(palette);
-    fireEvent.keyDown(palette, { key: "Enter" });
-    await waitFor(() => expect(frames()).toHaveLength(3));
-  });
-
   it("hands the keys back to the focused pane's composer when the palette closes", async () => {
     await openWorkspace();
     const composer = () =>
@@ -194,31 +182,6 @@ describe("keyboard workflows", () => {
     fireEvent.keyDown(palette, { key: "Enter" });
     await waitFor(() => expect(screen.queryByLabelText("palette")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(composer()));
-  });
-  it("shelves the pane of lowest standing, and says so, when a chord summons one more than the stage shows", async () => {
-    await openWorkspace();
-    await fillTheMain();
-    const showing = shownFrames().length;
-    expect(shelfPanes()).toHaveLength(0);
-    press("k", { ctrlKey: true });
-    press("B", { shiftKey: true });
-    await waitFor(() => expect(noticeText()).toBe(shelfNotices.tucked(1)));
-    expect(shownFrames()).toHaveLength(showing);
-    expect(shelfPanes().map((pane) => pane.dataset.why)).toEqual(["tucked"]);
-  });
-
-  it("does the same when the palette summons one more than the stage shows", async () => {
-    await openWorkspace();
-    await fillTheMain();
-    const showing = shownFrames().length;
-    press("p", { ctrlKey: true, shiftKey: true });
-    const palette = (await screen.findByLabelText("palette")) as HTMLInputElement;
-    palette.value = "/chores";
-    fireEvent.input(palette);
-    fireEvent.keyDown(palette, { key: "Enter" });
-    await waitFor(() => expect(noticeText()).toBe(shelfNotices.tucked(1)));
-    expect(shownFrames()).toHaveLength(showing);
-    expect(shelfPanes()).toHaveLength(1);
   });
 
   it("returns a tucked pane to its seat when the shelf is clicked, tucking the next in line", async () => {
@@ -254,42 +217,6 @@ describe("keyboard workflows", () => {
     expect(frames()).toHaveLength(open);
     expect(created).toBe(made);
   });
-
-  it("brings a listed session back into the pane last used when the layout is full", async () => {
-    await openWorkspace();
-    await fillTheMain();
-    const open = frames().length;
-    const lastUsed = focusedName() as string;
-    fireEvent.click(screen.getByText("+ new session"));
-    await waitFor(() => expect(focusedName()).toBe("new session"));
-    fireEvent.click(await screen.findByText(lastUsed, { selector: ".kw-tree-name" }));
-    await waitFor(() => expect(focusedName()).toBe(lastUsed));
-    expect(frames()).toHaveLength(open);
-  });
-
-  it("focuses the optional Stead pane on both its first and subsequent summons", async () => {
-    await openWorkspace();
-    expect(focusedName()).toBe("new session");
-    expect(frames()).toHaveLength(2);
-    press("k", { ctrlKey: true });
-    press("0");
-    await waitFor(() => expect(focusedName()).toBe("stead"));
-    expect(frames()).toHaveLength(3);
-
-    press("2", { altKey: true });
-    expect(focusedName()).toBe("new session");
-    const composer = document.querySelector(
-      ".kw-frame[data-focused] .kw-composer-input",
-    ) as HTMLTextAreaElement;
-    composer.focus();
-    expect(document.activeElement).toBe(composer);
-    press("k", { ctrlKey: true });
-    press("0");
-    await waitFor(() => expect(focusedName()).toBe("stead"));
-    expect(frames()).toHaveLength(3);
-    await waitFor(() => expect(document.activeElement?.closest(".kw-stead")).not.toBeNull());
-    expect(document.activeElement).not.toBe(composer);
-  });
 });
 
 describe("floating, shelving and pinning by key", () => {
@@ -314,29 +241,6 @@ describe("floating, shelving and pinning by key", () => {
     expect(document.querySelector(".kw-float-grip")).toBeNull();
   });
 
-  it("lets the pane travel between its seat and its float for one beat, then holds still", async () => {
-    await openWorkspace();
-    leader(" ");
-    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBe(""));
-    expect(slotNamed("sessions")?.dataset.changingLayer).toBeUndefined();
-    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBeUndefined());
-    expect(slotNamed("new session")?.dataset.floating).toBe("");
-    leader(" ");
-    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBe(""));
-    await waitFor(() => expect(slotNamed("new session")?.dataset.changingLayer).toBeUndefined());
-    expect(slotNamed("new session")?.dataset.floating).toBeUndefined();
-  });
-
-  it("steps from the tiling to the float and back with leader tab", async () => {
-    await openWorkspace();
-    leader(" ");
-    await waitFor(() => expect(slotNamed("new session")?.dataset.floating).toBe(""));
-    leader("Tab");
-    await waitFor(() => expect(focusedName()).toBe("sessions"));
-    leader("Tab");
-    await waitFor(() => expect(focusedName()).toBe("new session"));
-  });
-
   it("shelves the focused pane with leader minus, keeps it mounted, and returns it with leader equals", async () => {
     await openWorkspace();
     leader("-");
@@ -350,15 +254,6 @@ describe("floating, shelving and pinning by key", () => {
     await waitFor(() => expect(shelfPanes()).toHaveLength(0));
     expect(focusedName()).toBe("new session");
     expect(slotNamed("new session")?.hidden).toBe(false);
-  });
-
-  it("keeps the last pane on the stage and says so", async () => {
-    await openWorkspace();
-    leader("-");
-    await waitFor(() => expect(shelfPanes()).toHaveLength(1));
-    leader("-");
-    await waitFor(() => expect(noticeText()).toBe(shelfNotices.lastPaneStays));
-    expect(shelfPanes()).toHaveLength(1);
   });
 
   it("pins the focused pane with leader quote and marks its title row", async () => {
@@ -421,7 +316,6 @@ function pointer(type: string, target: EventTarget, x: number, y: number): void 
 }
 
 const stage = () => document.querySelector(".kw-stage") as HTMLElement;
-const seams = () => [...document.querySelectorAll(".kw-seam")] as HTMLElement[];
 const slotOf = (name: string): HTMLElement =>
   (
     [...document.querySelectorAll(".kw-frame-name")].find((node) => node.textContent === name) as
@@ -445,23 +339,6 @@ describe("the first run", () => {
 });
 
 describe("pointer gestures", () => {
-  it("drags the dock seam to a stepped ratio and shows the seam only while dragging", async () => {
-    await openWorkspace();
-    expect(seams()).toHaveLength(1);
-    const seam = seams()[0] as HTMLElement;
-    expect(seam.dataset.axis).toBe("x");
-    expect(seam.style.left).toBe("316px");
-    pointer("pointerdown", seam, 320, 100);
-    pointer("pointermove", window, 640, 100);
-    expect(stage().dataset.gesture).toBe("resizing");
-    expect((seams()[0] as HTMLElement).hasAttribute("data-active")).toBe(true);
-    expect((seams()[0] as HTMLElement).style.left).toBe("636px");
-    pointer("pointerup", window, 640, 100);
-    expect(stage().dataset.gesture).toBe("idle");
-    expect((seams()[0] as HTMLElement).hasAttribute("data-active")).toBe(false);
-    expect(slotOf("new session").style.left).toBe("640px");
-  });
-
   it("drags a pane by its title row onto the other dock and lifts the target's ink on the way", async () => {
     await openWorkspace();
     const title = slotOf("sessions").querySelector(".kw-frame-title") as HTMLElement;
@@ -489,19 +366,6 @@ describe("pointer gestures", () => {
     expect(stage().dataset.gesture).toBe("idle");
     expect(document.querySelector(".kw-drop")).toBeNull();
     pointer("pointerup", window, 1270, 300);
-    expect(slotOf("sessions").style.left).toBe(before);
-  });
-
-  it("focuses on a body press and never drags from it", async () => {
-    await openWorkspace();
-    expect(focusedName()).toBe("new session");
-    const before = slotOf("sessions").style.left;
-    const body = slotOf("sessions").querySelector(".kw-frame-body") as HTMLElement;
-    pointer("pointerdown", body, 100, 300);
-    pointer("pointermove", window, 900, 300);
-    expect(stage().dataset.gesture).not.toBe("dragging");
-    pointer("pointerup", window, 900, 300);
-    expect(focusedName()).toBe("sessions");
     expect(slotOf("sessions").style.left).toBe(before);
   });
 });

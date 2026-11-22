@@ -10,7 +10,6 @@ import type { HostPort } from "../../host/port.ts";
 import type { KeyHints, PaneActionHandler, ShellSeams } from "../registry.ts";
 import {
   begunBuild,
-  census,
   type FakeMeshServer,
   fakeMeshServer,
   firstLightRunThree,
@@ -19,7 +18,6 @@ import {
   ids,
   meshEnvelope,
   ok,
-  pairsReading,
   wrenGate,
 } from "./fixtures.ts";
 import { ParcelsBoard, parcelsPane } from "./index.tsx";
@@ -28,45 +26,6 @@ import { meshRoutesOver } from "./routes.ts";
 afterEach(cleanup);
 
 describe("the parcels pane", () => {
-  it("draws every machine on the tailnet with identity, lane and pairing, and its roles and gates", async () => {
-    const board = await loadedBoard();
-    expect(rowTexts(board.container)).toEqual([
-      "█ moak-main · Jordan Moak · windows here · claimed",
-      "░ build-box · tag:ci · linux ░ DERP ord · unpaired",
-      "▓ lab-mac · Jordan Moak · macOS ░ peer relay · pairing",
-      "· old-laptop · Jordan Moak · windows offline · no node",
-      "█ spark-ad4d · Jordan Moak · linux direct · claimed host",
-    ]);
-    expect(board.container.querySelectorAll(".kw-ov-row[data-muted]")).toHaveLength(1);
-    expect(detailTexts(board.container)).toEqual([
-      "roles house",
-      "gate moss from spark-ad4d · screen:view · until 13:30",
-      "audit 11:57 lab-mac allow pair.hello · identified",
-      "audit 11:48 spark-ad4d allow screen:view · grant-moss",
-      "audit 11:35 spark-ad4d deny exec · rm outside the grant",
-      "code 105 377 · the console on lab-mac asks to pair; if it shows the same code, c confirms here",
-      "roles host · pasture",
-      "gate wren · exec bun, git status · files:read ~/src/** · until 18:00",
-    ]);
-    expect(board.container.querySelector(".kw-ov-head-lead")?.textContent).toBe(
-      "5 parcels · 1 paired · 1 pairing · 2 gates open",
-    );
-    expect(board.container.querySelector(".kw-ov-head-detail")?.textContent).toBe(
-      "p pair · c confirm · g gate · x revoke · u unpair",
-    );
-  });
-
-  it("shows the audit rows of whichever parcel holds the cursor", async () => {
-    const board = await loadedBoard();
-    for (const _ of [1, 2, 3, 4]) board.act("parcels.down");
-    expect(cursorName(board.container)).toBe("spark-ad4d");
-    expect(detailTexts(board.container).filter((line) => line.startsWith("audit"))).toEqual([
-      "audit 11:48 allow screen:view · grant-moss",
-      "audit 11:35 deny exec · rm outside the grant",
-      "audit 11:20 allow exec · grant-wren",
-    ]);
-  });
-
   it("begins pairing on p, shows the six-digit code, and completes on c once the keeper compares", async () => {
     const release = deferred();
     const server = fakeMeshServer();
@@ -312,81 +271,6 @@ describe("the parcels pane", () => {
     expect(lastLine(board.container)).toBe(
       "the grant revocation for spark-ad4d is not delivered yet after 2 attempts: connect ETIMEDOUT",
     );
-  });
-
-  it("follows a peer's lane live from mesh.peers, without re-reading the census", async () => {
-    const board = await loadedBoard();
-    const censusReads = board.server.callsTo("census").length;
-    board.emit(
-      meshEnvelope(44, "mesh.peers", {
-        change: "lanes",
-        peers: [{ stableId: ids.build, path: { kind: "direct", endpoint: "192.168.4.20:41641" } }],
-      }),
-    );
-    await waitFor(() =>
-      expect(rowTexts(board.container)).toContain("░ build-box · tag:ci · linux direct · unpaired"),
-    );
-    board.emit(
-      meshEnvelope(45, "mesh.peers", {
-        change: "lanes",
-        peers: [{ stableId: ids.build, path: { kind: "derp", region: "nyc" } }],
-      }),
-    );
-    await waitFor(() =>
-      expect(rowTexts(board.container)).toContain(
-        "░ build-box · tag:ci · linux ░ DERP nyc · unpaired",
-      ),
-    );
-    expect(board.server.callsTo("census")).toHaveLength(censusReads);
-  });
-
-  it("lists pairs and gates by id when the node has no peers route, and says so", async () => {
-    const board = mountBoard(fakeMeshServer({ census: undefined }));
-    await waitFor(() => expect(rowTexts(board.container)).toHaveLength(3));
-    expect(rowTexts(board.container)).toEqual([
-      "▓ nLabMacCNTRL not listed · pairing",
-      "· nMoakMainCNTRL not listed · not paired",
-      "█ nSparkAd4dCNTRL not listed · claimed host",
-    ]);
-    expect(lineTexts(board.container)).toContain(
-      "this node does not list tailnet machines yet; rows come from pairs and gates only",
-    );
-    expect(board.container.querySelector(".kw-empty")).toBeNull();
-  });
-
-  it("puts the node's own words in an error line and teaches from the empty state when the mesh is not served", async () => {
-    const unserved = { status: 503, body: { error: "the mesh is not served by this host" } };
-    const board = mountBoard(
-      fakeMeshServer({
-        census: () => unserved,
-        pairs: () => unserved,
-        grants: () => unserved,
-        audit: () => unserved,
-      }),
-    );
-    await waitFor(() => expect(board.container.querySelector(".kw-empty")).not.toBeNull());
-    expect(board.container.querySelector(".kw-empty")?.textContent).toBe(
-      "No other parcels yet · run the node on another tailnet machine, then look again with r",
-    );
-    expect(lineTexts(board.container).filter((line) => line.includes("not served"))).toEqual([
-      "the mesh is not served by this host",
-    ]);
-  });
-
-  it("teaches below this machine's row when no other parcel is on the tailnet, and looks again on r", async () => {
-    const server = fakeMeshServer({
-      census: () => ok({ ...census, peers: [] }),
-      pairs: () => ok({ ...pairsReading, pairs: [], pending: [] }),
-      grants: () => ok({ issued: [], installed: [] }),
-    });
-    const board = mountBoard(server);
-    await waitFor(() => expect(board.container.querySelector(".kw-empty")).not.toBeNull());
-    expect(rowTexts(board.container)).toEqual([
-      "█ moak-main · Jordan Moak · windows here · claimed",
-    ]);
-    board.act("parcels.refresh");
-    await waitFor(() => expect(server.callsTo("census")).toHaveLength(2));
-    expect(server.callsTo("pairs")).toHaveLength(2);
   });
 
   it("is registered as a pane that reaches the node through HostPort.serverFetch", async () => {

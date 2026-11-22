@@ -273,12 +273,6 @@ export const morningRuns: readonly RunRow[] = [
   }),
 ];
 
-export const nodeSettings: NotificationSettings = {
-  tz: testZone,
-  digest: ["08:30", "12:30", "17:30"],
-  quietHours: { start: "22:00", end: "07:00" },
-};
-
 export interface ChoresReading {
   creatures: readonly CreatureRow[] | string;
   chores: Record<string, readonly ChoreRow[] | string>;

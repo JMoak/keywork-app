@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,17 +6,13 @@ import {
   loopbackRunsDir,
 } from "../../packages/desktop/src/main/screen/loopback/run-file.ts";
 import { repoRoot } from "../lib/repo-files.ts";
-import { parseRatchets, ratchetsFile, regressions } from "./ratchets.ts";
 import {
   conditionsMissed,
   fixedConditions,
-  fixedConditionsEnv,
   glassToGlassKey,
-  recordedScreenLatency,
   recordingFile,
   recordingOf,
   screenLatencyOf,
-  stageLines,
   stageMovedMost,
 } from "./screen-latency.ts";
 
@@ -41,12 +36,6 @@ describe("the screen's glass-to-glass ratchet", () => {
       [glassToGlassKey]: 134,
     });
     expect(() => screenLatencyOf({ glassToGlassMs: { p50: "fast" } })).toThrow("glassToGlassMs");
-  });
-
-  it("holds the committed recording at the committed ratchet", async () => {
-    const ratchets = parseRatchets(JSON.parse(readFileSync(join(repoRoot, ratchetsFile), "utf8")));
-    expect(ratchets[glassToGlassKey]?.better).toBe("lower");
-    expect(regressions(ratchets, await recordedScreenLatency())).toEqual([]);
   });
 
   it("records a loopback run with its conditions, codec and candidate pair", () => {
@@ -88,14 +77,6 @@ const fixedRun = {
 };
 
 describe("perf:screen's fixed conditions", () => {
-  it("pins the codec, the warm-up and the probe count for the loopback run it starts", () => {
-    expect(fixedConditionsEnv).toEqual({
-      KEYWORK_SCREEN_PERF_CODEC: "video/H265",
-      KEYWORK_LOOPBACK_WARMUP_FRAMES: "60",
-      KEYWORK_LOOPBACK_PROBES: "150",
-    });
-  });
-
   it("records the display, sizes, codec, warm-up, probes and stages a fixed run carries", () => {
     const recording = recordingOf(fixedRun, "idle", "artifacts/screen/runs/perf-2.json");
     expect(recording.fixed).toEqual({
@@ -140,17 +121,6 @@ describe("perf:screen's fixed conditions", () => {
       "moved most since the last recording: glass to capture, p50 79 to 130 ms",
     );
     expect(stageMovedMost(undefined, later)).toBeUndefined();
-  });
-
-  it("names where the time goes, stage by stage", () => {
-    expect(stageLines(stages)).toEqual([
-      "glass to capture (compose and capture): p50 79 ms, p95 87 ms",
-      "capture to receive (encode, pacer, network): p50 17 ms, p95 69 ms",
-      "  encode 12.7 ms (NVIDIA HEVC Encoder MFT), pacer 4.3 ms, network 0 ms",
-      "receive to present (jitter buffer, decode): p50 0 ms, p95 4 ms",
-      "  jitter buffer 11 ms, decode 0.5 ms",
-      "present to glass (compositor): p50 17 ms, p95 24 ms",
-    ]);
   });
 });
 

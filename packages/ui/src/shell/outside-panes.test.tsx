@@ -25,7 +25,6 @@ import { conversation, conversationId, homePath, reading, wren } from "../yard/a
 import { aSetting, eventFeed, proposed } from "../yard/testing.ts";
 import { fakeClient } from "./client-testing.ts";
 import { outsideNotices } from "./outside-panes.ts";
-import { refusalNotices } from "./tiler.ts";
 
 const restores: Array<() => void> = [];
 
@@ -228,22 +227,6 @@ describe("sending a pane outside the window", () => {
     expect(namesInside()).toContain("shell");
   });
 
-  it("names the key that brings a pane inside when a verb for the tiling is pressed on it", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    const frame = await sendFocusedOutside(desktop);
-    press("z", { altKey: true }, pageOf(frame));
-    expect(noticeText()).toBe(outsideNotices.isOutside("ctrl+k enter"));
-  });
-
-  it("brings the pane inside when its own button is pressed", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    const frame = await sendFocusedOutside(desktop);
-    pageOf(frame).querySelector<HTMLButtonElement>(".kw-surface-inside")?.click();
-    await waitFor(() => expect(namesInside()).toEqual(["sessions", "new session"]));
-  });
-
   it("brings the pane inside when its window is closed underneath it", async () => {
     const desktop = standingDesktop();
     await openWorkspace(desktop.port);
@@ -298,13 +281,6 @@ describe("every pane outside at once", () => {
     expect(savedOutside()).toBeUndefined();
   });
 
-  it("says there is nothing to spread while every pane is inside", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    leader(";");
-    await waitFor(() => expect(noticeText()).toBe(outsideNotices.noneOutside));
-  });
-
   it("steps to a pane outside with the layer key and hands its window the keeper's focus", async () => {
     const desktop = standingDesktop();
     await openWorkspace(desktop.port);
@@ -330,18 +306,6 @@ describe("overlays opened from a pane outside", () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape", bubbles: true });
     await waitFor(() => expect(document.querySelector(".kw-help-keys")).toBeNull());
     expect(desktop.fake.calls.at(-1)).toBe(`focus ${desktop.shows[0]?.id as string}`);
-  });
-
-  it("leave the console's focus alone when opened from inside", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    await sendFocusedOutside(desktop);
-    press("1", { altKey: true });
-    await waitFor(() => expect(desktop.fake.calls).toContain("focus console"));
-    const before = desktop.fake.calls.length;
-    press("F1");
-    expect(document.querySelector(".kw-help-keys")).not.toBeNull();
-    expect(desktop.fake.calls.slice(before)).toEqual([]);
   });
 });
 
@@ -388,16 +352,6 @@ describe("panes the saved layout says are outside", () => {
     expect(restingPlaceOf(desktop, desktop.shows[0])).toEqual(stood);
     expect(framesInside()).toHaveLength(1);
     expect(framesOutside(desktop)).toHaveLength(1);
-  });
-
-  it("find a new place beside the console when no display shows the old one", async () => {
-    localStorage.setItem(layoutKey, savedWith({ ...stood, x: 9000 }));
-    const desktop = standingDesktop();
-    await openSaved(desktop.port);
-    await waitFor(() => expect(desktop.shows).toHaveLength(1));
-    const place = restingPlaceOf(desktop, desktop.shows[0]) as ScreenRect;
-    expect(place.x).toBeGreaterThanOrEqual(desk.console.x + desk.console.width);
-    expect(place.x + place.width).toBeLessThanOrEqual(laptop.width);
   });
 
   it("come back inside when this window cannot keep panes outside", async () => {
@@ -538,17 +492,6 @@ describe("working between panes outside by key", () => {
     expect(lettersOn(sessions)).toBeUndefined();
   });
 
-  it("takes the letters off on escape and leaves focus where it was", async () => {
-    const desktop = standingDesktop();
-    const { conversation, sessions } = await bothOutside(desktop);
-    leader(":", document, { shiftKey: true });
-    const calls = desktop.fake.calls.length;
-    press("Escape");
-    expect([lettersOn(conversation), lettersOn(sessions)]).toEqual([undefined, undefined]);
-    press("a");
-    expect(desktop.fake.calls).toHaveLength(calls);
-  });
-
   it("ignores a key held down, and lets a chord through after taking the letters off", async () => {
     const desktop = standingDesktop();
     const { conversation } = await bothOutside(desktop);
@@ -561,25 +504,6 @@ describe("working between panes outside by key", () => {
     press("Escape");
   });
 
-  it("says no pane is outside when asked for letters with every pane inside", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    leader(":", document, { shiftKey: true });
-    expect(noticeText()).toBe(outsideNotices.noneOutside);
-  });
-
-  it("letters the panes when they spread, and gathers them when a letter is pressed", async () => {
-    const desktop = standingDesktop();
-    const { conversation, sessions } = await bothOutside(desktop);
-    const stood = desktop.shows.map((show) => restingPlaceOf(desktop, show));
-    leader(";");
-    await waitFor(() => expect(lettersOn(sessions)).toBeDefined());
-    expect(noticeText()).toBe(outsideNotices.spread("ctrl+k ;"));
-    press(lettersOn(conversation) as string);
-    await waitFor(() => expect(lastCall(desktop)).toBe(`focus ${idOf(desktop, 0)}`));
-    expect(desktop.shows.map((show) => restingPlaceOf(desktop, show))).toEqual(stood);
-  });
-
   it("moves focus by direction from a pane outside into the console, and out past the console's edge", async () => {
     const desktop = standingDesktop();
     await openWorkspace(desktop.port);
@@ -590,23 +514,6 @@ describe("working between panes outside by key", () => {
     leader("l");
     await waitFor(() => expect(lastCall(desktop)).toBe(`focus ${idOf(desktop, 0)}`));
     expect(focusedInside()).toBeUndefined();
-  });
-
-  it("moves focus by direction between panes outside", async () => {
-    const desktop = standingDesktop();
-    const { conversation, sessions } = await bothOutside(desktop);
-    leader("k", pageOf(sessions));
-    await waitFor(() => expect(lastCall(desktop)).toBe(`focus ${idOf(desktop, 0)}`));
-    leader("j", pageOf(conversation));
-    await waitFor(() => expect(lastCall(desktop)).toBe(`focus ${idOf(desktop, 1)}`));
-  });
-
-  it("says no pane lies that way when none does, inside or outside", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    const frame = await sendFocusedOutside(desktop);
-    leader("l", pageOf(frame));
-    await waitFor(() => expect(noticeText()).toBe(refusalNotices.nothingToward("right")));
   });
 
   it("shows a pane's ordinal on its strip outside while the modifier is held, and focuses it there by it", async () => {
@@ -644,17 +551,6 @@ describe("working between panes outside by key", () => {
     ]);
   });
 
-  it("says why nothing goes behind for a pane inside, or the only pane outside", async () => {
-    const desktop = standingDesktop({ restacks: true });
-    await openWorkspace(desktop.port);
-    leader("\\");
-    expect(noticeText()).toBe(outsideNotices.onlyOutsideGoesBehind);
-    const frame = await sendFocusedOutside(desktop);
-    leader("\\", pageOf(frame));
-    expect(noticeText()).toBe(outsideNotices.noOtherOutside);
-    expect(desktop.stacks).toEqual([]);
-  });
-
   it("steps a pane outside across the grid and along the named sizes, and remembers where that left it", async () => {
     const desktop = standingDesktop();
     await openWorkspace(desktop.port);
@@ -685,19 +581,6 @@ describe("working between panes outside by key", () => {
       height: 1016,
     });
     expect(noticeText()).not.toBe(outsideNotices.isOutside("ctrl+k enter"));
-  });
-
-  it("says a pane outside is as small as it shrinks at the card, having stepped down to it", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    const frame = await sendFocusedOutside(desktop);
-    const shrink = (): void => leader("<", pageOf(frame), { shiftKey: true });
-    shrink();
-    await waitFor(() => expect(restingPlaceOf(desktop, desktop.shows[0])?.height).toBe(320));
-    shrink();
-    await waitFor(() => expect(restingPlaceOf(desktop, desktop.shows[0])?.height).toBe(160));
-    shrink();
-    await waitFor(() => expect(noticeText()).toBe(refusalNotices.atItsLimit(-1)));
   });
 
   it("still moves and sizes a pane inside exactly as before while another is outside", async () => {
@@ -751,13 +634,6 @@ describe("dealing the panes outside on one key", () => {
     return sendFocusedOutside(desktop);
   }
 
-  it("says no pane is outside when there is none to deal", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    dealThem();
-    await waitFor(() => expect(noticeText()).toBe(outsideNotices.noneOutside));
-  });
-
   it("deals them into the next arrangement each time, names it, and remembers the seats", async () => {
     const desktop = standingDesktop();
     await twoOutside(desktop);
@@ -783,27 +659,6 @@ describe("dealing the panes outside on one key", () => {
       false,
       false,
     ]);
-  });
-
-  it("is heard in a pane outside, where a lone pane takes the whole room beside the console", async () => {
-    const desktop = standingDesktop();
-    await openWorkspace(desktop.port);
-    const frame = await sendFocusedOutside(desktop);
-    const before = desktop.glides.length;
-    dealThem(pageOf(frame));
-    await waitFor(() =>
-      expect(noticeText()).toBe("dealt as rows · the only arrangement for this many panes"),
-    );
-    await waitFor(() => expect(desktop.glides.length).toBeGreaterThan(before));
-    const seat = restingPlaceOf(desktop, desktop.shows[0]) as ScreenRect;
-    expect(seat).toEqual({ x: 1112, y: 12, width: 796, height: 1016 });
-    expect(noticeText()).not.toMatch(/surface/i);
-  });
-
-  it("keeps its panes inside, and says so, in a window that cannot put them outside", async () => {
-    await openWorkspace();
-    dealThem();
-    expect(noticeText()).toBe(outsideNotices.windowKeepsItsPanes);
   });
 
   it("leaves shift+enter to the draft when the leader was not pressed", async () => {

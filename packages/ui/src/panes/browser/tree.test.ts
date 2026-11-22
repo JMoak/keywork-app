@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   agentPathOf,
   agentWriteOf,
-  ancestorsOf,
   collapse,
   directoriesToLoad,
   emptyTree,
@@ -13,11 +12,9 @@ import {
   followHoldMs,
   lift,
   nextExpiry,
-  parentOf,
   rereadWhereMissing,
   rows,
   toggleHidden,
-  withFailure,
   withFilter,
   withListing,
 } from "./tree.ts";
@@ -74,11 +71,6 @@ describe("the browser tree", () => {
     ]);
   });
 
-  it("flags gitignored entries as density rather than dropping them", () => {
-    const [dist] = rows(loaded);
-    expect(dist).toMatchObject({ name: "dist", ignored: true, kind: "dir", load: undefined });
-  });
-
   it("nests an expanded directory's rows beneath it with their depth, and folds them back", () => {
     const open = expand(loaded, "src");
     expect(rows(open).map((row) => [row.path, row.depth])).toEqual([
@@ -114,14 +106,6 @@ describe("the browser tree", () => {
     ]);
   });
 
-  it("remembers a failed directory with its reason", () => {
-    const failed = withFailure(expand(loaded, "src/util"), "src/util", "no directory at src/util");
-    expect(failed.directories["src/util"]).toEqual({
-      kind: "failed",
-      reason: "no directory at src/util",
-    });
-  });
-
   it("lifts the agent's file for a few seconds, expanding loaded ancestors only", () => {
     const lit = lift(loaded, "src/util/pad.ts", 1000);
     expect(lit.expanded).toEqual(["", "src"]);
@@ -152,13 +136,6 @@ describe("the browser tree", () => {
     expect(agentPathOf(started("write", "./notes.txt"), "C:/work")).toBe("notes.txt");
     expect(agentPathOf(started("read", "C:/elsewhere/a.ts"), "C:/work")).toBeUndefined();
     expect(agentPathOf(started("bash", "src/index.ts"), "C:/work")).toBeUndefined();
-  });
-
-  it("walks a path's ancestors from the root", () => {
-    expect(ancestorsOf("src/util/pad.ts")).toEqual(["", "src", "src/util"]);
-    expect(ancestorsOf("README.md")).toEqual([""]);
-    expect(parentOf("src/util")).toBe("src");
-    expect(parentOf("src")).toBe("");
   });
 });
 

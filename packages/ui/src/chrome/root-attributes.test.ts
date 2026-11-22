@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { chromeWeight, gapCells, rootAttribute, themeName } from "./root-attributes.ts";
+import { chromeWeight, gapCells, rootAttribute } from "./root-attributes.ts";
 
 const root = document.documentElement;
 
@@ -9,12 +9,6 @@ afterEach(async () => {
 });
 
 describe("root attributes", () => {
-  it("default to the seams weight, no gap, and no theme name", () => {
-    expect(chromeWeight()).toBe("seams");
-    expect(gapCells()).toBe(0);
-    expect(themeName()).toBeUndefined();
-  });
-
   it("follow the root as the theme rewrites it", async () => {
     const theme = rootAttribute("data-theme");
     root.setAttribute("data-chrome", "borderless");

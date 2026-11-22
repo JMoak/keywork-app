@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { type FakeClock, fakeClock } from "../companion/testing.ts";
 import type { ScreenPoint, ScreenRect } from "./channels.ts";
 import { type Glidable, type Glider, glider, type Shapeable } from "./glide.ts";
-import { type PanesHelper, panesHelper } from "./helper.ts";
+import type { PanesHelper } from "./helper.ts";
 import { helpedGlider, helperPatienceMs, mostPanesGrowingOnTheWay } from "./mover.ts";
 import { glideFrameMs } from "./pacer.ts";
-import { type FakeHelperPipes, fakeHelperPipes, helperParentPid, readyHelper } from "./testing.ts";
+import { type FakeHelperPipes, fakeHelperPipes, readyHelper } from "./testing.ts";
 
 interface Body extends Glidable {
   path: ScreenPoint[];
@@ -36,13 +36,12 @@ interface Bench {
   letGo: string[];
 }
 
-function bench(options: { greeted?: boolean; pixelsPerPoint?: number } = {}): Bench {
+function bench(): Bench {
   const clock = fakeClock();
   const pipes = fakeHelperPipes();
-  const helper =
-    options.greeted === false ? panesHelper(pipes, helperParentPid) : readyHelper(pipes);
+  const helper = readyHelper(pipes);
   const letGo: string[] = [];
-  const scale = options.pixelsPerPoint ?? 2;
+  const scale = 2;
   const unaided = glider<string>({
     now: clock.now,
     everyFrame: (tick) => {
@@ -78,16 +77,6 @@ const far = { x: 1000, y: -400 };
 const partWay = { x: 400, y: -160 };
 
 describe("choosing who moves the panes", () => {
-  it("moves them itself until the helper has said it is ready", () => {
-    const { clock, pipes, glides } = bench({ greeted: false });
-    const body = bodyAt(origin);
-    void glides.run([{ key: "a", body, to: far }], 240);
-    clock.advance(300);
-    expect(pipes.written).toEqual([]);
-    expect(body.path.length).toBeGreaterThan(10);
-    expect(body.position()).toEqual(far);
-  });
-
   it("hands a glide to a helper in use as one command, and moves nothing itself", () => {
     const { clock, pipes, glides } = bench();
     const first = bodyAt(origin);
@@ -119,12 +108,6 @@ describe("choosing who moves the panes", () => {
 });
 
 describe("a glide through the helper", () => {
-  it("names where the app sees each window and where it should go, in the display's pixels", () => {
-    const fractional = bench({ pixelsPerPoint: 1.5 });
-    void fractional.glides.run([{ key: "a", body: bodyAt({ x: 101, y: 7 }), to: far }], 180);
-    expect(fractional.pipes.written).toEqual(["glide 1 180 a0@152,11>1500,-600"]);
-  });
-
   it("answers once the helper says the glide has settled, and not before", async () => {
     const { clock, pipes, glides } = bench();
     const body = bodyAt(origin);
@@ -265,17 +248,7 @@ describe("a glide through the helper", () => {
 describe("falling back to moving the panes itself", () => {
   const failures: ReadonlyArray<[string, (bench: Bench) => void]> = [
     ["exits", ({ pipes }) => pipes.ends()],
-    [
-      "will not take a line",
-      ({ pipes, glides }) => {
-        pipes.jammed = true;
-        glides.drop("bystander");
-        void glides.run([{ key: "other", body: bodyAt(origin), to: origin }], 0);
-      },
-    ],
     ["refuses a window it is gliding", ({ pipes }) => pipes.says("refused a0 not-parent-window")],
-    ["cannot read a command", ({ pipes }) => pipes.says("refused - too-many-windows")],
-    ["stops answering", ({ clock }) => clock.advance(240 + 2 * helperPatienceMs)],
   ];
 
   for (const [how, fail] of failures) {
@@ -452,20 +425,6 @@ describe("a play through the helper", () => {
     await aTurn();
     expect(waiting.frame()).toEqual(large);
     expect(run.settled).toBe(true);
-  });
-
-  it("releases a pane taken out of a play, and gives a pane to its newest play", () => {
-    const { pipes, glides } = bench();
-    const body = framedAt(small);
-    void glides.play([{ key: "a", body, to: large, delayMs: 0, durationMs: 200 }]);
-    void glides.play([{ key: "a", body, to: aside, delayMs: 0, durationMs: 200 }]);
-    glides.drop("a");
-    expect(pipes.written).toEqual([
-      "play 1 a0@0,0,800,600>2000,-800,1600,1200+0~200",
-      "play 2 a0@0,0,800,600>80,80,800,600+0~200",
-      "release a0",
-      "stats",
-    ]);
   });
 
   it("lets panes grow on the way while few change size, and has each take its size at once when many do", () => {

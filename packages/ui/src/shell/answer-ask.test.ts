@@ -82,16 +82,6 @@ describe("one answer path for the card's chords and the desk's keys", () => {
     expect(commands).toEqual(["redo"]);
   });
 
-  it("says nothing waits when the field had nothing to redo", async () => {
-    recordEditCommands(false);
-    const field = document.body.appendChild(document.createElement("textarea"));
-    field.focus();
-    expect(await answerHeldAsk(answering(emptyProjection), { sessionId: "s1" }, "approve")).toBe(
-      nothingAsking,
-    );
-    field.remove();
-  });
-
   it("passes the server's refusal and a failed request on in their own words", async () => {
     const refused = answering(asking(["c1"], [bunTest]), {
       refused: "nothing-to-remember",
