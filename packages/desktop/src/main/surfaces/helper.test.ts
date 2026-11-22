@@ -46,7 +46,7 @@ describe("the helper's greeting", () => {
 });
 
 describe("what the host tells the helper", () => {
-  it("is one line a command: a glide with two points a window, a release, a frame colour, a sync", () => {
+  it("is one line a command: a glide with two points a window, a release, a frame colour, no frame, the system's frame, a sync", () => {
     const pipes = fakeHelperPipes();
     const helper = readyHelper(pipes);
     helper.glide(7, 180, [
@@ -54,13 +54,15 @@ describe("what the host tells the helper", () => {
       { window: "1a40", at: { x: -8, y: 0 }, to: { x: -1520, y: -4 } },
     ]);
     helper.release("1a2b");
-    helper.frame("1a2b", "ff8800");
-    helper.frame("1a2b", undefined);
+    helper.frame("1a2b", { colour: "ff8800" });
+    helper.frame("1a2b", "none");
+    helper.frame("1a2b", "system");
     helper.sync();
     expect(pipes.written).toEqual([
       "glide 7 180 1a2b@160,160>2080,640 1a40@-8,0>-1520,-4",
       "release 1a2b",
       "border 1a2b ff8800",
+      "border 1a2b none",
       "border 1a2b clear",
       "stats",
     ]);

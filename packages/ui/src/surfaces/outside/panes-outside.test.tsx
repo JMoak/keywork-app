@@ -1,6 +1,8 @@
 import { type MotionPrefs, mulberry32 } from "@keywork-app/habitat";
+import type { SettingSignal } from "@keywork-app/protocol";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { arrivalFadesAfterMs } from "../../chrome/signals.ts";
 import type { LifecycleState } from "../../chrome/stamp.ts";
 import type { OutsideKind } from "../feel/arrange.ts";
 import { dealsToTry } from "../feel/arrangements.ts";
@@ -56,6 +58,7 @@ function bench(
   const shows: SurfaceShow[] = [];
   const glides: Glide[] = [];
   const stacks: SurfaceId[][] = [];
+  const frames: Array<[SurfaceId, string | undefined]> = [];
   const refusals: string[] = [];
   const faults: string[] = [];
   const refusing = (what: string): Promise<never> =>
@@ -73,6 +76,10 @@ function bench(
       return desktop.port.glide(glide);
     },
     focus: (id) => (failing.focus === true ? refusing("focus it") : desktop.port.focus(id)),
+    frame: (id, frame) => {
+      frames.push([id, frame]);
+      return Promise.resolve();
+    },
     ...(restacks && {
       stack: (bottomToTop: readonly SurfaceId[]) => {
         stacks.push([...bottomToTop]);
@@ -92,7 +99,7 @@ function bench(
   });
   cleanups.push(outside.dispose, desktop.closeEverything);
   const idOf = (key: string): SurfaceId => shows.find((show) => show.title === key)?.id ?? key;
-  return { desktop, outside, shows, glides, stacks, refusals, faults, idOf };
+  return { desktop, outside, shows, glides, stacks, frames, refusals, faults, idOf };
 }
 
 function paneNamed(key: string, kind: OutsideKind = "note", state: LifecycleState = "idle") {
@@ -2042,5 +2049,143 @@ describe("an arrangement that names things not yet out", () => {
       instruction: { kind: "dealt", deals: asCards },
     });
     expect(again).toMatchObject({ letGo: false });
+  });
+});
+
+describe("what a pane outside says by its border", () => {
+  const ofThread = { ...byACreature, company: "thread-1" } as const;
+  const returning = { ...byACreature, last: desk.console } as const;
+  const inks = { arrived: "#e0af68", "needs-you": "#e0af68", critical: "#f7768e" } as const;
+  const inked = { frameInk: (signal: keyof typeof inks) => inks[signal] };
+
+  function signalled(key: string, signal: () => SettingSignal | undefined) {
+    const pane = paneNamed(key);
+    const facts = pane.tenant.facts;
+    const tenant: Tenant = { ...pane.tenant, facts: () => ({ ...facts(), signal: signal() }) };
+    return { ...pane, tenant };
+  }
+
+  async function standing(made: ReturnType<typeof bench>, key: string, sending: Sent) {
+    const pane = paneNamed(key);
+    void made.outside.send(pane.tenant, sending);
+    await vi.waitFor(() => expect(made.outside.places().has(key)).toBe(true));
+    await settled();
+    return pane;
+  }
+
+  it("draws no outline and asks the desktop for no frame for the keeper's own pane", async () => {
+    const made = await warmed(bench(inked));
+    const pane = paneNamed("notes");
+    await made.outside.send(pane.tenant, byHand);
+    const chrome = chromeOf(pane.body);
+    expect(chrome.dataset.signal).toBeUndefined();
+    expect(chrome.dataset.edge).toBeUndefined();
+    expect(made.shows[0]?.frame).toBeUndefined();
+    expect(made.frames).toEqual([]);
+  });
+
+  it("outlines a creature's arrival in amber, on the page and the frame, for six seconds", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+    const made = bench(inked);
+    await vi.advanceTimersByTimeAsync(10);
+    const pane = paneNamed("on call");
+    void made.outside.send(pane.tenant, byACreature);
+    await vi.advanceTimersByTimeAsync(100);
+    const chrome = chromeOf(pane.body);
+    expect(chrome.dataset.signal).toBe("arrived");
+    expect(made.shows[0]?.frame).toBe("#e0af68");
+    await vi.advanceTimersByTimeAsync(arrivalFadesAfterMs - 200);
+    expect(chrome.dataset.signal).toBe("arrived");
+    expect(made.frames).toEqual([]);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(chrome.dataset.signal).toBeUndefined();
+    expect(chrome.dataset.outline).toBe("arrived");
+    expect(made.frames).toEqual([[made.shows[0]?.id, undefined]]);
+  });
+
+  it("lets an arrival go at once when the keeper focuses the pane", async () => {
+    const made = await warmed(bench(inked));
+    const pane = paneNamed("on call");
+    await made.outside.send(pane.tenant, byACreature);
+    const chrome = chromeOf(pane.body);
+    expect(chrome.dataset.signal).toBe("arrived");
+    made.desktop.emit({ kind: "focused", id: "kw-surface:1" });
+    expect(chrome.dataset.signal).toBeUndefined();
+  });
+
+  it("holds amber while the pane waits on the keeper, red only for critical, and no arrival on a return", async () => {
+    const made = await warmed(bench(inked));
+    const [signal, setSignal] = createSignal<SettingSignal | undefined>("needs-you");
+    const pane = signalled("tests", signal);
+    await made.outside.send(pane.tenant, returning);
+    const chrome = chromeOf(pane.body);
+    expect(chrome.dataset.signal).toBe("needs-you");
+    expect(made.shows[0]?.frame).toBe("#e0af68");
+    setSignal("critical");
+    expect(chrome.dataset.signal).toBe("critical");
+    setSignal(undefined);
+    expect(chrome.dataset.signal).toBeUndefined();
+    const waiting = paneNamed("asks", "conversation", "needs-you");
+    await made.outside.send(waiting.tenant, byHand);
+    expect(chromeOf(waiting.body).dataset.signal).toBe("needs-you");
+  });
+
+  it("repaints the frame as the signal changes, once for each change", async () => {
+    const made = await warmed(bench(inked));
+    const [signal, setSignal] = createSignal<SettingSignal | undefined>();
+    const pane = signalled("deploy", signal);
+    await made.outside.send(pane.tenant, returning);
+    const id = made.shows[0]?.id;
+    expect(made.shows[0]?.frame).toBeUndefined();
+    setSignal("critical");
+    setSignal("needs-you");
+    setSignal(undefined);
+    expect(made.frames).toEqual([
+      [id, "#f7768e"],
+      [id, "#e0af68"],
+      [id, undefined],
+    ]);
+  });
+
+  it("marks the lead of an arrangement with its top edge, and no lead once it stands alone", async () => {
+    const made = await warmed(bench({ ...makingRoom, ...inked }));
+    const keys = ["pane-0", "pane-1", "pane-2"];
+    const panes = keys.map((key) => paneNamed(key));
+    await Promise.all(panes.map((pane) => made.outside.send(pane.tenant, ofThread)));
+    await settled();
+    await made.outside.arrange({
+      keys,
+      lead: "pane-2",
+      instruction: {
+        kind: "dealt",
+        deals: (count) => dealsToTry({ shape: "lead-and-stack", led: true }, count),
+      },
+    });
+    const edges = () => panes.map((pane) => chromeOf(pane.body).dataset.edge);
+    expect(edges()).toEqual([undefined, undefined, "lead"]);
+    expect(made.frames.every(([, frame]) => frame === undefined)).toBe(true);
+    await made.outside.recall(["pane-0", "pane-1"]);
+    expect(chromeOf(panes[2]?.body as HTMLElement).dataset.edge).toBeUndefined();
+  });
+
+  it("marks the pane a drill came out of with its left edge while the drilled-in pane is out", async () => {
+    let stands = desk;
+    const steppingAside = async (): Promise<Desk> => {
+      stands = asTheHub;
+      return stands;
+    };
+    const made = await warmed(bench({ makeRoom: steppingAside }, {}, {}, false, () => stands));
+    const list = await standing(made, "list", ofThread);
+    expect(chromeOf(list.body).dataset.edge).toBeUndefined();
+    const item = await standing(made, "item", {
+      ...ofThread,
+      from: "list",
+      leads: true,
+      weight: 4,
+    });
+    expect(chromeOf(list.body).dataset.edge).toBe("way-back");
+    expect(chromeOf(item.body).dataset.edge).toBe("lead");
+    await made.outside.recall(["item"]);
+    expect(chromeOf(list.body).dataset.edge).toBeUndefined();
   });
 });

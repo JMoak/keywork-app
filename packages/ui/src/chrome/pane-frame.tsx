@@ -1,4 +1,13 @@
-import { createEffect, createMemo, createSignal, type JSX, onCleanup, onMount } from "solid-js";
+import type { SettingSignal } from "@keywork-app/protocol";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  type JSX,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import type { ContextLevel } from "../instruments/context.ts";
 import { tierOf, type WidthTier } from "../page/tiers.ts";
 import { observeSize } from "../surfaces/runtime/realm.ts";
@@ -34,6 +43,9 @@ export interface PaneFrameProps {
   agent?: string | undefined;
   agentColor?: string | undefined;
   tag?: string | undefined;
+  signal?: SettingSignal | undefined;
+  signalWhy?: string | undefined;
+  onClearSignal?: (() => void) | undefined;
   onFocus?: (() => void) | undefined;
   onGauge?: (() => void) | undefined;
   ref?: ((frame: HTMLElement) => void) | undefined;
@@ -79,6 +91,7 @@ export function PaneFrame(props: PaneFrameProps) {
       data-house={chromeWeight()}
       data-tier={tier()}
       data-state={shownState()}
+      data-signal={props.signal}
       data-focused={props.focused ? "" : undefined}
       style={{ "--kw-pane-hue": `var(--kw-ramp-${hueStop(props.hueRank ?? props.spawnRank)})` }}
     >
@@ -102,6 +115,9 @@ export function PaneFrame(props: PaneFrameProps) {
         agent={props.agent}
         agentColor={props.agentColor}
         tag={props.tag}
+        signal={props.signal}
+        signalWhy={props.signalWhy}
+        onClearSignal={props.onClearSignal}
         themeMark={dressed()}
         instruments={worn()?.instruments}
         onGauge={props.onGauge}
@@ -109,6 +125,9 @@ export function PaneFrame(props: PaneFrameProps) {
       <div class="kw-frame-body" ref={(body) => onCleanup(keepTabWithin(body))}>
         {props.children}
       </div>
+      <Show when={props.signal}>
+        <span class="kw-frame-outline" aria-hidden="true" />
+      </Show>
     </section>
   );
 }

@@ -2404,6 +2404,33 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
     updates a second with the main process at 9% of a core (taking their size at once), and 30
     a second at 42% when made to grow on the way; eight panes growing on the way at 56 to 62.
     Not yet done: arrivals as part of a play, and restacking through the mover.
+  - **The console's own panes, set out by a session (2026-11-22, not yet released; engine
+    0.9.0, which also carries border signals at contract 1.35).** A session's `show` could set out a file, a diff, a conversation, a
+    creature and chores as the console's own panes. It now takes `kind: "pane"` with the name of
+    one more: sessions, arcs, files, context, memory, needs-you, permissions, mcp or workspaces
+    (`settingPanes` in the protocol; `satelliteOf` maps each to its pane). The engine reads the
+    name in the caller's own words and keeps one of those nine; a name this console does not
+    know is said in words where the pane would have stood. Left out on purpose until the keeper
+    rules: the terminal, which starts a shell, and the screen pane, which captures the display.
+    Seen working in the running app on 2026-11-22: an agent over a creature's MCP asked for "the
+    session list", "files" and "needs you" outside, and the three panes stood beside the console.
+  - **Border signals (2026-11-22, not yet released; contract 1.35, engine 0.9.0, mover 0.3.0).**
+    Jordan's ruling: no border by default; a border is for getting the keeper's attention. A pane
+    outside now draws no outline and no top edge at rest, the keeper's own panes included, and on
+    Windows 11 the mover draws no frame for it (`border <window> none`). Two marks say where a
+    pane stands, each an edge and set only by the console: a violet top edge on the lead of an
+    arrangement or the pane a drill went into, and a violet left edge on each pane a drill came
+    out of while the pane it went into is out. Three signals say how much a pane wants the keeper,
+    each a whole outline in the page and the same colour on the OS frame: just arrived (thin
+    amber, the console's own, gone after six seconds or once the keeper focuses the pane),
+    needs you (heavier amber, while a pane waits on a question or permission, or when the
+    session raised it) and critical (red, raised by the session with a reason). The session's
+    word is `signal` on `show` and `arrange`, `needs-you` or `critical` on the wire
+    (`setting.signal`); the keeper clears it from the tag in the title row
+    (`DELETE /show/{id}/signal`). Beside the conversation a signalled card or panel wears the same
+    outline and tag. Seen working in the running app on 2026-11-22 with an agent over a
+    creature's MCP: at rest, the lead, the way back, an arrival, needs you and critical, and the
+    keeper clearing critical, with the mover told each frame colour and refusing none.
 - **Owed.** No screenshot stage covers a float or the shelf.
 
 ### Stock ledger (2026-11-12): the carter and the joiner

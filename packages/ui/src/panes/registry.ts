@@ -1,5 +1,5 @@
 import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
-import type { SettingSubject } from "@keywork-app/protocol";
+import type { SettingSignal, SettingSubject } from "@keywork-app/protocol";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
 import type { TitleBot } from "../chrome/identity.ts";
@@ -101,6 +101,8 @@ export interface PaneAdornments {
   readonly agent?: string | undefined;
   readonly agentColor?: string | undefined;
   readonly tag?: string | undefined;
+  readonly signal?: SettingSignal | undefined;
+  readonly signalWhy?: string | undefined;
 }
 
 export interface PaneView<Spec extends PaneSpecBase> {

@@ -42,7 +42,7 @@ import {
   houseOffsetMinutes,
   seatCreatures,
 } from "../panes/stead/habitat.ts";
-import { answerSetting } from "./answers.ts";
+import { answerSetting, clearSignal } from "./answers.ts";
 import { type AttendNotice, createAttentionFeed } from "./attention.ts";
 import { createKeeperVoice } from "./context.ts";
 import type { YardRuleBook } from "./rules.ts";
@@ -76,6 +76,7 @@ export interface YardModel {
   raiseByHand(setting: YardSetting): void;
   restorePlot(plot: PlotCard): void;
   answer(setting: YardSetting, outcome: KeeperShowOutcome): Promise<string | undefined>;
+  clearSignal(setting: YardSetting): Promise<string | undefined>;
 }
 
 export const withdrawalsKept = 32;
@@ -143,6 +144,7 @@ export function createYardModel(seams: YardModelSeams): YardModel {
       seams.rules.record(ruleFromHand(setting, "unfold"));
     },
     answer: (setting, outcome) => answerSetting(shellOf(setting).client, setting.id, outcome),
+    clearSignal: (setting) => clearSignal(shellOf(setting).client, setting.id),
   };
 }
 

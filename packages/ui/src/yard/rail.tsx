@@ -1,6 +1,7 @@
 import { yardIds } from "@keywork-app/habitat";
-import type { KeeperShowOutcome, Rung } from "@keywork-app/protocol";
+import type { KeeperShowOutcome, Rung, SettingSignal } from "@keywork-app/protocol";
 import { createEffect, createSignal, For, type JSX, on, Show } from "solid-js";
+import { signalReason, signalWords } from "../chrome/signals.ts";
 import { agentMark, tagTitle } from "../chrome/title-row.tsx";
 import type { Rect } from "../layout/index.ts";
 import { focusedIn } from "../surfaces/runtime/realm.ts";
@@ -33,6 +34,7 @@ export interface RailEntry {
   readonly agent?: string | undefined;
   readonly agentColor?: string | undefined;
   readonly tag?: string | undefined;
+  readonly signal?: SettingSignal | undefined;
   readonly grouped?: number | undefined;
   readonly plot?: number | undefined;
   readonly level?: number | undefined;
@@ -282,6 +284,7 @@ function RailCardView(props: RailCardViewProps) {
       data-plot={props.entry.plot}
       data-level={props.entry.level}
       data-cursor={props.cursor ? "" : undefined}
+      data-signal={props.entry.signal}
       style={rectStyle(props.rect)}
       onClick={() => props.onPick()}
     >
@@ -304,6 +307,17 @@ function RailCardView(props: RailCardViewProps) {
           {(tag) => (
             <span class="kw-yard-card-tag" title={tagTitle(tag())}>
               {tag()}
+            </span>
+          )}
+        </Show>
+        <Show when={props.entry.signal}>
+          {(signal) => (
+            <span
+              class="kw-yard-card-signal"
+              data-signal={signal()}
+              title={signalReason(signal(), props.entry.why)}
+            >
+              {signalWords[signal()]}
             </span>
           )}
         </Show>

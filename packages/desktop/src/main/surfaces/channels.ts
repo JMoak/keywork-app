@@ -10,6 +10,7 @@ export const surfaceChannels = {
   focus: "surfaces:focus",
   focusConsole: "surfaces:focus-console",
   stack: "surfaces:stack",
+  frame: "surfaces:frame",
   moveConsole: "surfaces:move-console",
   event: "surfaces:event",
   broughtHome: "surfaces:brought-home",
@@ -55,6 +56,7 @@ export interface SurfaceShow {
   readonly follows: boolean;
   readonly backdrop: string;
   readonly title: string;
+  // The colour of the window's own frame as #rrggbb, where the desktop draws one; none when absent.
   readonly frame?: string | undefined;
 }
 
@@ -120,6 +122,7 @@ export interface SurfacesPort {
   focus(id: SurfaceId): Promise<void>;
   focusConsole(): Promise<void>;
   stack?(bottomToTop: readonly SurfaceId[]): Promise<void>;
+  frame?(id: SurfaceId, frame: string | undefined): Promise<void>;
   moveConsole?(move: ConsoleMove): Promise<ConsoleMoved>;
   onLeaving?(listener: () => void): () => void;
   onEvent(listener: (event: SurfaceEvent) => void): () => void;

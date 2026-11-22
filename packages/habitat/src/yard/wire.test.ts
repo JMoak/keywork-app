@@ -76,6 +76,37 @@ describe("show settings in the habitat", () => {
     expect(yardOf(unseen).settings).toEqual(yardOf(decided).settings);
   });
 
+  it("raises and lowers a setting's signal in place, taking the reason and the hold it came with", () => {
+    const decided = showing(
+      project(emptyHabitat(), proposed(1, aSetting({ id: "a", until: "rests" }))),
+      { a: { shown: "card", depth: 2 } },
+    );
+    const changed = (state: HabitatState, setting: Setting): HabitatState =>
+      project(state, {
+        id: 2,
+        ts: later,
+        sessionId: setting.sessionId,
+        type: "show.changed",
+        payload: { setting },
+      });
+    const reason = "the release is half applied";
+
+    const raised = changed(
+      decided,
+      aSetting({ id: "a", signal: "critical", why: reason, until: "seen" }),
+    );
+    expect(yardOf(raised).settings.a).toMatchObject({
+      shown: "card",
+      depth: 2,
+      signal: "critical",
+      why: reason,
+      until: "seen",
+    });
+    const lowered = changed(raised, aSetting({ id: "a", why: reason, until: "seen" }));
+    expect(yardOf(lowered).settings.a).not.toHaveProperty("signal");
+    expect(yardOf(lowered).settings.a).toMatchObject({ why: reason, until: "seen" });
+  });
+
   it("keeps the rung a setting shows when its proposal is replayed", () => {
     const decided = showing(project(emptyHabitat(), proposed(1, aSetting({ id: "a" }))), {
       a: { shown: "card", depth: 2 },

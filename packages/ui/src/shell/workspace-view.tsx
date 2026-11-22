@@ -23,11 +23,12 @@ import { Dynamic } from "solid-js/web";
 import { FirstRun } from "../chrome/first-run.tsx";
 import { gapSeamReach, rootRemPx } from "../chrome/gap.ts";
 import { createStripPreference, NeedsYouStrip, stripLine } from "../chrome/needs-you-strip.tsx";
-import { hueStop, type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
+import { type LifecycleState, PaneFrame } from "../chrome/pane-frame.tsx";
 import { PaneShelf, type ShelfItem } from "../chrome/pane-shelf.tsx";
 import { useProductProfile } from "../chrome/product.ts";
 import { readingMs } from "../chrome/reading-time.ts";
 import { gapCells } from "../chrome/root-attributes.ts";
+import type { PaneSignal } from "../chrome/signals.ts";
 import { StatusLine } from "../chrome/status-line.tsx";
 import { telemetry } from "../chrome/telemetry.ts";
 import { createUpdateOffer, updateCommands } from "../chrome/update-offer.ts";
@@ -94,7 +95,7 @@ import {
 import { holdKeysWherePressed, sendStrayKeysHome } from "../panes/keyboard-home.ts";
 import { workingSession } from "../panes/overview/working-session.ts";
 import { createCloseGate, type PaneActionHandler } from "../panes/registry.ts";
-import { kindWorkedIn } from "../panes/setting/index.tsx";
+import { kindWorkedIn, settingShownBy } from "../panes/setting/index.tsx";
 import { type SteadHomeScope, shellForStead } from "../panes/stead/home-scope.ts";
 import { steadPane } from "../panes/stead/index.tsx";
 import { postureStorageKey } from "../posture/record.ts";
@@ -728,6 +729,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     factsOf: (pane) => paneFacts(pane),
     motion: () => ({ reducedMotion: yard.reducedMotion(), tier: "interact" }),
     backdrop: () => (wardrobe.wearing() ?? keyworkNight).tokens.background,
+    frameInk: (signal) => frameInkOf(signal),
     chord: (action) => keys.describe(action),
     say,
     act: actBesideTheHub,
@@ -1277,10 +1279,18 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
       hueRank,
       state: lifecycleOf(slot),
       ordinal: ordinalsShown() ? ordinalChord(slot) : undefined,
-      frame: inksWorn()[`--kw-ramp-${hueStop(hueRank)}`],
+      signal: adornmentsOf(slot).signal,
     };
   };
   const inksWorn = createMemo(() => themeVariables(wardrobe.wearing() ?? keyworkNight));
+  const frameInkOf = (signal: PaneSignal): string | undefined =>
+    inksWorn()[signal === "critical" ? "--kw-error" : "--kw-terminal-yellow"];
+  const signalClearerOf = (slot: PaneSlot): (() => void) | undefined => {
+    const shown = settingShownBy(slot.spec);
+    const setting = yard.settings().find((candidate) => candidate.id === shown?.id);
+    if (shown?.signal === undefined || setting === undefined) return undefined;
+    return () => yard.clearSignal(setting);
+  };
   const shelfItems = createMemo((): ShelfItem[] =>
     focusedPaneHub()
       ? []
@@ -1395,6 +1405,9 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           agent={adornmentsOf(slot()).agent}
           agentColor={adornmentsOf(slot()).agentColor}
           tag={adornmentsOf(slot()).tag}
+          signal={adornmentsOf(slot()).signal}
+          signalWhy={adornmentsOf(slot()).signalWhy}
+          onClearSignal={signalClearerOf(slot())}
         >
           <Dynamic
             component={definitionOf(spec().kind).component}
@@ -1523,6 +1536,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
         onEnter={enterFromTheYard}
         opensOutside={standsAsHub()}
         onAnswer={yard.answer}
+        onClearSignal={yard.clearSignal}
         onOpen={yard.open}
         onInteract={yard.interacted}
         onToggleView={yard.control.toggleView}

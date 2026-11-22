@@ -63,6 +63,7 @@ export interface YardSurface {
   shellOf(setting: YardSetting): ShellSeams;
   enter(setting: YardSetting, way: PanelWay): void;
   answer(setting: YardSetting, outcome: KeeperShowOutcome): void;
+  clearSignal(setting: YardSetting): void;
   open(from: YardSetting, what: SettingSubject): void;
   restore(plot: PlotCard): void;
   openFromPanel(spec: PaneSpec): boolean;
@@ -107,6 +108,11 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
       return;
     }
     void model.answer(setting, outcome).then((line) => {
+      if (line !== undefined) options.say(line);
+    });
+  };
+  const clearSignal = (setting: YardSetting): void => {
+    void model.clearSignal(setting).then((line) => {
       if (line !== undefined) options.say(line);
     });
   };
@@ -201,6 +207,7 @@ export function createYardSurface(options: YardSurfaceOptions): YardSurface {
       else unfoldBeside(setting);
     },
     answer,
+    clearSignal,
     open,
     restore: (plot) => {
       model.restorePlot(plot);

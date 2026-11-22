@@ -90,6 +90,34 @@ describe("PaneFrame", () => {
     expect(container.querySelector(".kw-frame-stamp")?.textContent).toBe(" ");
   });
 
+  it("outlines a signalled setting in the signal's colour, and draws nothing extra at rest", () => {
+    const [signal, setSignal] = createSignal<"needs-you" | "critical" | undefined>("needs-you");
+    const { container } = render(() => (
+      <PaneFrame name="Tests" state="idle" focused={false} spawnRank={0} signal={signal()}>
+        <p>body</p>
+      </PaneFrame>
+    ));
+    const frame = container.querySelector(".kw-frame") as HTMLElement;
+    expect(frame.dataset.signal).toBe("needs-you");
+    expect(frame.querySelector(":scope > .kw-frame-outline")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(frame.querySelector(".kw-frame-signal")?.textContent).toBe("needs you");
+    setSignal(undefined);
+    expect(frame.dataset.signal).toBeUndefined();
+    expect(frame.querySelector(".kw-frame-outline")).toBeNull();
+    expect(frame.querySelector(".kw-frame-signal")).toBeNull();
+  });
+
+  it("inks a signal amber, and red only when it is critical", () => {
+    const css = readFileSync(join(process.cwd(), "packages/ui/src/chrome/pane-frame.css"), "utf8");
+    expect(css).toMatch(/\.kw-frame \{\s*--kw-frame-signal-ink: var\(--kw-terminal-yellow\);/);
+    expect(css).toMatch(
+      /\.kw-frame\[data-signal="critical"\] \{\s*--kw-frame-signal-ink: var\(--kw-error\);/,
+    );
+    expect(css).toMatch(/box-shadow: inset 0 0 0 2px var\(--kw-frame-signal-ink\);/);
+  });
+
   it("calls onFocus when the frame is pressed", () => {
     let focused = 0;
     const { container } = render(() => (

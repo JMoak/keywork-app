@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { answerSetting, pinAnswer, type SettingAnswers } from "./answers.ts";
+import {
+  answerSetting,
+  clearSignal,
+  pinAnswer,
+  type SettingAnswers,
+  type SignalClearing,
+} from "./answers.ts";
 
 describe("the keeper's answers", () => {
   it("post the outcome to the wire and say what follows, settling nothing here", async () => {
@@ -42,6 +48,23 @@ describe("the keeper's answers", () => {
     expect(await answerSetting(failing, "set-1", "seen")).toBe(
       "not answered · the server answered 500",
     );
+  });
+
+  it("clear a signal on the wire and say the setting stays, taking a conflict as already clear", async () => {
+    const clearing = { clearSignal: vi.fn(async () => undefined) };
+    expect(await clearSignal(clearing, "set-1")).toBe("signal cleared · it stays where it is");
+    expect(clearing.clearSignal.mock.calls).toEqual([["set-1"]]);
+    const clearAlready: SignalClearing = {
+      clearSignal: async () => ({
+        refused: "conflict",
+        detail: "setting set-1 carries no signal, so there is nothing to clear",
+      }),
+    };
+    expect(await clearSignal(clearAlready, "set-1")).toBeUndefined();
+    const gone: SignalClearing = {
+      clearSignal: async () => ({ refused: "missing", detail: "no setting out has the id set-1" }),
+    };
+    expect(await clearSignal(gone, "set-1")).toBe("not answered · no setting out has the id set-1");
   });
 
   it("toggle a pin by what the setting already is", () => {

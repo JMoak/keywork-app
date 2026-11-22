@@ -91,6 +91,31 @@ describe("the rail", () => {
     );
   });
 
+  it("outlines a card that needs the keeper and names its signal with its reason", () => {
+    const signalled = { ...entry("deploy", "card", false), signal: "critical" as const };
+    const { container } = render(() => (
+      <Rail
+        entries={[signalled]}
+        cards={[{ id: "deploy", rect: { x: 0, y: 52, width: 272, height: 64 } }]}
+        head={head}
+        fold={undefined}
+        folded={0}
+        heldBack={0}
+        active={false}
+        cursor={undefined}
+        onCursor={() => undefined}
+        onEnter={() => undefined}
+        onAnswer={() => undefined}
+        onReturn={() => undefined}
+      />
+    ));
+    const card = container.querySelector(".kw-yard-card") as HTMLElement;
+    expect(card.dataset.signal).toBe("critical");
+    const named = card.querySelector(".kw-yard-card-signal") as HTMLElement;
+    expect(named.textContent).toBe("critical");
+    expect(named.getAttribute("title")).toBe("critical · worth a look");
+  });
+
   it("picks a card by pointer as Enter would", () => {
     const run = rail(false);
     const second = run.container.querySelectorAll<HTMLElement>(".kw-yard-card")[1];

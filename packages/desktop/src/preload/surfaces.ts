@@ -33,6 +33,7 @@ export function surfacesPort(ipc: SurfacesIpc): SurfacesPort {
     focus: (id) => ipc.invoke(surfaceChannels.focus, id) as Promise<void>,
     focusConsole: () => ipc.invoke(surfaceChannels.focusConsole) as Promise<void>,
     stack: (bottomToTop) => ipc.invoke(surfaceChannels.stack, bottomToTop) as Promise<void>,
+    frame: (id, frame) => ipc.invoke(surfaceChannels.frame, { id, frame }) as Promise<void>,
     moveConsole: (move) => ipc.invoke(surfaceChannels.moveConsole, move) as Promise<ConsoleMoved>,
     onLeaving: subscribe<null>(surfaceChannels.leaving),
     onEvent: subscribe<SurfaceEvent>(surfaceChannels.event),

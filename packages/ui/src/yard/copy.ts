@@ -17,6 +17,7 @@ export const kindWords: Readonly<Record<SettingKind, string>> = {
   chore: "a chore",
   url: "a link",
   note: "a note",
+  pane: "a pane",
 };
 
 export const answeredLines: Readonly<Record<KeeperShowOutcome, string>> = {
@@ -25,6 +26,8 @@ export const answeredLines: Readonly<Record<KeeperShowOutcome, string>> = {
   unpinned: "unpinned · it closes once settled",
   dismissed: "dismissed · it closes",
 };
+
+export const signalClearedLine = "signal cleared · it stays where it is";
 
 export const decisionsHead = "the yard's last decisions · enter closes";
 

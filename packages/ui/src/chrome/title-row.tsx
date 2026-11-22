@@ -1,3 +1,4 @@
+import type { SettingSignal } from "@keywork-app/protocol";
 import { For, onCleanup, onMount, Show } from "solid-js";
 import type { ContextLevel, GaugeStyle } from "../instruments/context.ts";
 import { ContextGauge, contextUnit } from "../instruments/gauge.tsx";
@@ -5,6 +6,7 @@ import { gaugeStyleFor, type InstrumentTier } from "../instruments/tier.ts";
 import type { WidthTier } from "../page/tiers.ts";
 import type { TitleBot } from "./identity.ts";
 import type { ChromeWeight } from "./root-attributes.ts";
+import { clearSignalTitle, signalReason, signalWords } from "./signals.ts";
 import { arcTagParts } from "./slug.ts";
 import { type LifecycleState, stampGlyph } from "./stamp.ts";
 import { compactTelemetry } from "./telemetry.ts";
@@ -46,6 +48,9 @@ export interface TitleRowProps {
   agent?: string | undefined;
   agentColor?: string | undefined;
   tag?: string | undefined;
+  signal?: SettingSignal | undefined;
+  signalWhy?: string | undefined;
+  onClearSignal?: (() => void) | undefined;
   themeMark?: ThemeMark | undefined;
   instruments?: InstrumentTier | undefined;
   onGauge?: (() => void) | undefined;
@@ -145,6 +150,11 @@ export function TitleRow(props: TitleRowProps) {
           </span>
         )}
       </Show>
+      <Show when={props.signal}>
+        {(signal) => (
+          <SignalTag signal={signal()} why={props.signalWhy} onClear={props.onClearSignal} />
+        )}
+      </Show>
       <Show when={shown("arc", props.arc)}>{(slug) => <ArcTag slug={slug()} />}</Show>
       <span class="kw-frame-detail">
         <Show when={shown("bot", props.bot)}>{(bot) => <BotIdentity bot={bot()} />}</Show>
@@ -185,6 +195,42 @@ export function TitleRow(props: TitleRowProps) {
         </span>
       </Show>
     </header>
+  );
+}
+
+interface SignalTagProps {
+  signal: SettingSignal;
+  why: string | undefined;
+  onClear: (() => void) | undefined;
+}
+
+function SignalTag(props: SignalTagProps) {
+  return (
+    <Show
+      when={props.onClear}
+      fallback={
+        <span
+          class="kw-frame-signal"
+          data-signal={props.signal}
+          title={signalReason(props.signal, props.why)}
+        >
+          {signalWords[props.signal]}
+        </span>
+      }
+    >
+      {(clear) => (
+        <button
+          type="button"
+          class="kw-frame-signal"
+          data-signal={props.signal}
+          title={clearSignalTitle(props.signal, props.why)}
+          // Solid delegates onClick to the document its bundle loaded in; a pane outside lives in another.
+          on:click={() => clear()()}
+        >
+          {signalWords[props.signal]}
+        </button>
+      )}
+    </Show>
   );
 }
 

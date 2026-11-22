@@ -4,9 +4,33 @@ export type Rung = (typeof rungs)[number];
 
 export type ProposedRung = Exclude<Rung, "glyph">;
 
-export const settingKinds = ["file", "diff", "report", "thread", "chore", "url", "note"] as const;
+export const settingKinds = [
+  "file",
+  "diff",
+  "report",
+  "thread",
+  "chore",
+  "url",
+  "note",
+  "pane",
+] as const;
 
 export type SettingKind = (typeof settingKinds)[number];
+
+// The console's own panes a session may set out (contract 1.34): the `ref` of a "pane" setting.
+export const settingPanes = [
+  "sessions",
+  "arcs",
+  "files",
+  "context",
+  "memory",
+  "needs-you",
+  "permissions",
+  "mcp",
+  "workspaces",
+] as const;
+
+export type SettingPane = (typeof settingPanes)[number];
 
 export interface SettingSubject {
   kind: SettingKind;
@@ -87,7 +111,14 @@ export interface Setting {
   // A word or two the session asked the keeper to read on the setting while it is out; a change
   // arrives as `show.changed`.
   mark?: string | undefined;
+  // Since contract 1.35: how much the setting wants the keeper, drawn as an outline. A change
+  // arrives as `show.changed`; the keeper clears it with `DELETE /show/{id}/signal`.
+  signal?: SettingSignal | undefined;
 }
+
+export const settingSignals = ["needs-you", "critical"] as const;
+
+export type SettingSignal = (typeof settingSignals)[number];
 
 export const agentColors = ["cyan", "magenta", "green", "yellow", "blue"] as const;
 
@@ -252,6 +283,7 @@ export const showRoutes = [
   { method: "GET", path: "/show", operationId: "listSettings" },
   { method: "POST", path: "/show", operationId: "openSetting" },
   { method: "POST", path: "/show/{id}/answer", operationId: "answerSetting" },
+  { method: "DELETE", path: "/show/{id}/signal", operationId: "clearSignal" },
   {
     method: "PUT",
     path: "/sessions/{sessionId}/settings/placements",

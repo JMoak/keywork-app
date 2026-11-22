@@ -1,4 +1,9 @@
-import { type Setting, type SettingSubject, settingKinds } from "@keywork-app/protocol";
+import {
+  type Setting,
+  type SettingSubject,
+  settingKinds,
+  settingSignals,
+} from "@keywork-app/protocol";
 import { createMemo, createSignal, Show } from "solid-js";
 import { z } from "zod";
 import { arcHueRank } from "../../chrome/identity.ts";
@@ -27,6 +32,8 @@ const settingSpec = z.object({
       }),
       agent: z.object({ name: z.string().optional(), color: z.string().optional() }).optional(),
       mark: z.string().optional(),
+      signal: z.enum(settingSignals).optional(),
+      why: z.string().optional(),
     })
     .optional(),
 });
@@ -73,12 +80,14 @@ export const settingPane = definePane<SettingSpec>({
           agent: setting.agent === undefined ? undefined : agentMarkLabel(setting.agent),
           agentColor: setting.agent?.color,
           tag: setting.mark,
+          signal: setting.signal,
+          signalWhy: setting.signal === undefined ? undefined : setting.why,
         },
 });
 
 export function settingSpecOf(setting: SetOut | undefined): SettingSpec {
   if (setting === undefined) return { kind: "setting" };
-  const { id, creature, sessionId, agent, mark } = setting;
+  const { id, creature, sessionId, agent, mark, signal, why } = setting;
   const { kind, ref, title } = setting.what;
   const what = title === undefined ? { kind, ref } : { kind, ref, title };
   const shown = { id, creature, sessionId, what };
@@ -88,6 +97,7 @@ export function settingSpecOf(setting: SetOut | undefined): SettingSpec {
       ...shown,
       ...(agent !== undefined && { agent }),
       ...(mark !== undefined && { mark }),
+      ...(signal !== undefined && { signal, ...(why !== undefined && why !== "" && { why }) }),
     },
   };
 }

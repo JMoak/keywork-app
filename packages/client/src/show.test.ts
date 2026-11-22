@@ -71,6 +71,15 @@ describe("the yard's routes", () => {
     ]);
   });
 
+  it("clears a setting's signal with DELETE /show/{id}/signal and changes nothing itself", async () => {
+    const server = serving(() => json(200, { setting }));
+    const client = keyworkClient(ticket, { fetch: server.fetch });
+    expect(await client.clearSignal("set 1")).toBeUndefined();
+    expect(server.calls).toEqual([
+      { url: "http://127.0.0.1:4770/show/set%201/signal", method: "DELETE", body: undefined },
+    ]);
+  });
+
   it("posts the keeper's own opening to POST /show as an unfolded child of the panel it came from", async () => {
     const opened = { ...setting, id: "set-2", what: { kind: "file", ref: "src/app.test.ts" } };
     const server = serving(() => json(200, { setting: opened }));

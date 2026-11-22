@@ -248,6 +248,49 @@ describe("TitleRow", () => {
   });
 });
 
+describe("a signal in the title row", () => {
+  const row = (onClearSignal?: () => void) =>
+    render(() => (
+      <TitleRow
+        name="Deploy"
+        state="idle"
+        step={0}
+        focused={false}
+        tier="broadsheet"
+        weight="seams"
+        signal="critical"
+        signalWhy="the release is half applied"
+        onClearSignal={onClearSignal}
+      />
+    ));
+
+  it("names the signal in plain words with its reason, and nothing to press without a way to clear it", () => {
+    const { container } = row();
+    const tag = container.querySelector(".kw-frame-signal") as HTMLElement;
+    expect(tag.tagName).toBe("SPAN");
+    expect(tag.textContent).toBe("critical");
+    expect(tag.dataset.signal).toBe("critical");
+    expect(tag.getAttribute("title")).toBe("critical · the release is half applied");
+  });
+
+  it("clears the signal when pressed, by pointer or by key, given a way to clear it", () => {
+    const cleared: string[] = [];
+    const { container } = row(() => cleared.push("cleared"));
+    const button = container.querySelector("button.kw-frame-signal") as HTMLButtonElement;
+    expect(button.getAttribute("type")).toBe("button");
+    expect(button.getAttribute("title")).toBe(
+      "critical · the release is half applied · press to clear",
+    );
+    button.click();
+    expect(cleared).toEqual(["cleared"]);
+  });
+
+  it("is absent at rest", () => {
+    const { container } = renderRow("broadsheet", false);
+    expect(container.querySelector(".kw-frame-signal")).toBeNull();
+  });
+});
+
 describe("the faint rung", () => {
   const frameCss = readFileSync(
     join(process.cwd(), "packages/ui/src/chrome/pane-frame.css"),

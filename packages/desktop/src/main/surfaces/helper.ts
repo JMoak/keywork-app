@@ -32,6 +32,9 @@ export interface Role {
 // The most windows one play line may carry; the helper refuses a longer one.
 export const mostRolesInAPlay = 32;
 
+// What a window's own frame is drawn in: a colour, nothing at all, or what the system would choose.
+export type FramePaint = { readonly colour: string } | "none" | "system";
+
 export interface HelperWatcher {
   settled(glide: number): void;
   refused(window: string, reason: string): void;
@@ -44,7 +47,7 @@ export interface PanesHelper {
   glide(id: number, durationMs: number, journeys: readonly Journey[]): void;
   play(id: number, roles: readonly Role[]): void;
   release(window: string): void;
-  frame(window: string, colour: string | undefined): void;
+  frame(window: string, paint: FramePaint): void;
   sync(): void;
   watch(watcher: HelperWatcher): void;
   retire(why: string): void;
@@ -110,7 +113,7 @@ export function panesHelper(
       say(`glide ${id} ${durationMs} ${journeys.map(journeyWord).join(" ")}`),
     play: (id, roles) => say(`play ${id} ${roles.map(roleWord).join(" ")}`),
     release: (window) => say(`release ${window}`),
-    frame: (window, colour) => say(`border ${window} ${colour ?? "clear"}`),
+    frame: (window, paint) => say(`border ${window} ${paintWord(paint)}`),
     sync: () => say(syncRequest),
     watch: (next) => {
       watcher = next;
@@ -153,6 +156,11 @@ const syncRequest = "stats";
 // Colouring a frame is refused where the desktop cannot do it (before Windows 11), and that
 // says nothing about whether the window can be moved.
 const unpaintedFrame = "border-failed";
+
+function paintWord(paint: FramePaint): string {
+  if (paint === "system") return "clear";
+  return paint === "none" ? "none" : paint.colour;
+}
 
 function roleWord({ window, at, to, delayMs, durationMs, sizeAtOnce }: Role): string {
   const timing = `+${Math.round(delayMs)}~${Math.round(durationMs)}`;

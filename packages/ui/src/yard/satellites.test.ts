@@ -1,5 +1,7 @@
+import { settingPanes } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
-import { namesAPath, panelTitleOf, satelliteOf } from "./satellites.ts";
+import { definitionOf } from "../panes/index.ts";
+import { namesAPath, panelTitleOf, satelliteOf, unknownPaneWords } from "./satellites.ts";
 import { aSetting } from "./testing.ts";
 
 describe("a diff set out for the keeper", () => {
@@ -28,5 +30,37 @@ describe("a diff set out for the keeper", () => {
       false,
       false,
     ]);
+  });
+});
+
+describe("one of the console's own panes set out for the keeper", () => {
+  const paneOf = (ref: string) => satelliteOf(aSetting({ what: { kind: "pane", ref } }));
+
+  it("is the pane the keeper knows by that name", () => {
+    expect(paneOf("sessions")).toEqual({ kind: "pane", spec: { kind: "tree" } });
+    expect(paneOf("files")).toEqual({ kind: "pane", spec: { kind: "browser" } });
+    expect(paneOf("needs-you")).toEqual({ kind: "pane", spec: { kind: "needs-you" } });
+    expect(paneOf("context")).toEqual({
+      kind: "pane",
+      spec: { kind: "context", sessionId: "home-conversation" },
+    });
+  });
+
+  it("opens a pane this console really has, for every name the engine may send", () => {
+    for (const name of settingPanes) {
+      const shown = paneOf(name);
+      expect(shown.kind, name).toBe("pane");
+      if (shown.kind !== "pane") continue;
+      const definition = definitionOf(shown.spec.kind);
+      expect(definition.spec.safeParse(shown.spec).success, name).toBe(true);
+    }
+  });
+
+  it("says so in words when a newer engine names a pane this console does not have", () => {
+    expect(paneOf("timeline")).toEqual({ kind: "note", text: unknownPaneWords("timeline") });
+    expect(panelTitleOf(aSetting({ what: { kind: "pane", ref: "sessions" } }))).toBe("sessions");
+    expect(panelTitleOf(aSetting({ what: { kind: "pane", ref: "needs-you" } }))).toBe("needs you");
+    const named = aSetting({ what: { kind: "pane", ref: "needs-you", title: "Waiting on you" } });
+    expect(panelTitleOf(named)).toBe("Waiting on you");
   });
 });

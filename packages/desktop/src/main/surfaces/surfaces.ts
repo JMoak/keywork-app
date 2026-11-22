@@ -108,6 +108,11 @@ interface ConsoleFlight {
   glide: FrameGlide | undefined;
 }
 
+interface Reframing {
+  readonly id?: unknown;
+  readonly frame?: unknown;
+}
+
 interface Surface {
   readonly id: SurfaceId;
   readonly window: SurfaceWindowLike;
@@ -188,6 +193,10 @@ class SurfaceHost {
       asked((owner, bottomToTop: readonly SurfaceId[]) => this.stack(owner, bottomToTop)),
     );
     ipc.handle(
+      surfaceChannels.frame,
+      asked((owner, { id, frame }: Reframing) => this.reframe(owner, id, frame)),
+    );
+    ipc.handle(
       surfaceChannels.moveConsole,
       asked((owner, move: ConsoleMove) => this.moveConsole(owner, move)),
     );
@@ -240,7 +249,7 @@ class SurfaceHost {
     surface.window.setZoomFactor(owner.console.zoomFactor());
     this.place(surface, wholeRect(request.bounds));
     surface.follows = request.follows;
-    this.frame(surface, request.frame);
+    this.paint(surface, request.frame);
     if (keeperWantsFocus(request)) this.showFocused(surface);
     else surface.window.showInactive();
   }
@@ -254,7 +263,7 @@ class SurfaceHost {
     const surface = owner.surfaces.get(id);
     if (surface === undefined) return;
     this.takeFromGlide(surface);
-    this.frame(surface, undefined);
+    this.unpaint(surface);
     if (this.reusable(surface)) surface.window.hide();
     else this.retire(surface);
   }
@@ -377,13 +386,27 @@ class SurfaceHost {
     }
   }
 
-  frame(surface: Surface, asked: string | undefined): void {
+  reframe(owner: Owner, id: unknown, asked: unknown): void {
+    if (typeof id !== "string") return;
+    const surface = owner.surfaces.get(id);
+    if (surface?.window.isVisible() === true) this.paint(surface, asked);
+  }
+
+  // A pane's own frame is the desktop's to draw. Asked for a colour it takes that colour, and
+  // otherwise it draws none, so panes at rest meet edge to edge.
+  paint(surface: Surface, asked: unknown): void {
     const { helper } = this.ports;
-    const colour = frameColour(asked);
     if (helper === undefined || !helper.inUse()) return;
-    if (colour === undefined && !surface.framed) return;
-    helper.frame(surface.window.nativeHandle(), colour);
-    surface.framed = colour !== undefined;
+    const colour = frameColour(asked);
+    helper.frame(surface.window.nativeHandle(), colour === undefined ? "none" : { colour });
+    surface.framed = true;
+  }
+
+  unpaint(surface: Surface): void {
+    const { helper } = this.ports;
+    if (helper === undefined || !helper.inUse() || !surface.framed) return;
+    helper.frame(surface.window.nativeHandle(), "system");
+    surface.framed = false;
   }
 
   place(surface: Surface, bounds: ScreenRect): void {
@@ -460,7 +483,7 @@ class SurfaceHost {
     if (this.disposed || !this.keeps(surface)) return;
     request.preventDefault();
     this.takeFromGlide(surface);
-    this.frame(surface, undefined);
+    this.unpaint(surface);
     surface.leaving = true;
     surface.window.hide();
     this.emit(surface.owner, { kind: "closed", id: surface.id });

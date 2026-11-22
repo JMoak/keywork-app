@@ -24,11 +24,14 @@ export function proposeSetting(yard: YardState, setting: Setting): YardState {
 export function changeSetting(yard: YardState, setting: Setting): YardState {
   const held = yard.settings[setting.id];
   if (held === undefined || !stillShown(setting)) return yard;
-  const { mark: _before, ...rest } = held;
-  const { mark, agent } = setting;
+  const { mark: _mark, signal: _signal, ...rest } = held;
+  const { mark, signal, agent, why, until } = setting;
   return withSetting(yard, {
     ...rest,
+    why,
+    until,
     ...(mark !== undefined && { mark }),
+    ...(signal !== undefined && { signal }),
     ...(agent !== undefined && { agent }),
   });
 }

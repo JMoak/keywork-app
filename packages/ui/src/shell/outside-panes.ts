@@ -1,5 +1,6 @@
 import type { MotionPrefs } from "@keywork-app/habitat";
 import { type Accessor, createEffect, on, onCleanup } from "solid-js";
+import type { PaneSignal } from "../chrome/signals.ts";
 import { type Chord, chordsOfKey } from "../keys/chord.ts";
 import type { Direction, PaneId, Rect, Screen, Verdict } from "../layout/index.ts";
 import type { PaneKind, PaneSpec } from "../panes/index.ts";
@@ -46,6 +47,7 @@ export interface OutsidePanesSeams {
   factsOf(pane: PaneId): PaneFacts;
   motion(): MotionPrefs;
   backdrop(): string;
+  frameInk?(signal: PaneSignal): string | undefined;
   chord(action: string): string | undefined;
   say(line: string): void;
   act(verdict: Verdict): void;
@@ -126,6 +128,7 @@ export function createOutsidePanes(seams: OutsidePanesSeams): OutsidePanes {
     windows: seams.windows ?? { burst: mostOutsideAtOnce },
     motion: seams.motion,
     backdrop: seams.backdrop,
+    frameInk: (signal) => seams.frameInk?.(signal),
     insideHint: () => seams.chord(paneOutsideActionId),
     refused: (_tenant, why) => seams.say(outsideNotices.couldNotLeave(why)),
     desktopRefused,

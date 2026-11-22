@@ -163,6 +163,25 @@
   color: var(--kw-text-mid);
 }
 
+.kw-yard-card {
+  --kw-yard-signal-ink: var(--kw-terminal-yellow);
+}
+.kw-yard-card[data-signal="critical"] {
+  --kw-yard-signal-ink: var(--kw-error);
+}
+.kw-yard-card[data-signal]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--kw-yard-signal-ink);
+}
+
+.kw-yard-card-signal {
+  margin-left: 1ch;
+  color: var(--kw-yard-signal-ink);
+}
+
 .kw-yard-satellite[data-cursor] > .kw-frame {
   box-shadow: 0 0 0 2px var(--kw-border-focus);
 }

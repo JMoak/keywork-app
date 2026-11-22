@@ -102,6 +102,7 @@ export interface YardProps {
   onRailLeft?: ((next: EventTarget | null) => void) | undefined;
   opensOutside?: boolean | undefined;
   onAnswer(setting: YardSetting, outcome: KeeperShowOutcome): void;
+  onClearSignal?: ((setting: YardSetting) => void) | undefined;
   onReturn(): void;
   children: JSX.Element;
 }
@@ -258,6 +259,7 @@ export function Yard(props: YardProps) {
     agent: setting.agent === undefined ? undefined : agentMarkLabel(setting.agent),
     agentColor: setting.agent?.color,
     tag: setting.mark,
+    signal: setting.signal,
     grouped: floods.closedAt(setting.id)?.members.length,
     level: levelOf(setting.id),
   });
@@ -393,6 +395,11 @@ export function Yard(props: YardProps) {
                   panels={panels}
                   onOpen={(what) => props.onOpen?.(shown().setting, what)}
                   onInteract={() => props.onInteract?.(shown().setting)}
+                  onClearSignal={
+                    props.onClearSignal === undefined
+                      ? undefined
+                      : () => props.onClearSignal?.(shown().setting)
+                  }
                 />
               )}
             </Show>

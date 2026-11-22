@@ -13,6 +13,7 @@ import { type RanchRequest, servedRefusalOf } from "./ranch.ts";
 export interface ShowClient {
   settings(): Promise<readonly Setting[] | ServedRefusal>;
   answerSetting(id: string, outcome: KeeperShowOutcome): Promise<ServedRefusal | undefined>;
+  clearSignal(id: string): Promise<ServedRefusal | undefined>;
   openSetting(opening: ShowOpening): Promise<Setting | ServedRefusal>;
   reportPlacements(sessionId: string, report: PlacementsReport): Promise<ServedRefusal | undefined>;
 }
@@ -20,6 +21,7 @@ export interface ShowClient {
 export const showOperations = {
   settings: "listSettings",
   answerSetting: "answerSetting",
+  clearSignal: "clearSignal",
   openSetting: "openSetting",
   reportPlacements: "reportPlacements",
 } as const satisfies Record<keyof ShowClient, string>;
@@ -36,6 +38,8 @@ export function showRoutes(request: RanchRequest): ShowClient {
         await request("POST", `/show/${encodeURIComponent(id)}/answer`, answer),
       );
     },
+    clearSignal: async (id) =>
+      servedRefusalOf(await request("DELETE", `/show/${encodeURIComponent(id)}/signal`)),
     openSetting: async (opening) => {
       const response = await request("POST", "/show", opening);
       return (await servedRefusalOf(response)) ?? ((await response.json()) as ShowOpened).setting;

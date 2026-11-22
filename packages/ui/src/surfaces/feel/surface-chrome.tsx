@@ -1,6 +1,7 @@
 import type { MotionPrefs } from "@keywork-app/habitat";
-import { createEffect, createSignal, type JSX, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, type JSX, Show } from "solid-js";
 import { hueStop } from "../../chrome/pane-frame.tsx";
+import { type PaneEdge, type PaneSignal, signalWords } from "../../chrome/signals.ts";
 import type { LifecycleState } from "../../chrome/stamp.ts";
 import { OrdinalBadge } from "../../layout/pane-badges.tsx";
 import { motionStyle } from "./choreography.ts";
@@ -14,6 +15,8 @@ export interface SurfaceChromeProps {
   motion: MotionPrefs;
   landing?: number | undefined;
   state?: LifecycleState | undefined;
+  edge?: PaneEdge | undefined;
+  signal?: PaneSignal | undefined;
   ordinal?: string | undefined;
   hint?: string | undefined;
   insideHint?: string | undefined;
@@ -25,6 +28,7 @@ export const bringInsideWords = "bring inside";
 
 export function SurfaceChrome(props: SurfaceChromeProps) {
   const [arrived, setArrived] = createSignal(false);
+  const outlined = createMemo<PaneSignal | undefined>((last) => props.signal ?? last);
   let body: HTMLDivElement | undefined;
   createEffect(() => {
     if (props.shown && body !== undefined) settleStyles(body);
@@ -33,9 +37,12 @@ export function SurfaceChrome(props: SurfaceChromeProps) {
   return (
     <section
       class="kw-surface"
-      aria-label={`${props.title} pane, outside the window`}
+      aria-label={surfaceLabel(props.title, props.signal)}
       data-focused={props.focused ? "" : undefined}
       data-state={props.state ?? "idle"}
+      data-edge={props.edge}
+      data-signal={props.signal}
+      data-outline={outlined()}
       data-motion={motionStyle(props.motion)}
       data-arrival={arrived() ? "arrived" : "waiting"}
       data-landing={landingOf(props) === undefined ? undefined : ""}
@@ -64,8 +71,14 @@ export function SurfaceChrome(props: SurfaceChromeProps) {
       <div class="kw-surface-body" ref={body}>
         {props.children}
       </div>
+      <span class="kw-surface-outline" aria-hidden="true" />
     </section>
   );
+}
+
+function surfaceLabel(title: string, signal: PaneSignal | undefined): string {
+  const pane = `${title} pane, outside the window`;
+  return signal === undefined || signal === "arrived" ? pane : `${pane}, ${signalWords[signal]}`;
 }
 
 function landingOf(props: Pick<SurfaceChromeProps, "motion" | "landing">): number | undefined {

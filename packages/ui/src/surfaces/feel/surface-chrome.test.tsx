@@ -5,6 +5,7 @@ import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { PaneFrame } from "../../chrome/pane-frame.tsx";
+import type { PaneEdge, PaneSignal } from "../../chrome/signals.ts";
 import { assumedContextLevel } from "../../instruments/context.ts";
 import { outsideMetrics } from "./arrange.ts";
 import { bringInsideWords, SurfaceChrome } from "./surface-chrome.tsx";
@@ -64,6 +65,54 @@ describe("SurfaceChrome", () => {
       </SurfaceChrome>
     ));
     expect(chromeOf(container).style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
+  });
+
+  it("carries its edge and its signal, and keeps the last signal's ink while the outline fades", () => {
+    const [signal, setSignal] = createSignal<PaneSignal | undefined>("critical");
+    const [edge, setEdge] = createSignal<PaneEdge | undefined>("lead");
+    const { container } = render(() => (
+      <SurfaceChrome
+        title="Deploy"
+        hueRank={0}
+        focused={false}
+        shown
+        edge={edge()}
+        signal={signal()}
+        motion={moving}
+        onBringInside={() => undefined}
+      >
+        <p>body</p>
+      </SurfaceChrome>
+    ));
+    const chrome = chromeOf(container);
+    expect(chrome.dataset).toMatchObject({ edge: "lead", signal: "critical", outline: "critical" });
+    expect(screen.getByRole("region", { name: "Deploy pane, outside the window, critical" })).toBe(
+      chrome,
+    );
+    expect(chrome.querySelector(".kw-surface-outline")?.getAttribute("aria-hidden")).toBe("true");
+    setSignal(undefined);
+    setEdge("way-back");
+    expect(chrome.dataset.signal).toBeUndefined();
+    expect(chrome.dataset).toMatchObject({ edge: "way-back", outline: "critical" });
+    setEdge(undefined);
+    expect(chrome.dataset.edge).toBeUndefined();
+  });
+
+  it("says nothing of a pane that only just arrived beyond its name", () => {
+    render(() => (
+      <SurfaceChrome
+        title="On call"
+        hueRank={0}
+        focused={false}
+        shown
+        signal="arrived"
+        motion={moving}
+        onBringInside={() => undefined}
+      >
+        <p>body</p>
+      </SurfaceChrome>
+    ));
+    expect(screen.getByRole("region", { name: "On call pane, outside the window" })).toBeDefined();
   });
 
   it("marks focus and lets it go without remounting", () => {
@@ -323,6 +372,7 @@ describe("the look", () => {
     expect(ruleFor(titleRowOutside)).toMatch(/user-select: none;/);
     expect(ruleFor(".kw-surface-inside")).toMatch(/-webkit-app-region: no-drag;/);
     expect(ruleFor(".kw-surface-body .kw-frame-gauge")).toMatch(/-webkit-app-region: no-drag;/);
+    expect(ruleFor(".kw-surface-body .kw-frame-signal")).toMatch(/-webkit-app-region: no-drag;/);
   });
 
   it("keeps what it lays over the title row as slim as the row, in the machine's mono voice", () => {
@@ -338,20 +388,61 @@ describe("the look", () => {
     expect(ruleFor(".kw-surface-inside")).toMatch(/max-width: var\(--kw-surface-reach\);/);
   });
 
-  it("draws the hue as a hairline along the top edge that flares while waiting", () => {
-    expect(ruleFor(".kw-surface::before")).toMatch(
-      /height: 2px;\s*background: var\(--kw-pane-ink\);/,
-    );
-    expect(css).toMatch(
-      /\.kw-surface\[data-state="needs-you"\],\s*\.kw-surface\[data-arrival="waiting"\] \{\s*--kw-pane-ink: var\(--kw-pane-hue\);/,
-    );
-    expect(ruleFor('.kw-surface[data-arrival="waiting"]::before')).toMatch(/transform: scaleY/);
+  it("draws no border at rest, in its own chrome or in the frame it holds", () => {
+    expect(ruleFor(".kw-surface")).not.toMatch(/^\s*(border|box-shadow|outline):/m);
+    expect(ruleFor(".kw-surface::before")).toMatch(/visibility: hidden;/);
+    expect(ruleFor(".kw-surface-outline")).toMatch(/opacity: 0;/);
+    expect(ruleFor(".kw-surface-body .kw-frame")).toMatch(/border: 0;/);
+    expect(ruleFor(".kw-surface-body .kw-frame::after")).toMatch(/content: none;/);
+    expect(ruleFor(".kw-surface-body .kw-frame-outline")).toMatch(/visibility: hidden;/);
     expect(ruleFor('.kw-surface[data-arrival="waiting"]::after')).toMatch(/opacity: 1;/);
   });
 
-  it("gives focus brighter ink than rest", () => {
-    expect(ruleFor(".kw-surface[data-focused]")).toMatch(/--kw-pane-ink: var\(--kw-pane-lift\);/);
-    expect(ruleFor(".kw-surface[data-focused]::before")).toMatch(/height: 4px;/);
+  it("marks the lead with a violet top edge and the way back with a violet left edge, never a whole outline", () => {
+    expect(ruleFor(".kw-surface")).toMatch(/--kw-surface-edge: var\(--kw-accent\);/);
+    expect(ruleFor(".kw-surface::before")).toMatch(
+      /height: 2px;\s*background: var\(--kw-surface-edge\);/,
+    );
+    expect(ruleFor(".kw-surface[data-edge]::before")).toMatch(/visibility: visible;/);
+    expect(ruleFor('.kw-surface[data-edge="way-back"]::before')).toMatch(
+      /inset: 0 auto 0 0;\s*width: 2px;\s*height: auto;/,
+    );
+  });
+
+  it("outlines a signal in amber, thin on arrival and heavier when it needs the keeper, and only critical in red", () => {
+    expect(ruleFor(".kw-surface")).toMatch(/--kw-surface-amber: var\(--kw-terminal-yellow\);/);
+    expect(ruleFor(".kw-surface")).toMatch(/--kw-surface-red: var\(--kw-error\);/);
+    expect(ruleFor(".kw-surface")).toMatch(
+      /--kw-surface-outline-ink: var\(--kw-surface-amber\);\s*--kw-surface-outline-width: 1px;/,
+    );
+    expect(ruleFor(".kw-surface-outline")).toMatch(
+      /box-shadow: inset 0 0 0 var\(--kw-surface-outline-width\) var\(--kw-surface-outline-ink\);/,
+    );
+    expect(ruleFor(".kw-surface[data-signal] .kw-surface-outline")).toMatch(/opacity: 1;/);
+    expect(css).toMatch(
+      /\.kw-surface\[data-outline="needs-you"\],\s*\.kw-surface\[data-outline="critical"\] \{\s*--kw-surface-outline-width: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.kw-surface\[data-outline="critical"\] \{\s*--kw-surface-outline-ink: var\(--kw-surface-red\);/,
+    );
+    expect(css.match(/--kw-surface-red/g)).toHaveLength(2);
+  });
+
+  it("fades an outline as it goes, and drops the fade when motion is reduced", () => {
+    expect(ruleFor(".kw-surface-outline")).toMatch(/transition: opacity var\(--kw-surface-fade\);/);
+    const system = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(system).toMatch(
+      /\.kw-surface-outline,\s*\.kw-surface\[data-signal\] \.kw-surface-outline \{\s*transition: none;/,
+    );
+    expect(css).toMatch(
+      /\.kw-surface\[data-motion="still"\] \.kw-surface-outline \{\s*transition: none;/,
+    );
+  });
+
+  it("lights the focused pane's title row, and draws no edge for focus alone", () => {
+    const unforced = css.slice(0, css.indexOf("@media (forced-colors: active)"));
+    expect(unforced).not.toContain(".kw-surface[data-focused] {");
+    expect(unforced).not.toContain(".kw-surface[data-focused]::before");
     expect(ruleFor(`.kw-surface[data-focused] ${titleRowOutside}`)).toMatch(
       /--kw-surface-lit: color-mix\(in oklch, var\(--kw-pane-hue\) 10%, var\(--kw-panel-lift\)\);/,
     );
@@ -383,9 +474,7 @@ describe("the look", () => {
     const transitioned = [...css.matchAll(/transition:([^;]+);/g)].flatMap(([, list]) =>
       (list ?? "").split(",").map((part) => part.trim().split(/\s+/)[0]),
     );
-    expect(new Set(transitioned)).toEqual(
-      new Set(["transform", "opacity", "color", "background-color", "none"]),
-    );
+    expect(new Set(transitioned)).toEqual(new Set(["transform", "opacity", "color", "none"]));
   });
 
   it("drops the movement when motion is reduced, by setting or by the system", () => {

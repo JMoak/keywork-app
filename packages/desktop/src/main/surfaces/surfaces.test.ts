@@ -919,10 +919,10 @@ describe("the colour of a pane's frame", () => {
     expect(window.visible).toBe(true);
   });
 
-  it("is given back when the pane is hidden, and never asked for a pane that had none", async () => {
+  it("is none at all when a pane is shown with none, and given back to the system when it is hidden", async () => {
     const bench = helpedBench();
     const window = bench.open("kw-surface:1");
-    bench.open("kw-surface:2");
+    const resting = bench.open("kw-surface:2");
     await bench.show(framed);
     await bench.show({ id: "kw-surface:2" });
     await bench.ask(surfaceChannels.hide, "kw-surface:1");
@@ -930,13 +930,15 @@ describe("the colour of a pane's frame", () => {
     await bench.ask(surfaceChannels.hide, "kw-surface:1");
     expect(bench.pipes.written).toEqual([
       `border ${window.nativeHandle()} ff8800`,
+      `border ${resting.nativeHandle()} none`,
       `border ${window.nativeHandle()} clear`,
+      `border ${resting.nativeHandle()} clear`,
     ]);
     expect(window.destroyed).toBe(false);
     expect(window.visible).toBe(false);
   });
 
-  it("is given back when the pane is shown again without one, or the desktop asks to close it", async () => {
+  it("is none when the pane is shown again without a colour, and given back when the desktop asks to close it", async () => {
     const bench = helpedBench();
     const reshown = bench.open("kw-surface:1");
     const closing = bench.open("kw-surface:2");
@@ -946,9 +948,26 @@ describe("the colour of a pane's frame", () => {
     closing.desktopAsksToClose();
     expect(bench.pipes.written).toEqual([
       `border ${reshown.nativeHandle()} ff8800`,
-      `border ${reshown.nativeHandle()} clear`,
+      `border ${reshown.nativeHandle()} none`,
       `border ${closing.nativeHandle()} ff8800`,
       `border ${closing.nativeHandle()} clear`,
+    ]);
+  });
+
+  it("changes while the pane stands, as its signal comes and goes, and not while it is hidden", async () => {
+    const bench = helpedBench();
+    const window = bench.open("kw-surface:1");
+    await bench.show({ id: "kw-surface:1" });
+    await bench.ask(surfaceChannels.frame, { id: "kw-surface:1", frame: "#F7768E" });
+    await bench.ask(surfaceChannels.frame, { id: "kw-surface:1" });
+    await bench.ask(surfaceChannels.hide, "kw-surface:1");
+    await bench.ask(surfaceChannels.frame, { id: "kw-surface:1", frame: "#E0AF68" });
+    await bench.ask(surfaceChannels.frame, { id: 7, frame: "#E0AF68" });
+    expect(bench.pipes.written).toEqual([
+      `border ${window.nativeHandle()} none`,
+      `border ${window.nativeHandle()} f7768e`,
+      `border ${window.nativeHandle()} none`,
+      `border ${window.nativeHandle()} clear`,
     ]);
   });
 

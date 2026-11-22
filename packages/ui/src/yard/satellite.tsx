@@ -24,6 +24,7 @@ export interface SatelliteSlotProps {
   panels: YardPanels;
   onOpen(what: SettingSubject): void;
   onInteract(): void;
+  onClearSignal?: (() => void) | undefined;
 }
 
 export function SatelliteSlot(props: SatelliteSlotProps) {
@@ -99,6 +100,9 @@ export function SatelliteSlot(props: SatelliteSlotProps) {
         agent={props.setting.agent === undefined ? undefined : agentMarkLabel(props.setting.agent)}
         agentColor={props.setting.agent?.color}
         tag={props.setting.mark}
+        signal={props.setting.signal}
+        signalWhy={props.setting.why}
+        onClearSignal={props.onClearSignal}
       >
         <SettingBody
           paneId={paneId()}

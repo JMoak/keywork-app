@@ -1,6 +1,13 @@
 import { type Extent, type MotionPrefs, overlaps, type Random } from "@keywork-app/habitat";
-import { type Accessor, createSignal, type Setter } from "solid-js";
+import type { SettingSignal } from "@keywork-app/protocol";
+import { type Accessor, createEffect, createSignal, type Setter } from "solid-js";
 import { render } from "solid-js/web";
+import {
+  arrivalFadesAfterMs,
+  type PaneEdge,
+  type PaneSignal,
+  strongestSignal,
+} from "../../chrome/signals.ts";
 import type { LifecycleState } from "../../chrome/stamp.ts";
 import { listenForKeys } from "../../keys/listen.ts";
 import type { Direction } from "../../layout/index.ts";
@@ -73,7 +80,7 @@ export interface PaneFacts {
   readonly hueRank: number;
   readonly state: LifecycleState;
   readonly ordinal?: string | undefined;
-  readonly frame?: string | undefined;
+  readonly signal?: SettingSignal | undefined;
 }
 
 export interface Tenant {
@@ -205,6 +212,7 @@ export interface PanesOutsideOptions {
   readonly windows?: SurfaceRuntimeOptions | undefined;
   motion(): MotionPrefs;
   backdrop(): string;
+  frameInk?(signal: PaneSignal): string | undefined;
   insideHint(): string | undefined;
   refused(tenant: Tenant, why: string): void;
   desktopRefused(why: string): void;
@@ -316,8 +324,36 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     });
 
   const placesChanged = (what: PlacesChange): void => {
+    remark();
     if (!disposed) options.changed?.(what);
   };
+
+  const remark = (): void => {
+    const marks = edgesNow();
+    for (const stand of stands.values()) stand.request.setEdge(marks.get(stand));
+  };
+
+  const edgesNow = (): Map<Stand, PaneEdge> => {
+    const marks = new Map<Stand, PaneEdge>();
+    for (const troupe of troupes.values()) {
+      const members = [...stands.values()].filter(
+        (stand) => companyOf(stand) === troupe.company && restsOrArrives(stand),
+      );
+      if (members.length < 2) continue;
+      const memberAt = (key: string | undefined): Stand | undefined =>
+        members.find((stand) => keyOfStand(stand) === key);
+      const [lead, ...wayBack] = troupe.drill === undefined ? [troupe.lead] : pathOf(troupe.drill);
+      for (const key of wayBack) {
+        const stand = memberAt(key);
+        if (stand !== undefined) marks.set(stand, "way-back");
+      }
+      const leading = memberAt(lead);
+      if (leading !== undefined) marks.set(leading, "lead");
+    }
+    return marks;
+  };
+
+  const restsOrArrives = (stand: Stand): boolean => standsStill(stand) && !stand.returning;
 
   const pacingOf = (moving: readonly Stand[], mood?: Mood, lead?: SurfaceId): Pacing => ({
     mood: mood ?? moving.flatMap((stand) => stand.request.sending.mood ?? [])[0] ?? "brisk",
@@ -330,6 +366,8 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
       if (has(tenant.key)) return settle(undefined);
       const [shown, setShown] = createSignal(false);
       const [focused, setFocused] = createSignal(false);
+      const [fresh, setFresh] = createSignal(false);
+      const [edge, setEdge] = createSignal<PaneEdge>();
       const request: Request = {
         tenant,
         sending,
@@ -340,6 +378,12 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
         setShown,
         focused,
         setFocused,
+        fresh,
+        setFresh,
+        edge,
+        setEdge,
+        framedAs: undefined,
+        fading: undefined,
       };
       pending.set(tenant.key, request);
       joinTheStack(request);
@@ -554,6 +598,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     if (newcomers.length === 0) return [];
     theDrillTidied(desk, troupe);
     drilledInBy(troupe, newcomers);
+    ledBy(troupe, newcomers);
     const beside = besideTheirParents(desk, troupe, newcomers);
     const dealing = newcomers.filter((stand) => !beside.has(stand));
     const settling = dealing.some((stand) => placeKept(desk, stand) === undefined);
@@ -681,6 +726,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
       company,
       shaped: undefined,
       drill: undefined,
+      lead: undefined,
       desk: undefined,
       turns: [],
       waitingSince: undefined,
@@ -834,6 +880,11 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     }
   };
 
+  const ledBy = (troupe: Troupe, newcomers: readonly Stand[]): void => {
+    const leading = newcomers.findLast((stand) => stand.request.sending.leads === true);
+    if (troupe.drill === undefined && leading !== undefined) troupe.lead = keyOfStand(leading);
+  };
+
   const drilledDeeper = (
     troupe: Troupe,
     child: Stand,
@@ -945,6 +996,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     const desk = drilled ? await deskNow() : undefined;
     if (desk === undefined) return;
     const eased = drillsEasedBy(left, desk);
+    remark();
     await Promise.all(eased.map(({ troupe }) => regrouped(troupe)));
     for (const { comingBack } of eased) setOutAgain(comingBack);
   };
@@ -1121,8 +1173,10 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
   const chromeIn = (mount: HTMLElement, request: Request): OutsideFrame => {
     const { tenant } = request;
     mount.tabIndex = -1;
-    const dispose = render(
-      () => (
+    const signalOn = (): PaneSignal | undefined => signalShownBy(request);
+    const dispose = render(() => {
+      createEffect(() => repaintTheFrame(request, frameInkOf(signalOn())));
+      return (
         <SurfaceChrome
           title={tenant.facts().title}
           hueRank={tenant.facts().hueRank}
@@ -1131,6 +1185,8 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
           hint={hintOn(tenant.key)}
           focused={request.focused()}
           shown={request.shown()}
+          edge={request.edge()}
+          signal={signalOn()}
           motion={options.motion()}
           landing={paceOf(request.sending.mood).landing}
           insideHint={options.insideHint()}
@@ -1138,9 +1194,8 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
         >
           {undefined}
         </SurfaceChrome>
-      ),
-      mount,
-    );
+      );
+    }, mount);
     const holder = mount.querySelector<HTMLElement>(chromeBodySelector);
     if (holder !== null) return { holder, dispose };
     dispose();
@@ -1227,9 +1282,45 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     return stand === undefined ? [] : [stand.request.tenant.key];
   };
 
+  const signalShownBy = (request: Request): PaneSignal | undefined => {
+    const { signal, state } = request.tenant.facts();
+    return strongestSignal(signal, state, request.fresh());
+  };
+
+  const signalOnArrival = (request: Request): PaneSignal | undefined => {
+    const { signal, state } = request.tenant.facts();
+    const fresh = request.fresh() || (!request.shown() && arrivesFresh(request.sending));
+    return strongestSignal(signal, state, fresh);
+  };
+
+  const frameInkOf = (signal: PaneSignal | undefined): string | undefined =>
+    signal === undefined ? undefined : options.frameInk?.(signal);
+
+  const repaintTheFrame = (request: Request, ink: string | undefined): void => {
+    if (!request.shown() || ink === request.framedAs) return;
+    const stand = stands.get(request.tenant.key);
+    if (stand?.request !== request || port.frame === undefined) return;
+    request.framedAs = ink;
+    port.frame(stand.pane.id, ink).catch(() => undefined);
+  };
+
+  const arrivedFresh = (request: Request): void => {
+    if (!arrivesFresh(request.sending)) return;
+    request.setFresh(true);
+    clearTimeout(request.fading);
+    request.fading = setTimeout(() => request.setFresh(false), arrivalFadesAfterMs);
+  };
+
+  const seenFresh = (request: Request): void => {
+    clearTimeout(request.fading);
+    request.setFresh(false);
+  };
+
   const showOf = (stand: Stand): SurfaceShow => {
     const { tenant, sending } = stand.request;
-    const { title, frame } = tenant.facts();
+    const { title } = tenant.facts();
+    const frame = frameInkOf(signalOnArrival(stand.request));
+    stand.request.framedAs = frame;
     return {
       id: stand.pane.id,
       bounds: stand.at ?? emptyRect,
@@ -1245,7 +1336,9 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
   const appeared = (show: SurfaceShow): void => {
     const stand = bySurface.get(show.id);
     if (stand === undefined) return;
+    if (!stand.request.shown()) arrivedFresh(stand.request);
     stand.request.setShown(true);
+    remark();
     if (takesTheKeeperFocus(stand.request.sending)) tookFocus(stand);
     stand.request.settle({
       id: stand.pane.id,
@@ -1377,6 +1470,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
   const flownHome = async (returning: readonly Stand[], pacing: Pacing): Promise<void> => {
     const desk = await port.desk();
     const eased = drillsEasedBy(returning, desk);
+    remark();
     const retreats = eased.flatMap((drill) => drill.retreats);
     const home = returning.filter((stand) => !retreats.some(({ child }) => child === stand));
     const leaves = inTurn(topFirst(home).map((stand) => stand.pane.id));
@@ -1519,7 +1613,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
         desk,
         pacing,
       );
-      arrangedAs(asked, seated);
+      arrangedAs(asked, seated, lead);
       takenAside(aside, pacing);
     }
     sentBackToTheRail(leftOut);
@@ -1604,7 +1698,11 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     }
   };
 
-  const arrangedAs = (asked: Arranging, seated: readonly Stand[]): void => {
+  const arrangedAs = (
+    asked: Arranging,
+    seated: readonly Stand[],
+    lead: Stand | undefined,
+  ): void => {
     const { instruction } = asked;
     const shaped: Troupe["shaped"] =
       instruction.kind === "written" ? "by-hand" : { deals: instruction.deals, lead: asked.lead };
@@ -1613,7 +1711,9 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
       const troupe = troupeOf(company);
       troupe.shaped = shaped;
       troupe.drill = undefined;
+      troupe.lead = lead === undefined ? undefined : keyOfStand(lead);
     }
+    remark();
   };
 
   const writtenOnto = (
@@ -1886,6 +1986,7 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
   const tookFocus = (stand: Stand): void => {
     if (stand.returning) return;
     stack = raised(stack, stand.request.tenant.key);
+    seenFresh(stand.request);
     stand.request.setFocused(true);
     setHoldingFocus(stand.request.tenant.key);
     stand.request.tenant.tookFocus?.();
@@ -1961,6 +2062,12 @@ interface Request {
   readonly setShown: Setter<boolean>;
   readonly focused: Accessor<boolean>;
   readonly setFocused: Setter<boolean>;
+  readonly fresh: Accessor<boolean>;
+  readonly setFresh: Setter<boolean>;
+  readonly edge: Accessor<PaneEdge | undefined>;
+  readonly setEdge: Setter<PaneEdge | undefined>;
+  framedAs: string | undefined;
+  fading: ReturnType<typeof setTimeout> | undefined;
   settle(arrived: Arrived | undefined): void;
 }
 
@@ -1985,6 +2092,7 @@ interface Troupe {
   readonly company: string | undefined;
   shaped: Shaped | "by-hand" | undefined;
   drill: Drill | undefined;
+  lead: string | undefined;
   desk: Desk | undefined;
   turns: readonly Start[];
   waitingSince: number | undefined;
@@ -2095,6 +2203,10 @@ const emptyRect: ScreenRect = { x: 0, y: 0, width: 0, height: 0 };
 const noneComeBack: ReadonlyMap<string, ScreenRect> = new Map();
 
 const drillMetrics = { orderStep: 0.001 } as const;
+
+function arrivesFresh(sending: Sending): boolean {
+  return !takesTheKeeperFocus(sending) && sending.last === undefined;
+}
 
 function takesTheKeeperFocus(sending: Sending): boolean {
   return sending.origin === "keeper" && sending.focus;

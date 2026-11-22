@@ -7,7 +7,7 @@ import { repoRoot } from "./lib/repo-files.ts";
 
 // The pane mover is Vignette's `kw-panes-mover`: a small Windows program the app starts to move
 // its panes outside the window together. Moving this pin is a dependency update like any other.
-export const moverRelease = { owner: "JMoak", repo: "vignette-mcp", version: "0.2.0" } as const;
+export const moverRelease = { owner: "JMoak", repo: "vignette-mcp", version: "0.3.0" } as const;
 
 export const moverAssetName = "kw-panes-mover-windows-x64.exe";
 
