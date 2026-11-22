@@ -508,15 +508,15 @@ export {
   type WaitingAsks,
 } from "./sessions.ts";
 export {
+  type AgentColor,
   type ArrangedSeat,
   type Arrangement,
   type ArrangementAnswer,
-  type AgentColor,
   type ArrangementReach,
   type ArrangementRelation,
+  type ArrangementShape,
   type ArrangementSide,
   agentColors,
-  type ArrangementShape,
   arrangementRelations,
   arrangementShapes,
   type IsoTime,

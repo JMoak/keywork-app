@@ -1,8 +1,8 @@
 import { Match, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { PaneId } from "../layout/index.ts";
-import { definitionOf, type PaneSpec, type ShellSeams } from "../panes/index.ts";
 import { Markdown } from "../page/markdown.tsx";
+import { definitionOf, type PaneSpec, type ShellSeams } from "../panes/index.ts";
 import type { PaneActionHandler } from "../panes/registry.ts";
 import type { Satellite } from "./satellites.ts";
 
