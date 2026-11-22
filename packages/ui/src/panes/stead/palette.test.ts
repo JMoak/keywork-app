@@ -18,7 +18,7 @@ describe("the palette across the gallery", () => {
     expect(gallery.length).toBeGreaterThan(10);
     for (const theme of gallery) {
       const source = sourceOfTheme(theme);
-      for (const hueStop of [undefined, 1, 2, 3]) {
+      for (const hueStop of [undefined, 1, 2, 3, 4, 5, 6, 7, 8]) {
         const palette = resolvePalette(source, { hueStop });
         expect(unresolvedRoles(palette), `${theme.name} hue ${hueStop}`).toEqual([]);
         for (const color of palette.slice(1)) expect(color, theme.name).toMatch(hex);

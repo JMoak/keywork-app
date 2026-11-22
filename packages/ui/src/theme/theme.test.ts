@@ -221,11 +221,12 @@ describe("the faint rung", () => {
 });
 
 describe("themeVariables", () => {
-  it("maps every token, three ramp stops, the density mapping, the appearance and the fonts", () => {
+  it("maps every token, eight ramp stops, the density mapping, the appearance and the fonts", () => {
     const variables = themeVariables(keyworkNight);
     expect(variables["--kw-background"]).toBe("#1a1b26");
     expect(variables["--kw-panel-lift"]).toBe("#24283b");
     expect(variables["--kw-ramp-3"]).toBe("#7dcfff");
+    expect(variables["--kw-ramp-8"]).toBe("#faba4a");
     expect(variables["--kw-density-full"]).toBe("var(--kw-accent)");
     expect(variables["--kw-density-light"]).toBe("var(--kw-text-dim)");
     expect(variables["--kw-appearance"]).toBe("dark");

@@ -23,7 +23,7 @@ describe("stampGlyph", () => {
   });
 
   it("sweeps the ramp by spawn rank and wraps", () => {
-    expect([0, 1, 2, 3, 4].map(hueStop)).toEqual([1, 2, 3, 1, 2]);
+    expect([0, 1, 2, 3, 4, 7, 8, 9].map(hueStop)).toEqual([1, 2, 3, 4, 5, 8, 1, 2]);
   });
 });
 
@@ -44,7 +44,7 @@ describe("PaneFrame", () => {
     const frame = container.querySelector(".kw-frame") as HTMLElement;
     expect(frame.dataset.state).toBe("needs-you");
     expect(frame.hasAttribute("data-focused")).toBe(true);
-    expect(frame.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
+    expect(frame.style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-5)");
     expect(container.querySelector(".kw-frame-stamp")?.textContent).toBe("█");
     expect(container.querySelector(".kw-frame-name")?.textContent).toBe("fix the tests");
     expect(container.querySelector(".kw-frame-usage")?.textContent).toBe("12 tokens · $0.01");

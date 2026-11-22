@@ -64,7 +64,7 @@ describe("SurfaceChrome", () => {
         <p>body</p>
       </SurfaceChrome>
     ));
-    expect(chromeOf(container).style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-2)");
+    expect(chromeOf(container).style.getPropertyValue("--kw-pane-hue")).toBe("var(--kw-ramp-5)");
   });
 
   it("carries its edge and its signal, and keeps the last signal's ink while the outline fades", () => {

@@ -1,0 +1,1065 @@
+<title>Stead World</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column. The world is drawn straight on the page ground, with no frame, the way the stead sits in a pane.
+   Stills sit in wrapping rows under short captions; decisions are a ruled list. Dark is the first theme, as in the app. */
+:root{
+  --bg:#1a1b26; --panel:#1f2335; --fg:#c0caf5; --mid:#a4accd; --dim:#8a92b2; --line:#343a57;
+  --accent:#bb9af7; --amber:#e0af68;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){ --bg:#e9ebf3; --panel:#f4f5fa; --fg:#2a3050; --mid:#474e70; --dim:#666e90; --line:#c7cbdc; --accent:#7446c9; --amber:#c98a1e; color-scheme:light }
+}
+:root[data-theme="light"]{ --bg:#e9ebf3; --panel:#f4f5fa; --fg:#2a3050; --mid:#474e70; --dim:#666e90; --line:#c7cbdc; --accent:#7446c9; --amber:#c98a1e; color-scheme:light }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 16px/1.55 var(--body);margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding-block:40px 88px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:60px}
+section,header{display:flex;flex-direction:column;gap:16px;min-width:0}
+h1{font:700 clamp(2rem,5.4vw,3.4rem)/1.04 var(--display);letter-spacing:-.02em;margin:0;text-wrap:balance}
+h2{font:700 1.5rem/1.2 var(--display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+p{margin:0;max-width:66ch}
+.eyebrow{font:500 .75rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.lede{font-size:1.125rem;color:var(--mid);max-width:60ch}
+.note{font-size:.875rem;color:var(--dim)}
+canvas{display:block;width:100%}
+#hero{height:clamp(320px,58vw,580px)}
+#hero:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.deck{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);gap:10px;align-items:stretch}
+.flank{display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel{border:1px solid var(--line);min-width:0;display:flex;flex-direction:column}
+.panel.lead{border-top:2px solid var(--accent)}
+.panel.asks{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+.ptitle{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);font:500 .75rem/1.2 var(--mono);color:var(--dim)}
+.ptitle b{color:var(--fg);font-weight:500}
+#whoArt{height:150px}
+#whoLine{padding:8px 10px;font-size:.875rem;line-height:1.45;color:var(--mid);max-width:none}
+#talkLines{padding:10px;display:flex;flex-direction:column;gap:9px;font-size:.875rem;line-height:1.45;flex:1}
+.say b{display:block;font:500 .6875rem/1.2 var(--mono);color:var(--dim);margin-bottom:2px}
+.say.me{color:var(--dim)}
+.say .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.say .acts span{font:500 .75rem/1 var(--mono);border:1px solid var(--line);padding:6px 8px;border-radius:3px;color:var(--fg)}
+.composer{margin:0 10px 10px;padding:8px 10px;border:1px solid var(--line);font:400 .8125rem/1.2 var(--mono);color:var(--dim)}
+.popped{display:flex;flex-wrap:wrap;gap:10px}
+.card{border:1px solid var(--line);border-top:2px solid var(--amber);padding:8px 10px;font-size:.8125rem;line-height:1.4;min-width:190px;max-width:280px;color:var(--mid)}
+.card b{display:block;font:500 .75rem/1.3 var(--mono);color:var(--fg)}
+@media (max-width:760px){ .deck{grid-template-columns:1fr} }
+.bar{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;border-top:1px solid var(--line);padding-top:14px}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+button{font:500 .8125rem/1 var(--mono);color:var(--fg);background:var(--panel);border:1px solid var(--line);padding:9px 12px;border-radius:3px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+output,.side{font:500 .8125rem/1.2 var(--mono);color:var(--mid)}
+output{min-width:17ch;text-align:center}
+.side{min-width:11ch}
+.row{display:grid;gap:22px 18px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.row.tight{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+button.set,button.setworld{align-self:flex-start;padding:7px 10px}
+.close{display:grid;gap:22px 28px;grid-template-columns:minmax(0,1fr) minmax(0,3fr);align-items:start}
+.close img,img.wide{display:block;width:100%;image-rendering:pixelated;border:1px solid var(--line)}
+img.wide{max-width:988px}
+.clips{display:flex;flex-wrap:wrap;gap:14px 26px}
+.clips figure{align-items:center;gap:6px}
+.clips canvas{width:170px;height:180px}
+.clips figcaption{font:500 .75rem/1 var(--mono);color:var(--dim)}
+.pick.done{background:var(--accent)}
+@media (max-width:640px){ .close{grid-template-columns:1fr} }
+figure{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+figcaption{font-size:.875rem;line-height:1.45;color:var(--mid)}
+figcaption b{color:var(--fg);font-weight:600}
+.today img{display:block;width:100%;image-rendering:pixelated;border:1px solid var(--line)}
+ul.plain{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;max-width:68ch}
+.three{display:grid;gap:18px 28px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.three h3{font:600 1rem/1.3 var(--body);margin:0 0 4px}
+.three p{font-size:.9375rem;color:var(--mid)}
+.forms{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:flex-end}
+.forms figure{align-items:center;gap:4px}
+.forms canvas{width:72px;height:84px}
+.forms figcaption{font:500 .75rem/1 var(--mono);color:var(--dim)}
+.decisions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.decisions>li{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px 28px;padding:16px 0;border-top:1px solid var(--line)}
+.decisions>li:last-child{border-bottom:1px solid var(--line)}
+.decisions h3{font:600 1rem/1.35 var(--body);margin:0}
+.decisions .why{font-size:.875rem;color:var(--dim);margin-top:4px}
+.decisions ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:.9375rem;color:var(--mid)}
+.pick{font:500 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--bg);background:var(--amber);padding:3px 6px;border-radius:2px;margin-right:6px;white-space:nowrap}
+.decisions ul li:has(.pick){color:var(--fg)}
+ol.steps{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:10px;max-width:68ch}
+ol.steps b{font-weight:600}
+@media (max-width:640px){ .decisions>li{grid-template-columns:1fr} }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Stead · proposal · 22 Nov 2026</p>
+  <h1>A stead that grows into a town</h1>
+  <p class="lede">The creatures' place, rebuilt as one world of blocks. You see it flat from one side, turn it a quarter at a time, and it gains a plot each time a creature is made.</p>
+</header>
+
+<section aria-label="Live sketch">
+  <div class="deck">
+    <div class="panel lead"><div class="ptitle"><b>stead</b><span>press a workshop, a creature or the house</span></div><canvas id="hero" tabindex="0" aria-label="A live sketch of the stead. Left and right arrow keys turn it. Press a workshop to choose its creature."></canvas></div>
+    <div class="flank">
+      <div class="panel" id="who"><div class="ptitle"><b id="whoName">a creature</b><span id="whoState"></span></div><canvas id="whoArt" aria-hidden="true"></canvas><p id="whoLine"></p></div>
+      <div class="panel" id="talk"><div class="ptitle"><b>conversation</b><span id="talkWith"></span></div><div id="talkLines"></div><div class="composer" id="talkBox"></div></div>
+    </div>
+  </div>
+  <div class="popped" id="popped"></div>
+  <div class="bar">
+    <div class="grp"><button id="turnL" type="button">◀ Turn</button><button id="turnR" type="button">Turn ▶</button><span class="side" id="sideName">from the front</span></div>
+    <div class="grp"><button id="less" type="button" aria-label="One creature fewer">−</button><output id="count" for="less more">5 creatures · a hamlet</output><button id="more" type="button" aria-label="One creature more">+</button></div>
+    <div class="grp"><button id="eyeLevel" type="button" aria-pressed="false">Level eye</button><button id="eyeRaised" type="button" aria-pressed="true">Raised eye</button><button id="corner" type="button" aria-pressed="false">Rest on corners</button></div>
+    <div class="grp"><button id="alive" type="button" aria-pressed="true">Moving</button><button id="nextWho" type="button">Next creature</button></div>
+    <div class="grp" id="themes"><button type="button" data-world="lantern" aria-pressed="true">Lantern</button><button type="button" data-world="neon" aria-pressed="false">Neon</button><button type="button" data-world="terrace" aria-pressed="false">Terrace</button></div>
+  </div>
+  <p class="note">The three panels work together: press a workshop or a creature in the stead and the creature and conversation panels follow it; press the storehouse or the mill and a window opens for it. All of it runs in the page, on plain canvas. Lantern, Neon and Terrace are three themes, each a building style with its own colours. Switch the page between dark and light to see night and day. The drawing is a stand-in for scale, light and structure; the real art pass is the first step below. With the picture focused, the arrow keys turn it.</p>
+</section>
+
+<section class="today">
+  <h2>What is off today</h2>
+  <img alt="The stead as the app draws it now: one strip of grey buildings with three creatures taller than their workshops." src="__TODAY_PNG__">
+  <ul class="plain">
+    <li>The creature is taller than its own workshop, so the buildings read as props.</li>
+    <li>The world is one grey ramp. Only the creature has colour, and there are three coats.</li>
+    <li>It is one strip. A town would only be a longer strip.</li>
+    <li>The newer branch adds painted stills in a second style: cream, olive, storybook. Its creature ideas are good (Folio, Tessera, Cairn, Purl, Hush, Knot). The paint is what clashes with the console.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>One place, built of blocks</h2>
+  <div class="three">
+    <div><h3>Flat at rest</h3><p>You look at one side, square on. It stays crisp pixel art on one grid, coloured from the theme, as the accepted art decision says.</p></div>
+    <div><h3>A quarter turn at a time</h3><p>The world has depth, and the next side comes round on a key. Depth hides things. Turning shows them.</p></div>
+    <div><h3>A plot for each creature</h3><p>Land is added when a creature is made. Nothing built ever moves or is taken away.</p></div>
+  </div>
+  <p class="note">Borrowed from FEZ: the flat sides, the quarter turn, and a map that turns. The look, the creatures and the land are Stead's own.</p>
+</section>
+
+<section>
+  <h2>Three sizes</h2>
+  <div class="row">
+    <figure><canvas class="still" style="height:230px" data-world="town" data-n="2" data-eye="level"></canvas><figcaption><b>One or two creatures: a stead.</b> A house, a storehouse and a workshop along one lane. The eye is level, as it is today.</figcaption><button type="button" class="set" data-set="2">Show it above</button></figure>
+    <figure><canvas class="still" style="height:230px" data-world="town" data-n="6" data-eye="raised"></canvas><figcaption><b>Three to seven: a hamlet.</b> A street forms, and the eye rises so the ground between buildings can be seen.</figcaption><button type="button" class="set" data-set="6">Show it above</button></figure>
+    <figure><canvas class="still" style="height:230px" data-world="town" data-n="16" data-eye="raised"></canvas><figcaption><b>Eight and more: a town.</b> The camera steps back a whole pixel size at a time, never a fraction.</figcaption><button type="button" class="set" data-set="16">Show it above</button></figure>
+  </div>
+</section>
+
+<section>
+  <h2>A theme is a style and its colours</h2>
+  <div class="row">
+    <figure><canvas class="still" style="height:300px" data-world="town" data-n="5" data-eye="raised" data-theme="lantern"></canvas><figcaption><b>Lantern.</b> Timber frames, gabled roofs, warm windows.</figcaption><button type="button" class="setworld" data-world="lantern">Show it above</button></figure>
+    <figure><canvas class="still" style="height:300px" data-world="town" data-n="5" data-eye="raised" data-theme="neon"></canvas><figcaption><b>Neon.</b> Flat roofs, ribbon windows and signs, each lit in its creature's own colour.</figcaption><button type="button" class="setworld" data-world="neon">Show it above</button></figure>
+    <figure><canvas class="still" style="height:300px" data-world="town" data-n="5" data-eye="raised" data-theme="terrace"></canvas><figcaption><b>Terrace.</b> Whitewashed blocks, roof gardens, striped awnings.</figcaption><button type="button" class="setworld" data-world="terrace">Show it above</button></figure>
+  </div>
+  <p>Every theme has a night and a day. All three now carry drawn light: pools under lamps and at lit doors, soft shadows, a glow in the sky, and haze with distance.</p>
+</section>
+
+<section>
+  <h2>Roads say who works together</h2>
+  <div class="row">
+    <figure><canvas class="still" style="height:300px" data-world="pair" data-grade="1" data-eye="raised"></canvas><figcaption><b>A trodden path.</b> They have handed each other work a few times.</figcaption></figure>
+    <figure><canvas class="still" style="height:300px" data-world="pair" data-grade="2" data-eye="raised"></canvas><figcaption><b>A cart track.</b> They work together often.</figcaption></figure>
+    <figure><canvas class="still" style="height:300px" data-world="pair" data-grade="3" data-eye="raised"></canvas><figcaption><b>A paved road with lamps.</b> They work together all the time.</figcaption></figure>
+  </div>
+  <p>Every workshop also has a path to the porch, where work is brought to you. A creature walking a road with a crate is work being handed over.</p>
+  <p class="note">Today the world is not told who works with whom. The engine carries messages between creatures; counting them for each pair is new work.</p>
+</section>
+
+<section>
+  <h2>Each creature its own</h2>
+  <div class="row tight">
+    <figure><canvas class="still" style="height:330px" data-world="solo" data-n="0" data-eye="level"></canvas><figcaption><b>Roof and colour: whose it is.</b> Eight colours here. Today there are three.</figcaption></figure>
+    <figure><canvas class="still" style="height:330px" data-world="solo" data-n="1" data-eye="level"></canvas><figcaption><b>Storeys: work delivered.</b> A floor is added and never taken away.</figcaption></figure>
+    <figure><canvas class="still" style="height:330px" data-world="solo" data-n="2" data-eye="level"></canvas><figcaption><b>Ivy: how long it has stood.</b></figcaption></figure>
+    <figure><canvas class="still" style="height:330px" data-world="solo" data-n="3" data-eye="level"></canvas><figcaption><b>Lanterns over the door:</b> gates it holds on other machines.</figcaption></figure>
+  </div>
+  <div class="forms" id="forms"></div>
+  <p class="note">The six creatures at world size, generated with Codex as tiny sprites and put on the grid. The kid is the earlier hand-made stand-in.</p>
+</section>
+
+<section>
+  <h2>Up close</h2>
+  <div class="close">
+    <figure><img alt="Today's large drawing of a creature, a horned tinkerer in an apron." src="__KID_PNG__"><figcaption><b>Today's large drawing.</b> 48 by 52, with 21 poses.</figcaption></figure>
+    <figure><img alt="Six creatures drawn large in the new look: a leaf-winged dragon, a mosaic-shelled crab, a ring of floating stones, a striped cuttlefish, a stone ring holding a storm, and a knotted ribbon." src="__CONCEPT_PNG__"><figcaption><b>A first try at the new large drawing.</b> Generated with Codex from one prompt.</figcaption></figure>
+  </div>
+  <figure><img class="wide" alt="The same six creatures on a true pixel grid, each repainted in eight colours." src="__RECOLOUR_PNG__"><figcaption><b>The same six after a cleanup script.</b> Each is now on a true pixel grid about 50 pixels across, and every pixel has a role in place of a colour, so any creature can take any of the eight colours.</figcaption></figure>
+  <div class="grp" id="who"><button type="button" data-who="folio" aria-pressed="true">Folio</button><button type="button" data-who="tessera" aria-pressed="false">Tessera</button><button type="button" data-who="cairn" aria-pressed="false">Cairn</button><button type="button" data-who="purl" aria-pressed="false">Purl</button><button type="button" data-who="hush" aria-pressed="false">Hush</button><button type="button" data-who="knot" aria-pressed="false">Knot</button></div>
+  <div class="clips" id="poses"></div>
+  <p class="note">Six creatures, twelve poses each, from Codex, put on the grid by the same script and playing here, each strip in a different colour. Each moves and works in its own way.</p>
+  <div class="clips" id="turns"></div>
+  <p class="note">Each creature from eight directions, turning in place: the four sides and four corners the world can be seen from. Until now a creature was one flat drawing that always faced the same way.</p>
+  <p>Three distances. In the world a creature is a small figure. Step into its workshop and it is drawn large and fine, with all its poses. And it can float beside your work as a companion, as the companion window does today.</p>
+</section>
+
+<section>
+  <h2>Earned, never lost</h2>
+  <div class="row tight">
+    <figure><canvas class="still" style="height:300px" data-world="earn" data-n="0" data-eye="level"></canvas><figcaption><b>New.</b> A plain workshop.</figcaption></figure>
+    <figure><canvas class="still" style="height:300px" data-world="earn" data-n="1" data-eye="level"></canvas><figcaption><b>Proven.</b> Lights along the eave and a banner in its own colour.</figcaption></figure>
+    <figure><canvas class="still" style="height:300px" data-world="earn" data-n="2" data-eye="level"></canvas><figcaption><b>Decorated.</b> A gold banner and a star on the roof, for the rare ones.</figcaption></figure>
+  </div>
+  <div class="clips" id="tools"></div>
+  <p class="note">Better tools as it progresses: the same creature at work with a wooden, an iron, a gold and a star-metal hammer. Last, wearing a medal.</p>
+  <ul class="plain">
+    <li><b>A creature earns</b> from what it has really done: a hundred conversations, a first night worked through, ten hand-offs with one partner, a project that became a tower, a year standing.</li>
+    <li><b>Its tools improve</b> with its range: the more kinds of real tool it has used well, the better the hammer it is drawn with.</li>
+    <li><b>You earn</b> for the place: the first creature, a hamlet, a town, the first paved road, the first tower. A stone on the green becomes a gold statue.</li>
+    <li><b>A run can earn too.</b> Seven days in a row with work delivered earns a ribbon. When the run ends, the ribbon stays and nothing is said.</li>
+    <li><b>Each one is a fact with its proof</b>, listed where firsts are remembered today, and none is ever taken away.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Project directories become buildings</h2>
+  <div class="row">
+    <figure><canvas class="still" style="height:430px" data-world="plot" data-n="1" data-eye="raised"></canvas><figcaption><b>One project.</b> A shed beside the workshop.</figcaption></figure>
+    <figure><canvas class="still" style="height:430px" data-world="plot" data-n="4" data-eye="raised"></canvas><figcaption><b>Four.</b> They spread out while the plot has room.</figcaption></figure>
+    <figure><canvas class="still" style="height:430px" data-world="plot" data-n="7" data-eye="raised"></canvas><figcaption><b>Seven.</b> They squeeze in and stack. The workshop never moves.</figcaption></figure>
+  </div>
+  <p>Each directory a creature works in is a small building on its own plot, in its colour, lit while a thread runs there. Pressing one opens that folder.</p>
+  <figure><canvas class="still" style="height:clamp(300px,62vw,620px)" data-world="ladder" data-eye="level"></canvas><figcaption><b>Six stages.</b> A tiny shack for a project that is mostly empty, then a shed, a house, a tower, a high-rise and a skyscraper.</figcaption></figure>
+  <figure><canvas class="still" style="height:clamp(300px,62vw,620px)" data-world="ladder" data-eye="raised" data-corner="1"></canvas><figcaption><b>The same six from a corner.</b> They are built of blocks, so every side and every corner view of them already exists.</figcaption></figure>
+  <figure><img class="wide" alt="Six buildings in a row from a tiny shack to a skyscraper, lit in orange." src="__STAGES_PNG__"><figcaption><b>The design sheet behind them</b>, generated with Codex. I rebuilt its six designs in blocks at the town's own pixel size.</figcaption></figure>
+  <p>Nothing is scanned for this. Every conversation already records its directory, so the count is free. A repository states its number of tracked files in the first twelve bytes of its index. A folder that is not a repository grows only by the files the creature has touched.</p>
+</section>
+
+<section>
+  <h2>Four sides of a workshop, four things to open</h2>
+  <div class="row tight">
+    <figure><canvas class="still" style="height:270px" data-world="one" data-q="0" data-eye="level"></canvas><figcaption><b>Door.</b> Opens the conversation.</figcaption></figure>
+    <figure><canvas class="still" style="height:270px" data-world="one" data-q="1" data-eye="level"></canvas><figcaption><b>Bench window.</b> Lit while a thread runs.</figcaption></figure>
+    <figure><canvas class="still" style="height:270px" data-world="one" data-q="2" data-eye="level"></canvas><figcaption><b>Shelf.</b> What it has delivered.</figcaption></figure>
+    <figure><canvas class="still" style="height:270px" data-world="one" data-q="3" data-eye="level"></canvas><figcaption><b>Chore board.</b> What is scheduled.</figcaption></figure>
+  </div>
+  <p>Pressing a side would open that pane, by you or by the creature, through the window tools already built.</p>
+</section>
+
+<section>
+  <h2>The map</h2>
+  <figure><canvas class="still" style="height:clamp(280px,48vw,470px)" data-world="map" data-eye="raised"></canvas><figcaption>Step back once more and each machine is its own piece of land. A plank lane is a direct link, stepping stones are a relayed one, and a machine that is offline fades. The map turns the same way.</figcaption></figure>
+</section>
+
+<section>
+  <h2>Alive, cheaply</h2>
+  <ul class="plain">
+    <li>A lit window is a thread running. Smoke is a tool in use. A lit loft is a child thread.</li>
+    <li>Sails turn while a model is loaded. Flags move. The sky follows the clock, as it does now.</li>
+    <li>It is drawn only when something changes: a few frames a second at rest, the full rate only during a turn, and nothing when hidden or when you ask for stillness.</li>
+  </ul>
+  <p class="note">What stays as it is: indexed pixel art on one grid, the world as a pure reading of events, nothing decorative that is not informative, and growth that never decays.</p>
+</section>
+
+<section>
+  <h2>Decisions for you</h2>
+  <ul class="decisions">
+    <li><div><h3>Where the eye rests</h3><p class="why">Try each with the buttons above.</p></div>
+      <ul><li><span class="pick">My pick</span>Level for a stead, rising once a street forms.</li><li>Always level. Purest, but roads and back rows cannot be seen.</li><li>Always raised.</li><li>On the corners, as in the middle of a turn. Two sides show at once, but the pixels no longer sit square to the screen.</li></ul></li>
+    <li><div><h3>Creature size</h3><p class="why">You settled this today.</p></div>
+      <ul><li><span class="pick done">Settled</span>A small figure in the world, and a larger, finer drawing for close views and the companion.</li></ul></li>
+    <li><div><h3>How far the game goes</h3><p class="why">You settled this today.</p></div>
+      <ul><li><span class="pick done">Settled</span>Rewards, never guilt. A run of days may earn a reward when it happens. When a run ends, nothing is said and nothing is lost.</li></ul></li>
+    <li><div><h3>What a better tool is</h3><p class="why">You settled this today.</p></div>
+      <ul><li><span class="pick done">Settled</span>A nicer-looking tool in the picture, and nothing more. It changes nothing about what the creature can do.</li></ul></li>
+    <li><div><h3>How the large drawing is made</h3><p class="why">Six creatures have twelve poses each. The app has 21 for each.</p></div>
+      <ul><li><span class="pick">My pick</span>Generate with Codex, put on the grid by script, then correct by hand, a creature at a time. You judge each sheet.</li><li>Draw every pose by hand from the start.</li></ul></li>
+    <li><div><h3>What a theme is</h3><p class="why">You asked for several, each a style plus colours.</p></div>
+      <ul><li><span class="pick">My pick</span>A building style with a night and a day of its own. It takes the pane's ground from the app theme, so the world still sits in the pane.</li><li>Colours only, following the app theme, with one building style.</li><li>A style for each creature, so one town is mixed.</li></ul></li>
+    <li><div><h3>Drawn light</h3><p class="why">The earlier rule: lamps light nothing and nothing casts a shadow.</p></div>
+      <ul><li><span class="pick">My pick</span>Allow it, drawn in pixels and never blurred: pools, soft shadows, sky glow, haze.</li><li>Keep the earlier rule.</li></ul></li>
+    <li><div><h3>Do roads ever fade</h3><p class="why">Your rule so far is that the stead only grows.</p></div>
+      <ul><li><span class="pick">My pick</span>Never. The road is the record; who is walking it shows this week.</li><li>Yes. A road follows the last month and wears away.</li></ul></li>
+    <li><div><h3>What counts as working together</h3><p class="why">Needs a count from the engine.</p></div>
+      <ul><li><span class="pick">My pick</span>Messages and hand-offs between two creatures, both ways.</li><li>Also shared files, shared chores, or the same machine.</li></ul></li>
+    <li><div><h3>What a workshop says about its creature</h3><p class="why">Standing, as opposed to what it is doing now.</p></div>
+      <ul><li><span class="pick">My pick</span>As drawn: storeys for work delivered, ivy for age, lanterns for gates.</li><li>Fewer signs, or other ones (spend, trust, models).</li></ul></li>
+    <li><div><h3>Which directories get a building</h3><p class="why">Your idea: project directories as buildings on the plot.</p></div>
+      <ul><li><span class="pick">My pick</span>Every directory the creature has worked in. Old ones stay, unlit.</li><li>Only those with work this month.</li><li>Only those you pin.</li></ul></li>
+    <li><div><h3>How a project building grows</h3><p class="why">Your idea: humble homes into towers.</p></div>
+      <ul><li><span class="pick">My pick</span>Height from conversations in that directory, a wider base from tracked files. Neither needs a scan.</li><li>Height from one of the two only.</li></ul></li>
+    <li><div><h3>What moves a project up a stage</h3><p class="why">Six stages, from a tiny shack to a skyscraper.</p></div>
+      <ul><li><span class="pick">My pick</span>Conversations: 1, 3, 10, 30, 100 and 300 reach each stage in turn. A repository with over 2,000 tracked files stands one stage higher.</li><li>Files alone, or a stage you set by hand.</li></ul></li>
+    <li><div><h3>Where a big project stands</h3><p class="why">A skyscraper does not fit in a workshop's yard, and nothing built may move.</p></div>
+      <ul><li><span class="pick">My pick</span>Every project gets a lot of its own beside its creature's workshop, four lots to a plot. A tiny shack starts on an empty lot and grows there.</li><li>Projects stay in the yard and big ones are drawn slender.</li></ul></li>
+    <li><div><h3>Four sides, four panes</h3><p class="why">Door, bench window, shelf, chore board.</p></div>
+      <ul><li><span class="pick">My pick</span>Yes. Each side opens its pane.</li><li>No. The whole workshop opens the creature.</li></ul></li>
+    <li><div><h3>The renderer</h3><p class="why">The 5 Nov decision chose canvas with no library.</p></div>
+      <ul><li><span class="pick">My pick</span>Keep plain canvas and add a small block renderer of our own. This page runs on it.</li><li>Move the world to the graphics card, still without a library.</li><li>Adopt a 3D library. A new dependency.</li></ul></li>
+    <li><div><h3>The courtyard grid and districts</h3><p class="why">On main since PR 9: a grid of courts, sixteen to a district.</p></div>
+      <ul><li><span class="pick">My pick</span>Replaced by the town and the map.</li><li>Kept beside them as a list view.</li></ul></li>
+    <li><div><h3>The unmerged branch</h3><p class="why">Folio, material ramps, painted stills, a painted home.</p></div>
+      <ul><li><span class="pick">My pick</span>Keep the creature ideas and the extra colour ramps. Drop the painted stills and the painted home.</li><li>Merge it whole first, then rebuild.</li></ul></li>
+    <li><div><h3>Who may turn the world</h3><p class="why">The window tools already let a creature arrange panes.</p></div>
+      <ul><li><span class="pick">My pick</span>You, to begin with. The creature later, to show you something.</li><li>Both from the start.</li></ul></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Order of work</h2>
+  <ol class="steps">
+    <li><b>The look, still.</b> One stead from the front in the app's real renderer, day and night, and a contact sheet of figures. You judge it before anything is built on it.</li>
+    <li><b>The block world.</b> The same stead as blocks with four sides and the turn.</li>
+    <li><b>Growth.</b> Plots, the hamlet, the town, and the camera's whole steps.</li>
+    <li><b>Roads.</b> The engine counts who works with whom; the world lays roads from it.</li>
+    <li><b>Life.</b> Walkers, lamps, smoke, sails, inside the drawing budget.</li>
+    <li><b>The map.</b> Machines as linked land.</li>
+    <li><b>The roster.</b> Each creature as a figure and a portrait, in batches, with sheets for you.</li>
+  </ol>
+  <p class="note">Steps 1 and 7 are taste and stay with you and me, on sheets like this one. Steps 2 to 6 are mechanics, for Opus 5.5 agents in worktrees of their own.</p>
+</section>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+var U=56;
+function fill(p){
+ var d=function(k,src,to,t){ if(!p[k]) p[k]=mixH(p[src],p[to],t); };
+ d('grassHi','grass','paper',.18); d('grassLo','grass','ink',.22); d('soilLo','soil','ink',.2); d('rockLo','rock','ink',.22); d('pathLo','path','ink',.2); d('cobbleLo','cobble','ink',.24);
+ d('plasterHi','plaster','paper',.3); d('timberDk','timber','ink',.3); d('woodHi','wood','paper',.25); d('woodDk','wood','ink',.28); d('slateDk','slate','ink',.5); d('glint','glass','paper',.3); d('lampHi','lamp','paper',.6); d('leafHi','leaf','paper',.25); d('leafLo','leaf','ink',.22);
+ if(!p.gold) p.gold=p.night?'#ffd166':'#e6a817'; d('goldHi','gold','paper',.55); d('goldDk','gold','ink',.38);
+ return p;
+}
+var HN=['#c4a1ff','#7aa8ff','#6fd6ff','#5fe0c8','#a6e06a','#ffa05c','#ff8fb8','#ffd76a'];
+var THEMES={
+ lantern:{name:'Lantern',style:{roof:'gable',frames:true,ribbon:false,litHue:false},
+  night:{key:'ln',night:true,bg:'#1a1b26',ink:'#10101c',paper:'#dfe3ff',star:'#7d86b8',
+   grass:'#21494b',soil:'#3f2f54',rock:'#262846',path:'#6c5b7c',cobble:'#7b82b6',
+   plaster:'#8990cf',timber:'#3a2e5c',wood:'#9c6a68',slate:'#474d8c',stone:'#6a70a4',
+   glass:'#222a54',lamp:'#ffbe5c',accent:'#bb9af7',err:'#ff6b8a',leaf:'#3f9c6c',chalk:'#dfe3ff',smoke:'#8088b8',
+   hues:HN,sky:['#1d1e33','#222344','#2a2856'],orb:'#efe6ff',pool:'#ffbe5c',haze:.2,shadow:.26},
+  day:{key:'ld',night:false,bg:'#e9ebf3',ink:'#2b2d55',paper:'#ffffff',star:null,
+   grass:'#8fd08a',soil:'#c79a7e',rock:'#9c9ab8',path:'#ecd3a8',cobble:'#d9dbec',
+   plaster:'#fbfaff',timber:'#6a4f66',wood:'#c9946a',slate:'#6b74a8',stone:'#aeb1c8',
+   glass:'#5a6aa8',lamp:'#ffb02e',accent:'#8a63d2',err:'#e0446a',leaf:'#4fae5c',chalk:'#f2f4fb',smoke:'#c2c6d8',
+   hues:['#8b5cf6','#3b7bf0','#12a5dd','#10b3a0','#62b02c','#f47b2a','#ec4f93','#e0a81e'],
+   sky:['#e6e9f5','#e1e7f7','#dbe4f9'],orb:'#fff1b8',pool:null,haze:.14,shadow:.16}},
+ neon:{name:'Neon',style:{roof:'flat',frames:false,ribbon:true,litHue:true,sign:true,antenna:true},
+  night:{key:'nn',night:true,bg:'#1a1b26',ink:'#0b0c16',paper:'#eef0ff',star:'#6f76b0',
+   grass:'#182f3a',soil:'#2a2146',rock:'#1b1c34',path:'#34305c',cobble:'#464b80',
+   plaster:'#2e3362',timber:'#141628',wood:'#3f3568',slate:'#272a54',stone:'#42477e',
+   glass:'#10122a',lamp:'#7df9ff',accent:'#ff5fd2',err:'#ff4d6d',leaf:'#1f8f86',chalk:'#dfe6ff',smoke:'#5a5f96',
+   hues:['#c084fc','#60a5fa','#22d3ee','#2dd4bf','#a3e635','#fb923c','#f472b6','#fde047'],
+   sky:['#20193a','#301d55','#4a2068','#6c2672'],orb:'#ff8ad8',orbSlit:true,pool:'#7df9ff',haze:.24,shadow:.3},
+  day:{key:'nd',night:false,bg:'#e9ebf3',ink:'#2a2550',paper:'#ffffff',star:null,
+   grass:'#a8e6cf',soil:'#c9b6e6',rock:'#a79bd6',path:'#f3d9ee',cobble:'#e2e5f7',
+   plaster:'#ffffff',timber:'#3a3470',wood:'#d9c8f0',slate:'#8a8fd0',stone:'#bcc0e6',
+   glass:'#4a55a8',lamp:'#ff8fcf',accent:'#e23fb4',err:'#e0446a',leaf:'#3fc0a8',chalk:'#ffffff',smoke:'#cfd3ea',
+   hues:['#a855f7','#3b82f6','#06b6d4','#14b8a6','#84cc16','#f97316','#ec4899','#eab308'],
+   sky:['#ede8f5','#f1e0f0','#f6d8e6','#fbd3d6'],orb:'#ffe9a8',orbSlit:true,pool:null,haze:.14,shadow:.14}},
+ terrace:{name:'Terrace',style:{roof:'flat',frames:false,ribbon:false,litHue:false,awning:true,plants:true},
+  night:{key:'tn',night:true,bg:'#1a1b26',ink:'#0f1322',paper:'#e8eeff',star:'#8a95c0',
+   grass:'#2a4a44',soil:'#5a3f4a',rock:'#33324e',path:'#7c6a72',cobble:'#8a8fb0',
+   plaster:'#7480b8',timber:'#2e3558',wood:'#a07068',slate:'#b0645a',stone:'#7a7fa8',
+   glass:'#1f2850',lamp:'#ffc46b',accent:'#bb9af7',err:'#ff6b8a',leaf:'#3f9a6a',chalk:'#e8eeff',smoke:'#8a95c0',
+   hues:HN,sky:['#1c2140','#1f2a55','#24356c'],orb:'#fff6dc',pool:'#ffc46b',haze:.2,shadow:.26},
+  day:{key:'td',night:false,bg:'#e9ebf3',ink:'#3a3350',paper:'#ffffff',star:null,
+   grass:'#c5d98a',soil:'#dba678',rock:'#b98a70',path:'#f0dcb4',cobble:'#ece4d4',
+   plaster:'#fffaf0',timber:'#b89a84',wood:'#d9a878',slate:'#e07a52',stone:'#cdbfae',
+   glass:'#3f78b8',lamp:'#ffb02e',accent:'#8a63d2',err:'#e0446a',leaf:'#5fae4c',chalk:'#ffffff',smoke:'#d8d2c8',
+   hues:['#7c5cff','#2f6fed','#1aa3c9','#12a594','#6aa329','#e2632a','#e0457b','#d6a21e'],
+   sky:['#e6ebf5','#deeaf7','#d3e6f8'],orb:'#fff1b8',pool:null,haze:.12,shadow:.18}}
+};
+var themeId='neon', P=null, ST=null, epoch=0, memo=new Map();
+function usePalette(id){ var t=THEMES[id]||THEMES.lantern; P=t[isDark()?'night':'day']; ST=t.style; }
+
+function h2(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function mixH(a,b,t){var A=h2(a),B=h2(b),o='#';for(var i=0;i<3;i++){var v=Math.round(A[i]+(B[i]-A[i])*t);v=v<0?0:v>255?255:v;o+=(v<16?'0':'')+v.toString(16);}return o;}
+function shade(hex,tone,fog){ if(!tone&&!fog) return hex; var k=P.key+hex+'|'+tone+'|'+fog, v=memo.get(k); if(v) return v; v=hex; if(tone>0) v=mixH(v,P.paper,tone); else if(tone<0) v=mixH(v,P.ink,-tone); if(fog) v=mixH(v,P.bg,fog); memo.set(k,v); return v; }
+function ramp(h){ return {d:mixH(h,P.ink,.42),m:mixH(h,P.ink,.16),b:h,l:mixH(h,P.paper,.3),h:mixH(h,P.paper,.62)}; }
+function rng(seed){ var a=seed>>>0; return function(){ a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+function isDark(){ var t=document.documentElement.getAttribute('data-theme'); if(t==='dark') return true; if(t==='light') return false; return !(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches); }
+function G(ctx){ return {ctx:ctx,tone:0,fog:0,r:function(x,y,w,h,c){ if(w<=0||h<=0) return; ctx.fillStyle=shade(c,this.tone,this.fog); ctx.fillRect(x,y,w,h); },a:function(x,y,w,h,c,al){ if(w<=0||h<=0) return; ctx.globalAlpha=al; ctx.fillStyle=shade(c,0,this.fog); ctx.fillRect(x,y,w,h); ctx.globalAlpha=1; }}; }
+for(var tk in THEMES){ fill(THEMES[tk].night); fill(THEMES[tk].day); }
+function box(x0,x1,y0,y1,z0,z1,p){ return {x0:x0,x1:x1,y0:y0,y1:y1,z0:z0,z1:z1,p:p}; }
+
+/* ---------- figures ---------- */
+function art(rows){ var w=0,i; for(i=0;i<rows.length;i++) w=Math.max(w,rows[i].length); for(i=0;i<rows.length;i++) while(rows[i].length<w) rows[i]+='.'; return {w:w,h:rows.length,rows:rows}; }
+var ART={
+ kid:art(["o...........o","oo.........oo",".oo.......oo.","..ooooooooo..",".obbbbbbbbbo.","obbbbbbbbbblo","obbebbbbebblo","obbbbllbbbbbo",".obbbllbbbbo.","..ooooooooo..","...okkkkko...","..obkkkkkbo..","..obkkkkkbo..","...okkkkko...","...ob...bo...","...oo...oo..."]),
+ cairn:art(["...........oooooo...........",".........oohhhhbboo.........","........ohhhhhhbbmmoo.......",".......ohhhhhbmbbbbmo.......","......oobbmdmddbbblbdo......","......obbbboooooobmddo......","..oo..obbbmo....o.bbmo..oo..",".omlo.odddoo.....oblbo.olbo.","ohllloobbbo......olbloollbbo","ohllbbobbbo......ollbolllblo","ommmmmolbbo......odddommmmmo",".ommm.obbblo...o.bmmdoommmo.",".oomo.obbbmdoooobbbbdo.ommo.","..oo..oodddllllbmbbmoo..oo..",".......ommdllllmdmddo.......",".......oomdmlbbbdddoo.......",".........oommmmmmoo.........","...........oooooo..........."]),
+ tessera:art([".........ooooooo........",".......oohhlldbboo......","......ohhhhlldbbbboo....",".....ohhhhhlbdmbbbbo....","....ohhhhlddblddmbbmo...","....ommmmdllllbbdddmo...","...ollllldlllbbbdbmmmo..","..odhlllldllbbbbdmmmmo..","..omllllbddbbmbddmmmmo..",".oommllb.......dmmmmmmo.",".ommmmmo.........mmmmmo.",".ommooo..h...h...ooommo.",".ooodmo..h...h...omdooo.","..ommooooo....ooooommo..",".oddoollbboddollbbooddo.","olbmollbbbboolllbbbombmo","obboobbbooboolombbboombo","obo.oobbooooooo.bmoo.obo","ooo..oobmo....obboo..ooo","......oooo....oooo......"]),
+ folio:art([".....ooo...oo.......oooooo","....ohbo.ooho.....oolllblo","...ohbooohboo...oolllllllo","...obm.bbboo...ohlllldlbo.","...obbbbboooo.olldlldllbo.",".ohmbbbbmbbboollldldllhoo.",".obbmoombdoooblllddllllo..","ombbowombbmoollldllllhoo..","ombbommmmmmolllddlllloo...","ombbbmmddooobbddlllloooo..",".ooooodmmo.olddhhlddmbbbo.",".....ommmoobbdddddbbbbboo.","....obbmmoommbmbbbbbbboo..","...ohhhmbodoooombbbmoo....","...ohhhbmmddddooooooooo...","...obbbbmmmmmmdo..ombmoo..","...oohhbmbmbdmbdo.omombo..","....ohhhmmmddmmmdoooommo..","....mohhdbmddmmmdmooommo..","..oommooobbooommmmmmmmoo..","..ohbboohhmo.ohbmooooo....","..oooooooooo.oooo........."]),
+ purl:art(["................oooooo....",".............oooommmmo....","...........oolbbmmdmmmo...","........o.hhhbbbbbmddmo...",".......olhhhmmmmbbmdddo...",".....oomhhhlmmmmdmmbddoo..",".....oohhhbbbbbbdddmmdmm..","...ooohhhhbbbbbbdddmmdmmoo","...olbllmmmmmmbbbddddmmboo","...ollbddddddddbbmmddblboo","...oobmhhhlllbddmmmdbblloo",".....omohhbooooddmdmbhoo..",".....obbooobbbmoddmbblo...",".....oobbbbb.oooobbbllo...",".....ohobbboohoomollloo...",".ooooohobbbohhommooooo....","oolbmooblbbboommoooo......","ollmmollllbbbmommmmoo.....","oloooollollbdbmommmbo.....","omoollllollbobbmooobo.....",".oolbbboobllombbmoooo.....","..olboo.olllooobbo........","..ollo.obbloo.obmo........","..oooo.obloo.obbo.........",".......oooo..oooo........."]),
+ hush:art(["..........ooooo..........",".........olllbdooo.......","......ooolllbbdmmmoo.....","....oohlbdbbbbdbmmdoo....","...ollllloooooombddbbo...","..ollllloo.....oodbbbbo..","..ohlllo...o..oo..mbbb.o.","..oblo....ohllbbo..obmmo.","oooddo.....llhlbd..odddoo","olllo..oolllhbllboo.odbbo","olbboo.lblllhhbhhhboombbo","olbboohhllllllmhhlblommbo","obbboommmmmmmmmmmmmmommmo","oodd...ooooollooooo.oddoo",".odbbo......hh......bbbo.",".obbboo....hhhh....olbbo.",".obbbmo.....dh.....obbbo.","..obbbdo....h.....omdbo..","...odmbboo......oolmmdo..","...oodddmoooooooblmmmo...","....ooodmmdbbbmdmbdooo...","...olbbodmdmmmmdmdolloo..",".oollmmmomdmmmmdmollbmoo.",".obbbmmmmoooooo.ombbbmmo.",".ombbmmmdo......ombbbmmo.",".ooooooooo......oooooooo."]),
+ knot:art(["...........ooooo.........",".........oohhbbbo........",".......oohhhhbbbmo.......","......oobhhll..ddmo......","......obblo.....dmo......","...o.oobmoh.oh..mmo......","..oo...o..h..h..mmo......","..lllbbbo....o.bmboooo...","oollllbbbo...oommombbbmo.","oblooo.bbmo.obbbmmbbbbboo","obdo..oomoohlllbooooombmo","obddo..oohlhhloo....oodmo","omdmmddolhhhloo....ooddmo",".ommmdolhllodddooooddmddo","..ommdobboommdmmommmmmdo.","...oooomdooommmbodmmmoo..","......omddodobbbbooooo...","......omddddoobbbo.......",".....ooommmmo.obbbo......","...oollmbmbo..olbboo.....","..ollllbmoo...olbbmooo...",".olllhlmoo.....olbbbmmo..",".ollllloo......olbbbbbmo.",".oloollo........olbboooo.",".ooo.llo.........obmo....",".....ooo..........ooo...."])
+};
+var FORMS=['kid','cairn','tessera','folio','purl','hush','knot'];
+var HOVER={cairn:2};
+var POSESETS=__POSES_JSON__, poseName='folio';
+var TURNSETS=__TURNS_JSON__;
+var TURNS=['folio','tessera','cairn','purl','hush','knot'].map(function(n,i){ return {name:n.charAt(0).toUpperCase()+n.slice(1),f:[0,1,2,3,4,5,6,7],hue:[0,2,5,6,1,4][i],set:TURNSETS[n],slow:true}; });
+var WORK=[8,8,9,9,8,8,9,9];
+var TOOLCLIPS=[{name:'Wood',f:WORK,hue:0,tool:'wood'},{name:'Iron',f:WORK,hue:0,tool:'iron'},{name:'Gold',f:WORK,hue:0,tool:'gold'},{name:'Star metal',f:WORK,hue:0,tool:'star'},{name:'A medal',f:[0,0,0,0,1,0,0,0],hue:0,medal:true}];
+var TIERS={wood:{d:'#4a2f2a',m:'#6e4a3c',b:'#946a50',l:'#b98d6a',h:'#d9b38c'},iron:{d:'#3a3f55',m:'#5b6280',b:'#8a92b2',l:'#b8c0dc',h:'#e6ebff'},gold:{d:'#8a5a12',m:'#c98a1e',b:'#f2b53a',l:'#ffd76a',h:'#fff3c0'},star:{d:'#145a78',m:'#1f9cc0',b:'#46d6f0',l:'#9af0ff',h:'#f0feff'}};
+var TOOLBOX={8:[0,17,12,26],9:[5,36,12,43]}, SPARK={9:[0,36,4,41]};
+var CLIPS=[{name:'At rest',f:[0,0,0,0,1,0,0,0,2,2,0,0,3,3,3,0],hue:0},{name:'Moving',f:[4,5,6,7],hue:2},{name:'At work',f:[8,8,9,9,8,8,9,9,0,0],hue:5,tool:'iron'},{name:'Greeting',f:[0,10,10,0,10,10,0,0],hue:4},{name:'Asleep',f:[11],hue:6}];
+function artMap(hue){ return {o:P.ink,d:hue.d,m:hue.m,b:hue.b,l:hue.l,h:hue.h,w:P.paper,e:P.ink,k:P.wood,c:P.slateDk,a:P.lamp,g:P.leafHi}; }
+function drawArt(g,a,ox,oy,map){ for(var y=0;y<a.h;y++){ var row=a.rows[y],x=0; while(x<a.w){ var ch=row[x]; if(ch==='.'){x++;continue;} var e=x+1; while(e<a.w&&row[e]===ch) e++; g.r(ox+x,oy+y,e-x,1,map[ch]); x=e; } } }
+
+function critter(cr,x,z,state){
+ var a=ART[cr.form], hov=HOVER[cr.form]||0;
+ return {x:x,y:0,z:z,draw:function(g,t){
+  var hue=ramp(P.hues[cr.hue]), bob=(state==='nap'||!t)?0:(((t+cr.i*3)>>2)%2);
+  var ox=-(a.w>>1), oy=-a.h-hov-bob, gy=oy-7-(((t+cr.i)>>2)%2), c;
+  if(hov) g.r(-3,-1,6,1,P.grassLo);
+  drawArt(g,a,ox,oy,artMap(hue));
+  if(state==='porch'){ c=P.accent; g.r(0,gy,1,1,c); g.r(-1,gy+1,3,1,c); g.r(-2,gy+2,5,1,c); g.r(-1,gy+3,3,1,c); g.r(0,gy+4,1,1,c); }
+  else if(state==='blocked'){ c=P.err; g.r(-2,gy,1,1,c); g.r(2,gy,1,1,c); g.r(-1,gy+1,1,1,c); g.r(1,gy+1,1,1,c); g.r(0,gy+2,1,1,c); g.r(-1,gy+3,1,1,c); g.r(1,gy+3,1,1,c); g.r(-2,gy+4,1,1,c); g.r(2,gy+4,1,1,c); }
+  else if(state==='nap'){ c=P.chalk; g.r(3,oy-4,3,1,c); g.r(4,oy-3,1,1,c); g.r(3,oy-2,3,1,c); g.r(7,oy-8,2,1,c); g.r(7,oy-7,2,1,c); }
+  else if(state==='walk'){ g.r((a.w>>1)-1,-6-hov-bob,5,5,P.wood); g.r((a.w>>1)-1,-6-hov-bob,5,1,P.woodHi); g.r((a.w>>1)-1,-2-hov-bob,5,1,P.woodDk); }
+  else if(state==='work'&&t&&((t+cr.i*2)%6)<2){ g.r(ox-3,-6,2,2,P.lampHi); g.r(ox-5,-8,1,1,P.lamp); }
+ }};
+}
+
+/* ---------- wall and roof paints ---------- */
+function win(g,x,y,lit,o){ g.r(x,y,7,8,o.frame); g.r(x+1,y+1,5,6,lit?(o.litCol||P.lamp):P.glass); if(lit) g.r(x+1,y+1,2,2,o.litHi||P.lampHi); else g.r(x+1,y+1,1,1,o.glint); g.r(x+3,y+1,1,6,o.frame); g.r(x+1,y+3,5,1,o.frame); g.r(x-1,y+8,9,1,o.sill); }
+function door(g,x,y,o){ g.r(x,y,9,13,o.frame); g.r(x+1,y+1,7,12,o.doorCol); g.r(x+1,y+1,7,1,o.doorHi); g.r(x+4,y+2,1,11,o.doorLo); g.r(x+6,y+7,1,1,P.lampHi); }
+function sign(g,x,y,o){ g.r(x,y,5,1,P.ink); g.r(x,y+1,5,5,o.hue.l); g.r(x,y+5,5,1,o.hue.d); for(var i=0;i<3;i++) if((o.glyph>>i)&1) g.r(x+1+i,y+2+((o.glyph>>(i+3))&1),1,2,P.ink); }
+function bench(g,x,y,o){ g.r(x,y,15,9,o.frame); g.r(x+1,y+1,13,7,o.lit?(o.litCol||P.lamp):P.glass); if(o.lit){ g.r(x+1,y+1,13,2,o.litHi||P.lampHi); g.r(x+3,y+4,4,1,P.ink); g.r(x+4,y+5,2,3,P.ink); g.r(x+9,y+5,3,3,P.ink); } g.r(x+5,y+1,1,7,o.frame); g.r(x+10,y+1,1,7,o.frame); g.r(x-1,y+9,17,2,o.sill); }
+function shelf(g,x,y,o){ g.r(x,y,17,12,o.frame); g.r(x+1,y+1,15,10,P.ink); g.r(x+1,y+5,15,1,o.frame); for(var i=0;i<6&&i<o.crates;i++){ var cx=x+2+(i%3)*5, cy=y+(i<3?7:1); g.r(cx,cy,4,4,P.wood); g.r(cx,cy,4,1,P.woodHi); } }
+function board(g,x,y,o){ g.r(x,y,13,10,o.frame); g.r(x+1,y+1,11,8,P.slateDk); for(var i=0;i<o.chores&&i<3;i++) g.r(x+2,y+2+i*2,4+(((o.seed>>(i*2))&3)*2),1,P.chalk); }
+function ivy(g,w,h,o){ var r=rng(o.seed*13+5+o.role), n=o.ivy*10; for(var i=0;i<n;i++){ var t=r(), y=h-3-((t*t*h*0.85)|0), x=(r()*Math.max(3,w*0.5*(1-t*0.6)))|0; g.r(x,y,2,2,r()<.5?P.leaf:P.leafHi); } }
+function wallPaint(o){ return function(g,w,h){
+  var s,y,i,y0=h-2;
+  g.r(0,0,w,h,o.base);
+  if(o.planks){ for(y=3;y<h;y+=4) g.r(0,y,w,1,o.plank); }
+  if(o.frames!==false){ g.r(0,0,2,h,o.frame); g.r(w-2,0,2,h,o.frame); g.r(0,0,w,1,o.frame); for(s=1;s<o.storeys;s++) g.r(0,h-s*o.sh-1,w,2,o.frame); }
+  else { g.r(0,0,w,1,o.rim); g.r(w-1,1,1,h-1,o.band); for(s=1;s<o.storeys;s++) g.r(0,h-s*o.sh,w,1,o.band); }
+  g.r(0,y0,w,2,o.foot);
+  if(o.tower){ for(var f=0;f<o.tower-1;f++){ var ty=2+f*8; g.r(0,ty+7,w,1,o.band||o.frame); for(var tx=2;tx+2<=w-2;tx+=4){ var on=o.lit&&(((o.seed>>((f*3+tx)%11))&1)===1); g.r(tx,ty+1,2,4,on?o.litCol:P.glass); } } }
+  for(s=1;s<o.storeys;s++){ y=h-(s+1)*o.sh+5; if(o.ribbon) ribbon(g,4,y+1,w-8,o); else { win(g,5,y,o.lit,o); if(w>=30) win(g,w-12,y,o.lit,o); } }
+  if(o.role===0){ door(g,5,y0-13,o); sign(g,16,y0-13,o); win(g,w-10,y0-12,o.lit,o); for(i=0;i<o.lamps;i++){ g.r(17+i*4,2,2,1,P.ink); g.r(17+i*4,3,2,2,P.lamp); } }
+  else if(o.role===1){ bench(g,(w>>1)-7,y0-13,o); }
+  else if(o.role===2){ shelf(g,(w>>1)-8,y0-13,o); }
+  else if(o.role===3){ board(g,4,y0-13,o); if(w>=30) win(g,w-11,y0-12,o.lit,o); }
+  else if(o.role===5){ door(g,(w>>1)-4,y0-13,o); win(g,3,y0-12,o.lit,o); win(g,w-10,y0-12,o.lit,o); }
+  else if(o.role===6){ win(g,5,y0-12,o.lit,o); if(w>=30) win(g,w-12,y0-12,o.lit,o); }
+  else if(o.role===7){ for(i=0;i<10;i++){ var cx=3+(i%5)*7, cy=i<5?y0-6:y0-13; g.r(cx,cy,6,6,P.ink); if(i<o.crates){ g.r(cx+1,cy+2,4,4,P.wood); g.r(cx+1,cy+2,4,1,P.woodHi); } } }
+  else if(o.role===9){ door(g,(w>>1)-4,y0-13,o); }
+  else if(o.role===10){ win(g,(w>>1)-3,(h>>1)-4,o.lit,o); }
+  else if(o.role===11){ g.r((w>>1)-3,y0-8,6,8,o.frame); g.r((w>>1)-2,y0-7,4,7,o.doorCol); g.r((w>>1)-2,y0-7,4,1,o.doorHi); g.r((w>>1)+4,y0-8,1,2,o.lit?P.lamp:o.frame); }
+  if(o.garland){ for(i=2;i<w-2;i+=3) g.r(i,1,1,2,[P.gold,o.hue.l,P.accent][((i-2)/3)%3]); }
+  if(o.banner&&o.role===0&&o.storeys>=2){ var bx=(w>>1)-1, by=h-2*o.sh+3, gold=o.banner>1; g.r(bx-1,by-1,5,1,P.ink); g.r(bx,by,3,9,gold?P.gold:o.hue.b); g.r(bx+1,by+2,1,3,gold?P.goldHi:o.hue.h); g.r(bx,by+8,3,1,gold?P.goldDk:o.hue.d); g.r(bx+1,by+8,1,1,o.base); }
+  if(o.ivy) ivy(g,w,h,o);
+}; }
+function roof(x0,x1,z0,z1,y,kind,tread,col,wallCol,opt){
+ var out=[],ax0=x0,ax1=x1,az0=z0,az1=z1,i=0;
+ for(;;){
+  var w=ax1-ax0,d=az1-az0; if(w<=0||d<=0) break;
+  var slope=(function(i){ return function(g,w,h){ g.r(0,0,w,1,col.b); g.r(0,1,w,h-1,col.m); for(var x=(i%2)*3+1;x<w;x+=6) g.r(x,0,1,1,col.l); }; })(i);
+  var end=(function(i){ return function(g,w,h){ g.r(0,0,w,h,wallCol); g.r(0,0,2,h,col.d); g.r(w-2,0,2,h,col.d); if(opt&&(i===opt.loftAt||i===opt.loftAt+1)&&w>12){ g.r((w>>1)-2,0,4,h,opt.loftLit?P.lamp:P.glass); } }; })(i);
+  var p={top:col.l};
+  if(kind==='gx'){ p.pz=slope;p.nz=slope;p.px=end;p.nx=end; }
+  else if(kind==='gz'){ p.px=slope;p.nx=slope;p.pz=end;p.nz=end; }
+  else { p.pz=slope;p.nz=slope;p.px=slope;p.nx=slope; }
+  out.push(box(ax0,ax1,y+i*2,y+i*2+2,az0,az1,p));
+  if(kind!=='gz'){ az0+=tread; az1-=tread; }
+  if(kind!=='gx'){ ax0+=tread; ax1-=tread; }
+  i++; if(i>30) break;
+ }
+ return out;
+}
+function soilPaint(g,w,h){ g.r(0,0,w,h,P.soil); g.r(0,0,w,2,P.grassHi); g.r(0,2,w,1,P.grassLo); g.r(0,8,w,1,P.soilLo); g.r(0,11,w,h-11,P.rock); for(var x=3;x<w;x+=11){ g.r(x,5+(x%3),2,1,P.soilLo); g.r(x+5,13+(x%2),3,1,P.rockLo); } }
+function rockPaint(g,w,h){ g.r(0,0,w,h,P.rock); g.r(0,h-3,w,3,P.rockLo); g.r(4,2,6,1,P.rockLo); g.r(w-12,3,5,1,P.rockLo); }
+function chimPaint(g,w,h){ g.r(0,0,w,h,P.stone); g.r(0,0,w,1,P.ink); g.r(0,3,w,1,P.slateDk); }
+function cratePaint(g,w,h){ g.r(0,0,w,h,P.wood); g.r(0,0,w,1,P.woodHi); g.r(0,h-1,w,1,P.woodDk); g.r(w>>1,1,1,h-2,P.woodDk); }
+function plankPaint(g,w,h){ g.r(0,0,w,h,P.woodDk); g.r(0,0,w,1,P.wood); }
+function plankTop(g,w,h){ g.r(0,0,w,h,P.wood); for(var x=0;x<w;x+=6) g.r(x,0,2,h,P.woodDk); }
+function ribbon(g,x,y,w,o){ g.r(x,y,w,6,o.frame); g.r(x+1,y+1,w-2,4,o.lit?o.litCol:P.glass); if(o.lit) g.r(x+1,y+1,w-2,1,o.litHi); else g.r(x+1,y+1,3,1,o.glint); for(var i=x+5;i<x+w-1;i+=5) g.r(i,y+1,1,4,o.frame); }
+function styled(o,hue,own){ o.frames=ST.frames; o.ribbon=ST.ribbon; o.rim=mixH(o.base,P.paper,.3); o.band=mixH(o.base,P.ink,.22); o.litCol=(own&&ST.litHue)?hue.l:P.lamp; o.litHi=(own&&ST.litHue)?hue.h:P.lampHi; return o; }
+function slabPaint(hue){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(0,0,w,1,hue.b); }; }
+function slabTop(hue,plants){ return function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(2,2,w-4,h-4,hue.d); g.r(4,4,w-8,h-8,hue.m); if(plants){ for(var x=4;x<w-6;x+=8){ g.r(x,2,2,2,P.leafHi); g.r(x+4,h-4,2,2,P.leaf); } } }; }
+function flatRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z){
+ var sp=slabPaint(hue), top=[], lit=cr.lit, lc=ST.litHue?hue.l:P.lamp, door=cr.door, sb;
+ grp.parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(hue,ST.plants)})});
+ var ph=function(g,w,h){ g.r(0,0,w,h,P.plaster); g.r(0,0,w,1,P.plasterHi); g.r(2,3,w-4,3,lit?lc:P.glass); };
+ top.push({x:x0+8,z:z0+7,b:box(x0+2,x0+14,H+3,H+11,z0+2,z0+12,{pz:ph,nz:ph,px:ph,nx:ph,top:hue.b})});
+ if(ST.sign){
+  var sg=function(g,w,h){ g.r(0,0,w,h,lit?hue.b:hue.d); g.r(1,1,w-2,1,lit?hue.h:hue.m); g.r(1,h-2,w-2,1,lit?hue.h:hue.m); };
+  if(door==='pz') sb=box(X-8,X+8,H+3,H+9,z1,z1+2); else if(door==='nz') sb=box(X-8,X+8,H+3,H+9,z0-2,z0); else if(door==='px') sb=box(x1,x1+2,H+3,H+9,Z-8,Z+8); else sb=box(x0-2,x0,H+3,H+9,Z-8,Z+8);
+  sb.p={pz:sg,nz:sg,px:sg,nx:sg,top:hue.h}; top.push({x:(sb.x0+sb.x1)/2,z:(sb.z0+sb.z1)/2,b:sb});
+ }
+ top.push({x:x1-4,z:z0+4,s:ST.antenna?sAntenna(x1-4,H+3,z0+4,hue,cr.i):sFlag(x1-4,H+3,z0+4,hue,cr.i)});
+ if(lit) top.push({x:x0+8,z:z0+7.5,s:sSmoke(x0+8,H+11,z0+7,cr.i)});
+ if(cr.star) top.push({x:x0+8,z:z0+7.2,s:sStar(x0+8,H+11,z0+7)});
+ grp.top=top; return H+20;
+}
+
+/* ---------- sprites ---------- */
+function sSmoke(x,y,z,i){ return {x:x,y:y,z:z,draw:function(g,t){ for(var p=0;p<3;p++){ var a=(t+i*5+p*4)%12, sz=a<5?2:3; g.r(-1+(((a>>1)+p)%3)-1,-a-3,sz,sz,P.smoke); } }}; }
+function sFlag(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ var f=((t>>1)+i)%2; g.r(0,-9,1,9,P.ink); g.r(1,-9+f,3,3,hue.b); g.r(4,-8-f,2,3,hue.b); g.r(1,-9+f,3,1,hue.l); }}; }
+function sAntenna(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ g.r(0,-10,1,10,P.ink); g.r(-1,-6,3,1,P.ink); g.r(-1,-12,3,2,(((t>>2)+i)%2)?hue.h:P.err); }}; }
+function sStar(x,y,z){ return {x:x,y:y,z:z,draw:function(g){ g.r(0,-3,1,3,P.ink); g.r(0,-9,1,1,P.gold); g.r(-2,-8,5,1,P.gold); g.r(-1,-7,3,1,P.gold); g.r(-1,-6,1,1,P.gold); g.r(1,-6,1,1,P.gold); g.r(0,-8,1,1,P.goldHi); }}; }
+function sStone(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-2,-9,4,9,P.stone); g.r(-2,-9,1,9,P.plasterHi); g.r(-3,-1,6,1,P.slateDk); g.r(-1,-11,2,2,P.gold); }}; }
+function sStatue(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-4,-4,8,4,P.stone); g.r(-4,-5,8,1,P.ink); g.r(-4,-4,8,1,P.plasterHi); g.r(-2,-12,4,7,P.gold); g.r(-1,-14,2,2,P.gold); g.r(-3,-11,1,3,P.gold); g.r(2,-12,1,2,P.gold); g.r(2,-15,1,3,P.goldDk); g.r(-1,-14,1,1,P.goldHi); g.r(-2,-12,1,6,P.goldHi); g.r(1,-8,1,3,P.goldDk); }}; }
+function sVane(x,y,z){ return {x:x,y:y,z:z,draw:function(g){ g.r(0,-7,1,7,P.ink); g.r(-3,-6,7,1,P.ink); g.r(2,-7,1,3,P.ink); }}; }
+function sBell(x,y,z,ring){ return {x:x,y:y,z:z,draw:function(g,t){ var sw=ring&&t?(((t>>1)%2)?1:-1):0, c=ring?P.accent:P.lamp; g.r(0,0,1,2,P.ink); g.r(-1+sw,1,3,1,c); g.r(-2+sw,2,5,4,c); g.r(-2+sw,6,5,1,P.ink); g.r(sw,7,1,1,P.ink); }}; }
+function sTree(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-1,-14,3,14,P.wood); g.r(1,-14,1,14,P.woodDk); g.r(-4,-34,8,2,P.leafHi); g.r(-6,-32,12,6,P.leafHi); g.r(-6,-26,12,8,P.leaf); g.r(-5,-18,10,4,P.leafLo); g.r(-4,-29,2,2,P.leaf); g.r(1,-24,3,2,P.leafHi); g.r(-5,-21,2,2,P.leafLo); g.r(2,-30,2,2,P.leaf); }}; }
+function sLamp(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(0,-11,1,11,P.ink); g.r(-1,-14,3,3,P.night?P.lamp:P.glint); g.r(-1,-15,3,1,P.ink); if(P.night) g.r(0,-13,1,1,P.lampHi); }}; }
+function sWell(x,z){ return {x:x,y:0,z:z,draw:function(g){ g.r(-5,-5,10,5,P.stone); g.r(-5,-6,10,1,P.ink); g.r(-5,-1,10,1,P.slateDk); g.r(-5,-14,1,8,P.woodDk); g.r(4,-14,1,8,P.woodDk); g.r(-6,-16,12,2,P.wood); g.r(-6,-16,12,1,P.woodHi); g.r(0,-14,1,5,P.ink); }}; }
+function sSails(x,y,z,busy){ return {x:x,y:y,z:z,draw:function(g,t){ var ang=(busy?t:0)*Math.PI/16; for(var a=0;a<4;a++){ var th=ang+a*Math.PI/2, c=Math.cos(th), s=Math.sin(th); for(var r=5;r<=18;r++){ for(var o=1;o<=3;o++) g.r(Math.round(c*r-s*o),Math.round(s*r+c*o),1,1,P.plaster); } for(r=2;r<=19;r++) g.r(Math.round(c*r),Math.round(s*r),1,1,P.ink); } g.r(-1,-1,3,3,P.ink); }}; }
+
+/* ---------- the world ---------- */
+function World(){ this.cells=new Map(); this.list=[]; this.segs=new Map(); this.walkers=[]; this.hmax=30; }
+World.prototype.cell=function(cx,cz,land){ var k=cx+','+cz, c=this.cells.get(k); if(!c){ c={cx:cx,cz:cz,land:land!==false,items:[],fog:0,foot:null}; this.cells.set(k,c); this.list.push(c); } return c; };
+World.prototype.land=function(cx,cz){ var c=this.cells.get(cx+','+cz); return !!(c&&c.land); };
+World.prototype.at=function(x,z){ return this.cells.get(Math.floor((x+28)/U)+','+Math.floor((z+28)/U)); };
+World.prototype.seg=function(t,i,j){ return this.segs.get(t+i+','+j)||0; };
+World.prototype.mark=function(t,i,j,g){ var k=t+i+','+j; if((this.segs.get(k)||0)<g) this.segs.set(k,g); };
+World.prototype.node=function(i,j){ return Math.max(this.seg('h',i-1,j),this.seg('h',i,j),this.seg('v',i,j-1),this.seg('v',i,j)); };
+function segOf(b){ var x=b.cx,z=b.cz; if(b.door==='pz') return {t:'h',i:x,j:z+1,n:[[x,z+1],[x+1,z+1]]}; if(b.door==='nz') return {t:'h',i:x,j:z,n:[[x,z],[x+1,z]]}; if(b.door==='px') return {t:'v',i:x+1,j:z,n:[[x+1,z],[x+1,z+1]]}; return {t:'v',i:x,j:z,n:[[x,z],[x,z+1]]}; }
+function segMid(s){ return s.t==='h'?[s.i*U,s.j*U-28]:[s.i*U-28,s.j*U]; }
+World.prototype.road=function(A,B,g){
+ var self=this, sa=segOf(A), sb=segOf(B), goal={}, prev={}, q=[], end=null, i;
+ var key=function(n){return n[0]+','+n[1];};
+ for(i=0;i<2;i++){ goal[key(sb.n[i])]=1; prev[key(sa.n[i])]=0; q.push(sa.n[i]); }
+ while(q.length){
+  var n=q.shift(); if(goal[key(n)]){ end=n; break; }
+  var x=n[0],z=n[1], nb=[];
+  if(self.land(x,z-1)||self.land(x,z)) nb.push([[x+1,z],'h',x,z]);
+  if(self.land(x-1,z-1)||self.land(x-1,z)) nb.push([[x-1,z],'h',x-1,z]);
+  if(self.land(x-1,z)||self.land(x,z)) nb.push([[x,z+1],'v',x,z]);
+  if(self.land(x-1,z-1)||self.land(x,z-1)) nb.push([[x,z-1],'v',x,z-1]);
+  for(i=0;i<nb.length;i++){ var m=nb[i][0]; if(prev[key(m)]===undefined){ prev[key(m)]=[n,nb[i][1],nb[i][2],nb[i][3]]; q.push(m); } }
+ }
+ if(!end) return null;
+ this.mark(sa.t,sa.i,sa.j,g); this.mark(sb.t,sb.i,sb.j,g);
+ var nodes=[], cur=end;
+ while(cur){ nodes.unshift(cur); var p=prev[key(cur)]; if(!p) break; this.mark(p[1],p[2],p[3],g); cur=p[0]; }
+ var pts=[segMid(sa)]; for(i=0;i<nodes.length;i++) pts.push([nodes[i][0]*U-28,nodes[i][1]*U-28]); pts.push(segMid(sb));
+ return pts;
+};
+function topPaint(w,cell){ return function(g){
+  var cx=cell.cx,cz=cell.cz,i,a;
+  g.r(0,0,56,56,P.grass);
+  var r=rng(cx*31+cz*17+99); for(i=0;i<16;i++){ var x=((r()*27)|0)*2, y=((r()*27)|0)*2; g.r(x,y,2,2,r()<.6?P.grassHi:P.grassLo); }
+  var sides=[['N',w.seg('h',cx,cz)],['S',w.seg('h',cx,cz+1)],['W',w.seg('v',cx,cz)],['E',w.seg('v',cx+1,cz)]];
+  for(i=0;i<4;i++){ (function(side,gr){ if(!gr) return;
+    var R=function(a,b,aw,bh,col){ if(side==='N') g.r(8+a,b,aw,bh,col); else if(side==='S') g.r(8+a,56-b-bh,aw,bh,col); else if(side==='W') g.r(b,8+a,bh,aw,col); else g.r(56-b-bh,8+a,bh,aw,col); };
+    if(gr===1){ for(a=2;a<40;a+=8) R(a,0,4,2,P.path); }
+    else if(gr===2){ R(0,0,40,4,P.path); for(a=4;a<40;a+=10) R(a,2,2,2,P.pathLo); }
+    else { R(0,0,40,6,P.cobble); R(0,6,40,2,P.cobbleLo); for(a=0;a<40;a+=4) R(a,((a/4)%3)*2,2,2,P.cobbleLo); }
+  })(sides[i][0],sides[i][1]); }
+  var corners=[[0,0,w.node(cx,cz)],[1,0,w.node(cx+1,cz)],[0,1,w.node(cx,cz+1)],[1,1,w.node(cx+1,cz+1)]];
+  for(i=0;i<4;i++){ (function(ex,ey,ng){ if(!ng) return;
+    var C=function(a,b,ww,hh,col){ g.r(ex?56-a-ww:a, ey?56-b-hh:b, ww,hh,col); };
+    if(ng===1){ C(0,0,2,2,P.path); }
+    else if(ng===2){ C(0,0,8,4,P.path); C(0,0,4,8,P.path); }
+    else { C(0,0,8,8,P.cobble); C(6,6,2,2,P.cobbleLo); C(2,2,2,2,P.cobbleLo); C(6,0,2,2,P.cobbleLo); C(0,6,2,2,P.cobbleLo); }
+  })(corners[i][0],corners[i][1],corners[i][2]); }
+  if(cell.foot){ var f=cell.foot, sa=P.shadow; g.a(f.x0+26,f.z0+26,f.x1-f.x0+4,f.z1-f.z0+4,P.ink,sa*.55); g.a(f.x1+28,f.z0+32,6,f.z1-f.z0+2,P.ink,sa); g.a(f.x0+32,f.z1+28,f.x1-f.x0-4,6,P.ink,sa); }
+  if(P.pool){
+   for(i=0;i<4;i++){ if(corners[i][2]!==3) continue; (function(ex,ey){ for(var dy=0;dy<16;dy+=2){ var hw=Math.round(Math.sqrt(256-dy*dy)/2)*2, hw2=dy<10?Math.round(Math.sqrt(100-dy*dy)/2)*2:0; g.a(ex?56-hw:0,ey?54-dy:dy,hw,2,P.pool,.12); if(hw2) g.a(ex?56-hw2:0,ey?54-dy:dy,hw2,2,P.pool,.14); } })(corners[i][0],corners[i][1]); }
+   if(cell.glow){ var gx=cx*U-28, gz=cz*U-28; cell.glow.r.forEach(function(q,n){ g.a(Math.min(q[0][0],q[1][0])-gx,Math.min(q[0][1],q[1][1])-gz,Math.abs(q[1][0]-q[0][0]),Math.abs(q[1][1]-q[0][1]),cell.glow.col,n?.22:.18); }); }
+  }
+}; }
+World.prototype.finish=function(){
+ var minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9, self=this, seen={};
+ this.list.forEach(function(c){
+  var X=c.cx*U,Z=c.cz*U;
+  minx=Math.min(minx,X-28); maxx=Math.max(maxx,X+28); minz=Math.min(minz,Z-28); maxz=Math.max(maxz,Z+28);
+  if(c.land){
+   c.ground=box(X-28,X+28,-16,0,Z-28,Z+28,{pz:soilPaint,nz:soilPaint,px:soilPaint,nx:soilPaint,top:topPaint(self,c)});
+   c.keel=box(X-20,X+20,-24,-16,Z-20,Z+20,{pz:rockPaint,nz:rockPaint,px:rockPaint,nx:rockPaint});
+  }
+ });
+ this.list.forEach(function(c){ if(!c.land) return; [[c.cx,c.cz],[c.cx+1,c.cz],[c.cx,c.cz+1],[c.cx+1,c.cz+1]].forEach(function(n){ var k=n[0]+','+n[1]; if(seen[k]) return; seen[k]=1; if(self.node(n[0],n[1])===3){ var x=n[0]*U-28,z=n[1]*U-28; c.items.push({t:'spr',x:x,z:z,s:sLamp(x,z)}); } }); });
+ this.bounds={cx:(minx+maxx)/2,cz:(minz+maxz)/2,dx:maxx-minx,dz:maxz-minz,h:this.hmax,slab:24};
+ return this;
+};
+
+function along(b,u,out){ if(b.door==='pz') return [b.x0+u,b.z1+out]; if(b.door==='nz') return [b.x1-u,b.z0-out]; if(b.door==='px') return [b.x1+out,b.z1-u]; return [b.x0-out,b.z0+u]; }
+function addWorkshop(w,cell,cr){
+ var X=cell.cx*U,Z=cell.cz*U, hue=ramp(P.hues[cr.hue]);
+ var W=cr.wide?36:32, D=cr.deep?32:28, SH=18, H=cr.storeys*SH;
+ var x0=X-W/2,x1=X+W/2,z0=Z-D/2,z1=Z+D/2, sides=['pz','px','nz','nx'], di=sides.indexOf(cr.door), i, top;
+ var base=styled({base:P.plaster,frame:P.timber,foot:P.timberDk,sill:P.timberDk,glint:P.glint,storeys:cr.storeys,sh:SH,lit:cr.lit,hue:hue,seed:cr.seed,crates:cr.shelf,chores:cr.chores,lamps:cr.lamps,ivy:cr.ivy,doorCol:hue.b,doorHi:hue.l,doorLo:hue.d,glyph:(cr.seed&63)|1,garland:cr.garland,banner:cr.banner},hue,true);
+ var p={top:P.timberDk};
+ for(i=0;i<4;i++){ var o={},k; for(k in base) o[k]=base[k]; o.role=(i-di+4)%4; p[sides[i]]=wallPaint(o); }
+ var grp={t:'grp',x:X,z:Z,parts:[{b:box(x0,x1,0,H,z0,z1,p)}],pick:{kind:'workshop',cr:cr}}, parts=grp.parts;
+ if(ST.roof==='flat') top=flatRoof(grp,x0,x1,z0,z1,H,hue,cr,X,Z);
+ else {
+  var steps=roof(x0-2,x1+2,z0-2,z1+2,H,cr.roof,2,hue,P.plaster,{loftAt:2,loftLit:cr.child});
+  steps.forEach(function(b){ parts.push({b:b}); });
+  top=H+steps.length*2;
+  if(cr.chimney&&cr.roof!=='hip'){
+   var hx=cr.roof==='gx'?x1-10:X-2, hz=cr.roof==='gx'?Z-2:z0+6;
+   parts.push({b:box(hx,hx+4,top-4,top+5,hz,hz+4,{pz:chimPaint,nz:chimPaint,px:chimPaint,nx:chimPaint,top:P.ink})});
+   if(cr.lit) parts.push({s:sSmoke(hx+2,top+5,hz+2,cr.i)});
+  }
+  var fx=cr.roof==='gx'?x0+3:X, fz=cr.roof==='gz'?z1-3:Z;
+  parts.push({s:sFlag(fx,top,fz,hue,cr.i)});
+  if(cr.star) parts.push({s:sStar(cr.roof==='hip'?X+4:X,top,Z)});
+  top+=10;
+ }
+ cell.items.push(grp);
+ cell.foot={x0:x0-X,x1:x1-X,z0:z0-Z,z1:z1-Z};
+ var b={cx:cell.cx,cz:cell.cz,door:cr.door,x0:x0,x1:x1,z0:z0,z1:z1};
+ var fw=(cr.door==='pz'||cr.door==='nz')?W:D;
+ for(i=0;i<cr.crates;i++){ var c=along(b,fw-4-i*7,4); cell.items.push({t:'box',x:c[0],z:c[1],b:box(c[0]-3,c[0]+3,0,5,c[1]-3,c[1]+3,{pz:cratePaint,nz:cratePaint,px:cratePaint,nx:cratePaint,top:P.woodHi})}); }
+ if(ST.awning){
+  var a0=along(b,2,0), a1=along(b,16,4), aw=function(g,w,h){ for(var q=0;q<w;q+=4){ g.r(q,0,2,h,hue.b); g.r(q+2,0,2,h,P.paper); } };
+  cell.items.push({t:'box',x:(a0[0]+a1[0])/2,z:(a0[1]+a1[1])/2,b:box(Math.min(a0[0],a1[0]),Math.max(a0[0],a1[0]),14,16,Math.min(a0[1],a1[1]),Math.max(a0[1],a1[1]),{pz:aw,nz:aw,px:aw,nx:aw,top:aw})});
+ }
+ if(cr.lit&&P.pool) cell.glow={col:base.litCol,r:[[along(b,4,0),along(b,14,8)],[along(b,6,0),along(b,12,4)]]};
+ w.hmax=Math.max(w.hmax,top);
+ cr.b=b; cr.cell=cell; return b;
+}
+function addHouse(w,cell,ring){
+ var X=cell.cx*U,Z=cell.cz*U,x0=X-20,x1=X+12,z0=Z-20,z1=Z+12,H=36, sl=ramp(P.slate), ac=ramp(P.accent), top, flat=ST.roof==='flat';
+ var base=styled({base:P.wood,plank:P.woodDk,planks:true,frame:P.timberDk,foot:P.timberDk,sill:P.timberDk,glint:P.glint,storeys:2,sh:18,lit:P.night,hue:sl,seed:5,ivy:0,doorCol:P.accent,doorHi:ac.l,doorLo:ac.d},sl,false);
+ var p={top:P.timberDk}, roles={pz:5,px:6,nz:6,nx:6};
+ ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=roles[sd]; p[sd]=wallPaint(o); });
+ var parts=[{b:box(x0,x1,0,H,z0,z1,p)}];
+ if(flat){ var sp=slabPaint(ac); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,ST.plants)})}); top=H+7; }
+ else { var steps=roof(x0-2,x1+2,z0-2,z1+2,H,'gx',2,sl,P.wood,{loftAt:3,loftLit:P.night}); steps.forEach(function(b){ parts.push({b:b}); }); top=H+steps.length*2; }
+ parts.push({b:box(x1-10,x1-6,top-4,top+6,Z-6,Z-2,{pz:chimPaint,nz:chimPaint,px:chimPaint,nx:chimPaint,top:P.ink})});
+ if(P.night) parts.push({s:sSmoke(x1-8,top+6,Z-4,3)});
+ parts.push({s:sVane(x0+4,flat?H+3:top,Z-4)});
+ cell.items.push({t:'grp',x:X-4,z:Z-4,parts:parts,pick:{kind:'house'}});
+ var deck=function(g,w,h){ g.r(0,0,w,h,P.wood); g.r(0,0,w,1,P.woodHi); };
+ var post={pz:P.timberDk,nz:P.timberDk,px:P.timberDk,nx:P.timberDk};
+ var slab={pz:sl.d,nz:sl.d,px:sl.d,nx:sl.d,top:sl.l};
+ cell.items.push({t:'grp',x:X-4,z:z1+5,parts:[
+  {b:box(x0,x1,0,3,z1,z1+8,{pz:deck,px:deck,nx:deck,top:P.woodHi})},
+  {b:box(x0,x0+2,3,16,z1+6,z1+8,post)},{b:box(x1-2,x1,3,16,z1+6,z1+8,post)},
+  {b:box(x0-2,x1+2,16,19,z1,z1+10,slab)},
+  {s:sBell(X-14,16,z1+9,ring)}]});
+ cell.items.push({t:'spr',x:X+18,z:Z-2,s:sTree(X+18,Z-2)});
+ cell.foot={x0:x0-X,x1:x1-X,z0:z0-Z,z1:z1+8-Z};
+ if(P.pool) cell.glow={col:P.lamp,r:[[[X-10,z1+8],[X+2,z1+16]],[[X-8,z1+8],[X,z1+12]]]};
+ w.hmax=Math.max(w.hmax,top+10);
+ return {cx:cell.cx,cz:cell.cz,door:'pz',x0:x0,x1:x1,z0:z0,z1:z1+8};
+}
+function addStore(w,cell,count){
+ var X=cell.cx*U,Z=cell.cz*U,x0=X-20,x1=X+20,z0=Z-14,z1=Z+14,H=16, sl=ramp(P.slate);
+ var base=styled({base:P.wood,plank:P.woodDk,planks:true,frame:P.timberDk,foot:P.timberDk,sill:P.timberDk,glint:P.glint,storeys:1,sh:16,lit:false,hue:sl,seed:9,ivy:0,crates:count,doorCol:P.timber,doorHi:P.wood,doorLo:P.timberDk},sl,false);
+ var p={top:P.timberDk}, roles={pz:7,px:8,nz:8,nx:9};
+ ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=roles[sd]; p[sd]=wallPaint(o); });
+ var parts=[{b:box(x0,x1,0,H,z0,z1,p)}];
+ if(ST.roof==='flat'){ var sp=slabPaint(sl); parts.push({b:box(x0-2,x1+2,H,H+3,z0-2,z1+2,{pz:sp,nz:sp,px:sp,nx:sp,top:slabTop(sl,false)})}); }
+ else roof(x0-2,x1+2,z0-2,z1+2,H,'gx',4,sl,P.wood,null).forEach(function(b){ parts.push({b:b}); });
+ cell.items.push({t:'grp',x:X,z:Z,parts:parts,pick:{kind:'store'}});
+ cell.foot={x0:x0-X,x1:x1-X,z0:z0-Z,z1:z1-Z};
+ return {cx:cell.cx,cz:cell.cz,door:'pz',x0:x0,x1:x1,z0:z0,z1:z1};
+}
+function addMill(w,cell,busy){
+ var X=cell.cx*U,Z=cell.cz*U, sl=ramp(P.slate), parts=[], tiers=[[12,0,18,9],[10,18,34,10],[8,34,46,8]];
+ tiers.forEach(function(t){
+  var base=styled({base:P.plaster,frame:P.timber,foot:P.timber,sill:P.timberDk,glint:P.glint,storeys:1,sh:t[2]-t[1],lit:busy,hue:sl,seed:21+t[0],ivy:0,doorCol:P.wood,doorHi:P.woodHi,doorLo:P.woodDk},sl,false); base.ribbon=false;
+  var p={top:P.timberDk};
+  ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=(sd==='pz'?t[3]:(t[3]===9?10:t[3])); p[sd]=wallPaint(o); });
+  parts.push({b:box(X-t[0],X+t[0],t[1],t[2],Z-t[0],Z+t[0],p)});
+ });
+ roof(X-10,X+10,Z-10,Z+10,46,'hip',2,sl,P.plaster,null).forEach(function(b){ parts.push({b:b}); });
+ parts.push({s:sSails(X,40,Z,busy)});
+ cell.items.push({t:'grp',x:X,z:Z,parts:parts,pick:{kind:'mill'}});
+ cell.foot={x0:-12,x1:12,z0:-12,z1:12};
+ w.hmax=Math.max(w.hmax,62);
+}
+function creature(i){
+ var r=rng(1000+i*77), shelf=Math.min(6,((r()*4)|0)+(i<4?3:i<9?1:0));
+ return {i:i,hue:i%8,form:FORMS[(i*3+(i>6?1:0))%7],seed:(r()*1e6)|0,shelf:shelf,storeys:1+(shelf>=3?1:0)+(shelf>=6?1:0),
+  roof:['gx','gz','hip'][(r()*3)|0],wide:r()<.5,deep:r()<.4,chimney:r()<.75,ivy:i<3?3:i<7?2:i<11?1:0,lamps:(r()*4)|0,chores:1+((r()*3)|0),crates:(r()*3)|0,child:r()<.3,lit:false,door:'pz',garland:false,banner:0,star:false};
+}
+function walker(cr,pts,phase){
+ var sp=critter(cr,0,0,'walk'), L=0, sl=[], i;
+ for(i=0;i<pts.length-1;i++){ var d=Math.abs(pts[i+1][0]-pts[i][0])+Math.abs(pts[i+1][1]-pts[i][1]); sl.push(d); L+=d; }
+ return {at:function(t){ var d=(t*1.4+phase)%(2*L); if(d>L) d=2*L-d; var i=0; while(i<sl.length-1&&d>sl[i]){ d-=sl[i]; i++; } var a=pts[i],b=pts[i+1],f=sl[i]?d/sl[i]:0; sp.x=Math.round(a[0]+(b[0]-a[0])*f); sp.z=Math.round(a[1]+(b[1]-a[1])*f); return sp; }};
+}
+var SLOTS=[[-1,0],[2,0],[-1,1],[1,1],[2,1],[0,-1],[-1,-1],[1,-1],[-2,0],[-2,1],[0,2],[-1,2],[1,2],[-2,-1],[2,2],[-2,2]];
+var STATES=['work','porch','walk','work','nap','work','walk','work','idle','work','blocked','walk','work','nap','work','walk'];
+var PAIRS=[[0,1,3],[1,2,2],[0,3,2],[3,4,3],[2,5,1],[4,6,2],[5,7,3],[6,8,1],[7,9,2],[8,10,3],[9,11,1],[10,12,2],[11,13,3],[12,14,1],[13,15,2],[0,5,2],[3,9,1]];
+// An idle creature rests by its own door. One in four is out on the green, which has a few
+// fixed spots that never overlap.
+var GREEN=[[-16,-16],[15,-14],[1,6],[-17,22]];
+function town(n){
+ var w=new World(), i, cs=[], idle=0;
+ var house=addHouse(w,w.cell(0,0),n>=2), store=addStore(w,w.cell(1,0),Math.min(10,2+n)), green=w.cell(0,1);
+ if(n>=4) green.items.push({t:'spr',x:-20,z:U+2,s:sWell(-20,U+2)});
+ if(n>=3) green.items.push({t:'spr',x:18,z:U+22,s:n>=8?sStatue(18,U+22):sStone(18,U+22)});
+ if(n>=3) addMill(w,w.cell(2,-1),true);
+ for(i=0;i<n;i++){ var cr=creature(i); cr.state=STATES[i]; cr.lit=cr.state==='work'||cr.state==='walk'; cr.door=SLOTS[i][1]>=1?'nz':'pz'; cr.garland=i<6; cr.banner=i<2?2:i<5?1:0; cr.star=i<2; addWorkshop(w,w.cell(SLOTS[i][0],SLOTS[i][1]),cr); cs.push(cr); }
+ w.road(store,house,1);
+ for(i=0;i<n;i++) w.road(cs[i].b,house,1);
+ var paths={};
+ PAIRS.forEach(function(p){ if(p[0]<n&&p[1]<n){ var pts=w.road(cs[p[0]].b,cs[p[1]].b,p[2]); if(pts){ if(!paths[p[0]]) paths[p[0]]=pts; if(!paths[p[1]]) paths[p[1]]=pts; } } });
+ for(i=0;i<n;i++){ var c=cs[i], b=c.b, pos;
+  if(c.state==='walk'){ var pts=paths[i]||w.road(b,house,1); if(pts){ var wk=walker(c,pts,i*37); wk.cr=c; w.walkers.push(wk); continue; } }
+  if(c.state==='porch'){ pos=[8,25]; w.cell(0,0).items.push({t:'spr',x:pos[0],z:pos[1],s:critter(c,pos[0],pos[1],'porch'),pick:{kind:'creature',cr:c}}); continue; }
+  if((c.state==='nap'||c.state==='idle')&&c.i%4===0&&idle<GREEN.length){ pos=[GREEN[idle][0],U+GREEN[idle][1]]; idle++; green.items.push({t:'spr',x:pos[0],z:pos[1],s:critter(c,pos[0],pos[1],c.state),pick:{kind:'creature',cr:c}}); continue; }
+  pos=along(b,19,5); c.cell.items.push({t:'spr',x:pos[0],z:pos[1],s:critter(c,pos[0],pos[1],c.state),pick:{kind:'creature',cr:c}});
+ }
+ w.cast=cs;
+ return w.finish();
+}
+function pairWorld(grade){
+ var w=new World(), a=creature(0), b=creature(1);
+ a.door='pz'; b.door='pz'; a.lit=true; b.lit=grade>1; a.storeys=1; b.storeys=1; a.roof='gx'; b.roof='gz'; a.crates=0; b.crates=0; a.wide=false; b.wide=false; a.form='purl'; b.form='folio'; a.lamps=0; b.lamps=0;
+ addWorkshop(w,w.cell(0,0),a); addWorkshop(w,w.cell(1,0),b); w.cell(0,1); w.cell(1,1);
+ var pts=w.road(a.b,b.b,grade), p=along(a.b,19,5);
+ w.cell(0,0).items.push({t:'spr',x:p[0],z:p[1],s:critter(a,p[0],p[1],'work')});
+ if(grade>1&&pts) w.walkers.push(walker(b,pts,grade===3?40:30)); else { p=along(b.b,19,5); w.cell(1,0).items.push({t:'spr',x:p[0],z:p[1],s:critter(b,p[0],p[1],'idle')}); }
+ return w.finish();
+}
+var SOLO=[{hue:4,form:'folio',storeys:1,roof:'gx',ivy:0,lamps:0,shelf:1,lit:false,state:'idle',chimney:true,crates:0},{hue:1,form:'purl',storeys:3,roof:'gz',ivy:0,lamps:0,shelf:6,lit:true,state:'work',chimney:true,crates:2},{hue:5,form:'cairn',storeys:2,roof:'hip',ivy:3,lamps:0,shelf:4,lit:true,state:'work',chimney:false,crates:0},{hue:0,form:'hush',storeys:2,roof:'gx',ivy:0,lamps:3,shelf:4,lit:false,state:'idle',chimney:true,crates:0}];
+function soloWorld(i){
+ var w=new World(), cr=creature(i), s=SOLO[i], k; for(k in s) cr[k]=s[k]; cr.door='pz'; cr.wide=true;
+ addWorkshop(w,w.cell(0,0),cr); var p=along(cr.b,21,5); cr.cell.items.push({t:'spr',x:p[0],z:p[1],s:critter(cr,p[0],p[1],s.state)});
+ w.hmax=Math.max(w.hmax,84);
+ return w.finish();
+}
+function oneWorld(){
+ var w=new World(), cr=creature(2); cr.hue=3; cr.form='tessera'; cr.storeys=2; cr.roof='gx'; cr.lit=true; cr.shelf=5; cr.chores=3; cr.lamps=2; cr.ivy=1; cr.crates=1; cr.chimney=true; cr.door='pz'; cr.child=true;
+ addWorkshop(w,w.cell(0,0),cr); var p=along(cr.b,19,5); cr.cell.items.push({t:'spr',x:p[0],z:p[1],s:critter(cr,p[0],p[1],'work')});
+ return w.finish();
+}
+var SHEDS=[{x0:16,x1:26,z0:-10,z1:6,h:12,ridge:'gz',door:'pz'},{x0:10,x1:22,z0:16,z1:26,h:10,ridge:'gx',door:'pz'},{x0:-26,x1:-16,z0:-6,z1:10,h:12,ridge:'gz',door:'pz'},{x0:-12,x1:4,z0:-26,z1:-16,h:10,ridge:'gx',door:'nz'},{x0:-26,x1:-16,z0:14,z1:24,h:8,ridge:'gz',door:'pz'},{x0:16,x1:26,z0:-10,z1:6,y0:12,h:10,ridge:'gz',door:'pz',on:0},{x0:-26,x1:-16,z0:-6,z1:10,y0:12,h:10,ridge:'gz',door:'pz',on:2}];
+function addShed(w,cell,cr,s,lit,roofed,floors){
+ floors=floors||1;
+ var X=cell.cx*U,Z=cell.cz*U,hue=ramp(P.hues[cr.hue]),x0=X+s.x0,x1=X+s.x1,z0=Z+s.z0,z1=Z+s.z1,y0=s.y0||0,y1=y0+s.h+(floors-1)*8, tall=floors>1;
+ var base=styled({base:tall?P.plaster:P.wood,plank:P.woodDk,planks:!tall,frame:P.timberDk,foot:P.timberDk,sill:P.timberDk,glint:P.glint,storeys:1,sh:s.h,lit:lit,hue:hue,seed:cr.seed+s.x0+77,ivy:0,doorCol:hue.b,doorHi:hue.l,doorLo:hue.d,tower:tall?floors:0},hue,true);
+ var p={top:P.timberDk};
+ ['pz','px','nz','nx'].forEach(function(sd){ var o={},k; for(k in base) o[k]=base[k]; o.role=(sd===s.door?(y0?10:11):8); p[sd]=wallPaint(o); });
+ var grp={t:'grp',x:(x0+x1)/2,z:(z0+z1)/2,parts:[{b:box(x0,x1,y0,y1,z0,z1,p)}]};
+ if(roofed){
+  if(ST.roof==='flat'||floors>=3){ var sp=slabPaint(hue); grp.parts.push({b:box(x0,x1,y1,y1+2,z0,z1,{pz:sp,nz:sp,px:sp,nx:sp,top:hue.m})}); if(floors>=6) grp.parts.push({s:sAntenna((x0+x1)/2,y1+2,(z0+z1)/2,hue,3)}); }
+  else roof(x0,x1,z0,z1,y1,s.ridge,2,hue,P.wood,null).forEach(function(b){ grp.parts.push({b:b}); });
+ }
+ cell.items.push(grp);
+ w.hmax=Math.max(w.hmax,y1+(floors>=6?16:10));
+}
+function plotCreature(){ var cr=creature(4); cr.hue=5; cr.form='knot'; cr.storeys=2; cr.roof='gx'; cr.wide=false; cr.deep=false; cr.lit=true; cr.crates=0; cr.chimney=true; cr.door='pz'; cr.ivy=1; cr.lamps=1; return cr; }
+function plotWorld(n){
+ var w=new World(), cr=plotCreature(), cell=w.cell(0,0), i;
+ addWorkshop(w,cell,cr);
+ for(i=0;i<n&&i<SHEDS.length;i++){ var topped=false; for(var j=i+1;j<n&&j<SHEDS.length;j++) if(SHEDS[j].on===i) topped=true; addShed(w,cell,cr,SHEDS[i],i%2===0,!topped,1); }
+ cell.items.push({t:'spr',x:3,z:20,s:critter(cr,3,20,'work')});
+ w.hmax=Math.max(w.hmax,92);
+ return w.finish();
+}
+function tallWorld(){
+ var w=new World(), cr=plotCreature(), cell=w.cell(0,0);
+ addWorkshop(w,cell,cr);
+ addShed(w,cell,cr,SHEDS[2],false,true,1); addShed(w,cell,cr,SHEDS[1],true,true,3); addShed(w,cell,cr,SHEDS[0],true,true,9);
+ cell.items.push({t:'spr',x:3,z:20,s:critter(cr,3,20,'work')});
+ w.hmax=Math.max(w.hmax,92);
+ return w.finish();
+}
+function earnWorld(stage){
+ var w=new World(), cr=creature(1); cr.hue=0; cr.form='folio'; cr.storeys=2; cr.roof='gx'; cr.wide=false; cr.deep=false; cr.lit=true; cr.ivy=1; cr.shelf=4; cr.crates=stage?1:0; cr.chimney=true; cr.door='pz'; cr.lamps=stage>1?2:0;
+ cr.garland=stage>=1; cr.banner=stage; cr.star=stage>=2;
+ addWorkshop(w,w.cell(0,0),cr); var p=along(cr.b,19,5); cr.cell.items.push({t:'spr',x:p[0],z:p[1],s:critter(cr,p[0],p[1],'work')});
+ w.hmax=Math.max(w.hmax,74);
+ return w.finish();
+}
+var STAGES=[
+ {name:'shack',shack:true},
+ {name:'shed',tiers:[[12,10,1]],ant:true},
+ {name:'house',tiers:[[16,12,2]],unit:true,ant:true},
+ {name:'tower',tiers:[[16,14,9]],unit:true,ant:true},
+ {name:'high-rise',tiers:[[22,16,11],[16,12,3]],sign:true,ant:true},
+ {name:'skyscraper',tiers:[[28,20,14],[22,16,5],[14,10,3]],crown:true,spire:true}
+];
+function tierPaint(o){ return function(g,w,h){
+  var i,x,y,r=rng(o.seed), upper=o.ground?o.floors-1:o.floors;
+  g.r(0,0,w,h,o.base); g.r(0,0,1,h,o.band); g.r(w-1,0,1,h,o.band); g.r(0,0,w,1,o.hue.b);
+  if(o.frames){ for(i=1;i<=upper;i++) g.r(0,i*6,w,1,o.band); }
+  for(i=0;i<upper;i++){ y=2+i*6; var on=r()<o.lit; g.r(2,y,w-4,3,on?o.hue.l:P.glass); if(on) g.r(2,y,w-4,1,o.hue.h); for(x=4;x<w-3;x+=3) g.r(x,y,1,3,o.base); }
+  if(o.ground){ y=h-7; if(o.door){ g.r((w>>1)-2,h-7,4,7,o.band); g.r((w>>1)-1,h-6,2,6,o.hue.d); g.r(2,y,(w>>1)-5,3,o.lit?o.hue.l:P.glass); g.r((w>>1)+3,y,w-(w>>1)-5,3,o.lit?o.hue.l:P.glass); } else g.r(2,y,w-4,3,o.lit>.5?o.hue.l:P.glass); g.r(0,h-1,w,1,o.band); }
+}; }
+function sLantern(x,z,hue){ return {x:x,y:0,z:z,draw:function(g){ g.r(0,-6,1,6,P.ink); g.r(-1,-9,3,1,P.ink); g.r(-1,-8,3,3,hue.l); g.r(0,-7,1,1,hue.h); }}; }
+function sSpire(x,y,z,hue,i){ return {x:x,y:y,z:z,draw:function(g,t){ g.r(0,-18,1,18,P.ink); g.r(-1,-6,3,1,P.ink); g.r(-1,-12,3,1,P.ink); g.r(-1,-21,3,3,(((t>>2)+i)%2)?hue.h:hue.l); }}; }
+function addProject(w,cell,cr,stage,px,pz,lit){
+ var X=cell.cx*U+px, Z=cell.cz*U+pz, hue=ramp(P.hues[cr.hue]), st=STAGES[stage], sides=['pz','px','nz','nx'], parts=[], top=[], y=0;
+ var roofTop=function(g,w,h){ g.r(0,0,w,h,P.timberDk); g.r(2,2,w-4,h-4,hue.d); };
+ if(st.shack){
+  var wall=function(door){ return function(g,w,h){ g.r(0,0,w,h,P.wood); for(var q=2;q<h;q+=3) g.r(0,q,w,1,P.woodDk); g.r(0,0,1,h,P.woodDk); g.r(w-1,0,1,h,P.woodDk); if(door){ g.r((w>>1)-1,h-5,3,5,P.ink); g.r((w>>1),h-4,1,4,hue.d); } }; };
+  var roofSide=function(g,w,h){ g.r(0,0,w,h,P.slateDk); g.r(0,0,w,1,hue.d); };
+  var patched=function(g,w,h){ g.r(0,0,w,h,P.slateDk); g.r(2,0,2,2,P.woodHi); };
+  parts.push({b:box(X-4,X+4,0,6,Z-4,Z+4,{pz:wall(true),nz:wall(false),px:wall(false),nx:wall(false),top:P.woodDk})});
+  parts.push({b:box(X-4,X+4,6,7,Z-4,Z+4,{pz:roofSide,nz:roofSide,px:roofSide,nx:roofSide,top:patched})});
+  parts.push({b:box(X-4,X+4,7,9,Z-4,Z,{pz:roofSide,nz:roofSide,px:roofSide,nx:roofSide,top:P.slateDk})});
+  cell.items.push({t:'grp',x:X,z:Z,parts:parts});
+  cell.items.push({t:'spr',x:X+6,z:Z+6,s:sLantern(X+6,Z+6,hue)});
+  w.hmax=Math.max(w.hmax,14); return;
+ }
+ st.tiers.forEach(function(t,n){
+  var W=t[0],D=t[1],floors=t[2],ground=n===0,h=ground?(floors-1)*6+10:floors*6+2,p={top:roofTop};
+  sides.forEach(function(sd,k){ p[sd]=tierPaint({floors:floors,ground:ground,door:ground&&sd==='pz',lit:lit?0.8:0.15,hue:hue,seed:cr.seed+stage*31+n*7+k,base:P.plaster,band:mixH(P.plaster,P.ink,.3),frames:ST.frames}); });
+  parts.push({b:box(X-W/2,X+W/2,y,y+h,Z-D/2,Z+D/2,p)}); y+=h;
+ });
+ var last=st.tiers[st.tiers.length-1], lw=last[0], ld=last[1];
+ if(st.unit){ var up=function(g,w,h){ g.r(0,0,w,h,P.plaster); g.r(0,0,w,1,P.plasterHi); }; top.push({x:X-lw/2+4,z:Z-ld/2+4,b:box(X-lw/2+2,X-lw/2+6,y,y+3,Z-ld/2+2,Z-ld/2+6,{pz:up,nz:up,px:up,nx:up,top:P.plasterHi})}); }
+ if(st.sign){ var sg=function(g,w,h){ g.r(0,0,w,h,lit?hue.b:hue.d); g.r(1,1,w-2,1,lit?hue.h:hue.m); g.r(1,h-2,w-2,1,lit?hue.h:hue.m); }; top.push({x:X,z:Z+ld/2-1,b:box(X-4,X+4,y+2,y+7,Z+ld/2-2,Z+ld/2,{pz:sg,nz:sg,px:sg,nx:sg,top:hue.h})}); }
+ if(st.crown){ var cw=function(g,w,h){ g.r(0,0,w,h,lit?hue.l:hue.d); g.r(0,0,w,1,hue.h); for(var q=1;q<w;q+=2) g.r(q,1,1,h-1,P.timberDk); }; parts.push({b:box(X-4,X+4,y,y+8,Z-4,Z+4,{pz:cw,nz:cw,px:cw,nx:cw,top:hue.b})}); y+=8; }
+ if(st.spire) top.push({x:X,z:Z,s:sSpire(X,y,Z,hue,cr.i)});
+ else if(st.ant) top.push({x:X+lw/2-3,z:Z-ld/2+3,s:sAntenna(X+lw/2-3,y,Z-ld/2+3,hue,cr.i+stage)});
+ cell.items.push({t:'grp',x:X,z:Z,parts:parts,top:top});
+ w.hmax=Math.max(w.hmax,y+(st.spire?24:14));
+}
+function ladderWorld(){
+ var w=new World(), cr=creature(5); cr.hue=5; cr.form='folio';
+ var a=w.cell(0,0), b=w.cell(1,0), c=w.cell(2,0), d=w.cell(3,0);
+ addProject(w,a,cr,0,4,4,true); addProject(w,a,cr,1,18,2,true);
+ addProject(w,b,cr,2,-14,0,true); addProject(w,b,cr,3,12,0,true);
+ addProject(w,c,cr,4,0,0,true);
+ addProject(w,d,cr,5,0,0,true);
+ a.items.push({t:'spr',x:-14,z:18,s:critter(cr,-14,18,'idle')});
+ return w.finish();
+}
+function mapWorld(){
+ var w=new World(), i, house=addHouse(w,w.cell(0,0),false), store=addStore(w,w.cell(1,0),6); w.cell(0,1);
+ [[-1,0],[-1,1],[1,1]].forEach(function(s,i){ var cr=creature(i); cr.door=s[1]>=1?'nz':'pz'; cr.lit=i!==1; addWorkshop(w,w.cell(s[0],s[1]),cr); w.road(cr.b,house,2); });
+ w.road(store,house,2);
+ var bs=[]; [[3,0],[3,1]].forEach(function(s,i){ var cr=creature(5+i); cr.door=s[1]>=1?'nz':'pz'; cr.lit=true; addWorkshop(w,w.cell(s[0],s[1]),cr); bs.push(cr.b); });
+ addMill(w,w.cell(4,0),true); w.cell(4,1);
+ w.road(bs[0],bs[1],2); w.mark('h',4,1,2); w.mark('h',1,1,2);
+ var c1=w.cell(-1,3), c2=w.cell(0,3); c1.fog=c2.fog=.55; var cr=creature(9); cr.door='pz'; cr.lit=false; cr.crates=0; cr.storeys=1; addWorkshop(w,c1,cr);
+ w.mark('v',0,1,1); w.mark('v',0,3,1);
+ var gap=w.cell(2,0,false); gap.items.push({t:'box',x:112,z:25,b:box(84,140,-4,0,22,28,{pz:plankPaint,nz:plankPaint,top:plankTop})});
+ var st=w.cell(-1,2,false); for(i=88;i<136;i+=12) st.items.push({t:'box',x:-32,z:i+3,b:box(-36,-28,-3,0,i,i+6,{pz:P.rock,nz:P.rock,px:P.rock,nx:P.rock,top:P.stone})});
+ return w.finish();
+}
+
+/* ---------- the view ---------- */
+var TONE={pz:0,px:.07,nx:-.1,nz:-.16,top:.08};
+function tex(b,key,w,h,tone,fog){ if(b._ep!==epoch){ b._tx={}; b._ep=epoch; } var c=b._tx[key]; if(!c){ c=document.createElement('canvas'); c.width=w; c.height=h; var g=G(c.getContext('2d')); g.tone=tone; g.fog=fog; b.p[key](g,w,h); b._tx[key]=c; } return c; }
+function View(canvas,opt){ this.c=canvas; this.ctx=canvas.getContext('2d'); this.g=G(this.ctx); this.q=opt.q||0; this.th=this.q*Math.PI/2; this.k=opt.eye==='level'?0:.5; this.kT=this.k; this.tight=!!opt.tight; this.stars=!!opt.stars; this.slab=opt.slab; this.S=1; this.life=!!opt.life; this.theme=opt.theme||null; if(opt.corner) this.th+=Math.PI/4; }
+View.prototype.withTheme=function(fn){ var sp=P, ss=ST; if(this.theme) usePalette(this.theme); try{ return fn(); } finally{ P=sp; ST=ss; } };
+View.prototype.render=function(tick){ var self=this; this.withTheme(function(){ self._render(tick); }); };
+var DITH={};
+function dither(ctx,col,S){ var k=col+'|'+S, pt=DITH[k]; if(!pt){ var c=document.createElement('canvas'); c.width=c.height=2*S; var x=c.getContext('2d'); x.fillStyle=col; x.fillRect(0,0,S,S); x.fillRect(S,S,S,S); pt=DITH[k]=ctx.createPattern(c,'repeat'); } return pt; }
+function drawSky(ctx,W,H,S){
+ var i,n=P.sky?P.sky.length:0, hx=Math.round(W/2/S)*S, hy=Math.round(H*0.54/S)*S;
+ var oval=function(rx,ry,style){ ctx.fillStyle=style; for(var yy=Math.ceil((hy-ry)/S)*S;yy<hy+ry;yy+=S){ var dy=(yy+S/2-hy)/ry; if(dy<=-1||dy>=1) continue; var hw=Math.round(rx*Math.sqrt(1-dy*dy)/S)*S; if(hw>0) ctx.fillRect(hx-hw,yy,hw*2,S); } };
+ for(i=0;i<n;i++){ var f=1-i/(n+0.8), rx=W*0.44*f, ry=H*0.42*f; oval(rx*1.07,ry*1.09,dither(ctx,P.sky[i],S)); oval(rx,ry,P.sky[i]); }
+ if(P.orb){ var R=14, ox=Math.round(W*0.27/S), oy=Math.round(H*0.2/S); ctx.fillStyle=P.orb;
+  for(var d=-R;d<R;d++){ if(P.orbSlit&&d>1&&(d%4)>=2) continue; var w2=Math.round(Math.sqrt(R*R-(d+.5)*(d+.5))); ctx.fillRect((ox-w2)*S,(oy+d)*S,w2*2*S,S); } }
+}
+View.prototype.fit=function(){
+ var dpr=window.devicePixelRatio||1, cw=this.c.clientWidth, ch=this.c.clientHeight; if(!cw||!ch||!this.world) return false;
+ var W=Math.round(cw*dpr), H=Math.round(ch*dpr); if(this.c.width!==W||this.c.height!==H){ this.c.width=W; this.c.height=H; }
+ var b=this.world.bounds, wide=this.tight?(this.q%2?b.dz:b.dx):Math.max(b.dx,b.dz), dep=this.tight?(this.q%2?b.dx:b.dz):Math.max(b.dx,b.dz);
+ var slab=this.slab!=null?this.slab:b.slab;
+ this.S=Math.max(1,Math.floor(Math.min(W/(wide+12),H/(b.h+slab+dep*this.kT+10))));
+ this.W=W; this.H=H; this.dep=dep; this.sl=slab; return true;
+};
+View.prototype._render=function(tick){
+ if(!this.W) return;
+ var ctx=this.ctx,S=this.S,W=this.W,H=this.H,w=this.world,b=w.bounds,g=this.g,k=this.k,i,j;
+ ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false; ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H);
+ if(this.stars) drawSky(ctx,W,H,S);
+ if(this.stars&&P.star){ var r=rng(7); ctx.fillStyle=P.star; var ss=Math.max(1,S>>1); for(i=0;i<40;i++){ var sx=Math.floor(r()*W/S)*S, sy=Math.floor(r()*H*0.62/S)*S; ctx.fillRect(sx,sy,ss,ss); } }
+ var c=Math.cos(this.th), s=Math.sin(this.th);
+ if(Math.abs(c)<1e-6) c=0; if(Math.abs(s)<1e-6) s=0; if(Math.abs(c)>1-1e-6) c=c<0?-1:1; if(Math.abs(s)>1-1e-6) s=s<0?-1:1;
+ var rest=(c===0||s===0)&&(k===0||k===.5);
+ var yTop=-b.h-this.dep/2*k, yBot=this.sl+this.dep/2*k, cx=W/S/2, cy=H/S/2-(yTop+yBot)/2;
+ if(rest){ cx=Math.round(cx); cy=Math.round(cy); }
+ var E=1e-4, hits=this.hits=[];
+ function proj(x,y,z){ x-=b.cx; z-=b.cz; return [cx+x*c-z*s, cy-y+(x*s+z*c)*k]; }
+ function face(bx,key,o,ux,uy,vx,vy,fw,fh,fog){ var p=bx.p[key]; if(!p||fw<=0||fh<=0) return; ctx.setTransform(S*ux,S*uy,S*vx,S*vy,S*o[0],S*o[1]); if(typeof p==='string'){ ctx.fillStyle=shade(p,TONE[key],fog); ctx.fillRect(0,0,fw,fh); } else ctx.drawImage(tex(bx,key,fw,fh,TONE[key],fog),0,0); if(haze>.01){ ctx.globalAlpha=haze; ctx.fillStyle=hazeCol; ctx.fillRect(0,0,fw,fh); ctx.globalAlpha=1; } }
+ function drawBox(bx,fog){ var fw=bx.x1-bx.x0, fh=bx.y1-bx.y0, fd=bx.z1-bx.z0;
+  if(c>E) face(bx,'pz',proj(bx.x0,bx.y1,bx.z1),c,s*k,0,1,fw,fh,fog);
+  if(c<-E) face(bx,'nz',proj(bx.x1,bx.y1,bx.z0),-c,-s*k,0,1,fw,fh,fog);
+  if(s>E) face(bx,'px',proj(bx.x1,bx.y1,bx.z1),s,-c*k,0,1,fd,fh,fog);
+  if(s<-E) face(bx,'nx',proj(bx.x0,bx.y1,bx.z0),-s,c*k,0,1,fd,fh,fog);
+  if(k>E) face(bx,'top',proj(bx.x0,bx.y1,bx.z0),c,s*k,-s,c*k,fw,fd,fog); }
+ function drawSpr(sp,fog){ var o=proj(sp.x,sp.y,sp.z); ctx.setTransform(S,0,0,S,S*Math.round(o[0]),S*Math.round(o[1])); g.tone=0; g.fog=fog; sp.draw(g,tick); }
+ function drawItem(it,fog){ if(it.t==='grp'){ for(var n=0;n<it.parts.length;n++){ var p=it.parts[n]; if(p.b) drawBox(p.b,fog); else drawSpr(p.s,fog); } if(it.top){ var tl=it.top.slice().sort(byDepth); for(n=0;n<tl.length;n++){ if(tl[n].b) drawBox(tl[n].b,fog); else drawSpr(tl[n].s,fog); } } } else if(it.t==='box') drawBox(it.b,fog); else drawSpr(it.s,fog); if(it.pick) note(it); }
+ function note(it){ var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9, add=function(o){ if(o[0]<x0)x0=o[0]; if(o[0]>x1)x1=o[0]; if(o[1]<y0)y0=o[1]; if(o[1]>y1)y1=o[1]; };
+  if(it.t==='grp'){ it.parts.forEach(function(q){ if(!q.b) return; var bb=q.b; [bb.x0,bb.x1].forEach(function(x){ [bb.y0,bb.y1].forEach(function(y){ [bb.z0,bb.z1].forEach(function(z){ add(proj(x,y,z)); }); }); }); }); }
+  else { var o=proj(it.s.x,it.s.y,it.s.z); add([o[0]-13,o[1]-28]); add([o[0]+13,o[1]]); }
+  hits.push({x0:x0*S,y0:y0*S,x1:x1*S,y1:y1*S,pick:it.pick}); }
+ var zs=c>=0?1:-1, xs=s>=0?1:-1;
+ var cells=w.list.slice().sort(function(a,d){ return (a.cz-d.cz)*zs||(a.cx-d.cx)*xs; });
+ var dyn=new Map();
+ for(i=0;i<w.walkers.length;i++){ var sp=w.walkers[i].at(tick), cl=w.at(sp.x+3*s,sp.z+3*c); if(!cl||!cl.land) cl=w.at(sp.x-3*s,sp.z-3*c); if(!cl) continue; if(!dyn.has(cl)) dyn.set(cl,[]); dyn.get(cl).push({t:'spr',x:sp.x,z:sp.z,s:sp,pick:w.walkers[i].cr?{kind:'creature',cr:w.walkers[i].cr}:null}); }
+ var byDepth=function(a,d){ return (a.x*s+a.z*c)-(d.x*s+d.z*c); };
+ var dmax=-1e9, haze=0, hazeCol=P.sky?P.sky[P.sky.length-1]:P.bg; for(i=0;i<cells.length;i++) dmax=Math.max(dmax,cells[i].cx*s+cells[i].cz*c);
+ for(i=0;i<cells.length;i++){ var cell=cells[i], fog=cell.fog; haze=Math.min(1,(dmax-(cell.cx*s+cell.cz*c))/4)*P.haze;
+  if(cell.land){ drawBox(cell.keel,fog); drawBox(cell.ground,fog); }
+  var items=cell.items, d=dyn.get(cell); if(d) items=items.concat(d);
+  if(items.length>1) items=items.slice().sort(byDepth);
+  for(j=0;j<items.length;j++) drawItem(items[j],fog);
+ }
+ ctx.setTransform(1,0,0,1,0,0);
+ if(this.sel){ for(i=hits.length-1;i>=0;i--){ var hh=hits[i]; if((hh.pick.kind==='workshop'&&hh.pick.cr===this.sel)||hh.pick.kind===this.sel){ ctx.fillStyle=P.accent; var L=5*S, T=S, ax=hh.x0-2*S, ay=hh.y0-2*S, bx2=hh.x1+2*S, by2=hh.y1+2*S; [[ax,ay,1,1],[bx2,ay,-1,1],[ax,by2,1,-1],[bx2,by2,-1,-1]].forEach(function(q){ ctx.fillRect(q[2]>0?q[0]:q[0]-L,q[3]>0?q[1]:q[1]-T,L,T); ctx.fillRect(q[2]>0?q[0]:q[0]-T,q[3]>0?q[1]:q[1]-L,T,L); }); break; } } }
+ if(this.life&&P.pool){ var fr=rng(11); ctx.fillStyle=P.lampHi; for(i=0;i<10;i++){ var bx=(fr()-.5)*W/S*.6, by=(fr()-.7)*H/S*.34, px=Math.round(W/S/2+bx+Math.sin(tick*.06+i*1.9)*7), py=Math.round(cy+by+Math.cos(tick*.045+i*2.3)*5); ctx.globalAlpha=.4+.3*Math.sin(tick*.25+i*1.3); ctx.fillRect(px*S,py*S,S,S); } ctx.globalAlpha=1; }
+};
+
+/* ---------- page wiring ---------- */
+var qs=new URLSearchParams(location.search);
+var reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var hero={sel:-1,selKind:null,n:+(qs.get('n')||5),q:+(qs.get('q')||0),eyeAuto:!qs.get('eye'),eye:qs.get('eye')||null,moving:!reduced&&!qs.get('still'),corner:!!qs.get('corner')};
+function restAngle(){ return (((hero.q%4)+4)%4)*Math.PI/2+(hero.corner?Math.PI/4:0); }
+var heroC=document.getElementById('hero'), view, stills=[], tick=0, raf=0, anim=null, seen=true;
+var SIDES=['from the front','from the right','from the back','from the left'];
+function builders(kind,n,grade){ if(kind==='pair') return pairWorld(grade); if(kind==='solo') return soloWorld(n); if(kind==='one') return oneWorld(); if(kind==='map') return mapWorld(); if(kind==='plot') return plotWorld(n); if(kind==='tall') return tallWorld(); if(kind==='earn') return earnWorld(n); if(kind==='ladder') return ladderWorld(); return town(n); }
+function autoEye(){ return hero.n<=2?'level':'raised'; }
+function label(){
+ var n=hero.n, kind=n<=2?'a stead':n<=7?'a hamlet':'a town';
+ document.getElementById('count').textContent=n+(n===1?' creature':' creatures')+' · '+kind;
+ document.getElementById('sideName').textContent=hero.corner?'from a corner':SIDES[((hero.q%4)+4)%4];
+ document.getElementById('corner').setAttribute('aria-pressed',String(hero.corner));
+ var raised=view.kT>0; document.getElementById('eyeLevel').setAttribute('aria-pressed',String(!raised)); document.getElementById('eyeRaised').setAttribute('aria-pressed',String(raised));
+ document.getElementById('alive').setAttribute('aria-pressed',String(hero.moving));
+ var tb=document.querySelectorAll('#themes button'); for(var ti=0;ti<tb.length;ti++) tb[ti].setAttribute('aria-pressed',String(tb[ti].getAttribute('data-world')===themeId));
+ document.getElementById('alive').textContent=hero.moving?'Moving':'Still';
+}
+function frame(now){
+ raf=0; var busy=false;
+ if(anim){ var f=Math.min(1,(now-anim.t0)/anim.ms), e=f<.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2;
+  if(anim.th!=null) view.th=anim.th0+(anim.th-anim.th0)*e;
+  if(anim.k!=null) view.k=anim.k0+(anim.k-anim.k0)*e;
+  if(f>=1){ if(anim.th!=null) view.th=restAngle(); if(anim.k!=null) view.k=anim.k; anim=null; } else busy=true; }
+ view.render(tick);
+ if(busy) kick();
+}
+function kick(){ if(!raf) raf=requestAnimationFrame(frame); }
+function turn(dir){ if(anim&&anim.th!=null) return; if(anim){ view.k=anim.k; anim=null; } hero.q+=dir; var th0=view.th, th=th0+dir*Math.PI/2; view.q=((hero.q%4)+4)%4; label(); if(reduced){ view.th=restAngle(); kick(); return; } anim={t0:performance.now(),ms:620,th0:th0,th:th}; kick(); }
+function setCorner(on){ if(anim){ if(anim.k!=null) view.k=anim.k; anim=null; } hero.corner=on; label(); var th0=view.th, th=th0+(on?1:-1)*Math.PI/4; if(reduced){ view.th=restAngle(); kick(); return; } anim={t0:performance.now(),ms:380,th0:th0,th:th}; kick(); }
+function setEye(e,instant){ var k=e==='level'?0:.5; if(view.kT===k) return; view.kT=k; view.fit(); label(); if(instant||reduced){ view.k=k; kick(); return; } anim={t0:performance.now(),ms:420,k0:view.k,k:k}; kick(); }
+function setN(n){ hero.n=Math.max(1,Math.min(16,n)); view.world=town(hero.n); reselect(); if(hero.eyeAuto){ var k=autoEye()==='level'?0:.5; view.kT=k; view.k=k; } view.fit(); label(); kick(); }
+function buildAll(){
+ usePalette(themeId); epoch++; memo.clear();
+ view.world=town(hero.n); reselect(); view.fit(); view.render(tick);
+ stills.forEach(function(s){ s.v.withTheme(function(){ s.v.world=builders(s.kind,s.n,s.grade); }); if(s.v.fit()) s.v.render(0); });
+ drawForms(); drawPoses(tick);
+}
+function drawForms(){
+ var host=document.getElementById('forms'); if(!host.firstChild){ FORMS.forEach(function(f,i){ var fig=document.createElement('figure'), c=document.createElement('canvas'), cap=document.createElement('figcaption'); c.setAttribute('data-form',f); c.setAttribute('aria-label',f); cap.textContent=f.charAt(0).toUpperCase()+f.slice(1); fig.appendChild(c); fig.appendChild(cap); host.appendChild(fig); }); }
+ var list=host.querySelectorAll('canvas');
+ for(var i=0;i<list.length;i++){ var c=list[i], dpr=window.devicePixelRatio||1, W=Math.round(c.clientWidth*dpr), H=Math.round(c.clientHeight*dpr); if(!W) continue; c.width=W; c.height=H; var a=ART[c.getAttribute('data-form')], S=Math.max(1,Math.floor(Math.min(W/17,H/20))), ctx=c.getContext('2d'), g=G(ctx); ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H); ctx.setTransform(S,0,0,S,Math.round(W/2),H-S); g.r(-8,0,16,1,P.grassHi); drawArt(g,a,-(a.w>>1),-a.h-(HOVER[c.getAttribute('data-form')]||0),artMap(ramp(P.hues[(i*3+2)%8]))); ctx.setTransform(1,0,0,1,0,0); }
+}
+function drawClips(id,clips,t,set){
+ var host=document.getElementById(id), i; if(!host) return;
+ if(!host.firstChild){ clips.forEach(function(c){ var fig=document.createElement('figure'), cv=document.createElement('canvas'), cap=document.createElement('figcaption'); cv.setAttribute('aria-label',c.name); cap.textContent=c.name; fig.appendChild(cv); fig.appendChild(cap); host.appendChild(fig); }); }
+ var list=host.querySelectorAll('canvas'), dpr=window.devicePixelRatio||1, inBox=function(b,x,y){ return b&&x>=b[0]&&y>=b[1]&&x<=b[2]&&y<=b[3]; };
+ for(i=0;i<list.length;i++){
+  var cv=list[i], c=clips[i], st=c.set||set, tools=st===POSESETS.folio, W=Math.round(cv.clientWidth*dpr), H=Math.round(cv.clientHeight*dpr); if(!W) continue;
+  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  var S=Math.max(1,Math.floor(Math.min(W/st.w,H/st.h))), ctx=cv.getContext('2d'), hue=ramp(P.hues[c.hue]); if(c.slow) S=Math.min(S,3);
+  var map={o:P.ink,d:hue.d,m:hue.m,b:hue.b,l:hue.l,h:hue.h,w:P.paper}, fi=c.f[(t>>(c.slow?2:1))%c.f.length], fr=st.frames[fi], tier=c.tool&&tools?TIERS[c.tool]:null;
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H);
+  var ox=Math.floor((W-st.w*S)/2), oy=H-st.h*S;
+  for(var y=0;y<st.h;y++){ var row=fr[y]; for(var x=0;x<st.w;x++){ var ch=row[x]; if(ch==='.') continue;
+   var col=map[ch]||st.fixed[ch]||hue.m;
+   if(tier&&ch!=='o'){ if(inBox(TOOLBOX[fi],x,y)) col=tier[ch]||tier.m; else if(inBox(SPARK[fi],x,y)) col=P.goldHi; }
+   ctx.fillStyle=col; ctx.fillRect(ox+x*S,oy+y*S,S,S); } }
+  if(c.medal){ var px=function(x,y,w,h,k){ ctx.fillStyle=k; ctx.fillRect(ox+x*S,oy+y*S,w*S,h*S); }; px(19,23,1,3,P.err); px(18,25,3,1,P.ink); px(18,26,3,3,P.gold); px(18,26,1,1,P.goldHi); px(20,28,1,1,P.goldDk); }
+ }
+}
+function drawPoses(t){ drawClips('poses',CLIPS,t,POSESETS[poseName]); drawClips('tools',TOOLCLIPS,t,POSESETS.folio); drawClips('turns',TURNS,t,TURNSETS.folio); }
+var GIVEN=['Wren','Moss','Ash','Ivy','Sol','Fen','Rue','Oak','Pip','Bo','Kit','Lark','Nell','Tam','Zed','Mab'];
+var SAY={work:['working','Its lamp is lit: a thread is running.','Running the checks on the branch. Two files changed so far.'],
+ walk:['handing work over','On the road with a crate for another creature.','Taking the summary across. Back in a moment.'],
+ porch:['needs you','Waiting for you at the porch.','I would like to push this to main. May I?'],
+ nap:['resting','Asleep by its door.','Nothing is waiting. I am by my door when you need me.'],
+ idle:['at ease','Nothing running.','Nothing is waiting. Say the word.'],
+ blocked:['blocked','The build has failed three times.','The build keeps failing. One question: should I pin the older version?']};
+var ACT={work:[8,8,9,9,8,8,9,9,0,0],walk:[4,5,6,7],porch:[0,10,10,0,10,10,0,0],nap:[11],idle:[0,0,0,0,1,0,0,0,2,2,0,0,3,3,3,0],blocked:[3,3,3,0,0,1,0,0]};
+function nameOf(cr){ return GIVEN[cr.i%GIVEN.length]; }
+function el(id){ return document.getElementById(id); }
+function sayLine(who,text,acts,me){ var d=document.createElement('div'); d.className='say'+(me?' me':''); var b=document.createElement('b'); b.textContent=who; d.appendChild(b); d.appendChild(document.createTextNode(text)); if(acts){ var a=document.createElement('div'); a.className='acts'; acts.forEach(function(t){ var sp=document.createElement('span'); sp.textContent=t; a.appendChild(sp); }); d.appendChild(a); } return d; }
+function panels(){
+ var sel=view.sel, cast=view.world.cast||[], lines=el('talkLines'), talk=el('talk'); lines.textContent=''; talk.className='panel';
+ if(sel&&typeof sel==='object'){
+  var say=SAY[sel.state]||SAY.idle, nm=nameOf(sel);
+  el('whoName').textContent=nm+' · a '+sel.form; el('whoState').textContent=say[0];
+  el('whoLine').textContent=say[1]+' Its workshop has '+sel.storeys+(sel.storeys===1?' floor':' floors')+' for the work it has delivered.';
+  el('talkWith').textContent='with '+nm;
+  lines.appendChild(sayLine('you','How is it going?',null,true));
+  var asks=sel.state==='porch'||sel.state==='blocked';
+  lines.appendChild(sayLine(nm,say[2],asks?(sel.state==='porch'?['Allow once','Not yet']:['Pin it','Keep trying']):null));
+  if(sel.state==='work'&&sel.child) lines.appendChild(sayLine(nm+' · a second thread','Reading the release notes alongside.'));
+  if(asks) talk.className='panel asks';
+  el('talkBox').textContent='Write to '+nm;
+ } else if(sel==='house'){
+  var waiting=cast.filter(function(c){ return c.state==='porch'||c.state==='blocked'; });
+  el('whoName').textContent='the porch'; el('whoState').textContent=waiting.length?waiting.length+' waiting':'nobody waiting';
+  el('whoLine').textContent='Where creatures bring finished work and wait when they need you.';
+  el('talkWith').textContent='what needs you';
+  if(!waiting.length) lines.appendChild(sayLine('the porch','Nothing needs you right now.'));
+  waiting.forEach(function(c){ lines.appendChild(sayLine(nameOf(c),(SAY[c.state]||SAY.idle)[2])); });
+  if(waiting.length) talk.className='panel asks';
+  el('talkBox').textContent='Answer whoever is first';
+ }
+ drawWho(tick);
+}
+function drawWho(t){
+ var cv=el('whoArt'), sel=view&&view.sel; if(!cv) return;
+ var dpr=window.devicePixelRatio||1, W=Math.round(cv.clientWidth*dpr), H=Math.round(cv.clientHeight*dpr); if(!W) return;
+ if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+ var ctx=cv.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=P.bg; ctx.fillRect(0,0,W,H);
+ if(!sel||typeof sel!=='object') return;
+ var hue=ramp(P.hues[sel.hue]), set=POSESETS[sel.form];
+ if(!set){ var a=ART[sel.form], S0=Math.max(1,Math.floor(Math.min(W/(a.w+4),(H-8)/(a.h+2)))), g=G(ctx); ctx.setTransform(S0,0,0,S0,Math.round(W/2),H-S0*2); drawArt(g,a,-(a.w>>1),-a.h,artMap(hue)); ctx.setTransform(1,0,0,1,0,0); return; }
+ var seq=ACT[sel.state]||ACT.idle, fr=set.frames[seq[(t>>1)%seq.length]], S=Math.max(1,Math.floor(Math.min(W/set.w,(H-6)/set.h)));
+ var map={o:P.ink,d:hue.d,m:hue.m,b:hue.b,l:hue.l,h:hue.h,w:P.paper}, ox=Math.floor((W-set.w*S)/2), oy=H-set.h*S-3;
+ for(var y=0;y<set.h;y++){ var row=fr[y]; for(var x=0;x<set.w;x++){ var ch=row[x]; if(ch==='.') continue; ctx.fillStyle=map[ch]||set.fixed[ch]||hue.m; ctx.fillRect(ox+x*S,oy+y*S,S,S); } }
+}
+function reselect(){
+ var cast=view.world.cast||[], i;
+ if(hero.selKind) view.sel=hero.selKind;
+ else { if(hero.sel<0||hero.sel>=cast.length){ hero.sel=0; for(i=0;i<cast.length;i++) if(cast[i].state==='porch'){ hero.sel=i; break; } } view.sel=cast[hero.sel]||null; }
+ panels();
+}
+function pop(title,line){ var host=el('popped'), c=document.createElement('div'), b=document.createElement('b'); c.className='card'; b.textContent=title; c.appendChild(b); c.appendChild(document.createTextNode(line)); host.insertBefore(c,host.firstChild); while(host.children.length>3) host.removeChild(host.lastChild); }
+function choose(pick){
+ var cast=view.world.cast||[];
+ if(pick.kind==='creature'||pick.kind==='workshop'){ hero.selKind=null; hero.sel=cast.indexOf(pick.cr); }
+ else if(pick.kind==='house'){ hero.selKind='house'; }
+ else if(pick.kind==='store'){ pop('outputs','A window opens on what has been delivered: '+Math.min(10,2+hero.n)+' crates, newest first.'); return; }
+ else if(pick.kind==='mill'){ pop('models','A window opens on this machine\'s models: one loaded and turning.'); return; }
+ reselect(); kick();
+}
+function hitAt(e){ var r=heroC.getBoundingClientRect(), dpr=window.devicePixelRatio||1, x=(e.clientX-r.left)*dpr, y=(e.clientY-r.top)*dpr, hs=view.hits||[]; for(var i=hs.length-1;i>=0;i--){ var h=hs[i]; if(h.pick&&x>=h.x0&&x<=h.x1&&y>=h.y0&&y<=h.y1) return h.pick; } return null; }
+function init(){
+ if(qs.get('theme')) document.documentElement.setAttribute('data-theme',qs.get('theme'));
+ if(THEMES[qs.get('world')]) themeId=qs.get('world');
+ usePalette(themeId);
+ view=new View(heroC,{q:((hero.q%4)+4)%4,eye:hero.eye||autoEye(),stars:true,life:true});
+ var list=document.querySelectorAll('canvas.still');
+ for(var i=0;i<list.length;i++){ var c=list[i], kind=c.getAttribute('data-world'), s={kind:kind,n:+(c.getAttribute('data-n')||0),grade:+(c.getAttribute('data-grade')||0)}; s.v=new View(c,{q:+(c.getAttribute('data-q')||0),eye:c.getAttribute('data-eye'),tight:c.getAttribute('data-corner')!=='1',corner:c.getAttribute('data-corner')==='1',slab:kind==='one'||kind==='solo'||kind==='pair'||kind==='plot'||kind==='tall'||kind==='earn'||kind==='ladder'?12:null,theme:c.getAttribute('data-theme'),stars:kind==='town'||kind==='map'}); stills.push(s); }
+ if(qs.get('deg')) view.th=+qs.get('deg')*Math.PI/180; else view.th=restAngle();
+ buildAll(); label();
+ document.getElementById('turnL').onclick=function(){ turn(-1); };
+ document.getElementById('turnR').onclick=function(){ turn(1); };
+ document.getElementById('less').onclick=function(){ setN(hero.n-1); };
+ document.getElementById('more').onclick=function(){ setN(hero.n+1); };
+ document.getElementById('eyeLevel').onclick=function(){ hero.eyeAuto=false; setEye('level'); };
+ document.getElementById('eyeRaised').onclick=function(){ hero.eyeAuto=false; setEye('raised'); };
+ document.getElementById('corner').onclick=function(){ setCorner(!hero.corner); };
+ var tbs=document.querySelectorAll('#themes button, button.setworld');
+ for(i=0;i<tbs.length;i++) tbs[i].onclick=function(){ themeId=this.getAttribute('data-world'); buildAll(); label(); if(this.className==='setworld') heroC.scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'}); };
+ var who=document.querySelectorAll('#who button');
+ for(i=0;i<who.length;i++) who[i].onclick=function(){ poseName=this.getAttribute('data-who'); for(var k=0;k<who.length;k++) who[k].setAttribute('aria-pressed',String(who[k]===this)); drawPoses(tick); };
+ var sets=document.querySelectorAll('button.set');
+ for(i=0;i<sets.length;i++) sets[i].onclick=function(){ hero.eyeAuto=true; setN(+this.getAttribute('data-set')); heroC.scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'}); };
+ heroC.addEventListener('click',function(e){ var pick=hitAt(e); if(pick) choose(pick); });
+ heroC.addEventListener('mousemove',function(e){ heroC.style.cursor=hitAt(e)?'pointer':'default'; });
+ document.getElementById('nextWho').onclick=function(){ var cast=view.world.cast||[]; if(!cast.length) return; hero.selKind=null; hero.sel=(hero.sel+1)%cast.length; reselect(); kick(); };
+ document.getElementById('alive').onclick=function(){ hero.moving=!hero.moving; label(); kick(); };
+ heroC.addEventListener('keydown',function(e){ if(e.key==='ArrowLeft'){ e.preventDefault(); turn(-1); } else if(e.key==='ArrowRight'){ e.preventDefault(); turn(1); } });
+ setInterval(function(){ if(hero.moving&&!document.hidden){ tick++; if(seen){ kick(); drawWho(tick); } drawPoses(tick); } },125);
+ if('IntersectionObserver' in window) new IntersectionObserver(function(en){ seen=en[0].isIntersecting; }).observe(heroC);
+ var redo=0, again=function(){ if(redo) return; redo=requestAnimationFrame(function(){ redo=0; if(view.fit()) view.render(tick); stills.forEach(function(s){ if(s.v.fit()) s.v.render(0); }); drawForms(); drawPoses(tick); }); };
+ window.addEventListener('resize',again);
+ if('ResizeObserver' in window) new ResizeObserver(again).observe(heroC);
+ new MutationObserver(buildAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+ if(window.matchMedia){ var mq=window.matchMedia('(prefers-color-scheme: light)'); if(mq.addEventListener) mq.addEventListener('change',buildAll); }
+}
+init();
+})();
+</script>

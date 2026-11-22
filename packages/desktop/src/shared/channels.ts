@@ -18,6 +18,7 @@ export const hostChannels = {
   openExternal: "host:open-external",
   openInEditor: "host:open-in-editor",
   writeClipboard: "host:write-clipboard",
+  trackedFiles: "host:tracked-files",
   watchKeybindings: "host:watch-keybindings",
   unwatchKeybindings: "host:unwatch-keybindings",
   keybindingsRead: "host:keybindings-read",

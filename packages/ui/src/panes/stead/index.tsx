@@ -18,6 +18,7 @@ import {
   workshopFamilies,
   workshopFamilyOf,
 } from "@keywork-app/habitat";
+import type { Hit } from "@keywork-app/habitat/block";
 import { type GardenKind, gardenKinds } from "@keywork-app/habitat/render";
 import type { DenyReason } from "@keywork-app/protocol";
 import {
@@ -72,6 +73,10 @@ import {
   type PaneProps,
   type ShellSeams,
 } from "../registry.ts";
+import { BlockWorld, type BlockWorldControls } from "./block/block-world.tsx";
+import { createProjectSites, placeSeamsOf } from "./block/places.ts";
+import { pressedOn } from "./block/press.ts";
+import { blockWorldShown } from "./block/switch.ts";
 import {
   acceptHint,
   acceptsOnly,
@@ -228,6 +233,7 @@ export const steadPane = definePane<SteadSpec>({
       "stead-overturn",
       "overturn the call a promoted class decided in your name; the class waits for you again",
     ),
+    ...(blockWorldShown ? blockWorldActions() : {}),
   },
   lifecycle: (_view, shell) =>
     waitingCount(shell) > 0 ? "needs-you" : anyWorking(shell) ? "working" : "idle",
@@ -502,6 +508,10 @@ function Stead(props: PaneProps<SteadSpec>) {
   let downAt: ArtPoint | undefined;
   let lastInputAt = Number.NEGATIVE_INFINITY;
   const drawer = steadDrawer();
+  let blockWorld: BlockWorldControls | undefined;
+  const blockSites = blockWorldShown
+    ? createProjectSites(placeSeamsOf(props.shell), world)
+    : undefined;
 
   const members = (): readonly Member[] => herd().members;
   const meetsItsCreature = (): boolean =>
@@ -606,7 +616,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const loop = steadField(
     browserFieldHost(() => stage),
     {
-      hidden: () => documentHidden(stage) || courts.overview(),
+      hidden: () => blockWorldShown || documentHidden(stage) || courts.overview(),
       resting: () => !props.focused || !windowFocused(),
       lastInputAt: () => lastInputAt,
     },
@@ -716,6 +726,25 @@ function Stead(props: PaneProps<SteadSpec>) {
       case "mill":
         setNotice(noPaneYet("mills"));
         break;
+    }
+  };
+  const openHit = (hit: Hit): void => {
+    const pressed = pressedOn(hit, world(), props.shell.workspace);
+    switch (pressed.kind) {
+      case "creature":
+        openCreature(pressed.creature);
+        return;
+      case "session":
+        setNotice(undefined);
+        props.shell.sessions.openSession(pressed.session);
+        return;
+      case "pane":
+        setNotice(undefined);
+        props.shell.openPane(pressed.spec);
+        return;
+      case "notice":
+        setNotice(pressed.line);
+        return;
     }
   };
   const onPointerMove = (event: PointerEvent): void => {
@@ -847,6 +876,10 @@ function Stead(props: PaneProps<SteadSpec>) {
     switch (action) {
       case "stead.overturn":
         return overturn();
+      case "stead.turn-left":
+        return blockWorld?.turn(-1);
+      case "stead.turn-right":
+        return blockWorld?.turn(1);
       case "stead.down":
         setNotice(undefined);
         return cursor.move(1);
@@ -1103,9 +1136,21 @@ function Stead(props: PaneProps<SteadSpec>) {
           onOpen={visitCourt}
         />
       </Show>
+      <Show when={blockWorldShown}>
+        <BlockWorld
+          world={world()}
+          focused={props.focused}
+          hidden={courts.overview()}
+          projects={blockSites?.()}
+          onPick={openHit}
+          onControls={(controls) => {
+            blockWorld = controls;
+          }}
+        />
+      </Show>
       <div
         class="kw-stead-stage"
-        hidden={courts.overview()}
+        hidden={blockWorldShown || courts.overview()}
         ref={stage}
         style={{ height: frame() === undefined ? undefined : `${frame()?.fit.cssHeight}px` }}
       >
@@ -1385,6 +1430,23 @@ function watchVisibility(pane: Node | undefined, react: () => void): () => void 
     realm.document.addEventListener("visibilitychange", react);
     return () => realm.document.removeEventListener("visibilitychange", react);
   });
+}
+
+function blockWorldActions(): Record<string, PaneLocalAction> {
+  return {
+    "stead.turn-left": steadAction(
+      "left",
+      "turn the stead a quarter to the left",
+      "stead-turn-left",
+      "turn the stead a quarter turn to the left to see its next side",
+    ),
+    "stead.turn-right": steadAction(
+      "right",
+      "turn the stead a quarter to the right",
+      "stead-turn-right",
+      "turn the stead a quarter turn to the right to see its next side",
+    ),
+  };
 }
 
 function steadAction(

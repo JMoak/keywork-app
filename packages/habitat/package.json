@@ -6,6 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./render": "./src/render/index.ts",
+    "./block": "./src/block/index.ts",
+    "./block/testing": "./src/block/testing.ts",
     "./skins": "./src/skins/index.ts"
   },
   "dependencies": {

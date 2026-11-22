@@ -12,6 +12,7 @@ import type { ContextLevel } from "../instruments/context.ts";
 import { tierOf, type WidthTier } from "../page/tiers.ts";
 import { observeSize } from "../surfaces/runtime/realm.ts";
 import type { Outfit } from "../theme/attire.ts";
+import { identityCount } from "../theme/identities.ts";
 import type { Theme } from "../theme/schema.ts";
 import { dressElement, swapAtOnce, undressElement } from "../theme/variables.ts";
 import type { TitleBot } from "./identity.ts";
@@ -52,7 +53,7 @@ export interface PaneFrameProps {
   children: JSX.Element;
 }
 
-export const rampStops = 3;
+export const rampStops = identityCount;
 
 export function hueStop(spawnRank: number): number {
   return (Math.max(0, spawnRank) % rampStops) + 1;

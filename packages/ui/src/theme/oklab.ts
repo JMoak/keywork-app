@@ -7,6 +7,12 @@ export function mixOklab(from: string, toward: string, amount: number): string {
   return hexOfOklab([l1 + (l2 - l1) * blend, a1 + (a2 - a1) * blend, b1 + (b2 - b1) * blend]);
 }
 
+export function oklabDistance(from: string, to: string): number {
+  const [l1, a1, b1] = oklabOf(from);
+  const [l2, a2, b2] = oklabOf(to);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
 export type Oklab = readonly [number, number, number];
 
 export function oklabOf(hex: string): Oklab {

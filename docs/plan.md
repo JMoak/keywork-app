@@ -2479,6 +2479,49 @@ unbounded storage/mill artwork. A proposed opt-in cultivation-to-decoration loop
 places are specified separately; the implemented gardens do not grow, wilt or yield items.
 This remains canonical source work, not published SDK adoption or an installed Stead update.
 
+### Block world ledger (2026-11-22, behind a switch)
+
+The stead drawn as a world of blocks, after `docs/design/block-world/sketch.html`, built beside
+the strip and the courtyards, which stay the default. `packages/habitat/src/block/` is pure
+TypeScript: the model (cells on a 56-unit pitch, boxes with five faces, sprites, crowns, walkers),
+the camera (quarter turns, corner rests, level and raised eyes), a draw-list builder that turns a
+world into ordered quads with affine matrices, the sky backdrop and the drifting night lights, hit
+testing, stable workshop slots, sketch-ordered roads with caller-given grades, project buildings
+that stack and grow floors, and `scene.ts`, a pure function from habitat state to a world. Kits
+own shapes and colours: `kits/sketch/` holds the construction the three sketch styles share and
+`kits/neon`, `kits/lantern` and `kits/terrace` each add a style and one colour module; art stays
+indexed, and only the pane ground comes from the app theme. `raster.ts` is a software rasteriser
+whose alpha blending matches Chrome's canvas, so stills compare pixel for pixel with the sketch.
+`packages/ui/src/panes/stead/block/` paints the same draw list with Canvas 2D under the stead's
+power tiers, turns on the pane's left and right keys, and reports what is under the pointer.
+`VITE_STEAD_BLOCK_WORLD=1` at build or dev time shows it in place of the strip; unset, nothing
+differs. `BLOCK_SHOTS=update bun run test` writes stills to `artifacts/shots/block-world/stills`.
+
+An idle or napping creature rests by its own door; one in four, by seed, stands on the green's five
+fixed spots, which never overlap. Each directory a creature has worked in is a project building on
+its plot: a conversation belongs to a creature by its session's `bot`, and its directory is the
+`cwd` of its session detail, read once per conversation (`block/places.ts`) because the session
+list does not carry it. Floors double: one for one or two conversations, one more per doubling, at
+most twenty. A building is lit while a thread runs in its directory. For a git repository the main
+process reads the twelve-byte header of `.git/index` (`HostPort.trackedFiles`, cached by the index's
+modification time; never a walk, never git) and the count rides on the building's spec, undrawn.
+The monument follows the creature count as the sketch does: a stone from three, a gold statue from
+eight. A creature's identity colour is the one the console's chrome gives it, one of eight
+(`--kw-ramp-1` to `--kw-ramp-8`; colours 4 to 8 per gallery theme live in
+`packages/ui/src/theme/identities.ts`, since the gallery itself is keywork's). Under forced colours
+the world paints in Canvas, CanvasText, Highlight and GrayText, outlines each box face, and keeps a
+lit window distinct by its own-light role. Pressing a workshop opens its creature's conversation at
+the door, the running thread at the bench (the latest when the bench is dark), the creature's
+profile and threads at the shelf, and its chores at the board; a project building opens the files
+pane at its directory when that lies in the workspace, and says so when it does not; the house,
+storehouse and mill open the desk, the sessions and the mills.
+
+Not done: walkers and roads between creatures need the engine's counts of who works with whom (the
+scene takes them as input); decorations have no earning rule; the map of machines; a fourth kit
+authored outside the sketch; the tracked-file count is not drawn. A creature has seven building
+spots, so its eighth directory onward has no building. Server lane: `cwd` on the session list
+would replace one detail read per conversation.
+
 ## What is deliberately not in this plan
 
 - Shared workspaces across machines (keywork P2.3) and any multi-user story.

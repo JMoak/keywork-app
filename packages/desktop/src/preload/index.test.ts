@@ -48,4 +48,13 @@ describe("the preload bridge", () => {
     await host.surroundings.read();
     expect(invoked).toEqual([[hostChannels.surroundings, []]]);
   });
+
+  it("asks main for a directory's tracked files with the directory alone", async () => {
+    const host = exposed.get("keyworkHost") as {
+      trackedFiles(directory: string): Promise<unknown>;
+    };
+    invoked.length = 0;
+    await host.trackedFiles("/work/lights");
+    expect(invoked).toEqual([[hostChannels.trackedFiles, ["/work/lights"]]]);
+  });
 });

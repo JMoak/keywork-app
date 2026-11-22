@@ -144,7 +144,7 @@ describe("first-run onboarding on the stead", () => {
     expect(run.patched[0]?.[1]).toBe(1);
   });
 
-  it("with two creatures on the stead, takes the third coat and a third name; the fourth creature wraps to the first coat", async () => {
+  it("with two creatures on the stead, takes the third coat and a third name; the ninth creature wraps to the first coat", async () => {
     const two = harness({
       creatures: creaturesListed([
         { slug: "osk", name: "Osk", seed: 0 },
@@ -159,15 +159,20 @@ describe("first-run onboarding on the stead", () => {
     await flush();
     expect(two.patched.map(([, seed]) => seed)).toEqual([2]);
 
-    const three = harness({
+    const eight = harness({
       creatures: creaturesListed([
         { slug: "osk", name: "Osk", seed: 0 },
         { slug: "tam", name: "Tam", seed: 1 },
         { slug: "quin", name: "Quin", seed: 2 },
+        { slug: "ada", name: "Ada", seed: 3 },
+        { slug: "bea", name: "Bea", seed: 4 },
+        { slug: "cy", name: "Cy", seed: 5 },
+        { slug: "dov", name: "Dov", seed: 6 },
+        { slug: "eli", name: "Eli", seed: 7 },
       ]),
     });
     await flush();
-    expect(three.onboarding.coat()).toBe(hueStop(0));
+    expect(eight.onboarding.coat()).toBe(hueStop(0));
   });
 
   it.each([

@@ -14,6 +14,7 @@ import {
 import { type AppIpc, trustedIpc } from "./app-page.ts";
 import { freePort, spawnChild } from "./child.ts";
 import { type EditorSeams, openInEditor, startDetached } from "./editor.ts";
+import { trackedFileCounter } from "./git-index.ts";
 import { followKeybindingFiles, keybindingFileSeams, keybindingFilesFor } from "./keybindings.ts";
 import { showToast } from "./native.ts";
 import { type SidecarRun, sidecarNodeServing } from "./node-consent.ts";
@@ -254,6 +255,10 @@ export function registerHostHandlers(
   ipc.handle(hostChannels.writeClipboard, (_event, text: unknown) => {
     if (typeof text === "string") clipboard.writeText(text);
   });
+  const countTrackedFiles = trackedFileCounter();
+  ipc.handle(hostChannels.trackedFiles, (_event, directory: unknown) =>
+    countTrackedFiles(directory),
+  );
   registerKeybindingWatches(ipc, (workspace) => workspaces.openRoots().includes(workspace));
   ipc.handle(hostChannels.notify, (event, notice: unknown) => {
     const window = BrowserWindow.fromWebContents(event.sender);

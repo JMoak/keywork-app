@@ -143,6 +143,8 @@ function consoleHost() {
     openInEditor: (target: EditorTarget) =>
       ipcRenderer.invoke(hostChannels.openInEditor, target) as Promise<EditorOpened>,
     writeClipboard: (text: string) => ipcRenderer.invoke(hostChannels.writeClipboard, text),
+    trackedFiles: (directory: string) =>
+      ipcRenderer.invoke(hostChannels.trackedFiles, directory) as Promise<number | undefined>,
     watchKeybindings,
     notify: (notice: unknown) => ipcRenderer.invoke(hostChannels.notify, notice),
     onNotificationActivated: subscribe(hostChannels.notificationActivated),

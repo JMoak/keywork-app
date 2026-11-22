@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { derivedTextFaint } from "./complete.ts";
 import { wcagContrast } from "./contrast.ts";
+import { identitiesBeyondTheRamp, identitiesFromTheRamp } from "./identities.ts";
 import {
   groundsOf,
   legibleInks,
@@ -30,6 +31,11 @@ const wordRoles = [
   "--kw-ramp-1",
   "--kw-ramp-2",
   "--kw-ramp-3",
+  "--kw-ramp-4",
+  "--kw-ramp-5",
+  "--kw-ramp-6",
+  "--kw-ramp-7",
+  "--kw-ramp-8",
 ] as const;
 
 const markRoles = ["--kw-border-focus", "--kw-scrollbar"] as const;
@@ -67,6 +73,12 @@ describe("every shipped theme is legible at WCAG AA", () => {
     }
     declared.ramp.forEach((stop, index) => {
       expect(hueDrift(stop, inks.ramp[index] ?? ""), `ramp ${index}`).toBeLessThan(hueSlackDegrees);
+    });
+    identitiesBeyondTheRamp.get(theme.name)?.forEach((ink, index) => {
+      const stop = identitiesFromTheRamp + index;
+      expect(hueDrift(ink, inks.identities[stop] ?? ""), `ramp-${stop + 1}`).toBeLessThan(
+        hueSlackDegrees,
+      );
     });
   });
 });

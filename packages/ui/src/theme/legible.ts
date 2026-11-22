@@ -1,5 +1,6 @@
 import { derivedTextFaint } from "./complete.ts";
 import { wcagContrast } from "./contrast.ts";
+import { identityInks } from "./identities.ts";
 import { mixOklab } from "./oklab.ts";
 import type { Theme, ThemeTokens } from "./schema.ts";
 
@@ -18,6 +19,7 @@ export interface LegibleInks extends Record<TextTier | WordInk, string> {
   readonly borderFocus: string;
   readonly scrollbar: string;
   readonly ramp: readonly string[];
+  readonly identities: readonly string[];
 }
 
 export function legibleInks(theme: Theme): LegibleInks {
@@ -71,6 +73,7 @@ function liftedInks(theme: Theme): LegibleInks {
     borderFocus: lift(tokens.borderFocus, wcagMark),
     scrollbar: lift(tokens.border, wcagMark),
     ramp: tokens.ramp.map((stop) => lift(stop, wcagText)),
+    identities: identityInks(theme, (ink) => lift(ink, wcagText)),
   };
 }
 

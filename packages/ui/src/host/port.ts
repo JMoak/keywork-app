@@ -26,6 +26,7 @@ export interface HostPort {
   openExternal(url: string): Promise<void>;
   openInEditor(target: EditorTarget): Promise<EditorOpened>;
   writeClipboard(text: string): Promise<void>;
+  trackedFiles?(directory: string): Promise<number | undefined>;
   watchKeybindings(
     scope: KeybindingsScope,
     listener: (reading: KeybindingsReading) => void,

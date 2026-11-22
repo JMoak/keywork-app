@@ -17,6 +17,11 @@
   --kw-ramp-1: #bb9af7;
   --kw-ramp-2: #7aa2f7;
   --kw-ramp-3: #7dcfff;
+  --kw-ramp-4: #73daca;
+  --kw-ramp-5: #9ece6a;
+  --kw-ramp-6: #ff9e64;
+  --kw-ramp-7: #ff8fb8;
+  --kw-ramp-8: #faba4a;
   --kw-density-light: var(--kw-text-dim);
   --kw-density-medium: var(--kw-text-mid);
   --kw-density-heavy: var(--kw-text);

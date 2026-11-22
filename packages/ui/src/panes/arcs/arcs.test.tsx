@@ -40,7 +40,7 @@ describe("the arcs pane", () => {
     expect(
       arcRows(arcs, { "arc-1": 1 }, sessions, new Set(["arc-1", "unbound"])).map((row) => row.kind),
     ).toEqual(["arc", "session", "group", "session"]);
-    expect(arcHueStyle(4)).toEqual({ "--kw-arc-hue": "var(--kw-ramp-2)" });
+    expect(arcHueStyle(4)).toEqual({ "--kw-arc-hue": "var(--kw-ramp-5)" });
     expect(arcHueStyle(undefined)).toEqual({});
   });
 

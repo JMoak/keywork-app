@@ -32,9 +32,7 @@ export function themeVariables(theme: Theme): ThemeVariables {
     "--kw-accent-soft": inks.accentSoft,
     "--kw-success": inks.success,
     "--kw-error": inks.error,
-    ...Object.fromEntries(
-      rampStops(inks.ramp).map((stop, index) => [`--kw-ramp-${index + 1}`, stop]),
-    ),
+    ...Object.fromEntries(inks.identities.map((ink, index) => [`--kw-ramp-${index + 1}`, ink])),
     ...Object.fromEntries(
       densityLevels.map((level) => [
         `--kw-density-${level}`,
@@ -138,15 +136,6 @@ const stylesheetWidth = 100;
 function declaration(name: string, value: string): string {
   const inline = `  ${name}: ${value};`;
   return inline.length <= stylesheetWidth ? inline : `  ${name}:\n    ${value};`;
-}
-
-const rampStopCount = 3;
-
-function rampStops(ramp: readonly string[]): string[] {
-  return Array.from(
-    { length: rampStopCount },
-    (_, index) => ramp[Math.min(index, ramp.length - 1)] ?? "",
-  );
 }
 
 function sectionVariables<Key extends string>(
