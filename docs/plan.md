@@ -2404,6 +2404,16 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
     updates a second with the main process at 9% of a core (taking their size at once), and 30
     a second at 42% when made to grow on the way; eight panes growing on the way at 56 to 62.
     Not yet done: arrivals as part of a play, and restacking through the mover.
+  - **The console's own panes, set out by a session (2026-11-22, not yet released; contract
+    1.34, engine 0.9.0).** A session's `show` could set out a file, a diff, a conversation, a
+    creature and chores as the console's own panes. It now takes `kind: "pane"` with the name of
+    one more: sessions, arcs, files, context, memory, needs-you, permissions, mcp or workspaces
+    (`settingPanes` in the protocol; `satelliteOf` maps each to its pane). The engine reads the
+    name in the caller's own words and keeps one of those nine; a name this console does not
+    know is said in words where the pane would have stood. Left out on purpose until the keeper
+    rules: the terminal, which starts a shell, and the screen pane, which captures the display.
+    Seen working in the running app on 2026-11-22: an agent over a creature's MCP asked for "the
+    session list", "files" and "needs you" outside, and the three panes stood beside the console.
 - **Owed.** No screenshot stage covers a float or the shelf.
 
 ### Stock ledger (2026-11-12): the carter and the joiner

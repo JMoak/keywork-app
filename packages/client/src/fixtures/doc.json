@@ -3,7 +3,7 @@
   "info": {
     "title": "keywork",
     "version": "fixture",
-    "x-keywork-contract": "1.33",
+    "x-keywork-contract": "1.34",
     "description": "The keywork workspace server: the in-process event bus over HTTP and SSE. Bound to 127.0.0.1 with a per-launch bearer token."
   },
   "servers": [
@@ -6936,15 +6936,16 @@
                           "thread",
                           "chore",
                           "url",
-                          "note"
+                          "note",
+                          "pane"
                         ],
-                        "description": "file, diff, report, thread, chore, url or note: what you set out."
+                        "description": "file, diff, report, thread, chore, url, note or pane: what you set out."
                       },
                       "ref": {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 2000,
-                        "description": "Which one: a workspace path for a file, a change-set id for a diff, a report id, a session id for a thread, a chore id, a url, or the note's own words (at most 2000 characters, read as markdown)."
+                        "description": "Which one: a workspace path for a file, a change-set id for a diff, a report id, a session id for a thread, a chore id, a url, the note's own words (at most 2000 characters, read as markdown), or for a pane the name of one of the console's own: sessions, arcs, files, context, memory, needs-you, permissions, mcp or workspaces."
                       },
                       "title": {
                         "description": "A short title for the card; the yard names it from ref when left out.",

@@ -12,6 +12,7 @@ export const kindWeights: Readonly<Record<SettingKind, number>> = {
   thread: 4,
   chore: 3,
   file: 3,
+  pane: 3,
   url: 2,
   note: 2,
 };

@@ -17,6 +17,7 @@ export const kindWords: Readonly<Record<SettingKind, string>> = {
   chore: "a chore",
   url: "a link",
   note: "a note",
+  pane: "a pane",
 };
 
 export const answeredLines: Readonly<Record<KeeperShowOutcome, string>> = {

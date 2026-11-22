@@ -4,9 +4,33 @@ export type Rung = (typeof rungs)[number];
 
 export type ProposedRung = Exclude<Rung, "glyph">;
 
-export const settingKinds = ["file", "diff", "report", "thread", "chore", "url", "note"] as const;
+export const settingKinds = [
+  "file",
+  "diff",
+  "report",
+  "thread",
+  "chore",
+  "url",
+  "note",
+  "pane",
+] as const;
 
 export type SettingKind = (typeof settingKinds)[number];
+
+// The console's own panes a session may set out (contract 1.34): the `ref` of a "pane" setting.
+export const settingPanes = [
+  "sessions",
+  "arcs",
+  "files",
+  "context",
+  "memory",
+  "needs-you",
+  "permissions",
+  "mcp",
+  "workspaces",
+] as const;
+
+export type SettingPane = (typeof settingPanes)[number];
 
 export interface SettingSubject {
   kind: SettingKind;

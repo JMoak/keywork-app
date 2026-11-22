@@ -1,4 +1,4 @@
-import type { Setting, SettingKind } from "@keywork-app/protocol";
+import { type Setting, type SettingKind, settingPanes } from "@keywork-app/protocol";
 import type { PaneSpec } from "../panes/index.ts";
 
 export type Satellite =
@@ -41,7 +41,36 @@ export function satelliteOf(setting: Shown): Satellite {
       return { kind: "link", url: ref };
     case "note":
       return { kind: "note", text: ref };
+    case "pane":
+      return ownPaneOf(ref, setting.sessionId);
   }
+}
+
+// One of the console's own panes, by the name the engine keeps it under. A name this console
+// does not know (a newer engine's) is said in words, where a pane would have stood.
+function ownPaneOf(name: string, sessionId: string): Satellite {
+  const known = settingPanes.find((pane) => pane === name);
+  if (known === undefined) return { kind: "note", text: unknownPaneWords(name) };
+  switch (known) {
+    case "sessions":
+      return { kind: "pane", spec: { kind: "tree" } };
+    case "arcs":
+      return { kind: "pane", spec: { kind: "arcs" } };
+    case "files":
+      return { kind: "pane", spec: { kind: "browser" } };
+    case "context":
+      return { kind: "pane", spec: { kind: "context", sessionId } };
+    case "memory":
+    case "needs-you":
+    case "permissions":
+    case "mcp":
+    case "workspaces":
+      return { kind: "pane", spec: { kind: known } };
+  }
+}
+
+export function unknownPaneWords(name: string): string {
+  return `This console has no pane called ${JSON.stringify(name)}.`;
 }
 
 export function satellitePaneId(setting: Pick<Setting, "id">): string {
@@ -49,7 +78,9 @@ export function satellitePaneId(setting: Pick<Setting, "id">): string {
 }
 
 export function titleOfSetting(setting: Pick<Shown, "what">): string {
-  return setting.what.title ?? shortRef(setting.what.ref);
+  const { kind, ref, title } = setting.what;
+  if (title !== undefined) return title;
+  return kind === "pane" ? ref.replaceAll("-", " ") : shortRef(ref);
 }
 
 export const wholeSessionScope = "every change in the session";
