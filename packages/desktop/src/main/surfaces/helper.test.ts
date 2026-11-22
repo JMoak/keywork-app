@@ -202,3 +202,49 @@ describe("the helper's process", () => {
     expect(() => pipes.kill()).not.toThrow();
   });
 });
+
+describe("a play", () => {
+  it("is one line: each window's frame as its owner sees it, the frame it goes to, its wait and its time", () => {
+    const pipes = fakeHelperPipes();
+    readyHelper(pipes).play(7, [
+      {
+        window: "1a2b",
+        at: { x: 160, y: 160, width: 800, height: 600 },
+        to: { x: 2080, y: 640, width: 1280, height: 960 },
+        delayMs: 120,
+        durationMs: 180,
+      },
+      {
+        window: "1a40",
+        at: { x: -8.4, y: 0, width: 400.5, height: 240 },
+        to: { x: -8.4, y: 0, width: 400.5, height: 240 },
+        delayMs: 0,
+        durationMs: 0,
+      },
+    ]);
+    expect(pipes.written).toEqual([
+      "play 7 1a2b@160,160,800,600>2080,640,1280,960+120~180 1a40@-8,0,401,240>-8,0,401,240+0~0",
+    ]);
+  });
+});
+
+describe("a play whose windows take their size at once", () => {
+  it("marks each such window at the end of its word", () => {
+    const pipes = fakeHelperPipes();
+    const frame = { x: 0, y: 0, width: 400, height: 300 };
+    readyHelper(pipes).play(2, [
+      {
+        window: "a",
+        at: frame,
+        to: { ...frame, width: 800 },
+        delayMs: 40,
+        durationMs: 160,
+        sizeAtOnce: true,
+      },
+      { window: "b", at: frame, to: frame, delayMs: 0, durationMs: 160 },
+    ]);
+    expect(pipes.written).toEqual([
+      "play 2 a@0,0,400,300>0,0,800,300+40~160! b@0,0,400,300>0,0,400,300+0~160",
+    ]);
+  });
+});

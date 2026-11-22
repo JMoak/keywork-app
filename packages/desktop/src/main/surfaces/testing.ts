@@ -40,6 +40,7 @@ export interface FakeSurfaceWindow extends SurfaceWindowLike {
   keeperMaximisesOver(workArea: ScreenRect): void;
   keeperRestores(): void;
   desktopMovesTo(point: ScreenPoint): void;
+  desktopShapesTo(frame: ScreenRect): void;
   desktopAsksToClose(): "kept" | "closed";
   emit(signal: SurfaceSignal): void;
 }
@@ -157,6 +158,7 @@ export function fakeSurfaceWindow(id: number): FakeSurfaceWindow {
       window.emit("unmaximize");
     },
     desktopMovesTo: (point) => reshape({ ...bounds, ...point }),
+    desktopShapesTo: (frame) => reshape(frame),
     desktopAsksToClose: () => {
       const request = closeRequest();
       for (const listener of closeListeners) listener(request);

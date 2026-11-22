@@ -5,6 +5,8 @@ import {
   type ConsoleStand,
   type Desk,
   type Glide,
+  type Play,
+  type PlayPart,
   type ScreenPoint,
   type ScreenRect,
   type SurfaceEvent,
@@ -32,6 +34,7 @@ import {
   type GlideTrack,
   glideFrame,
   glider,
+  type PlayTrack,
 } from "./glide.ts";
 import { frameColour, type PanesHelper } from "./helper.ts";
 import { type MoveLedger, moveLedger } from "./ledger.ts";
@@ -169,6 +172,10 @@ class SurfaceHost {
       asked((owner, glide: Glide) => this.glide(owner, glide)),
     );
     ipc.handle(
+      surfaceChannels.play,
+      asked((owner, play: Play) => this.play(owner, play)),
+    );
+    ipc.handle(
       surfaceChannels.focus,
       asked((owner, id: SurfaceId) => this.named(owner, id).window.focus()),
     );
@@ -288,6 +295,34 @@ class SurfaceHost {
       body: {
         position: () => originOf(surface.window.getBounds()),
         moveTo: (point) => this.slide(surface, { ...to, ...point }),
+      },
+    };
+  }
+
+  // A play is handed over whole. With the helper each pane reaches its new size as it travels,
+  // on the helper's clock; without it each takes its size as it sets off, as a glide does.
+  play(owner: Owner, play: Play): Promise<void> {
+    const tracks = play.parts.flatMap((part) => {
+      const surface = owner.surfaces.get(part.id);
+      if (surface === undefined || surface.window.isMaximized()) return [];
+      return [this.partOf(surface, part)];
+    });
+    return this.glides.play(tracks);
+  }
+
+  partOf(surface: Surface, part: PlayPart): PlayTrack<Surface> {
+    const to = wholeRect(part.bounds);
+    surface.ledger.hostSends(to);
+    return {
+      key: surface,
+      to,
+      delayMs: Math.max(0, part.atMs),
+      durationMs: Math.max(0, part.durationMs),
+      body: {
+        position: () => originOf(surface.window.getBounds()),
+        moveTo: (point) => this.slide(surface, { ...to, ...point }),
+        frame: () => surface.window.getBounds(),
+        reshape: (frame) => this.place(surface, frame),
       },
     };
   }

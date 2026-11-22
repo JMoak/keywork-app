@@ -2387,8 +2387,23 @@ AD5's standing rule, built in `packages/ui`. Not yet released in an SDK.
     without one, and on every other system, panes are moved from JavaScript as before. Measured
     here with `perf:panes-outside`, sixteen panes gliding together, one run each on a 60 Hz
     display: all sixteen moved inside one refresh in 52 of 52 frames with the mover against 20
-    of 60 from JavaScript, and the main process spent 18% of a core against 89%. Not yet done:
-    the SDK and Stead carrying the mover, and any system but Windows x64.
+    of 60 from JavaScript, and the main process spent 18% of a core against 89%. Released in
+    0.9.0; the SDK names the mover version and Stead pins it. Not yet done: any system but
+    Windows x64.
+  - **A whole arrangement in one hand-off (2026-11-22, not yet released).** The page used to run
+    a timer for each pane of an arrangement and ask for each glide separately, and the main
+    process set a pane's new size itself before the pane moved. Now `perform` hands every glide
+    of a pane that is already out to the host in one `play` (`SurfacesPort.play`): each pane with
+    the frame it goes to, when it sets off and how long it takes. With the mover (0.2.0, which
+    this pins) that is one line, timed on the mover's clock, and size is the mover's too: a pane
+    grows on the way when at most eight change size in one play, and takes its size at once
+    as it sets off when more do. Without the mover the main process plays it itself, each pane
+    taking its size as it sets off, as before. A pane the same plan shows for the first time
+    keeps its own cues. Measured with `perf:panes-outside --play --grow=120`, one run each at
+    60 Hz, every frame moving all panes inside one refresh in every case: sixteen panes at 62
+    updates a second with the main process at 9% of a core (taking their size at once), and 30
+    a second at 42% when made to grow on the way; eight panes growing on the way at 56 to 62.
+    Not yet done: arrivals as part of a play, and restacking through the mover.
 - **Owed.** No screenshot stage covers a float or the shelf.
 
 ### Stock ledger (2026-11-12): the carter and the joiner

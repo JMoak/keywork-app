@@ -21,8 +21,24 @@ export interface GlideTrack<Key> {
   readonly to: ScreenPoint;
 }
 
+export interface Shapeable extends Glidable {
+  frame(): ScreenRect;
+  reshape(frame: ScreenRect): void;
+}
+
+// One body's part in a play: its own frame to reach, its own wait before setting off, and its
+// own time to get there.
+export interface PlayTrack<Key> {
+  readonly key: Key;
+  readonly body: Shapeable;
+  readonly to: ScreenRect;
+  readonly delayMs: number;
+  readonly durationMs: number;
+}
+
 export interface Glider<Key> {
   run(tracks: readonly GlideTrack<Key>[], durationMs: number): Promise<void>;
+  play(tracks: readonly PlayTrack<Key>[]): Promise<void>;
   gliding(key: Key): boolean;
   drop(key: Key): void;
   stop(): void;
@@ -30,17 +46,29 @@ export interface Glider<Key> {
 
 export function glider<Key>(clock: GlideClock): Glider<Key> {
   const runs = new Set<Run<Key>>();
+  const waits = new Set<Wait<Key>>();
   let stopTicking: (() => void) | undefined;
 
-  const finish = (run: Run<Key>): void => {
-    if (!runs.delete(run)) return;
-    run.settled();
-    if (runs.size > 0) return;
+  const restIfIdle = (): void => {
+    if (runs.size > 0 || waits.size > 0) return;
     stopTicking?.();
     stopTicking = undefined;
   };
 
+  const finish = (run: Run<Key>): void => {
+    if (!runs.delete(run)) return;
+    run.settled();
+    restIfIdle();
+  };
+
+  const forgo = (wait: Wait<Key>): void => {
+    if (!waits.delete(wait)) return;
+    wait.settled();
+    restIfIdle();
+  };
+
   const drop = (key: Key): void => {
+    for (const wait of [...waits]) if (wait.key === key) forgo(wait);
     for (const run of [...runs]) {
       if (run.legs.delete(key) && run.legs.size === 0) finish(run);
     }
@@ -54,24 +82,59 @@ export function glider<Key>(clock: GlideClock): Glider<Key> {
 
   const tick = (): void => {
     const now = clock.now();
+    for (const wait of [...waits]) {
+      if (now < wait.startsAt || !waits.delete(wait)) continue;
+      wait.begin();
+    }
     for (const run of [...runs]) advance(run, now);
+    restIfIdle();
+  };
+
+  const run = (tracks: readonly GlideTrack<Key>[], durationMs: number): Promise<void> => {
+    for (const track of tracks) drop(track.key);
+    if (!(durationMs > 0)) return jumped(tracks);
+    const legs = new Map(tracks.map((track) => [track.key, legOf(track)] as const));
+    const moving = new Map([...legs].filter(([, leg]) => !samePoint(leg.from, leg.to)));
+    if (moving.size === 0) return Promise.resolve();
+    return new Promise((settled) => {
+      runs.add({ startedAt: clock.now(), durationMs, legs: moving, settled });
+      stopTicking ??= clock.everyFrame(tick);
+    });
+  };
+
+  // Unaided, a body takes its new size as it sets off and then glides to its place, which is
+  // what a glide has always done; only the wait before it is new.
+  const setOff = (track: PlayTrack<Key>): Promise<void> => {
+    const { body, to } = track;
+    const stands = body.frame();
+    if (stands.width !== to.width || stands.height !== to.height) {
+      body.reshape({ x: stands.x, y: stands.y, width: to.width, height: to.height });
+    }
+    return run([{ key: track.key, body, to: { x: to.x, y: to.y } }], track.durationMs);
+  };
+
+  const inItsTurn = (track: PlayTrack<Key>): Promise<void> => {
+    drop(track.key);
+    if (!(track.delayMs > 0)) return setOff(track);
+    return new Promise((settled) => {
+      waits.add({
+        key: track.key,
+        startsAt: clock.now() + track.delayMs,
+        begin: () => void setOff(track).then(settled),
+        settled,
+      });
+      stopTicking ??= clock.everyFrame(tick);
+    });
   };
 
   return {
-    run: (tracks, durationMs) => {
-      for (const track of tracks) drop(track.key);
-      if (!(durationMs > 0)) return jumped(tracks);
-      const legs = new Map(tracks.map((track) => [track.key, legOf(track)] as const));
-      const moving = new Map([...legs].filter(([, leg]) => !samePoint(leg.from, leg.to)));
-      if (moving.size === 0) return Promise.resolve();
-      return new Promise((settled) => {
-        runs.add({ startedAt: clock.now(), durationMs, legs: moving, settled });
-        stopTicking ??= clock.everyFrame(tick);
-      });
-    },
-    gliding: (key) => [...runs].some((run) => run.legs.has(key)),
+    run,
+    play: (tracks) => Promise.all(tracks.map(inItsTurn)).then(() => undefined),
+    gliding: (key) =>
+      [...runs].some((run) => run.legs.has(key)) || [...waits].some((wait) => wait.key === key),
     drop,
     stop: () => {
+      for (const wait of [...waits]) forgo(wait);
       for (const run of [...runs]) finish(run);
     },
   };
@@ -127,6 +190,13 @@ interface Run<Key> {
   readonly startedAt: number;
   readonly durationMs: number;
   readonly legs: Map<Key, Leg>;
+  readonly settled: () => void;
+}
+
+interface Wait<Key> {
+  readonly key: Key;
+  readonly startsAt: number;
+  readonly begin: () => void;
   readonly settled: () => void;
 }
 

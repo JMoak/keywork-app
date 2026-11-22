@@ -1231,3 +1231,69 @@ describe("a pane asked to show with nowhere to stand", () => {
     expect(window.calls).toEqual([]);
   });
 });
+
+describe("playing a whole arrangement", () => {
+  const wide = { x: 100, y: 80, width: 640, height: 480 };
+  const play = {
+    parts: [
+      { id: "kw-surface:1", bounds: beside, atMs: 0, durationMs: 200 },
+      { id: "kw-surface:2", bounds: wide, atMs: 60, durationMs: 180 },
+    ],
+  };
+
+  it("hands the helper one line for every pane and sizes none of them itself", async () => {
+    const bench = helpedBench({ pixelsPerPoint: 2 });
+    const first = bench.open("kw-surface:1");
+    const second = bench.open("kw-surface:2");
+    const settled = bench.ask(surfaceChannels.play, play);
+    const stands = "1120,480,1600,1200";
+    expect(bench.pipes.written).toEqual([
+      `play 1 ${first.nativeHandle()}@${stands}>3000,400,800,600+0~200 ${second.nativeHandle()}@${stands}>200,160,1280,960+60~180`,
+    ]);
+    expect(first.calls).toEqual([]);
+    expect(second.calls).toEqual([]);
+    bench.pipes.says("settled 1");
+    await settled;
+    expect(first.getBounds()).toEqual(beside);
+    expect(second.getBounds()).toEqual(wide);
+  });
+
+  it("leaves out a pane that is gone or maximised, and still answers", async () => {
+    const bench = helpedBench();
+    const window = bench.open("kw-surface:1");
+    window.keeperMaximisesOver(laptop.workArea);
+    await bench.ask(surfaceChannels.play, play);
+    expect(bench.pipes.written).toEqual([]);
+  });
+
+  it("plays it itself without a helper: each pane waits its turn, takes its size, and glides", async () => {
+    const bench = surfaceBench();
+    const first = bench.open("kw-surface:1");
+    const second = bench.open("kw-surface:2");
+    const settled = bench.ask(surfaceChannels.play, play);
+    expect(first.calls).toEqual([`setBounds:${spawnBounds.x},${spawnBounds.y},400x300`]);
+    expect(second.calls).toEqual([]);
+    bench.ports.clock.advance(60 + glideFrameMs);
+    expect(second.calls[0]).toBe(`setBounds:${spawnBounds.x},${spawnBounds.y},640x480`);
+    bench.ports.clock.advance(400);
+    await settled;
+    expect(first.getBounds()).toEqual(beside);
+    expect(second.getBounds()).toEqual(wide);
+  });
+
+  it("reports the helper's sizing and moving as the host's", async () => {
+    const bench = helpedBench();
+    const window = bench.open("kw-surface:1");
+    const settled = bench.ask(surfaceChannels.play, { parts: [play.parts[0]] });
+    window.desktopShapesTo({ x: 900, y: 220, width: 600, height: 450 });
+    bench.ports.clock.advance(newsEveryMs);
+    bench.pipes.says("settled 1");
+    await settled;
+    bench.ports.clock.advance(newsEveryMs);
+    const movers = eventsOf(bench.console, "moved").map(
+      (event) => event.kind === "moved" && event.by,
+    );
+    expect(movers.length).toBeGreaterThan(0);
+    expect(new Set(movers)).toEqual(new Set(["host"]));
+  });
+});

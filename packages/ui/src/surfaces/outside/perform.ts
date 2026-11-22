@@ -1,7 +1,7 @@
 import type { Cue, Plan } from "../feel/choreography.ts";
-import type { Glide, SurfaceId, SurfaceShow, SurfacesPort } from "../port.ts";
+import type { Glide, PlayPart, SurfaceId, SurfaceShow, SurfacesPort } from "../port.ts";
 
-export type PlanPort = Pick<SurfacesPort, "show" | "glide" | "hide">;
+export type PlanPort = Pick<SurfacesPort, "show" | "glide" | "hide" | "play">;
 
 export interface Performance {
   readonly finished: Promise<void>;
@@ -13,9 +13,17 @@ export interface Stagehand {
   readonly skips?: ((id: SurfaceId) => boolean) | undefined;
 }
 
+// Where the host can play a whole arrangement, every glide of a pane that is already out is
+// handed over in one call, each with its own start, so the host times them and not this page.
+// A pane the same plan shows keeps its own cue, because it has to be shown before it can move.
 export function perform(plan: Plan, port: PlanPort, stagehand: Stagehand = {}): Performance {
   const waiting = new Set<Waiting>();
   const skips = (id: SurfaceId): boolean => stagehand.skips?.(id) === true;
+  const together = handedOver(plan, port);
+  const playThoseStillWanted = (): Promise<void> => {
+    const parts = together.flatMap(partsOf).filter((part) => !skips(part.id));
+    return parts.length === 0 || port.play === undefined ? Promise.resolve() : port.play({ parts });
+  };
   const enact = async (cue: Cue): Promise<void> => {
     if (cue.kind === "glide") return glideThoseStillWanted(cue.glide);
     if (skips(cueSubject(cue))) return;
@@ -40,8 +48,10 @@ export function perform(plan: Plan, port: PlanPort, stagehand: Stagehand = {}): 
       waiting.add(held);
     });
   };
+  const handed = new Set<Cue>(together);
+  const alone = plan.cues.filter((cue) => !handed.has(cue));
   return {
-    finished: Promise.all(plan.cues.map(onCue)).then(() => undefined),
+    finished: Promise.all([playThoseStillWanted(), ...alone.map(onCue)]).then(() => undefined),
     cancel: () => {
       for (const held of waiting) {
         clearTimeout(held.timer);
@@ -55,6 +65,22 @@ export function perform(plan: Plan, port: PlanPort, stagehand: Stagehand = {}): 
 interface Waiting {
   readonly timer: ReturnType<typeof setTimeout>;
   skip(): void;
+}
+
+type GlideCue = Extract<Cue, { kind: "glide" }>;
+
+function handedOver(plan: Plan, port: PlanPort): GlideCue[] {
+  if (port.play === undefined) return [];
+  const shownHere = new Set(plan.cues.flatMap((cue) => (cue.kind === "show" ? [cue.show.id] : [])));
+  return plan.cues.filter(
+    (cue): cue is GlideCue =>
+      cue.kind === "glide" && cue.glide.moves.every((move) => !shownHere.has(move.id)),
+  );
+}
+
+function partsOf(cue: GlideCue): PlayPart[] {
+  const { moves, durationMs } = cue.glide;
+  return moves.map((move) => ({ id: move.id, bounds: move.bounds, atMs: cue.atMs, durationMs }));
 }
 
 function cueSubject(cue: Exclude<Cue, { kind: "glide" }>): SurfaceId {

@@ -29,6 +29,7 @@ export function surfacesPort(ipc: SurfacesIpc): SurfacesPort {
     hide: (id) => ipc.invoke(surfaceChannels.hide, id) as Promise<void>,
     close: (id) => ipc.invoke(surfaceChannels.close, id) as Promise<void>,
     glide: (glide) => ipc.invoke(surfaceChannels.glide, glide) as Promise<void>,
+    play: (play) => ipc.invoke(surfaceChannels.play, play) as Promise<void>,
     focus: (id) => ipc.invoke(surfaceChannels.focus, id) as Promise<void>,
     focusConsole: () => ipc.invoke(surfaceChannels.focusConsole) as Promise<void>,
     stack: (bottomToTop) => ipc.invoke(surfaceChannels.stack, bottomToTop) as Promise<void>,

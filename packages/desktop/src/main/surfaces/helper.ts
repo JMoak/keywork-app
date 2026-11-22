@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { ScreenPoint } from "./channels.ts";
+import type { ScreenPoint, ScreenRect } from "./channels.ts";
 
 export const helperProtocol = 1;
 
@@ -17,6 +17,21 @@ export interface Journey {
   readonly to: ScreenPoint;
 }
 
+// One window's part in a play, in screen pixels: the frame its owner says it has, the frame it
+// goes to, how long after the play starts it sets off, how long it takes, and whether it takes
+// its new size at once as it sets off instead of growing into it on the way.
+export interface Role {
+  readonly window: string;
+  readonly at: ScreenRect;
+  readonly to: ScreenRect;
+  readonly delayMs: number;
+  readonly durationMs: number;
+  readonly sizeAtOnce?: boolean;
+}
+
+// The most windows one play line may carry; the helper refuses a longer one.
+export const mostRolesInAPlay = 32;
+
 export interface HelperWatcher {
   settled(glide: number): void;
   refused(window: string, reason: string): void;
@@ -27,6 +42,7 @@ export interface HelperWatcher {
 export interface PanesHelper {
   inUse(): boolean;
   glide(id: number, durationMs: number, journeys: readonly Journey[]): void;
+  play(id: number, roles: readonly Role[]): void;
   release(window: string): void;
   frame(window: string, colour: string | undefined): void;
   sync(): void;
@@ -92,6 +108,7 @@ export function panesHelper(
     inUse: () => state === "serving",
     glide: (id, durationMs, journeys) =>
       say(`glide ${id} ${durationMs} ${journeys.map(journeyWord).join(" ")}`),
+    play: (id, roles) => say(`play ${id} ${roles.map(roleWord).join(" ")}`),
     release: (window) => say(`release ${window}`),
     frame: (window, colour) => say(`border ${window} ${colour ?? "clear"}`),
     sync: () => say(syncRequest),
@@ -136,6 +153,15 @@ const syncRequest = "stats";
 // Colouring a frame is refused where the desktop cannot do it (before Windows 11), and that
 // says nothing about whether the window can be moved.
 const unpaintedFrame = "border-failed";
+
+function roleWord({ window, at, to, delayMs, durationMs, sizeAtOnce }: Role): string {
+  const timing = `+${Math.round(delayMs)}~${Math.round(durationMs)}`;
+  return `${window}@${rectWord(at)}>${rectWord(to)}${timing}${sizeAtOnce === true ? "!" : ""}`;
+}
+
+function rectWord({ x, y, width, height }: ScreenRect): string {
+  return [x, y, width, height].map(Math.round).join(",");
+}
 
 function journeyWord({ window, at, to }: Journey): string {
   return `${window}@${Math.round(at.x)},${Math.round(at.y)}>${Math.round(to.x)},${Math.round(to.y)}`;

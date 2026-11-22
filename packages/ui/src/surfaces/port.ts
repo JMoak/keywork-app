@@ -50,6 +50,19 @@ export interface Glide {
   readonly durationMs: number;
 }
 
+// One pane's part in a play: where it goes, how long after the play starts it sets off, and how
+// long it takes. A play is handed over whole, so its timing does not ride on the page's timers.
+export interface PlayPart {
+  readonly id: SurfaceId;
+  readonly bounds: ScreenRect;
+  readonly atMs: number;
+  readonly durationMs: number;
+}
+
+export interface Play {
+  readonly parts: readonly PlayPart[];
+}
+
 export interface ConsoleStand {
   readonly bounds: ScreenRect;
   readonly maximized: boolean;
@@ -85,6 +98,7 @@ export interface SurfacesPort {
   hide(id: SurfaceId): Promise<void>;
   close(id: SurfaceId): Promise<void>;
   glide(glide: Glide): Promise<void>;
+  play?(play: Play): Promise<void>;
   focus(id: SurfaceId): Promise<void>;
   focusConsole(): Promise<void>;
   stack?(bottomToTop: readonly SurfaceId[]): Promise<void>;

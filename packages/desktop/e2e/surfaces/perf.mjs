@@ -87,6 +87,12 @@ const builtMain = join(desktopRoot, "out", "main", "index.js");
 const paneCount = numberFlag("panes", 16);
 const idleSampleMs = numberFlag("idle-ms", 5_000);
 const keepScratch = process.argv.includes("--keep");
+// --play asks for the measured glide as one play, the way an arrangement is handed over.
+// --grow=<px> also makes every pane that much wider and taller on the way.
+const throughPlay = process.argv.includes("--play");
+const growPx = process.argv.some((argument) => argument.startsWith("--grow="))
+  ? numberFlag("grow", 1)
+  : 0;
 const hookAnswersWithinMs = 5_000;
 const poolRefillMs = 300;
 const startupSettleMs = 5_000;
@@ -279,18 +285,30 @@ function printFirstFrames(popped) {
 
 async function glideTogether(app, page, popped) {
   const desk = await page.evaluate(() => window.keyworkHost.surfaces.desk());
-  const there = popped.map(({ id, bounds }) => ({ id, bounds: shiftedOn(desk.workArea, bounds) }));
+  const there = popped.map(({ id, bounds }) => ({
+    id,
+    bounds: grown(shiftedOn(desk.workArea, bounds), growPx),
+  }));
   const back = popped.map(({ id, bounds }) => ({ id, bounds }));
   await glide(page, back, 0);
   const stage = await watchPanes(app);
   const helperBefore = helperCpuMs(stage.mainPid);
   const probe = await startProbe(stage.handles);
   await markCpu(app);
-  await page.evaluate((asked) => window.keyworkHost.surfaces.glide(asked), {
-    moves: there,
-    durationMs: pacingGlideMs,
-  });
+  await page.evaluate(
+    ({ moves, durationMs, asAPlay }) => {
+      const { surfaces } = window.keyworkHost;
+      if (!asAPlay) return surfaces.glide({ moves, durationMs });
+      return surfaces.play({ parts: moves.map((move) => ({ ...move, atMs: 0, durationMs })) });
+    },
+    { moves: there, durationMs: pacingGlideMs, asAPlay: throughPlay },
+  );
   const main = await cpuSinceMark(app);
+  if (throughPlay || growPx > 0) {
+    console.log(
+      `panes outside · asked · ${throughPlay ? "as one play" : "as a glide"}${growPx > 0 ? `, each pane growing ${growPx} px each way` : ""}`,
+    );
+  }
   await page.waitForTimeout(glideTailMs);
   const helperAfter = helperCpuMs(stage.mainPid);
   const seen = await stopWatching(app);
@@ -469,6 +487,10 @@ async function glide(page, moves, durationMs) {
     },
     { moves, durationMs },
   );
+}
+
+function grown(bounds, by) {
+  return { ...bounds, width: bounds.width + by, height: bounds.height + by };
 }
 
 function shiftedOn(area, bounds) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type FakeClock, fakeClock } from "../companion/testing.ts";
-import type { ScreenPoint } from "./channels.ts";
-import { easedToRest, type Glidable, type GlideClock, glider } from "./glide.ts";
+import type { ScreenPoint, ScreenRect } from "./channels.ts";
+import { easedToRest, type Glidable, type GlideClock, glider, type Shapeable } from "./glide.ts";
 import { glideFrameMs } from "./pacer.ts";
 
 interface Body extends Glidable {
@@ -192,3 +192,94 @@ describe("a glide", () => {
     expect(body.path).toHaveLength(stoppedAt);
   });
 });
+
+describe("playing without a helper", () => {
+  interface Framed extends Shapeable {
+    shapes: ScreenRect[];
+    moves: ScreenPoint[];
+  }
+
+  function framedAt(start: ScreenRect): Framed {
+    const shapes: ScreenRect[] = [];
+    const moves: ScreenPoint[] = [];
+    let at = start;
+    return {
+      shapes,
+      moves,
+      position: () => ({ x: at.x, y: at.y }),
+      moveTo: (point) => {
+        at = { ...at, ...point };
+        moves.push(point);
+      },
+      frame: () => at,
+      reshape: (frame) => {
+        at = frame;
+        shapes.push(frame);
+      },
+    };
+  }
+
+  const small = { x: 0, y: 0, width: 400, height: 300 };
+  const large = { x: 1000, y: -400, width: 800, height: 600 };
+
+  it("leaves a body alone until its wait is over, then sizes it and glides it to its place", async () => {
+    const clock = fakeClock();
+    const glides = glider<string>(framesOf(clock));
+    const first = framedAt(small);
+    const second = framedAt(small);
+    const run = settledFlag(
+      glides.play([
+        { key: "first", body: first, to: large, delayMs: 0, durationMs: 160 },
+        { key: "second", body: second, to: large, delayMs: 120, durationMs: 160 },
+      ]),
+    );
+    expect(first.shapes).toEqual([{ x: 0, y: 0, width: 800, height: 600 }]);
+    clock.advance(100);
+    expect(first.moves.length).toBeGreaterThan(3);
+    expect(second.shapes).toEqual([]);
+    expect(second.moves).toEqual([]);
+    expect(glides.gliding("second")).toBe(true);
+    clock.advance(40);
+    expect(second.shapes).toEqual([{ x: 0, y: 0, width: 800, height: 600 }]);
+    clock.advance(300);
+    await aFewTurns();
+    expect(first.frame()).toEqual(large);
+    expect(second.frame()).toEqual(large);
+    expect(run.settled).toBe(true);
+  });
+
+  it("never sizes a body that keeps its size", async () => {
+    const clock = fakeClock();
+    const glides = glider<string>(framesOf(clock));
+    const body = framedAt(small);
+    void glides.play([
+      { key: "a", body, to: { ...small, x: 500, y: 40 }, delayMs: 0, durationMs: 160 },
+    ]);
+    clock.advance(200);
+    expect(body.shapes).toEqual([]);
+    expect(body.position()).toEqual({ x: 500, y: 40 });
+  });
+
+  it("answers for a body that is taken while it waits, and stops ticking when nothing is left", async () => {
+    const clock = fakeClock();
+    const said: string[] = [];
+    const glides = glider<string>(framesOf(clock, said));
+    const body = framedAt(small);
+    const run = settledFlag(
+      glides.play([{ key: "a", body, to: large, delayMs: 500, durationMs: 160 }]),
+    );
+    clock.advance(100);
+    glides.drop("a");
+    await aFewTurns();
+    expect(run.settled).toBe(true);
+    expect(glides.gliding("a")).toBe(false);
+    clock.advance(1000);
+    expect(body.shapes).toEqual([]);
+    expect(body.moves).toEqual([]);
+    expect(said).toEqual(["start", "stop"]);
+  });
+});
+
+async function aFewTurns(): Promise<void> {
+  for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+}

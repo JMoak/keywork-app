@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { type FakeClock, fakeClock } from "../companion/testing.ts";
-import type { ScreenPoint } from "./channels.ts";
-import { type Glidable, type Glider, glider } from "./glide.ts";
+import type { ScreenPoint, ScreenRect } from "./channels.ts";
+import { type Glidable, type Glider, glider, type Shapeable } from "./glide.ts";
 import { type PanesHelper, panesHelper } from "./helper.ts";
-import { helpedGlider, helperPatienceMs } from "./mover.ts";
+import { helpedGlider, helperPatienceMs, mostPanesGrowingOnTheWay } from "./mover.ts";
 import { glideFrameMs } from "./pacer.ts";
 import { type FakeHelperPipes, fakeHelperPipes, helperParentPid, readyHelper } from "./testing.ts";
 
@@ -359,5 +359,146 @@ describe("falling back to moving the panes itself", () => {
     expect(helper.inUse()).toBe(false);
     expect(letGo).toEqual(["a"]);
     expect(glides.gliding("a")).toBe(false);
+  });
+});
+
+describe("a play through the helper", () => {
+  interface Framed extends Shapeable {
+    shapes: ScreenRect[];
+    carriedTo(frame: ScreenRect): void;
+  }
+
+  function framedAt(start: ScreenRect): Framed {
+    const shapes: ScreenRect[] = [];
+    let at = start;
+    return {
+      shapes,
+      position: () => ({ x: at.x, y: at.y }),
+      moveTo: (point) => {
+        at = { ...at, ...point };
+      },
+      frame: () => at,
+      reshape: (frame) => {
+        at = frame;
+        shapes.push(frame);
+      },
+      carriedTo: (frame) => {
+        at = frame;
+      },
+    };
+  }
+
+  const small = { x: 0, y: 0, width: 400, height: 300 };
+  const large = { x: 1000, y: -400, width: 800, height: 600 };
+  const aside = { x: 40, y: 40, width: 400, height: 300 };
+
+  it("is one command with every pane's frame in pixels, its wait and its time, and sizes nothing itself", () => {
+    const { pipes, glides } = bench();
+    const first = framedAt(small);
+    const second = framedAt(small);
+    void glides.play([
+      { key: "a", body: first, to: large, delayMs: 0, durationMs: 180 },
+      { key: "b", body: second, to: aside, delayMs: 120.4, durationMs: 160 },
+    ]);
+    expect(pipes.written).toEqual([
+      "play 1 a0@0,0,800,600>2000,-800,1600,1200+0~180 b0@0,0,800,600>80,80,800,600+120~160",
+    ]);
+    expect(first.shapes).toEqual([]);
+    expect(second.shapes).toEqual([]);
+  });
+
+  it("answers when the helper settles it, and puts a pane on its frame itself if it was left beside it", async () => {
+    const { clock, pipes, glides } = bench();
+    const landed = framedAt(small);
+    const short = framedAt(small);
+    const run = settledFlag(
+      glides.play([
+        { key: "a", body: landed, to: large, delayMs: 0, durationMs: 180 },
+        { key: "b", body: short, to: large, delayMs: 60, durationMs: 180 },
+      ]),
+    );
+    clock.advance(240);
+    await aTurn();
+    expect(run.settled).toBe(false);
+    landed.carriedTo(large);
+    short.carriedTo({ ...large, width: 799 });
+    pipes.says("settled 1");
+    await aTurn();
+    expect(run.settled).toBe(true);
+    expect(landed.shapes).toEqual([]);
+    expect(short.shapes).toEqual([large]);
+  });
+
+  it("carries each pane on itself with what was left of its wait when the helper goes away", async () => {
+    const { clock, pipes, glides } = bench();
+    const under = framedAt(small);
+    const waiting = framedAt(small);
+    const run = settledFlag(
+      glides.play([
+        { key: "a", body: under, to: large, delayMs: 0, durationMs: 200 },
+        { key: "b", body: waiting, to: large, delayMs: 300, durationMs: 200 },
+      ]),
+    );
+    clock.advance(100);
+    pipes.ends();
+    expect(under.shapes).toEqual([{ ...small, width: 800, height: 600 }]);
+    expect(waiting.shapes).toEqual([]);
+    clock.advance(150);
+    expect(under.frame()).toEqual(large);
+    expect(waiting.shapes).toEqual([]);
+    clock.advance(60);
+    expect(waiting.shapes).toEqual([{ ...small, width: 800, height: 600 }]);
+    clock.advance(250);
+    await aTurn();
+    expect(waiting.frame()).toEqual(large);
+    expect(run.settled).toBe(true);
+  });
+
+  it("releases a pane taken out of a play, and gives a pane to its newest play", () => {
+    const { pipes, glides } = bench();
+    const body = framedAt(small);
+    void glides.play([{ key: "a", body, to: large, delayMs: 0, durationMs: 200 }]);
+    void glides.play([{ key: "a", body, to: aside, delayMs: 0, durationMs: 200 }]);
+    glides.drop("a");
+    expect(pipes.written).toEqual([
+      "play 1 a0@0,0,800,600>2000,-800,1600,1200+0~200",
+      "play 2 a0@0,0,800,600>80,80,800,600+0~200",
+      "release a0",
+      "stats",
+    ]);
+  });
+
+  it("lets panes grow on the way while few change size, and has each take its size at once when many do", () => {
+    const tracksOf = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        key: `p${index}`,
+        body: framedAt(small),
+        to: index === 0 ? aside : large,
+        delayMs: 0,
+        durationMs: 200,
+      }));
+    const few = bench();
+    void few.glides.play(tracksOf(mostPanesGrowingOnTheWay + 1));
+    expect(few.pipes.written[0]).not.toContain("!");
+    const many = bench();
+    void many.glides.play(tracksOf(mostPanesGrowingOnTheWay + 2));
+    const words = (many.pipes.written[0] ?? "").split(" ").slice(2);
+    expect(words).toHaveLength(mostPanesGrowingOnTheWay + 2);
+    expect(words.filter((word) => word.endsWith("!"))).toHaveLength(mostPanesGrowingOnTheWay + 1);
+    expect(words[0]?.endsWith("!")).toBe(false);
+  });
+
+  it("plays unaided when no helper is in use", async () => {
+    const { clock, pipes, helper, glides } = bench();
+    helper.retire("the test says so");
+    const body = framedAt(small);
+    const run = settledFlag(
+      glides.play([{ key: "a", body, to: large, delayMs: 40, durationMs: 160 }]),
+    );
+    clock.advance(400);
+    await aTurn();
+    expect(pipes.written).toEqual([]);
+    expect(body.frame()).toEqual(large);
+    expect(run.settled).toBe(true);
   });
 });

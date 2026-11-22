@@ -139,3 +139,65 @@ describe("performing a plan", () => {
     expect(shown).toEqual([]);
   });
 });
+
+describe("performing a plan through a host that plays whole arrangements", () => {
+  function playingPort(): { port: PlanPort; calls: string[] } {
+    const { port, calls } = recordingPort();
+    const play: NonNullable<PlanPort["play"]> = async ({ parts }) => {
+      const said = parts.map((part) => `${part.id}@${part.atMs}~${part.durationMs}`);
+      calls.push(`play ${said.join(" ")}`);
+    };
+    return { calls, port: { ...port, play } };
+  }
+
+  const glideOf = (atMs: number, id: string, durationMs: number): Cue => ({
+    atMs,
+    kind: "glide",
+    glide: { moves: [{ id, bounds: place }], durationMs },
+  });
+
+  it("hands over every glide of a pane already out in one call, each with its own start", async () => {
+    vi.useFakeTimers();
+    const { port, calls } = playingPort();
+    const playing = perform(
+      planOf([glideOf(0, "a", 160), glideOf(60, "b", 180), glideOf(120, "c", 200)]),
+      port,
+    );
+    expect(calls).toEqual(["play a@0~160 b@60~180 c@120~200"]);
+    vi.advanceTimersByTime(500);
+    await playing.finished;
+    expect(calls).toHaveLength(1);
+  });
+
+  it("keeps the cues of a pane the same plan shows, which has to be shown before it moves", async () => {
+    vi.useFakeTimers();
+    const { port, calls } = playingPort();
+    const playing = perform(
+      planOf([
+        glideOf(0, "out", 160),
+        { atMs: 40, kind: "show", show: showOf("new") },
+        glideOf(40, "new", 160),
+        { atMs: 200, kind: "hide", id: "out" },
+      ]),
+      port,
+    );
+    expect(calls).toEqual(["play out@0~160"]);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(calls).toEqual(["play out@0~160", "show new", "glide new"]);
+    await vi.advanceTimersByTimeAsync(200);
+    await playing.finished;
+    expect(calls).toEqual(["play out@0~160", "show new", "glide new", "hide out"]);
+  });
+
+  it("leaves out a pane that is no longer wanted, and asks for nothing when none is left", async () => {
+    const { port, calls } = playingPort();
+    const gone = new Set(["b"]);
+    await perform(planOf([glideOf(0, "a", 160), glideOf(60, "b", 180)]), port, {
+      skips: (id) => gone.has(id),
+    }).finished;
+    expect(calls).toEqual(["play a@0~160"]);
+    gone.add("a");
+    await perform(planOf([glideOf(0, "a", 160)]), port, { skips: (id) => gone.has(id) }).finished;
+    expect(calls).toHaveLength(1);
+  });
+});
