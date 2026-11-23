@@ -1,5 +1,10 @@
 import { sketchTown } from "@keywork-app/habitat/block/testing";
-import type { CreatureSummary, SessionDetail, SessionRow, SteadPlace } from "@keywork-app/protocol";
+import type {
+  CreatureSummary,
+  CreatureWorksite,
+  SessionRow,
+  SteadPlace,
+} from "@keywork-app/protocol";
 import { cleanup, fireEvent, waitFor, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { definitionOf } from "../../index.ts";
@@ -32,7 +37,7 @@ describe("pressing a place in the stead", () => {
         creatures: async () => [ada],
         routines: async () => [],
         creatureHandoffs: async () => [],
-        session: async (id: string) => detail(id),
+        creatureWorksites: async () => [worksite],
       } as unknown as ShellSeams["client"],
       host: {
         ...base.host,
@@ -110,16 +115,13 @@ const ada: CreatureSummary = {
   threads: 1,
 };
 
-function detail(id: string): SessionDetail {
-  return {
-    id,
-    title: id,
-    createdAt: at,
-    lastActivityAt: at,
-    messageCount: 2,
-    cwd: "C:/work/lamps",
-    live: false,
-    asOf: 0,
-    messages: [],
-  };
-}
+const worksite: CreatureWorksite = {
+  creature: "ada",
+  directory: "C:/work/lamps",
+  root: "C:/work/lamps",
+  project: null,
+  conversations: 1,
+  since: at,
+  latest: at,
+  active: false,
+};

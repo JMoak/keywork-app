@@ -23,6 +23,7 @@ export interface LedgerDesk {
   cursor(): number;
   move(by: number): void;
   point(index: number): void;
+  hold(index: number): CreatureLedgerEntry | undefined;
   talk(index?: number): void;
 }
 
@@ -84,6 +85,7 @@ export function createLedgerDesk(
       const entry = rows()[index];
       if (entry !== undefined) see(entry);
     },
+    hold: cursor.place,
     talk: (index = cursor.index()) => {
       const held = slug();
       const entry = cursor.place(index);

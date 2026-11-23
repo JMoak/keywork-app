@@ -1,0 +1,36 @@
+.kw-key-act {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color var(--kw-tempo-quick, 0s);
+}
+
+.kw-key-act kbd {
+  font: inherit;
+  color: var(--kw-text-dim);
+  transition: color var(--kw-tempo-quick, 0s);
+}
+
+.kw-key-act:hover,
+.kw-key-act:hover kbd {
+  color: var(--kw-text);
+}
+
+.kw-key-act[aria-pressed="true"] {
+  color: var(--kw-accent);
+}
+
+.kw-key-act:focus-visible {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .kw-key-act {
+    text-decoration: underline;
+  }
+}

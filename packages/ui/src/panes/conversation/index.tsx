@@ -35,6 +35,7 @@ import { askChordsOf } from "../../page/ask-card.tsx";
 import type { TailFollow } from "../../page/follow.ts";
 import { ConversationPane } from "../../page/pane.tsx";
 import type { DraftSeed } from "../../shell/controls-store.ts";
+import { useKeyboardScope } from "../../shell/keyboard-claim.ts";
 import { composerHold, promptReturnedNotice } from "../../shell/server-standing.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { spillOpening } from "../file/spill.ts";
@@ -307,6 +308,8 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   const knownName = lastKnownName(props.shell, () => props.spec.sessionId);
   let composerInput: HTMLTextAreaElement | undefined;
   let page: HTMLDivElement | undefined;
+  let pane: HTMLDivElement | undefined;
+  const keyboard = useKeyboardScope();
   keepKeyboardHome(
     () => composerInput,
     () => props.focused && pending() === undefined,
@@ -347,7 +350,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     setPending(restoreOffer(props.shell, id, knownName(), say));
   });
 
-  const talk = followLedgerTalk(props.shell, () => props.spec.sessionId);
+  const talk = followLedgerTalk(props.shell, () => props.spec.sessionId, {
+    root: () => pane,
+    say,
+    returnHome: () => keyboard?.returnHome(),
+  });
+  const leave = props.shell.closePane;
   const [returned, setReturned] = createSignal<DraftSeed>();
   const delivering =
     (deliver: (text: string) => Promise<void>) =>
@@ -439,7 +447,13 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
   const walkSeams = { page: () => page, composer: () => composerInput };
 
   return (
-    <div class="kw-conversation" ref={(root) => onCleanup(walkTranscript(root, walkSeams))}>
+    <div
+      class="kw-conversation"
+      ref={(root) => {
+        pane = root;
+        onCleanup(walkTranscript(root, walkSeams));
+      }}
+    >
       <div class="kw-page" ref={page}>
         <Show
           when={props.spec.sessionId !== undefined}
@@ -487,7 +501,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         onConfirm={answerPending}
         onDismiss={() => setPending(undefined)}
       />
-      <LedgerBand talk={talk} />
+      <LedgerBand
+        talk={talk}
+        leaveKey={props.shell.keys.chord("pane.close")}
+        onLeave={leave === undefined ? undefined : () => leave(props.id)}
+        returnHome={() => keyboard?.returnHome()}
+      />
       <Show when={!talk.ended()}>
         <Composer
           queue={projection().queue}

@@ -130,6 +130,12 @@ export interface Cell {
   readonly items: readonly Item[];
 }
 
+export interface Tall {
+  readonly reach: number;
+  readonly fromASide: number;
+  readonly fromACorner: number;
+}
+
 export interface WorldBounds {
   readonly minX: number;
   readonly maxX: number;
@@ -137,6 +143,7 @@ export interface WorldBounds {
   readonly maxZ: number;
   readonly height: number;
   readonly slab: number;
+  readonly skyline?: readonly Tall[] | undefined;
 }
 
 export interface BlockWorld {

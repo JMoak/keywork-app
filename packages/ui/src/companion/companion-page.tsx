@@ -1,6 +1,9 @@
 import { type MotionPrefs, type Rows, referenceRows } from "@keywork-app/habitat";
+import type { DenyReason } from "@keywork-app/protocol";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
-import { cardKeys } from "../page/ask-card.tsx";
+import { type AskPick, askKeyPick, cardKeys } from "../page/ask-card.tsx";
+import { type AnswerBy, admitsAnswer } from "../page/ask-card-guard.ts";
+import { askingWhy, askWhy, readWhyKeys, stopAskingWhy } from "../page/ask-card-why.ts";
 import { steadName } from "../panes/stead/copy.ts";
 import { wearRememberedTheme } from "../theme/wardrobe.ts";
 import { accessibleName } from "./announce.ts";
@@ -28,6 +31,7 @@ import {
 } from "./drag.ts";
 import { insideWithHysteresis, unionMask } from "./hit-test.ts";
 import {
+  type ChoreAccept,
   type CompanionConditions,
   type CompanionPort,
   type CompanionSnapshot,
@@ -112,6 +116,7 @@ export function CompanionPage(props: CompanionPageProps) {
   const [reacting, setReacting] = createSignal(false);
   const [strip, setStrip] = createSignal<TeamStripHandle>();
   const [airUnderFeet, setAirUnderFeet] = createSignal(0);
+  const [wording, setWording] = createSignal<string>();
   let stage: HTMLDivElement | undefined;
   let creature: HTMLButtonElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
@@ -248,6 +253,47 @@ export function CompanionPage(props: CompanionPageProps) {
 
   const open = (): void => props.port.open(snapshot()?.threadId);
 
+  const asked = (): string | undefined => bubble()?.callId;
+  const wordingHere = (): boolean => wording() !== undefined && wording() === asked();
+  const answer = (pick: AskPick, by: AnswerBy): void => {
+    const callId = asked();
+    if (callId === undefined || !admitsAnswer(by)) return;
+    if (pick === "deny") askWhy(callId);
+    else props.port.answer({ callId, pick });
+  };
+  const deny = (callId: string, reason: DenyReason, note?: string): void => {
+    stopAskingWhy(callId);
+    props.port.answer({ callId, pick: "deny", reason, ...(note !== undefined && { note }) });
+  };
+  const giveReason = (reason: DenyReason, by: AnswerBy): void => {
+    const callId = asked();
+    if (callId === undefined || !admitsAnswer(by)) return;
+    if (reason === "other") setWording(callId);
+    else deny(callId, reason);
+  };
+  const sendWords = (note: string): void => {
+    const callId = wording();
+    setWording(undefined);
+    if (callId !== undefined) deny(callId, "other", note.trim() === "" ? undefined : note);
+  };
+  const accept = (chore: ChoreAccept, by: AnswerBy): void => {
+    if (!admitsAnswer(by)) return;
+    props.port.answer({
+      callId: `chore:${chore.creature}/${chore.routineId}`,
+      pick: "approve",
+      accept: chore,
+    });
+  };
+  const answerByKey = (event: KeyboardEvent): boolean => {
+    const held = bubble();
+    const pick = held === undefined || wordingHere() ? undefined : askKeyPick(event);
+    if (held === undefined || pick === undefined) return false;
+    if (held.accept !== undefined && grants(pick)) accept(held.accept, "key");
+    else if (held.answers.includes(grants(pick) ? "approve" : pick)) answer(pick, "key");
+    else return false;
+    return true;
+  };
+
   const askForStead = (): void =>
     props.port.askForStead({ creature: strip()?.under() ?? snapshot()?.creature.slug });
 
@@ -349,6 +395,10 @@ export function CompanionPage(props: CompanionPageProps) {
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (answerByKey(event)) {
+      event.preventDefault();
+      return;
+    }
     const act = event.shiftKey ? movingKeys[event.key] : teamKeys[event.key];
     if (act === undefined || (act === "reveal" && !steadKeyReaches(event.target, stage))) return;
     event.preventDefault();
@@ -386,6 +436,18 @@ export function CompanionPage(props: CompanionPageProps) {
       setSnapshot(heldWhileTucked);
       heldWhileTucked = undefined;
     }),
+  );
+  readWhyKeys(
+    () => stage,
+    () => (wordingHere() ? undefined : asked()),
+    (reason) => giveReason(reason, "key"),
+  );
+  createEffect(
+    on(
+      [() => asked() !== undefined && askingWhy(asked() ?? ""), wordingHere],
+      () => teamChanged(),
+      { defer: true },
+    ),
   );
   createEffect(() => scheduler.setTier(tier(), conditions().onBattery));
   createEffect(() => scheduler.setStill(still()));
@@ -452,17 +514,11 @@ export function CompanionPage(props: CompanionPageProps) {
           <NeedsYouBubble
             bubble={needs()}
             keys={cardKeys}
-            onAnswer={(pick) => {
-              const callId = needs().callId;
-              if (callId !== undefined) props.port.answer({ callId, pick });
-            }}
-            onAccept={(accept) =>
-              props.port.answer({
-                callId: `chore:${accept.creature}/${accept.routineId}`,
-                pick: "approve",
-                accept,
-              })
-            }
+            wording={wordingHere()}
+            onAnswer={answer}
+            onReason={giveReason}
+            onWords={sendWords}
+            onAccept={accept}
             onOverturn={(overturn) =>
               props.port.answer({ callId: `decided:${overturn.recordId}`, pick: "deny", overturn })
             }
@@ -522,8 +578,14 @@ export function CompanionPage(props: CompanionPageProps) {
         </button>
       </div>
       <div class="kw-companion-controls">
-        <button type="button" class="kw-companion-control" data-hit onClick={open}>
-          talk
+        <button
+          type="button"
+          class="kw-companion-control"
+          data-hit
+          aria-keyshortcuts="Enter"
+          onClick={open}
+        >
+          talk <kbd>enter</kbd>
         </button>
         <button
           type="button"
@@ -547,6 +609,10 @@ export function CompanionPage(props: CompanionPageProps) {
       </div>
     </div>
   );
+}
+
+function grants(pick: AskPick): boolean {
+  return pick === "approve" || pick === "once";
 }
 
 type KeyAct = "reveal" | "before" | "after" | "leave" | "home" | NudgeStep;

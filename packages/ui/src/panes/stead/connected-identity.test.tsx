@@ -30,11 +30,11 @@ describe("a stead connected to its creature home", () => {
     );
     expect(held.homeRebind).not.toHaveBeenCalled();
     expect(container.querySelectorAll(".kw-stead")).toHaveLength(1);
-    fireEvent.click(within(container).getByRole("button", { name: "Deco" }));
+    fireEvent.click(within(container).getByRole("button", { name: /^building style Neon/ }));
     expect(held.hostRebind).toHaveBeenLastCalledWith("p1", {
       kind: "stead",
       courtOrder: ["alpha", "missing"],
-      kit: "deco",
+      kit: "lantern",
     });
     expect(held.homeRebind).not.toHaveBeenCalled();
     held.dispose();

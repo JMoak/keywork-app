@@ -13,15 +13,9 @@ import {
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import { focusedIn, restsOnPage } from "../surfaces/runtime/realm.ts";
-import {
-  askingWhy,
-  askWhy,
-  readWhyKeys,
-  reasonOffers,
-  stopAskingWhy,
-  takeBackOffer,
-  whyPrompt,
-} from "./ask-card-why.ts";
+import { type AnswerOffer, AskAnswers } from "./ask-card-answers.tsx";
+import { type AnswerBy, admitsAnswer } from "./ask-card-guard.ts";
+import { askingWhy, askWhy, readWhyKeys, stopAskingWhy } from "./ask-card-why.ts";
 import { coverageLines } from "./consequence.ts";
 import { AskConsequence } from "./consequence-view.tsx";
 import { NoteLine } from "./note-line.tsx";
@@ -92,8 +86,7 @@ export function AskCard(props: AskCardProps) {
   const quiet = () => props.quiet === true;
   const rules = () => rememberableRules(props.run);
   const chords = (): AskChords => props.chords ?? cardKeys;
-  const offers = () => askOffers(props.run);
-  const remembering = () => rememberingOffers(offers());
+  const remembering = () => rememberingOffers(askOffers(props.run));
   const rememberingChords = () => remembering().map((offer) => chords()[offer.pick]);
   const coverage = () =>
     props.run.ask?.tool === "bash" ? coverageOf(remembering(), rules(), chords()) : [];
@@ -125,11 +118,14 @@ export function AskCard(props: AskCardProps) {
     stopAskingWhy(props.run.callId);
     keyboard?.returnHome();
   };
-  const giveReason = (reason: DenyReason): void => {
+  const giveReason = (reason: DenyReason, by: AnswerBy): void => {
+    if (!admitsAnswer(by)) return;
     if (reason === "other") setNoting(true);
     else void answer(denialFor(reason));
   };
-  const choose = (choice: AskChoice): void => {
+  const choose = (pick: AskPick, by: AnswerBy): void => {
+    const choice = askChoiceFor(pick, props.run);
+    if (choice === undefined || !admitsAnswer(by)) return;
     if (isBareDenial(choice)) askWhy(props.run.callId);
     else void answer(choice);
   };
@@ -141,17 +137,16 @@ export function AskCard(props: AskCardProps) {
   const onKeyDown = (event: KeyboardEvent): void => {
     if (sayingWhy()) return;
     const pick = askKeyPick(event);
-    const choice = pick === undefined ? undefined : askChoiceFor(pick, props.run);
-    if (choice === undefined) return;
+    if (pick === undefined || askChoiceFor(pick, props.run) === undefined) return;
     event.preventDefault();
     event.stopPropagation();
-    choose(choice);
+    choose(pick, "key");
   };
 
   readWhyKeys(
     () => card,
     () => (noting() ? undefined : props.run.callId),
-    (reason, words) => (words ? setNoting(true) : void answer(denialFor(reason))),
+    (reason) => giveReason(reason, "key"),
   );
   createEffect(() => {
     if (sayingWhy() && card !== undefined && focusRestsNear(card)) card.focus();
@@ -167,6 +162,7 @@ export function AskCard(props: AskCardProps) {
       tabIndex={-1}
       ref={card}
       data-walk=""
+      data-ask-surface=""
       data-call-id={props.run.callId}
       onKeyDown={onKeyDown}
       data-answering={answering() ? "" : undefined}
@@ -199,52 +195,27 @@ export function AskCard(props: AskCardProps) {
       </Show>
       <span class="kw-ask-actions">
         <Show
-          when={sayingWhy()}
+          when={sayingWhy() && noting()}
           fallback={
-            <For each={offers()}>
-              {(offer) => (
-                <AnswerButton
-                  label={answerLabel(offer.choice)}
-                  chord={chords()[offer.pick]}
-                  tone={toneOf(offer.choice)}
-                  onPress={() => choose(offer.choice)}
-                />
-              )}
-            </For>
+            <AskAnswers
+              callId={props.run.callId}
+              offers={offeredAnswers(props.run)}
+              keys={chords()}
+              why={sayingWhy()}
+              part="kw-ask"
+              onAnswer={choose}
+              onReason={giveReason}
+              onBack={takeBack}
+            />
           }
         >
-          <Show
-            when={noting()}
-            fallback={
-              <>
-                <span class="kw-ask-reason-prompt">{whyPrompt}</span>
-                <For each={reasonOffers}>
-                  {(offer) => (
-                    <AnswerButton
-                      label={offer.label}
-                      chord={offer.key}
-                      tone="deny"
-                      onPress={() => giveReason(offer.reason)}
-                    />
-                  )}
-                </For>
-                <AnswerButton
-                  label={takeBackOffer.label}
-                  chord={takeBackOffer.key}
-                  tone="back"
-                  onPress={takeBack}
-                />
-              </>
-            }
-          >
-            <NoteLine
-              onSend={(note) => void answer(denialFor("other", note))}
-              onBack={() => {
-                setNoting(false);
-                card?.focus();
-              }}
-            />
-          </Show>
+          <NoteLine
+            onSend={(note) => void answer(denialFor("other", note))}
+            onBack={() => {
+              setNoting(false);
+              card?.focus();
+            }}
+          />
         </Show>
       </span>
       <Show when={refusal()}>
@@ -336,6 +307,14 @@ export function askOffers(run: ToolRun): AskOffer[] {
   });
 }
 
+export function offeredAnswers(run: ToolRun): AnswerOffer[] {
+  return askOffers(run).map(({ pick, choice }) => ({
+    pick,
+    label: answerLabel(choice),
+    tone: choice.verdict === "denied" ? "deny" : "grant",
+  }));
+}
+
 export function denialFor(reason: DenyReason, note?: string): AskChoice {
   const said = note?.trim() ?? "";
   return said === "" ? { verdict: "denied", reason } : { verdict: "denied", reason, note: said };
@@ -379,7 +358,7 @@ function defaultAskReason(tool: string | undefined): string {
   return "this tool asks before it runs";
 }
 
-function askKeyPick(event: KeyboardEvent): AskPick | undefined {
+export function askKeyPick(event: KeyboardEvent): AskPick | undefined {
   if (event.ctrlKey || event.altKey || event.metaKey) return undefined;
   const key = event.key.toLowerCase();
   return askPicks.find((pick) => cardKeys[pick] === key);
@@ -444,32 +423,6 @@ const codeRunners: ReadonlySet<string> = new Set([
   "perl",
   "php",
 ]);
-
-type AnswerTone = "grant" | "deny" | "back";
-
-interface AnswerButtonProps {
-  label: string;
-  chord: string;
-  tone: AnswerTone;
-  onPress: () => void;
-}
-
-function AnswerButton(props: AnswerButtonProps) {
-  return (
-    <button
-      type="button"
-      class="kw-ask-answer"
-      data-tone={props.tone}
-      onClick={() => props.onPress()}
-    >
-      <span class="kw-ask-label">{props.label}</span> <kbd>{props.chord}</kbd>
-    </button>
-  );
-}
-
-function toneOf(choice: AskChoice): AnswerTone {
-  return choice.verdict === "denied" ? "deny" : "grant";
-}
 
 function focusRestsNear(card: HTMLElement): boolean {
   return restsOnPage(card) || (paneOf(card)?.contains(focusedIn(card)) ?? false);

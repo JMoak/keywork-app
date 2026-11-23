@@ -161,12 +161,15 @@ export const projectStages = [
 
 export type ProjectStage = (typeof projectStages)[number];
 
+export const familyFlags = 6;
+
 export interface ProjectSpec {
   readonly stage: ProjectStage;
   readonly seed: number;
   readonly order: number;
   readonly lit: boolean;
   readonly name?: string | undefined;
+  readonly family?: number | undefined;
 }
 
 export interface ShedSpot extends Footprint {

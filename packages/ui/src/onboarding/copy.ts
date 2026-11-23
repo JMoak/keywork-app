@@ -1,10 +1,8 @@
+import type { Verb } from "./onboarding.ts";
+
 export const stageName = "a new creature";
 
 export const eggName = "an egg";
-export const notNowKey = "esc not now";
-export const eggKeys = `enter hatches it · ${notNowKey}`;
-export const meetKeys = "← → who · ↑ ↓ colour · tab another name · enter keeps";
-export const retryKeys = `enter tries again · ${notNowKey}`;
 
 export const nameField = "name";
 export const nameRefused = "a name is one to sixty-four characters";
@@ -12,8 +10,57 @@ export const nameTaken = "that name is taken on this computer";
 
 export const previousLook = "who: the one before";
 export const nextLook = "who: the next one";
+export const nextCoat = "colour: the next one";
+export const previousCoat = "colour: the one before";
 export const coatsName = "colour";
 export const anotherName = "another name";
+
+export interface StageKey {
+  readonly key: string;
+  readonly verb: Verb;
+  readonly spoken?: string;
+}
+
+export interface StageAct {
+  readonly keys: readonly StageKey[];
+  readonly words: string;
+}
+
+export const notNowAct = onEsc("not now");
+export const eggActs: readonly StageAct[] = [onEnter("hatches it"), notNowAct];
+export const retryActs: readonly StageAct[] = [onEnter("tries again"), notNowAct];
+export const meetActs: readonly StageAct[] = [
+  {
+    keys: [
+      { key: "←", verb: "previous", spoken: previousLook },
+      { key: "→", verb: "next", spoken: nextLook },
+    ],
+    words: "who",
+  },
+  {
+    keys: [
+      { key: "↑", verb: "up", spoken: nextCoat },
+      { key: "↓", verb: "down", spoken: previousCoat },
+    ],
+    words: coatsName,
+  },
+  { keys: [{ key: "tab", verb: "another" }], words: anotherName },
+  onEnter("keeps"),
+];
+export const conversationActs: readonly StageAct[] = [onEnter("opens its conversation")];
+export const connectActs: readonly StageAct[] = [onEnter("connects a model"), onEsc("later")];
+export const closeActs: readonly StageAct[] = [onEnter("closes")];
+
+export function keysLine(acts: readonly StageAct[]): string {
+  return acts
+    .map((act) => `${act.keys.map((held) => held.key).join(" ")} ${act.words}`)
+    .join(" · ");
+}
+
+export const notNowKey = keysLine([notNowAct]);
+export const eggKeys = keysLine(eggActs);
+export const meetKeys = keysLine(meetActs);
+export const retryKeys = keysLine(retryActs);
 
 export function coatName(coat: number, coats: number): string {
   return `colour ${coat} of ${coats}`;
@@ -98,6 +145,12 @@ export function threadRefusedLine(detail: string): string {
   return `its first conversation did not open: ${detail}`;
 }
 
-export const conversationKeys = "enter opens its conversation";
-export const connectKeys = "enter connects a model · esc later";
-export const closeKeys = "enter closes";
+export const connectKeys = keysLine(connectActs);
+
+function onEnter(words: string): StageAct {
+  return { keys: [{ key: "enter", verb: "accept" }], words };
+}
+
+function onEsc(words: string): StageAct {
+  return { keys: [{ key: "esc", verb: "leave" }], words };
+}

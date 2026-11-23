@@ -36,7 +36,7 @@ describe("draw order at the four rest positions", () => {
         }
       }
     }
-  });
+  }, 60_000);
 });
 
 function worldOf(count: number): BlockWorld {

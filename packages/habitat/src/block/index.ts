@@ -32,6 +32,7 @@ export {
   liftAt,
   type Ring,
   type RingMark,
+  reframed,
   ringFor,
   ringMarks,
   ringMask,
@@ -98,6 +99,7 @@ export {
   type Appearance,
   type BannerTier,
   type Construction,
+  familyFlags,
   type GroundSpec,
   type HouseSpec,
   identityCount,
@@ -128,6 +130,7 @@ export {
   neonKit,
   terraceKit,
 } from "./kits/index.ts";
+export { flagCuts } from "./kits/sketch/flag.ts";
 export {
   type CellAddress,
   doorSideOf,
@@ -175,6 +178,7 @@ export { type BlockPalette, resolveBlockPalette } from "./palette.ts";
 export {
   type ArtRect,
   type PlaceRects,
+  pathKey,
   placeKey,
   placeOfTarget,
   placeRectsOf,
@@ -210,13 +214,19 @@ export {
   wallsAround,
 } from "./scene.ts";
 export {
-  type ConversationPlace,
-  type ConversationPlaces,
   directoriesIn,
   floorCap,
   floorsFor,
+  type HeardAt,
+  inOrderOfFounding,
+  type LotOrder,
+  lotOrderAfter,
   projectSitesOf,
+  sameLotOrder,
+  stageFor,
   type TrackedFiles,
+  worksiteKey,
+  worksitesAfter,
 } from "./sites.ts";
 export { type Backdrop, backdropOf, firefliesOf, type Light } from "./sky.ts";
 export {

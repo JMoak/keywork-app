@@ -9,24 +9,27 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { KeyAct } from "../chrome/key-act.tsx";
 import { loadSkin } from "../panes/stead/habitat-render.ts";
 import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import type { OnboardingController } from "./controller.ts";
 import {
   anotherName,
-  closeKeys,
+  closeActs,
   coatName,
   coatsName,
-  connectKeys,
-  conversationKeys,
-  eggKeys,
+  connectActs,
+  conversationActs,
+  eggActs,
   eggName,
   lookLine,
-  meetKeys,
+  meetActs,
   nameField,
   nextLook,
+  notNowAct,
   previousLook,
-  retryKeys,
+  retryActs,
+  type StageAct,
   stageName,
 } from "./copy.ts";
 import { nameLimit } from "./names.ts";
@@ -220,8 +223,13 @@ export function HatchStage(props: HatchStageProps) {
           )}
         </Show>
         <p class="kw-hatch-keys" id={keysId}>
-          {keysIn(phase(), trouble())}
+          <StageActs acts={actsIn(phase(), trouble())} onAct={act} />
         </p>
+        <Show when={kind() === "meet"}>
+          <p class="kw-hatch-keys" data-aside="">
+            <StageActs acts={[notNowAct]} onAct={act} />
+          </p>
+        </Show>
       </div>
     </section>
   );
@@ -268,24 +276,71 @@ function saidIn(phase: Phase, trouble: string | undefined, who: string): string 
   }
 }
 
-function keysIn(phase: Phase, trouble: string | undefined): string {
+function actsIn(phase: Phase, trouble: string | undefined): readonly StageAct[] {
   switch (phase.kind) {
     case "egg":
-      return trouble === undefined ? eggKeys : retryKeys;
+      return trouble === undefined ? eggActs : retryActs;
     case "meet":
-      return meetKeys;
+      return meetActs;
     case "made":
-      return madeKeys[phase.made.next.kind];
+      return madeActs[phase.made.next.kind];
     default:
-      return "";
+      return [];
   }
 }
 
-const madeKeys = {
-  conversation: conversationKeys,
-  connect: connectKeys,
-  nothing: closeKeys,
+const madeActs = {
+  conversation: conversationActs,
+  connect: connectActs,
+  nothing: closeActs,
 } as const;
+
+interface StageActsProps {
+  readonly acts: readonly StageAct[];
+  onAct(verb: Verb): void;
+}
+
+function StageActs(props: StageActsProps) {
+  return (
+    <For each={props.acts}>
+      {(act, at) => (
+        <>
+          <Show when={at() > 0}> · </Show>
+          <Show
+            when={act.keys.length > 1 ? undefined : act.keys[0]}
+            fallback={
+              <>
+                <For each={act.keys}>
+                  {(held) => (
+                    <>
+                      <KeyAct
+                        chord={held.key}
+                        spoken={held.spoken}
+                        offTheTabPath
+                        onPress={() => props.onAct(held.verb)}
+                      />{" "}
+                    </>
+                  )}
+                </For>
+                {act.words}
+              </>
+            }
+          >
+            {(held) => (
+              <KeyAct
+                chord={held().key}
+                label={act.words}
+                keyLeads
+                offTheTabPath
+                onPress={() => props.onAct(held().verb)}
+              />
+            )}
+          </Show>
+        </>
+      )}
+    </For>
+  );
+}
 
 function shakenAs(shakes: number): "once" | "again" | undefined {
   if (shakes === 0) return undefined;

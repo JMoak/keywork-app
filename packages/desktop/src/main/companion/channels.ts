@@ -177,9 +177,13 @@ export interface MenuRequest {
   y: number;
 }
 
+export type AnswerReason = "unsafe" | "not-now" | "other";
+
 export interface AnswerRequest {
   callId: string;
   pick: AnswerPick;
+  reason?: AnswerReason | undefined;
+  note?: string | undefined;
   accept?: ChoreAccept | undefined;
   overturn?: OverturnOffer | undefined;
 }

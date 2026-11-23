@@ -247,7 +247,7 @@ export function TeamStrip(props: TeamStripProps) {
     const centre = (at * pitch() + cell / 2) * texel() - scrolled();
     const room = root.clientWidth;
     const wide = tag.offsetWidth;
-    const left = Math.max(0, Math.min(room - wide, centre - wide / 2));
+    const left = Math.min(room - wide, Math.max(0, centre - wide / 2));
     tag.style.left = `${Math.round(left)}px`;
   });
 

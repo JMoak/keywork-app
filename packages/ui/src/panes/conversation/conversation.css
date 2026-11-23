@@ -227,11 +227,62 @@
   outline-offset: 1px;
 }
 
-.kw-talk-ended {
-  margin: 0;
+.kw-talk-band:focus {
+  outline: none;
+}
+
+.kw-talk-acts {
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.kw-talk-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5ch;
+  margin-right: 1ch;
+}
+.kw-talk-answer {
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.kw-talk-answer kbd {
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+.kw-talk-answer[data-tone="grant"] {
+  color: var(--kw-success);
+}
+.kw-talk-answer[data-tone="deny"] {
+  color: var(--kw-error);
+}
+.kw-talk-reason-prompt {
+  color: var(--kw-text-mid);
+}
+
+.kw-talk-end {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.65rem 0.75rem;
   border-top: 1px solid var(--kw-border);
   background: var(--kw-panel);
   color: var(--kw-text-mid);
   font-family: var(--kw-font-mono);
+}
+
+.kw-talk-ended {
+  margin: 0;
+}
+
+.kw-talk-leave {
+  flex: none;
+  color: var(--kw-text-dim);
 }

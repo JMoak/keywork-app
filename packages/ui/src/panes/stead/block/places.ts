@@ -1,54 +1,78 @@
-import type { HabitatState } from "@keywork-app/habitat";
+import type { ServerFeed } from "@keywork-app/client";
 import {
-  type ConversationPlace,
-  type ConversationPlaces,
   directoriesIn,
+  type HeardAt,
+  inOrderOfFounding,
+  type LotOrder,
+  lotOrderAfter,
   type ProjectSite,
   projectSitesOf,
+  sameLotOrder,
   type TrackedFiles,
+  worksiteKey,
+  worksitesAfter,
 } from "@keywork-app/habitat/block";
-import { createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
+import type {
+  CreatureWorksite,
+  CreatureWorksiteChange,
+  ServedRefusal,
+} from "@keywork-app/protocol";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import type { ShellSeams } from "../../registry.ts";
 
-export interface SessionPlace {
-  readonly cwd: string;
-  readonly createdAt: string;
-}
-
 export interface PlaceSeams {
-  readSession(id: string): Promise<SessionPlace | undefined>;
+  readWorksites(): Promise<readonly CreatureWorksite[] | ServedRefusal>;
+  readonly feed: Pick<ServerFeed, "subscribe">;
   readonly trackedFiles?: ((directory: string) => Promise<number | undefined>) | undefined;
 }
 
 export interface PlaceTimers {
-  after(ms: number, run: () => void): () => void;
   every(ms: number, run: () => void): () => void;
 }
 
-export interface ProjectPlaces {
-  places(): ConversationPlaces;
-  trackedFiles(): TrackedFiles;
+export interface Worksites {
+  rows(): readonly CreatureWorksite[];
+  heardAt(): HeardAt;
+  whole(): boolean;
+}
+
+export interface LotOrders {
+  stored(): LotOrder | undefined;
+  keep(order: Record<string, string[]>): void;
 }
 
 export type ProjectSites = Readonly<Record<string, readonly ProjectSite[]>>;
 
-export const placeReadsAtOnce = 2;
-export const placeSettleMs = 400;
 export const trackedFilesRefreshMs = 60_000;
 
 export function createProjectSites(
   seams: PlaceSeams,
-  world: () => HabitatState,
+  lots: LotOrders = forgetful,
   timers: PlaceTimers = browserTimers,
+  now: () => number = Date.now,
 ): () => ProjectSites {
-  const known = createProjectPlaces(seams, () => creatureSessionsOf(world()), timers);
-  return createMemo(() => projectSitesOf(world(), known.places(), known.trackedFiles()));
+  const worksites = createWorksites(seams, now);
+  const trackedFiles = createTrackedFiles(seams, () => directoriesIn(worksites.rows()), timers);
+  const order = createMemo(
+    () => lotOrderAfter(lots.stored() ?? noLots, worksites.rows(), worksites.whole()),
+    noLots,
+    { equals: sameLotOrder },
+  );
+  createEffect(
+    on(order, (held) => {
+      if (!sameLotOrder(held, lots.stored() ?? noLots)) lots.keep(copied(held));
+    }),
+  );
+  return createMemo(() =>
+    projectSitesOf(worksites.rows(), trackedFiles(), worksites.heardAt(), order()),
+  );
 }
 
-export function placeSeamsOf(shell: Pick<ShellSeams, "client" | "host">): PlaceSeams {
+export function placeSeamsOf(shell: Pick<ShellSeams, "client" | "host" | "feed">): PlaceSeams {
   const { host } = shell;
   return {
-    readSession: async (id) => await shell.client.session(id),
+    readWorksites: () => shell.client.creatureWorksites(),
+    feed: shell.feed,
     trackedFiles:
       host.trackedFiles === undefined
         ? undefined
@@ -56,61 +80,79 @@ export function placeSeamsOf(shell: Pick<ShellSeams, "client" | "host">): PlaceS
   };
 }
 
-export function creatureSessionsOf(state: HabitatState): string[] {
-  return Object.values(state.threads)
-    .filter((thread) => thread.creature !== undefined && !thread.removed)
-    .map((thread) => thread.id)
-    .sort();
-}
-
-export function createProjectPlaces(
-  seams: PlaceSeams,
-  sessions: () => readonly string[],
-  timers: PlaceTimers = browserTimers,
-): ProjectPlaces {
-  const [places, setPlaces] = createSignal<ConversationPlaces>({});
-  const [trackedFiles, setTrackedFiles] = createSignal<TrackedFiles>({});
-  const wanted = createMemo(sessions, [], { equals: sameList });
-  const asked = new Set<string>();
-  const waiting: string[] = [];
-  const arrived = new Map<string, ConversationPlace>();
-  let reading = 0;
-  let settling: (() => void) | undefined;
+export function createWorksites(seams: PlaceSeams, now: () => number = Date.now): Worksites {
+  const [rows, setRows] = createSignal<readonly CreatureWorksite[]>([]);
+  const [heardAt, setHeardAt] = createSignal<HeardAt>(new Map());
+  const [whole, setWhole] = createSignal(false);
+  let beforeTheListing: CreatureWorksiteChange[] | undefined = [];
   let disposed = false;
 
-  const settle = (): void => {
-    settling = undefined;
-    if (disposed || arrived.size === 0) return;
-    const landed = Object.fromEntries(arrived);
-    arrived.clear();
-    setPlaces((held) => ({ ...held, ...landed }));
-  };
-  const landed = (id: string, found: SessionPlace | undefined): void => {
-    if (found !== undefined) arrived.set(id, { directory: found.cwd, startedAt: found.createdAt });
-    settling ??= timers.after(placeSettleMs, settle);
-  };
-  const pump = (): void => {
-    while (!disposed && reading < placeReadsAtOnce && waiting.length > 0) {
-      const id = waiting.shift();
-      if (id === undefined) return;
-      reading += 1;
-      seams
-        .readSession(id)
-        .then(
-          (found) => landed(id, found),
-          () => asked.delete(id),
-        )
-        .finally(() => {
-          reading -= 1;
-          pump();
-        });
+  const follow = (change: CreatureWorksiteChange): void => {
+    if (beforeTheListing !== undefined) {
+      beforeTheListing.push(change);
+      return;
     }
+    setRows((held) => worksitesAfter(held, change));
+    setHeardAt((held) => new Map(held).set(worksiteKey(change.worksite), now()));
   };
+  const seat = (listed: readonly CreatureWorksite[] | undefined): void => {
+    const early = beforeTheListing ?? [];
+    beforeTheListing = undefined;
+    if (disposed) return;
+    batch(() => {
+      setRows(early.reduce(worksitesAfter, inOrderOfFounding(listed ?? [])));
+      setWhole(listed !== undefined);
+    });
+  };
+
+  onCleanup(
+    seams.feed.subscribe((batch) => {
+      for (const envelope of batch) {
+        if (envelope.type === "creature.worksites") follow(envelope.payload);
+      }
+    }),
+  );
+  void Promise.resolve()
+    .then(() => seams.readWorksites())
+    .then(
+      (listed) => seat(Array.isArray(listed) ? listed : undefined),
+      () => seat(undefined),
+    );
+  onCleanup(() => {
+    disposed = true;
+  });
+  return { rows, heardAt, whole };
+}
+
+export const browserTimers: PlaceTimers = {
+  every: (ms, run) => {
+    const timer = setInterval(run, ms);
+    return () => clearInterval(timer);
+  },
+};
+
+export const forgetful: LotOrders = { stored: () => undefined, keep: () => undefined };
+
+const noLots: LotOrder = {};
+
+function copied(order: LotOrder): Record<string, string[]> {
+  return Object.fromEntries(Object.entries(order).map(([creature, lot]) => [creature, [...lot]]));
+}
+
+function createTrackedFiles(
+  seams: PlaceSeams,
+  directories: () => readonly string[],
+  timers: PlaceTimers,
+): () => TrackedFiles {
+  const [trackedFiles, setTrackedFiles] = createSignal<TrackedFiles>({});
+  const wanted = createMemo(directories, [], { equals: sameList });
+  let disposed = false;
+
   const count = async (): Promise<void> => {
     const read = seams.trackedFiles;
     if (read === undefined) return;
     const counted = await Promise.all(
-      directoriesIn(places()).map(
+      wanted().map(
         async (directory) => [directory, await read(directory).catch(() => undefined)] as const,
       ),
     );
@@ -119,36 +161,14 @@ export function createProjectPlaces(
     if (!disposed && !sameCounts(trackedFiles(), next)) setTrackedFiles(next);
   };
 
-  createEffect(
-    on(wanted, (ids) => {
-      for (const id of ids) {
-        if (asked.has(id)) continue;
-        asked.add(id);
-        waiting.push(id);
-      }
-      pump();
-    }),
-  );
-  createEffect(on(places, () => void count()));
+  createEffect(on(wanted, () => void count()));
   const stopRefreshing = timers.every(trackedFilesRefreshMs, () => void count());
   onCleanup(() => {
     disposed = true;
     stopRefreshing();
-    settling?.();
   });
-  return { places, trackedFiles };
+  return trackedFiles;
 }
-
-export const browserTimers: PlaceTimers = {
-  after: (ms, run) => {
-    const timer = setTimeout(run, ms);
-    return () => clearTimeout(timer);
-  },
-  every: (ms, run) => {
-    const timer = setInterval(run, ms);
-    return () => clearInterval(timer);
-  },
-};
 
 function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);

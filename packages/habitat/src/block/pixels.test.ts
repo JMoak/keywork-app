@@ -40,7 +40,7 @@ describe("whole pixels at rest", () => {
         }
       }
     }
-  });
+  }, 60_000);
 
   it("knows a camera between rest positions, or resting on a corner, is not at rest", () => {
     expect(atRest({ angle: quarterTurn * 0.5, eye: raisedEye })).toBe(false);

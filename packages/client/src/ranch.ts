@@ -15,6 +15,8 @@ import {
   type CreatureRemovalOutcome,
   type CreatureReport,
   type CreatureSummary,
+  type CreatureWorksite,
+  type CreatureWorksites,
   type DemoteOutcome,
   type ForgetSourceApplied,
   type ForgetSourcePreview,
@@ -74,6 +76,7 @@ export interface RanchClient {
     choice?: CreatureRemovalChoice,
   ): Promise<CreatureRemovalOutcome | ServedRefusal>;
   creatureHandoffs(): Promise<readonly CreatureHandoff[] | ServedRefusal>;
+  creatureWorksites(): Promise<readonly CreatureWorksite[] | ServedRefusal>;
   creatureLedger(slug: string): Promise<CreatureLedgerView | ServedRefusal>;
   markLedgerEntrySeen(slug: string, id: string): Promise<CreatureLedgerEntry | ServedRefusal>;
   openLedgerConversation(slug: string, id: string): Promise<CreatureLedgerEntry | ServedRefusal>;
@@ -179,6 +182,7 @@ export const ranchOperations = {
   resumeCreature: "resumeCreature",
   removeCreature: "removeCreature",
   creatureHandoffs: "listCreatureHandoffs",
+  creatureWorksites: "listCreatureWorksites",
   creatureLedger: "readCreatureLedger",
   markLedgerEntrySeen: "markCreatureLedgerEntrySeen",
   openLedgerConversation: "openLedgerConversation",
@@ -280,6 +284,11 @@ export function ranchRoutes(request: RanchRequest): RanchClient {
     },
     creatureHandoffs: async () =>
       picked(await request("GET", "/creature-handoffs"), (body: CreatureHandoffs) => body.handoffs),
+    creatureWorksites: async () =>
+      picked(
+        await request("GET", "/creature-worksites"),
+        (body: CreatureWorksites) => body.worksites,
+      ),
     creatureLedger: async (slug) => answered(await request("GET", creature(slug, "/ledger"))),
     markLedgerEntrySeen: async (slug, id) =>
       picked(await request("POST", ledgerEntry(slug, id, "/seen")), entryOf),

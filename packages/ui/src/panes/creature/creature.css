@@ -273,6 +273,7 @@
 
 .kw-ledger-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   min-width: 0;
   margin: 0;
@@ -373,6 +374,67 @@
 }
 .kw-ledger-row[data-conversation="open"] .kw-ledger-meta {
   color: var(--kw-text-mid);
+}
+
+.kw-ledger-answers,
+.kw-ledger-words-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5ch;
+  padding: 0 0.75rem 0.45rem 2.35rem;
+}
+.kw-ledger-row[data-cursor] .kw-ledger-answers,
+.kw-ledger-row[data-cursor] .kw-ledger-words-line {
+  background: var(--kw-panel);
+  box-shadow: inset 2px 0 0 var(--kw-accent);
+}
+.kw-ledger-answer {
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.kw-ledger-answer kbd {
+  font: inherit;
+  color: var(--kw-text-dim);
+}
+.kw-ledger-answer[data-tone="grant"] {
+  color: var(--kw-success);
+}
+.kw-ledger-answer[data-tone="deny"] {
+  color: var(--kw-error);
+}
+.kw-ledger-row:not([data-cursor]):not(:hover) .kw-ledger-answer:not([data-waiting]) {
+  color: var(--kw-text-mid);
+}
+.kw-ledger-reason-prompt {
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-faces {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  align-self: flex-end;
+  height: 0;
+  color: var(--kw-text-dim);
+  white-space: nowrap;
+}
+.kw-creature-faces-turn {
+  display: flex;
+  gap: 1.25ch;
+  padding: 0.3rem 0.75rem 0.2rem 1.5ch;
+  background: var(--kw-background);
+}
+.kw-creature-faces .kw-key-act[aria-pressed="true"] {
+  color: var(--kw-text);
+  cursor: default;
+}
+.kw-ledger-head,
+.kw-creature-head {
+  padding-top: 1.6rem;
 }
 
 .kw-ledger-quiet {

@@ -33,9 +33,9 @@ describe("one answer path for the card's chords and the desk's keys", () => {
 
   it("sends the choice the card would send: approve and once grant once, session remembers", async () => {
     const held = answering(asking(["c1"], [bunTest]));
-    expect(await answerHeldAsk(held, { sessionId: "s1" }, "approve")).toBeUndefined();
-    await answerHeldAsk(held, { sessionId: "s1", callId: "c1" }, "once");
-    await answerHeldAsk(held, { sessionId: "s1", callId: "c1" }, "session");
+    expect(await answerHeldAsk(held, { sessionId: "s1" }, "approve", "key")).toBeUndefined();
+    await answerHeldAsk(held, { sessionId: "s1", callId: "c1" }, "once", "key");
+    await answerHeldAsk(held, { sessionId: "s1", callId: "c1" }, "session", "key");
     expect(held.sent).toEqual([
       ["c1", "granted", undefined],
       ["c1", "granted", undefined],
@@ -45,20 +45,22 @@ describe("one answer path for the card's chords and the desk's keys", () => {
 
   it("asks why before a bare denial, then sends the reason and the words", async () => {
     const held = answering(asking(["c1"], [bunTest]));
-    expect(await answerHeldAsk(held, { sessionId: "s1" }, "deny")).toBeUndefined();
+    expect(await answerHeldAsk(held, { sessionId: "s1" }, "deny", "key")).toBeUndefined();
     expect(askingWhy("c1")).toBe(true);
     expect(held.sent).toEqual([]);
-    await answerHeldAsk(held, { sessionId: "s1" }, "deny", "other", "wrong branch");
+    await answerHeldAsk(held, { sessionId: "s1" }, "deny", "words", "other", "wrong branch");
     expect(held.sent).toEqual([["c1", "denied", undefined, "other", "wrong branch"]]);
     expect(askingWhy("c1")).toBe(false);
   });
 
   it("says why it sent nothing: no ask held, or an ask nothing could remember", async () => {
     const held = answering(asking(["c1"]));
-    expect(await answerHeldAsk(held, { sessionId: "s1", callId: "gone" }, "approve")).toBe(
+    expect(await answerHeldAsk(held, { sessionId: "s1", callId: "gone" }, "approve", "key")).toBe(
       nothingAsking,
     );
-    expect(await answerHeldAsk(held, { sessionId: "s1" }, "workspace")).toBe(onceOnlyNotice("y"));
+    expect(await answerHeldAsk(held, { sessionId: "s1" }, "workspace", "key")).toBe(
+      onceOnlyNotice("y"),
+    );
     expect(onceOnlyNotice("ctrl+y")).toBe(
       "this ask can only be answered once · ctrl+y approves it",
     );
@@ -70,15 +72,15 @@ describe("one answer path for the card's chords and the desk's keys", () => {
     const field = document.body.appendChild(document.createElement("textarea"));
     field.focus();
     const idle = answering(emptyProjection);
-    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve")).toBeUndefined();
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve", "key")).toBeUndefined();
     expect(commands).toEqual(["redo"]);
-    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "once")).toBe(nothingAsking);
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "once", "key")).toBe(nothingAsking);
     const waiting = answering(asking(["c1"]));
-    expect(await answerHeldAsk(waiting, { sessionId: "s1" }, "approve")).toBeUndefined();
+    expect(await answerHeldAsk(waiting, { sessionId: "s1" }, "approve", "key")).toBeUndefined();
     expect(waiting.sent).toEqual([["c1", "granted", undefined]]);
     expect(commands).toEqual(["redo"]);
     field.remove();
-    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve")).toBe(nothingAsking);
+    expect(await answerHeldAsk(idle, { sessionId: "s1" }, "approve", "key")).toBe(nothingAsking);
     expect(commands).toEqual(["redo"]);
   });
 
@@ -87,11 +89,11 @@ describe("one answer path for the card's chords and the desk's keys", () => {
       refused: "nothing-to-remember",
       detail: "keywork remembers nothing for this call",
     });
-    expect(await answerHeldAsk(refused, { sessionId: "s1" }, "session")).toBe(
+    expect(await answerHeldAsk(refused, { sessionId: "s1" }, "session", "key")).toBe(
       "keywork remembers nothing for this call",
     );
     const broken = answering(asking(["c1"]), new Error("the server went away"));
-    expect(await answerHeldAsk(broken, { sessionId: "s1" }, "deny", "not-now")).toBe(
+    expect(await answerHeldAsk(broken, { sessionId: "s1" }, "deny", "key", "not-now")).toBe(
       "the server went away",
     );
   });

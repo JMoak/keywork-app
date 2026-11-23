@@ -14,9 +14,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../app.tsx";
 import { quietMark } from "../chrome/title-row.tsx";
 import { browserHost } from "../host/browser.ts";
+import { answersNeverWait } from "../page/ask-card-guard-testing.ts";
 import { attireStorageKey, createAttire } from "../theme/attire.ts";
 import { createWardrobe } from "../theme/wardrobe.ts";
 import { fakeClient } from "./client-testing.ts";
+
+answersNeverWait();
 
 afterEach(() => {
   cleanup();

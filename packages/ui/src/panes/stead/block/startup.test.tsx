@@ -1,7 +1,7 @@
 import type {
   BusEnvelope,
   CreatureSummary,
-  SessionDetail,
+  CreatureWorksite,
   SessionRow,
 } from "@keywork-app/protocol";
 import { cleanup } from "@solidjs/testing-library";
@@ -9,7 +9,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { definitionOf } from "../../index.ts";
 import { mountPane, overviewShell } from "../../overview/testing.tsx";
 import type { ShellSeams } from "../../registry.ts";
-import { placeSettleMs } from "./places.ts";
 
 afterEach(() => {
   cleanup();
@@ -19,9 +18,9 @@ afterEach(() => {
 const steadPane = definitionOf("stead");
 
 describe("the stead at start-up", () => {
-  it("opens on the block world, stores each creature's address, and reads where its conversations ran", async () => {
+  it("opens on the block world, stores each creature's address and each building's spot, and reads where its creatures worked", async () => {
     quietCanvas();
-    const read: string[] = [];
+    let read = 0;
     const counted: string[] = [];
     const saved: unknown[] = [];
     const base = overviewShell({ summaries: rows }).shell;
@@ -37,9 +36,9 @@ describe("the stead at start-up", () => {
         ...base.client,
         creatures: async () => [creature("ada")],
         routines: async () => [],
-        session: async (id: string): Promise<SessionDetail> => {
-          read.push(id);
-          return detail(id);
+        creatureWorksites: async (): Promise<CreatureWorksite[]> => {
+          read += 1;
+          return [worksite];
         },
       } as unknown as ShellSeams["client"],
       host: {
@@ -59,8 +58,12 @@ describe("the stead at start-up", () => {
     const town = container.querySelector<HTMLElement>(".kw-stead-block");
     expect(town?.dataset.side).toBe("front");
     expect(town?.querySelector("canvas")).not.toBeNull();
-    expect(saved).toEqual([{ kind: "stead", courtOrder: ["ada"] }]);
-    expect(read).toEqual(["talk"]);
+    expect(saved.at(-1)).toEqual({
+      kind: "stead",
+      courtOrder: ["ada"],
+      lotOrder: { ada: ["c:/work/lamps"] },
+    });
+    expect(read).toBe(1);
     expect(counted).toEqual(["C:/work/lamps"]);
   });
 
@@ -82,7 +85,6 @@ describe("the stead at start-up", () => {
         ...base.client,
         creatures: async () => [creature("ada"), creature("bea")],
         routines: async () => [],
-        session: async (id: string) => detail(id),
         creatureHandoffs: async () => {
           reads += 1;
           return [{ from: "ada", to: "bea", count: 4, lastAt: at }];
@@ -129,19 +131,16 @@ const rows: SessionRow[] = [
   { id: "loose", title: "nobody's", createdAt: at, lastActivityAt: at, messageCount: 1 },
 ];
 
-function detail(id: string): SessionDetail {
-  return {
-    id,
-    title: id,
-    createdAt: at,
-    lastActivityAt: at,
-    messageCount: 2,
-    cwd: "C:/work/lamps",
-    live: false,
-    asOf: 0,
-    messages: [],
-  };
-}
+const worksite: CreatureWorksite = {
+  creature: "ada",
+  directory: "C:/work/lamps",
+  root: "C:/work/lamps",
+  project: null,
+  conversations: 1,
+  since: at,
+  latest: at,
+  active: false,
+};
 
 function creature(slug: string): CreatureSummary {
   return {
@@ -178,6 +177,6 @@ function quietCanvas(): void {
 }
 
 async function waitFor(done: () => boolean): Promise<void> {
-  const until = Date.now() + placeSettleMs * 10;
+  const until = Date.now() + 4000;
   while (!done() && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 20));
 }

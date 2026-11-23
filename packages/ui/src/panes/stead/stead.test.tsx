@@ -15,7 +15,8 @@ import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanionController } from "../../companion/floating.ts";
 import { keymapFromConfig } from "../../keys/index.ts";
-import { stopAskingWhy, whyLine } from "../../page/ask-card-why.ts";
+import { answersNeverWait } from "../../page/ask-card-guard-testing.ts";
+import { stopAskingWhy } from "../../page/ask-card-why.ts";
 import { type ChoreWaiting, choreAcceptedLine, type NeedsYouItem } from "../../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../../shell/needs-you-queue.ts";
 import { decidedItem } from "../../shell/needs-you-testing.ts";
@@ -24,7 +25,9 @@ import { morningTriage } from "../chores/testing.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { acceptHint, acceptsOnly, overturnHint, overturnsOnly } from "./copy.ts";
-import { answerHint, steadKeys, steadPane } from "./index.tsx";
+import { steadPane } from "./index.tsx";
+
+answersNeverWait();
 
 afterEach(() => {
   cleanup();
@@ -148,22 +151,79 @@ describe("the stead pane", () => {
     );
     expect(answers(container)).toEqual(["once y", "this session s", "this workspace w", "deny n"]);
     expect(stead.loaded).toEqual(["t1"]);
-    expect(lineText(container)).toBe(answerHint(steadKeys(keys), "enter"));
+    expect(onTheLine(container)).toEqual([...answers(container), "opens enter"]);
     expect(steadPane.title({ kind: "stead" }, stead.shell)).toBe("stead");
     act("stead.session");
     await settle();
     expect(stead.answered).toEqual([["c1", "granted", "session"]]);
     act("stead.deny");
     await settle();
-    expect(answers(container)).toEqual(["unsafe u", "not now n", "other o"]);
-    expect(lineText(container)).toBe(whyLine);
+    expect(answers(container)).toEqual(["unsafe u", "not now n", "other o", "back esc"]);
+    expect(onTheLine(container)).toEqual([...answers(container), "opens enter"]);
     fireEvent.keyDown(container.querySelector(".kw-stead") as Element, { key: "u" });
     await settle();
     expect(stead.answered.at(-1)).toEqual(["c1", "denied", undefined, "unsafe"]);
     fireEvent.click(bubble?.querySelector(".kw-stead-bubble-open") as Element);
     expect(stead.opened).toEqual(["t1"]);
   });
+
+  it("sends from a press on the porch line exactly what the key sends: each answer, and a denial with its reason", async () => {
+    const grants = [
+      ["once y", "stead.approve"],
+      ["this session s", "stead.session"],
+      ["this workspace w", "stead.workspace"],
+    ] as const;
+    for (const [label, action] of grants) {
+      const byKey = await askedAtThePorch();
+      byKey.act(action);
+      const byPress = await askedAtThePorch();
+      pressOnTheLine(byPress.container, label);
+      await settle();
+      expect(byPress.stead.answered).toEqual(byKey.stead.answered);
+      expect(byPress.stead.answered).toHaveLength(1);
+    }
+    const deniedByKey = await askedAtThePorch();
+    deniedByKey.act("stead.deny");
+    fireEvent.keyDown(deniedByKey.container.querySelector(".kw-stead") as Element, { key: "n" });
+    const deniedByPress = await askedAtThePorch();
+    pressOnTheLine(deniedByPress.container, "deny n");
+    pressOnTheLine(deniedByPress.container, "not now n");
+    await settle();
+    expect(deniedByPress.stead.answered).toEqual(deniedByKey.stead.answered);
+    expect(deniedByPress.stead.answered).toEqual([["c1", "denied", undefined, "not-now"]]);
+  });
 });
+
+async function askedAtThePorch() {
+  stopAskingWhy("c1");
+  const stead = steadHarness({
+    summaries: [row("t1", "fix the flaky trash test", "reviewer")],
+    projections: { t1: asking("c1", [bashRule("bun test *")]) },
+  });
+  const mounted = mount(stead);
+  stead.emit([
+    envelope(7, "t1", "gate.ask", {
+      ask: {
+        tool: "bash",
+        callId: "c1",
+        arguments: { command: "bun test src/shell/trash.test.ts" },
+        rule: "default",
+        rules: [bashRule("bun test *")],
+      },
+    }),
+  ]);
+  await settle();
+  return { ...mounted, stead };
+}
+
+function pressOnTheLine(container: HTMLElement, label: string): void {
+  const control = [...container.querySelectorAll(".kw-stead-line button")].find(
+    (button) => textOf(button) === label,
+  );
+  if (control === undefined) throw new Error(`nothing to press on the porch line: ${label}`);
+  fireEvent.pointerDown(control);
+  fireEvent.click(control, { detail: 1 });
+}
 
 type Answered =
   | [string, AskVerdict, AskScope | undefined]
@@ -353,9 +413,15 @@ function minutesAgo(minutes: number): string {
 }
 
 function answers(container: HTMLElement): string[] {
-  return [...container.querySelectorAll(".kw-stead-answer")].map(
-    (button) => button.textContent?.replace(/\s+/g, " ").trim() ?? "",
-  );
+  return [...container.querySelectorAll(".kw-stead-answer")].map(textOf);
+}
+
+function onTheLine(container: HTMLElement): string[] {
+  return [...container.querySelectorAll(".kw-stead-line button")].map(textOf);
+}
+
+function textOf(element: Element): string {
+  return element.textContent?.replace(/\s+/g, " ").trim() ?? "";
 }
 
 function lineText(container: HTMLElement): string | undefined {

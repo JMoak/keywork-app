@@ -1,18 +1,21 @@
 import type { ToolRun } from "@keywork-app/client";
 import type { DenyReason } from "@keywork-app/protocol";
-import { For, Show } from "solid-js";
+import { Show } from "solid-js";
+import { type AskChords, type AskPick, offeredAnswers, pickLabels } from "../page/ask-card.tsx";
 import {
-  type AskChords,
-  type AskPick,
-  answerLabel,
-  askOffers,
-  pickLabels,
-} from "../page/ask-card.tsx";
-import { askingWhy, reasonOffers, whyPrompt } from "../page/ask-card-why.ts";
+  AnswerKey,
+  type AnswerOffer,
+  AskAnswers,
+  waitWhenItAppears,
+} from "../page/ask-card-answers.tsx";
+import type { AnswerBy } from "../page/ask-card-guard.ts";
+import { askingWhy, stopAskingWhy } from "../page/ask-card-why.ts";
 import { NoteLine } from "../page/note-line.tsx";
 import type { NeedsYouBubble as Bubble, ChoreAccept, OverturnOffer } from "./port.ts";
 
-export type BubblePlacement = "companion" | "porch" | "desk";
+export type { AnswerOffer } from "../page/ask-card-answers.tsx";
+
+export type BubblePlacement = "companion" | "porch" | "line" | "desk" | "ledger" | "band";
 
 export const acceptLabel = "accept";
 
@@ -23,17 +26,16 @@ export const overturnChordDefault = "x";
 export const answerLabels = pickLabels;
 
 export interface NeedsYouBubbleProps {
-  placement?: Exclude<BubblePlacement, "desk"> | undefined;
+  placement?: Extract<BubblePlacement, "companion" | "porch"> | undefined;
   bubble: Bubble;
   keys: AskChords;
   run?: ToolRun | undefined;
   wording?: boolean | undefined;
-  style?: Readonly<Record<string, string>> | undefined;
   overturnChord?: string | undefined;
   onOpen(): void;
-  onAnswer(pick: AskPick): void;
-  onReason?(reason: DenyReason): void;
-  onAccept?(accept: ChoreAccept): void;
+  onAnswer(pick: AskPick, by: AnswerBy): void;
+  onReason?(reason: DenyReason, by: AnswerBy): void;
+  onAccept?(accept: ChoreAccept, by: AnswerBy): void;
   onOverturn?(overturn: OverturnOffer): void;
   onWords?(note: string): void;
 }
@@ -47,7 +49,6 @@ export function NeedsYouBubble(props: NeedsYouBubbleProps) {
       data-placement={placement()}
       data-hit={placement() === "companion" ? "" : undefined}
       aria-label="needs you"
-      style={props.style}
     >
       <button type="button" class={`${prefix()}-bubble-open`} onClick={() => props.onOpen()}>
         <span class={`${prefix()}-bubble-title`}>{props.bubble.title}</span>
@@ -60,13 +61,14 @@ export function NeedsYouBubble(props: NeedsYouBubbleProps) {
             placement={placement()}
             keys={props.keys}
             run={props.run}
+            callId={props.bubble.callId}
             answers={props.bubble.callId === undefined ? [] : props.bubble.answers}
             accept={props.bubble.accept}
             overturn={props.bubble.overturn}
             overturnChord={props.overturnChord}
-            onAnswer={(pick) => props.onAnswer(pick)}
-            onReason={(reason) => props.onReason?.(reason)}
-            onAccept={(accept) => props.onAccept?.(accept)}
+            onAnswer={(pick, by) => props.onAnswer(pick, by)}
+            onReason={(reason, by) => props.onReason?.(reason, by)}
+            onAccept={(accept, by) => props.onAccept?.(accept, by)}
             onOverturn={(overturn) => props.onOverturn?.(overturn)}
           />
         }
@@ -83,33 +85,23 @@ export interface NeedsYouAnswersProps {
   placement: BubblePlacement;
   keys: AskChords;
   run?: ToolRun | undefined;
+  callId?: string | undefined;
   answers?: readonly AskPick[] | undefined;
+  keyless?: boolean | undefined;
   accept?: ChoreAccept | undefined;
   overturn?: OverturnOffer | undefined;
   overturnChord?: string | undefined;
-  onAnswer(pick: AskPick): void;
-  onReason?(reason: DenyReason): void;
-  onAccept?(accept: ChoreAccept): void;
+  onAnswer(pick: AskPick, by: AnswerBy): void;
+  onReason?(reason: DenyReason, by: AnswerBy): void;
+  onAccept?(accept: ChoreAccept, by: AnswerBy): void;
   onOverturn?(overturn: OverturnOffer): void;
-}
-
-export interface AnswerOffer {
-  readonly pick: AskPick;
-  readonly label: string;
-  readonly tone: "grant" | "deny";
 }
 
 export function answerOffers(
   run: ToolRun | undefined,
   answers: readonly AskPick[] = [],
 ): AnswerOffer[] {
-  if (run !== undefined) {
-    return askOffers(run).map(({ pick, choice }) => ({
-      pick,
-      label: answerLabel(choice),
-      tone: choice.verdict === "denied" ? "deny" : "grant",
-    }));
-  }
+  if (run !== undefined) return offeredAnswers(run);
   return answers.map((pick) => ({
     pick,
     label: pickLabels[pick],
@@ -120,7 +112,16 @@ export function answerOffers(
 export function NeedsYouAnswers(props: NeedsYouAnswersProps) {
   const prefix = () => classPrefix[props.placement];
   const offers = () => answerOffers(props.run, props.answers);
-  const sayingWhy = () => props.run !== undefined && askingWhy(props.run.callId);
+  const callId = () => props.run?.callId ?? props.callId;
+  const sayingWhy = () => {
+    const asked = callId();
+    return asked !== undefined && askingWhy(asked);
+  };
+  const takeBack = (): void => {
+    const asked = callId();
+    if (asked !== undefined) stopAskingWhy(asked);
+  };
+  waitWhenItAppears(() => props.accept?.digest);
   return (
     <Show when={offers().length > 0 || props.accept !== undefined || props.overturn !== undefined}>
       <span class={`${prefix()}-answers`}>
@@ -131,7 +132,7 @@ export function NeedsYouAnswers(props: NeedsYouAnswersProps) {
               label={acceptLabel}
               chord={props.keys.approve}
               tone="grant"
-              onPress={() => props.onAccept?.(accept())}
+              onPress={(by) => props.onAccept?.(accept(), by)}
             />
           )}
         </Show>
@@ -142,39 +143,22 @@ export function NeedsYouAnswers(props: NeedsYouAnswersProps) {
               label={overturnLabel}
               chord={props.overturnChord ?? overturnChordDefault}
               tone="deny"
+              unguarded
               onPress={() => props.onOverturn?.(overturn())}
             />
           )}
         </Show>
-        <Show
-          when={sayingWhy()}
-          fallback={
-            <For each={offers()}>
-              {(offer) => (
-                <AnswerKey
-                  class={`${prefix()}-answer`}
-                  label={offer.label}
-                  chord={props.keys[offer.pick]}
-                  tone={offer.tone}
-                  onPress={() => props.onAnswer(offer.pick)}
-                />
-              )}
-            </For>
-          }
-        >
-          <span class={`${prefix()}-reason-prompt`}>{whyPrompt}</span>
-          <For each={reasonOffers}>
-            {(offer) => (
-              <AnswerKey
-                class={`${prefix()}-answer`}
-                label={offer.label}
-                chord={offer.key}
-                tone="deny"
-                onPress={() => props.onReason?.(offer.reason)}
-              />
-            )}
-          </For>
-        </Show>
+        <AskAnswers
+          callId={callId()}
+          offers={offers()}
+          keys={props.keys}
+          why={sayingWhy()}
+          part={prefix()}
+          keyless={props.keyless}
+          onAnswer={(pick, by) => props.onAnswer(pick, by)}
+          onReason={(reason, by) => props.onReason?.(reason, by)}
+          onBack={takeBack}
+        />
       </span>
     </Show>
   );
@@ -210,29 +194,8 @@ function badgeCount(props: BadgeProps): number | string {
 const classPrefix: Readonly<Record<BubblePlacement, string>> = {
   companion: "kw-companion",
   porch: "kw-stead",
+  line: "kw-stead-line",
   desk: "kw-desk",
+  ledger: "kw-ledger",
+  band: "kw-talk",
 };
-
-interface AnswerKeyProps {
-  class: string;
-  label: string;
-  chord: string;
-  tone: "grant" | "deny";
-  onPress(): void;
-}
-
-function AnswerKey(props: AnswerKeyProps) {
-  return (
-    <button
-      type="button"
-      class={props.class}
-      data-tone={props.tone}
-      onClick={(event) => {
-        event.stopPropagation();
-        props.onPress();
-      }}
-    >
-      {props.label} <kbd>{props.chord}</kbd>
-    </button>
-  );
-}

@@ -30,8 +30,8 @@ export function stillMotion(quarter: number, eye: number, corner = false): Camer
   return { quarter, corner, eye, turn: undefined, lift: undefined };
 }
 
-export function eyeFor(creatures: number): number {
-  return creatures >= streetFrom ? raisedEye : levelEye;
+export function eyeFor(creatures: number, buildings = 0): number {
+  return creatures >= streetFrom || buildings > 0 ? raisedEye : levelEye;
 }
 
 export function restAngle(motion: Pick<CameraMotion, "quarter" | "corner">): number {

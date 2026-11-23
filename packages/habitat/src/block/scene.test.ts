@@ -118,18 +118,37 @@ describe("the block world as a reading of the habitat", () => {
     expect(scene(withMill({ parcel: "elsewhere" }), noon).mill).toBeUndefined();
   });
 
-  it("gives each project a building at its stage on the lot behind its creature, four at most, named by its directory", () => {
+  it("gives each project a building at its stage on the lot behind its creature, named by its directory", () => {
     const sites = plotProjects(7, [1, 3, 10, 30, 100, 300, 300]);
     const big = sites.map((site, index) => (index === 1 ? { ...site, trackedFiles: 2001 } : site));
     const built = scene(sketchTown(2), noon, { [slugOf(0)]: big });
-    expect(built.raised.map((spec) => spec.stage)).toEqual(["shack", "house", "house", "tower"]);
+    expect(built.raised.map((spec) => spec.stage)).toEqual([
+      "shack",
+      "house",
+      "house",
+      "tower",
+      "high-rise",
+      "skyscraper",
+      "skyscraper",
+    ]);
     expect(built.raised.map((spec) => spec.name)).toEqual([
       "project-0",
       "project-1",
       "project-2",
       "project-3",
+      "project-4",
+      "project-5",
+      "project-6",
     ]);
-    expect(built.raised.map((spec) => spec.lit)).toEqual([true, false, true, false]);
+    expect(built.raised.map((spec) => spec.lit)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
     const lot = itemsIn(built.world, lotOf(workshopCell(0)));
     expect(lot.filter((item) => item.target?.kind === "shed").length).toBeGreaterThanOrEqual(4);
     expect(itemsIn(built.world, workshopCell(0)).some((item) => item.target?.kind === "shed")).toBe(

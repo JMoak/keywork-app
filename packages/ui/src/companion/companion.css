@@ -126,7 +126,16 @@
 .kw-companion-answers {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: calc(0.25rem * var(--kw-companion-scale));
+}
+
+.kw-companion-reason-prompt {
+  color: var(--kw-text-mid);
+}
+
+.kw-companion-words {
+  display: flex;
 }
 
 .kw-companion-answer,
@@ -139,6 +148,9 @@
   border: none;
   box-shadow: inset 0 0 0 1px var(--kw-border);
   cursor: pointer;
+}
+.kw-companion-answer[data-tone="grant"] {
+  color: var(--kw-success);
 }
 .kw-companion-answer[data-tone="deny"] {
   color: var(--kw-error);

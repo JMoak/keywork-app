@@ -197,7 +197,9 @@
 
 .kw-desk-answers {
   display: flex;
-  gap: 1.5ch;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 1.5ch;
   margin-left: auto;
 }
 .kw-desk-answer {
@@ -215,6 +217,9 @@
 }
 .kw-desk-answer[data-tone="deny"] {
   color: var(--kw-error);
+}
+.kw-desk-row:not([data-cursor]):not(:hover) .kw-desk-answer:not([data-waiting]) {
+  color: var(--kw-text-mid);
 }
 .kw-desk-reason-prompt {
   color: var(--kw-text-mid);

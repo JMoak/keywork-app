@@ -153,9 +153,13 @@ export interface NudgeStep {
   dy: -1 | 0 | 1;
 }
 
+export type AnswerReason = "unsafe" | "not-now" | "other";
+
 export interface AnswerRequest {
   callId: string;
   pick: AnswerPick;
+  reason?: AnswerReason | undefined;
+  note?: string | undefined;
   accept?: ChoreAccept | undefined;
   overturn?: OverturnOffer | undefined;
 }

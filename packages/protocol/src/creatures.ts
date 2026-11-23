@@ -33,6 +33,28 @@ export interface CreatureHandoffs {
   handoffs: CreatureHandoff[];
 }
 
+export interface CreatureWorksite {
+  creature: string;
+  directory: string;
+  root: string;
+  project: string | null;
+  conversations: number;
+  since: string;
+  latest: string;
+  active: boolean;
+}
+
+export type CreatureWorksiteChangeKind = "changed" | "dropped";
+
+export interface CreatureWorksiteChange {
+  change: CreatureWorksiteChangeKind;
+  worksite: CreatureWorksite;
+}
+
+export interface CreatureWorksites {
+  worksites: CreatureWorksite[];
+}
+
 export interface ExternalOrigin {
   kind: "external";
   client: string;
@@ -299,6 +321,7 @@ export const creatureRoutes = [
   { method: "POST", path: "/creatures/{slug}/resume", operationId: "resumeCreature" },
   { method: "DELETE", path: "/creatures/{slug}", operationId: "removeCreature" },
   { method: "GET", path: "/creature-handoffs", operationId: "listCreatureHandoffs" },
+  { method: "GET", path: "/creature-worksites", operationId: "listCreatureWorksites" },
   { method: "POST", path: "/creatures/{slug}/mcp", operationId: "serveCreatureMcp" },
   {
     method: "POST",

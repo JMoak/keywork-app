@@ -2,8 +2,32 @@
   color: var(--kw-text-mid);
 }
 
-.kw-ask-answer[data-tone="back"] {
+.kw-answer {
+  white-space: nowrap;
+  transition: color var(--kw-tempo-settle, 0s);
+}
+
+.kw-answer kbd {
+  transition: opacity var(--kw-tempo-settle, 0s);
+}
+
+.kw-answer[data-tone="back"] {
   color: var(--kw-text-mid);
+}
+
+.kw-answer.kw-answer[data-waiting] {
+  color: var(--kw-text-dim);
+  cursor: default;
+}
+
+.kw-answer kbd[data-waiting] {
+  opacity: 0.4;
+}
+
+@media (forced-colors: active) {
+  .kw-answer.kw-answer[data-waiting] {
+    color: GrayText;
+  }
 }
 
 .kw-ask-note {

@@ -1,4 +1,5 @@
 import { clockWord } from "../../chrome/clock-word.ts";
+import { KeyAct } from "../../chrome/key-act.tsx";
 import { useProductProfile } from "../../chrome/product.ts";
 import "../overview/overview.css";
 import "./stead.css";
@@ -37,8 +38,8 @@ import {
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { z } from "zod";
-import { NeedsYouBubble as Bubble } from "../../companion/bubble.tsx";
-import { creatureSnapshot, threadOfAsk } from "../../companion/feed.ts";
+import { NeedsYouBubble as Bubble, NeedsYouAnswers } from "../../companion/bubble.tsx";
+import { creatureSnapshot, defaultAnswers, threadOfAsk } from "../../companion/feed.ts";
 import type { ChoreAccept, NeedsYouBubble } from "../../companion/port.ts";
 import { bubbleShown } from "../../companion/snapshot.ts";
 import { CompanionSwitchRow } from "../../companion/switch.tsx";
@@ -48,7 +49,8 @@ import type { Rect } from "../../layout/index.ts";
 import { createOnboardingController } from "../../onboarding/controller.ts";
 import { OnboardingOnTheStead, onboardingActionId } from "../../onboarding/index.tsx";
 import { type AskChords, type AskPick, denialFor } from "../../page/ask-card.tsx";
-import { askingWhy, readWhyKeys, whyLine } from "../../page/ask-card-why.ts";
+import { type AnswerBy, admitsAnswer } from "../../page/ask-card-guard.ts";
+import { readWhyKeys } from "../../page/ask-card-why.ts";
 import { answerHeldAsk, askingRun, type HeldAsk } from "../../shell/answer-ask.ts";
 import { useKeyboardScope } from "../../shell/keyboard-claim.ts";
 import {
@@ -83,6 +85,7 @@ import {
   headLine,
   noAskHere,
   nothingDecidedHere,
+  opensWord,
   overturnHint,
   overturnsOnly,
   stateLabels,
@@ -105,6 +108,10 @@ const steadSpec = z.object({
     .max(4096)
     .optional()
     .describe("Keep each creature's plot where it was first raised as creatures leave and return."),
+  lotOrder: z
+    .record(z.string().min(1).max(128), z.array(z.string().min(1).max(1024)).max(4096))
+    .optional()
+    .describe("Keep each building on the spot of its lot where it was first raised."),
   kit: z
     .string()
     .min(1)
@@ -120,7 +127,9 @@ const steadSpec = z.object({
   eye: z
     .enum(["level", "raised"])
     .optional()
-    .describe("Where the keeper wants the eye to rest; unset, it rises once a street forms."),
+    .describe(
+      "Where the keeper wants the eye to rest; unset, it rises once a street forms or a lot holds a building.",
+    ),
   corners: z
     .boolean()
     .optional()
@@ -259,10 +268,6 @@ export function steadKeys(keys: KeyHints): AskChords {
     workspace: keys.chord("stead.workspace"),
     deny: keys.chord("stead.deny"),
   };
-}
-
-export function answerHint(keys: AskChords, open: string): string {
-  return `${keys.approve} once · ${keys.session} session · ${keys.workspace} workspace · ${keys.deny} deny · ${open} opens`;
 }
 
 export type Porch = ThreadAtThePorch | ChoreAtThePorch | DecidedAtThePorch;
@@ -419,7 +424,10 @@ function Stead(props: PaneProps<SteadSpec>) {
       if (held !== stored && held.length > 0) remember({ courtOrder: [...held] });
     }),
   );
-  const sites = createProjectSites(placeSeamsOf(props.shell), world);
+  const sites = createProjectSites(placeSeamsOf(props.shell), {
+    stored: () => preference().lotOrder,
+    keep: (lotOrder) => remember({ lotOrder }),
+  });
   const partnerships = createPartnerships(handoffSeamsOf(props.shell));
   const kit = createMemo((): Kit => kitNamed(preference().kit ?? "") ?? firstKit);
   const [controls, setControls] = createSignal<BlockWorldControls>();
@@ -442,20 +450,19 @@ function Stead(props: PaneProps<SteadSpec>) {
       ? undefined
       : { sessionId: standing.thread.id, callId: standing.callId };
   };
-  const sayingWhy = (): boolean => {
-    const callId = heldAsk()?.callId;
-    return callId !== undefined && askingWhy(callId);
-  };
   const wordingHere = (): boolean => wording() !== undefined && wording() === heldAsk()?.callId;
   const overturnKey = (): string => props.shell.keys.chord("stead.overturn");
   const footLine = (): string | undefined => {
     if (notice() !== undefined) return notice();
     if (porch()?.kind === "chore") return acceptHint(keys().approve);
-    if (porch()?.kind === "decided") {
-      return overturnHint(overturnKey(), props.shell.keys.chord("stead.open"));
-    }
-    if (heldAsk() === undefined || wordingHere()) return undefined;
-    return sayingWhy() ? whyLine : answerHint(keys(), props.shell.keys.chord("stead.open"));
+    return porch()?.kind === "decided"
+      ? overturnHint(overturnKey(), props.shell.keys.chord("stead.open"))
+      : undefined;
+  };
+  const askedOnTheLine = (): ThreadAtThePorch | undefined => {
+    const standing = porch();
+    const asking = notice() === undefined && heldAsk() !== undefined && !wordingHere();
+    return asking && standing?.kind === "thread" ? standing : undefined;
   };
 
   const setOut = (opening: Opening, place: SteadPlace): void => {
@@ -507,7 +514,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   const acceptGrants = (accept: ChoreAccept): void => {
     void acceptHeldChore(props.shell, accept).then((line) => setNotice(line));
   };
-  const answer = (pick: AskPick, reason?: DenyReason, note?: string): void => {
+  const answer = (pick: AskPick, by: AnswerBy, reason?: DenyReason, note?: string): void => {
     const standing = porch();
     if (standing?.kind === "decided") {
       setNotice(overturnsOnly(overturnKey()));
@@ -515,8 +522,9 @@ function Stead(props: PaneProps<SteadSpec>) {
     }
     if (standing?.kind === "chore") {
       const accept = standing.bubble.accept;
-      if (accept !== undefined && (pick === "approve" || pick === "once")) acceptGrants(accept);
-      else setNotice(acceptsOnly(keys().approve));
+      if (accept === undefined || (pick !== "approve" && pick !== "once"))
+        setNotice(acceptsOnly(keys().approve));
+      else if (admitsAnswer(by)) acceptGrants(accept);
       return;
     }
     const held = heldAsk();
@@ -525,23 +533,25 @@ function Stead(props: PaneProps<SteadSpec>) {
       return;
     }
     const answering = { store: props.shell.store, approveKey: keys().approve };
-    void answerHeldAsk(answering, held, pick, reason, note).then((line) => setNotice(line));
+    void answerHeldAsk(answering, held, pick, by, reason, note).then((line) => setNotice(line));
   };
-  const giveReason = (reason: DenyReason, words: boolean): void => {
-    if (words) setWording(heldAsk()?.callId);
-    else answer("deny", reason);
+  const giveReason = (reason: DenyReason, by: AnswerBy): void => {
+    if (reason !== "other") answer("deny", by, reason);
+    else if (admitsAnswer(by)) setWording(heldAsk()?.callId);
   };
   const sendWords = (note: string): void => {
     setWording(undefined);
     const denial = denialFor("other", note);
-    answer("deny", denial.reason, denial.note);
+    answer("deny", "words", denial.reason, denial.note);
     keyboard?.returnHome();
   };
   readWhyKeys(
     () => root,
     () => (props.focused && !wordingHere() ? heldAsk()?.callId : undefined),
-    giveReason,
+    (reason) => giveReason(reason, "key"),
   );
+  const nextStyle = (): void => remember({ kit: after(kits, kit()).id });
+  const nextLight = (): void => remember({ light: after(lights, preference().light) });
 
   const at = (slug: string | undefined): void => {
     if (slug === undefined || slug === "") return void setCursor(undefined);
@@ -557,7 +567,7 @@ function Stead(props: PaneProps<SteadSpec>) {
     if (onboarding.take(action)) return;
     if (action === steadAt) return at(argument);
     const asked = answerPicks[action];
-    if (asked !== undefined) return answer(asked);
+    if (asked !== undefined) return answer(asked, "key");
     switch (action) {
       case "stead.overturn":
         return overturn();
@@ -566,9 +576,9 @@ function Stead(props: PaneProps<SteadSpec>) {
       case "stead.turn-right":
         return controls()?.turn(1);
       case "stead.style":
-        return remember({ kit: after(kits, kit()).id });
+        return nextStyle();
       case "stead.light":
-        return remember({ light: after(lights, preference().light) });
+        return nextLight();
       case "stead.down":
         return step(1);
       case "stead.up":
@@ -638,6 +648,20 @@ function Stead(props: PaneProps<SteadSpec>) {
     >
       <div class="kw-ov-head">
         <span class="kw-ov-head-lead">{head()}</span>
+        <span class="kw-stead-looks" data-native-activation>
+          <KeyAct
+            label={kit().name}
+            chord={props.shell.keys.chord("stead.style")}
+            spoken={styleSpoken(kit().name)}
+            onPress={nextStyle}
+          />
+          <KeyAct
+            label={lightWords[preference().light ?? "theme"]}
+            chord={props.shell.keys.chord("stead.light")}
+            spoken={lightSpoken(preference().light)}
+            onPress={nextLight}
+          />
+        </span>
       </div>
       <CompanionSwitchRow
         switch={props.shell.companion?.toggle()}
@@ -657,6 +681,7 @@ function Stead(props: PaneProps<SteadSpec>) {
         projects={sites()}
         partnerships={partnerships()}
         board={props.shell.steadPlaces}
+        held={cursor()}
         onPick={pick}
         onHover={(hit) => setHovered(hit !== undefined)}
         onControls={setControls}
@@ -679,21 +704,25 @@ function Stead(props: PaneProps<SteadSpec>) {
         </Show>
         <Show when={porch()}>
           {(standing) => (
-            <Bubble
-              placement="porch"
-              bubble={porchBubble(standing())}
-              style={bubbleStyle(controls()?.onStage({ kind: "porch" }))}
-              run={bubbleRun()}
-              keys={keys()}
-              overturnChord={overturnKey()}
-              wording={wordingHere()}
-              onOpen={() => openPorch(standing())}
-              onAnswer={(pick) => answer(pick)}
-              onAccept={acceptGrants}
-              onOverturn={overturn}
-              onReason={(reason) => giveReason(reason, reason === "other")}
-              onWords={sendWords}
-            />
+            <div
+              class="kw-stead-bubble-seat"
+              style={seatAbove(controls()?.onStage({ kind: "porch" }))}
+            >
+              <Bubble
+                placement="porch"
+                bubble={porchBubble(standing())}
+                run={bubbleRun()}
+                keys={keys()}
+                overturnChord={overturnKey()}
+                wording={wordingHere()}
+                onOpen={() => openPorch(standing())}
+                onAnswer={answer}
+                onAccept={(_, by) => answer("approve", by)}
+                onOverturn={overturn}
+                onReason={giveReason}
+                onWords={sendWords}
+              />
+            </div>
           )}
         </Show>
         <Show when={cursor()}>
@@ -709,13 +738,9 @@ function Stead(props: PaneProps<SteadSpec>) {
         </Show>
       </BlockWorld>
       <TownControls
-        kit={kit()}
-        light={preference().light}
         eye={preference().eye}
         corners={preference().corners === true}
         side={controls()?.side() ?? "front"}
-        onKit={(chosen) => remember({ kit: chosen })}
-        onLight={(chosen) => remember({ light: chosen })}
         onEye={(chosen) => remember({ eye: chosen })}
         onCorners={(on) => remember({ corners: on })}
         onTurn={(steps) => controls()?.turn(steps)}
@@ -753,6 +778,26 @@ function Stead(props: PaneProps<SteadSpec>) {
         )}
       </Show>
       <Show when={footLine()}>{(line) => <p class="kw-ov-line">{line()}</p>}</Show>
+      <Show when={askedOnTheLine()}>
+        {(standing) => (
+          <p class="kw-ov-line kw-stead-line" data-native-activation>
+            <NeedsYouAnswers
+              placement="line"
+              run={bubbleRun()}
+              callId={heldAsk()?.callId}
+              answers={defaultAnswers}
+              keys={keys()}
+              onAnswer={answer}
+              onReason={giveReason}
+            />
+            <KeyAct
+              label={opensWord}
+              chord={props.shell.keys.chord("stead.open")}
+              onPress={() => openPorch(standing())}
+            />
+          </p>
+        )}
+      </Show>
     </section>
   );
 }
@@ -802,13 +847,9 @@ function PlaceBar(props: PlaceBarProps) {
 }
 
 interface TownControlsProps {
-  readonly kit: Kit;
-  readonly light: SteadSpec["light"];
   readonly eye: SteadSpec["eye"];
   readonly corners: boolean;
   readonly side: string;
-  onKit(id: string): void;
-  onLight(light: SteadSpec["light"]): void;
   onEye(eye: SteadSpec["eye"]): void;
   onCorners(on: boolean): void;
   onTurn(steps: number): void;
@@ -826,32 +867,6 @@ function TownControls(props: TownControlsProps) {
         </button>
       </fieldset>
       <span class="kw-stead-side">from the {props.side}</span>
-      <fieldset aria-label="building style">
-        <For each={kits}>
-          {(each) => (
-            <button
-              type="button"
-              aria-pressed={props.kit.id === each.id}
-              onClick={() => props.onKit(each.id)}
-            >
-              {each.name}
-            </button>
-          )}
-        </For>
-      </fieldset>
-      <fieldset aria-label="night or day">
-        <For each={lights.slice(1)}>
-          {(each) => (
-            <button
-              type="button"
-              aria-pressed={props.light === each}
-              onClick={() => props.onLight(props.light === each ? undefined : each)}
-            >
-              {lightWords[each ?? "clock"]}
-            </button>
-          )}
-        </For>
-      </fieldset>
       <fieldset aria-label="where the eye rests">
         <button
           type="button"
@@ -879,11 +894,20 @@ function TownControls(props: TownControlsProps) {
   );
 }
 
-const lightWords: Readonly<Record<NonNullable<SteadSpec["light"]>, string>> = {
-  night: "Night",
-  day: "Day",
-  clock: "By the clock",
+export const lightWords: Readonly<Record<NonNullable<SteadSpec["light"]> | "theme", string>> = {
+  theme: "as the app",
+  night: "by night",
+  day: "by day",
+  clock: "by the clock",
 };
+
+export function styleSpoken(style: string): string {
+  return `building style ${style}: press for the next`;
+}
+
+export function lightSpoken(light: SteadSpec["light"]): string {
+  return `the town drawn ${lightWords[light ?? "theme"]}: press for the next`;
+}
 
 function samePreferences(one: SteadSpec, other: SteadSpec): boolean {
   const keys = new Set([...Object.keys(one), ...Object.keys(other)]) as Set<keyof SteadSpec>;
@@ -1006,14 +1030,14 @@ function porchBubble(porch: Porch): NeedsYouBubble {
   };
 }
 
-function bubbleStyle(porch: Rect | undefined): Record<string, string> {
+function seatAbove(porch: Rect | undefined): Record<string, string> {
   if (porch === undefined) return { left: "8px", top: "8px", width: `${bubbleWidthPx}px` };
   const left = Math.max(0, porch.x + porch.width / 2 - bubbleWidthPx / 2);
   return {
     left: `${Math.round(left)}px`,
-    top: `${Math.max(0, porch.y - 4)}px`,
+    top: "0px",
+    height: `${Math.max(0, porch.y - 4)}px`,
     width: `${bubbleWidthPx}px`,
-    transform: "translateY(-100%)",
   };
 }
 

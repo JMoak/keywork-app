@@ -13,6 +13,7 @@ import {
 } from "../../instruments/context.ts";
 import { ContextGauge } from "../../instruments/gauge.tsx";
 import type { AskChords, AskPick } from "../../page/ask-card.tsx";
+import type { AnswerBy } from "../../page/ask-card-guard.ts";
 import { NoteLine } from "../../page/note-line.tsx";
 import { askingRun } from "../../shell/answer-ask.ts";
 import { glossOf, kindMarks, type NeedsYouItem } from "../../shell/needs-you.ts";
@@ -28,11 +29,12 @@ export interface DeskRowProps {
   row: DeskRow;
   shell: ShellSeams;
   cursor: boolean;
+  keyed: boolean;
   step: number;
   keys: AskChords;
   onPick(): void;
-  onAnswer(pick: AskPick): void;
-  onReason(reason: DenyReason): void;
+  onAnswer(pick: AskPick, by: AnswerBy): void;
+  onReason(reason: DenyReason, by: AnswerBy): void;
   wording: boolean;
   onWords(note: string): void;
 }
@@ -41,7 +43,7 @@ export function DeskRowView(props: DeskRowProps) {
   const facts = createMemo(() => sessionFacts(props.shell, localSession(props.row, props.shell)));
   const quiet = () => props.shell.quiet?.has(facts()?.id) === true;
   const tail = () => tailOf(props.row, facts());
-  const asking = () => (props.cursor ? askOnRow(props.row, props.shell) : undefined);
+  const asking = () => askOnRow(props.row, props.shell);
   return (
     <li
       class="kw-desk-row"
@@ -91,8 +93,9 @@ export function DeskRowView(props: DeskRowProps) {
                   placement="desk"
                   run={run()}
                   keys={props.keys}
-                  onAnswer={(pick) => props.onAnswer(pick)}
-                  onReason={(reason) => props.onReason(reason)}
+                  keyless={!props.keyed}
+                  onAnswer={(pick, by) => props.onAnswer(pick, by)}
+                  onReason={(reason, by) => props.onReason(reason, by)}
                 />
               )}
             </Show>

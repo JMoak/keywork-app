@@ -26,9 +26,8 @@ import {
 import {
   type CellAddress,
   doorSideOf,
-  landTowardsTheStreet,
   lotOf,
-  lotSpot,
+  lotPlace,
   lotSpots,
   monumentSpot,
   reserved,
@@ -55,6 +54,7 @@ import {
   type RampKey,
   type Side,
   sideAfter,
+  type Tall,
   type Target,
   turnedAbout,
   type Walker,
@@ -70,6 +70,10 @@ export interface ProjectSite {
   readonly trackedFiles?: number | undefined;
   readonly since?: number | undefined;
   readonly latest?: number | undefined;
+  readonly root?: string | undefined;
+  readonly family?: number | undefined;
+  readonly heardAt?: number | undefined;
+  readonly spot?: number | undefined;
 }
 
 export interface Partnership {
@@ -217,6 +221,11 @@ interface CellDraft {
   glow: readonly Glow[];
 }
 
+interface Raised {
+  readonly reach: number;
+  readonly ground: Footprint;
+}
+
 interface Placing {
   readonly at?: Point;
   readonly anchor?: Point;
@@ -237,6 +246,7 @@ class SceneBuilder {
   private readonly footprints = new Map<Slug, Footprint>();
   private readonly walkers: Walker[] = [];
   private readonly cast: CastMember[] = [];
+  private readonly raised: Raised[] = [];
   private porch: Plot | undefined;
   private reach = lowestReach;
 
@@ -376,25 +386,26 @@ class SceneBuilder {
         { ramp, anchor: { x: annex.x, z: annex.z } },
       );
     }
-    for (const land of landTowardsTheStreet(resident.cell)) this.cell(land);
     this.projects(resident, creature);
   }
 
   private projects(resident: Resident, creature: Creature): void {
-    const lot = lotOf(resident.cell);
-    this.cell(lot);
-    const sites = (this.input.projects?.[creature.slug] ?? []).slice(0, lotSpots.length);
-    sites.forEach((site, index) => {
-      const at = lotSpot(index, resident.door);
-      if (at === undefined) return;
+    this.cell(lotOf(resident.cell));
+    (this.input.projects?.[creature.slug] ?? []).forEach((site, index) => {
+      const spot = site.spot ?? index;
+      const { cell, at } = lotPlace(resident.cell, spot);
+      for (let nearer = 0; nearer < spot; nearer += lotSpots.length) {
+        this.cell(lotPlace(resident.cell, nearer).cell);
+      }
       const built = this.kit.project({
         stage: stageFor(site.conversations ?? 1, site.trackedFiles),
         seed: seedOf(creature, this.alphabetical),
         order: resident.order,
         lit: site.lit,
         name: lastPartOf(site.id),
+        family: site.family,
       });
-      this.place(lot, "project", resident.door === "pz" ? built : facingAway(built), {
+      this.place(cell, "project", resident.door === "pz" ? built : facingAway(built), {
         at,
         target: { kind: "shed", creature: creature.slug, project: site.id },
         ramp: identityRamp(resident.identity),
@@ -533,17 +544,24 @@ class SceneBuilder {
     });
     const xs = cells.map((cell) => cell.cx * cellPitch);
     const zs = cells.map((cell) => cell.cz * cellPitch);
+    const land: Footprint = {
+      x0: Math.min(...xs) - halfCell,
+      x1: Math.max(...xs) + halfCell,
+      z0: Math.min(...zs) - halfCell,
+      z1: Math.max(...zs) + halfCell,
+    };
     return {
       cells,
       walkers: this.walkers,
       cast: this.cast,
       bounds: {
-        minX: Math.min(...xs) - halfCell,
-        maxX: Math.max(...xs) + halfCell,
-        minZ: Math.min(...zs) - halfCell,
-        maxZ: Math.max(...zs) + halfCell,
+        minX: land.x0,
+        maxX: land.x1,
+        minZ: land.z0,
+        maxZ: land.z1,
         height: this.reach,
         slab: heroSlab,
+        skyline: skylineOf(land, [{ reach: lowestReach, ground: land }, ...this.raised]),
       },
     };
   }
@@ -617,6 +635,7 @@ class SceneBuilder {
       }));
     }
     this.reach = Math.max(this.reach, built.reach);
+    this.raised.push({ reach: built.reach, ground: groundUnder(built, dx, dz) });
   }
 
   private landmark(kind: Landmark["kind"]): Landmark | undefined {
@@ -648,6 +667,46 @@ function facingAway(built: Construction): Construction {
           })),
         }),
   };
+}
+
+function groundUnder(built: Construction, dx: number, dz: number): Footprint {
+  const stood = [...built.parts, ...(built.crown ?? []).map((crowning) => crowning.part)].map(
+    (part): Footprint =>
+      "box" in part
+        ? part.box
+        : { x0: part.sprite.x, x1: part.sprite.x, z0: part.sprite.z, z1: part.sprite.z },
+  );
+  const held = stood.length === 0 ? [{ x0: 0, x1: 0, z0: 0, z1: 0 }] : stood;
+  return {
+    x0: Math.min(...held.map((each) => each.x0)) + dx,
+    x1: Math.max(...held.map((each) => each.x1)) + dx,
+    z0: Math.min(...held.map((each) => each.z0)) + dz,
+    z1: Math.max(...held.map((each) => each.z1)) + dz,
+  };
+}
+
+function skylineOf(land: Footprint, raised: readonly Raised[]): Tall[] {
+  const middle = { x: (land.x0 + land.x1) / 2, z: (land.z0 + land.z1) / 2 };
+  const talls = raised.map(({ reach, ground }): Tall => {
+    const across = Math.max(Math.abs(ground.x0 - middle.x), Math.abs(ground.x1 - middle.x));
+    const deep = Math.max(Math.abs(ground.z0 - middle.z), Math.abs(ground.z1 - middle.z));
+    return { reach, fromASide: Math.max(across, deep), fromACorner: Math.hypot(across, deep) };
+  });
+  return talls.filter(
+    (tall, index) => !talls.some((other, at) => at !== index && overtops(other, tall, at < index)),
+  );
+}
+
+function overtops(other: Tall, tall: Tall, first: boolean): boolean {
+  const atLeast =
+    other.reach >= tall.reach &&
+    other.fromASide >= tall.fromASide &&
+    other.fromACorner >= tall.fromACorner;
+  const more =
+    other.reach > tall.reach ||
+    other.fromASide > tall.fromASide ||
+    other.fromACorner > tall.fromACorner;
+  return atLeast && (more || first);
 }
 
 function lastPartOf(directory: string): string {

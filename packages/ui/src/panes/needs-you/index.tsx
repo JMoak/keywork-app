@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTileFillStep } from "../../chrome/stamp.ts";
 import type { BindingSpec } from "../../keys/keymap.ts";
 import { type AskPick, denialFor } from "../../page/ask-card.tsx";
+import { type AnswerBy, admitsAnswer } from "../../page/ask-card-guard.ts";
 import { askingWhy, readWhyKeys, whyLine } from "../../page/ask-card-why.ts";
 import { answerHeldAsk, type HeldAsk } from "../../shell/answer-ask.ts";
 import { useKeyboardScope } from "../../shell/keyboard-claim.ts";
@@ -223,34 +224,34 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
     setNotice(next === undefined ? "nothing needs you" : undefined);
     if (next !== undefined) cursor.set(next);
   };
-  const answer = (pick: AskPick, reason?: DenyReason, note?: string): void => {
+  const answer = (pick: AskPick, by: AnswerBy, reason?: DenyReason, note?: string): void => {
     const held = heldAsk(current());
     if (held === undefined) {
       setNotice(`no ask on this row · ${keys().waiting} goes to the next waiting`);
       return;
     }
     const answering = { store: props.shell.store, approveKey: keys().approve };
-    void answerHeldAsk(answering, held, pick, reason, note).then((line) => setNotice(line));
+    void answerHeldAsk(answering, held, pick, by, reason, note).then((line) => setNotice(line));
   };
-  const giveReason = (reason: DenyReason, words: boolean): void => {
-    if (words) setWording(heldCallId());
-    else answer("deny", reason);
+  const giveReason = (reason: DenyReason, by: AnswerBy): void => {
+    if (reason !== "other") answer("deny", by, reason);
+    else if (admitsAnswer(by)) setWording(heldCallId());
   };
   const sendWords = (note: string): void => {
     setWording(undefined);
     const denial = denialFor("other", note);
-    answer("deny", denial.reason, denial.note);
+    answer("deny", "words", denial.reason, denial.note);
     keyboard?.returnHome();
   };
   readWhyKeys(
     () => root,
     () => (props.focused && !wordingHere() ? heldCallId() : undefined),
-    giveReason,
+    (reason) => giveReason(reason, "key"),
   );
 
   props.onAction((action) => {
     const pick = answerPicks[action];
-    if (pick !== undefined) return answer(pick);
+    if (pick !== undefined) return answer(pick, "key");
     switch (action) {
       case "needs-you.down":
         return move(1);
@@ -283,19 +284,20 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
                 group={group()}
                 shell={props.shell}
                 cursor={props.focused ? cursor.index() : undefined}
+                held={cursor.index()}
                 step={step()}
                 keys={keys()}
                 onPick={(index) => {
                   cursor.set(index);
                   go(rows()[index]);
                 }}
-                onAnswer={(index, pick) => {
+                onAnswer={(index, pick, by) => {
                   cursor.set(index);
-                  answer(pick);
+                  answer(pick, by);
                 }}
-                onReason={(index, reason) => {
+                onReason={(index, reason, by) => {
                   cursor.set(index);
-                  giveReason(reason, reason === "other");
+                  giveReason(reason, by);
                 }}
                 wording={wordingHere()}
                 onWords={sendWords}
@@ -313,11 +315,12 @@ interface DeskSectionProps {
   group: DeskGroup;
   shell: ShellSeams;
   cursor: number | undefined;
+  held: number;
   step: number;
   keys: DeskKeys;
   onPick(index: number): void;
-  onAnswer(index: number, pick: AskPick): void;
-  onReason(index: number, reason: DenyReason): void;
+  onAnswer(index: number, pick: AskPick, by: AnswerBy): void;
+  onReason(index: number, reason: DenyReason, by: AnswerBy): void;
   wording: boolean;
   onWords(note: string): void;
 }
@@ -333,11 +336,12 @@ function DeskSection(props: DeskSectionProps) {
               row={row()}
               shell={props.shell}
               cursor={props.cursor === props.group.first + at}
+              keyed={props.held === props.group.first + at}
               step={props.step}
               keys={props.keys}
               onPick={() => props.onPick(props.group.first + at)}
-              onAnswer={(pick) => props.onAnswer(props.group.first + at, pick)}
-              onReason={(reason) => props.onReason(props.group.first + at, reason)}
+              onAnswer={(pick, by) => props.onAnswer(props.group.first + at, pick, by)}
+              onReason={(reason, by) => props.onReason(props.group.first + at, reason, by)}
               wording={props.wording && props.cursor === props.group.first + at}
               onWords={(note) => props.onWords(note)}
             />

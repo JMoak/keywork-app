@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { answersNeverWait } from "../page/ask-card-guard-testing.ts";
+import { stopAskingWhy } from "../page/ask-card-why.ts";
 import { CompanionPage, type PageHost } from "./companion-page.tsx";
 import type { CompanionConditions, CompanionPort, CompanionSnapshot } from "./port.ts";
 import { restingConditions } from "./port.ts";
@@ -143,7 +145,12 @@ function mount() {
   return { port, host, view, calls: (name: string) => port.calls.filter(([n]) => n === name) };
 }
 
-afterEach(cleanup);
+answersNeverWait();
+
+afterEach(() => {
+  cleanup();
+  stopAskingWhy("c1");
+});
 
 describe("the companion page", () => {
   it("shows the needs-you bubble with its answer keys; an answer never opens the thread, the title does", () => {
@@ -152,7 +159,9 @@ describe("the companion page", () => {
     expect(view.getByText("rename the ledger")).toBeTruthy();
     expect(view.getByText("asks to run a command")).toBeTruthy();
     fireEvent.click(view.getByText("deny"));
-    expect(calls("answer")).toEqual([["answer", { callId: "c1", pick: "deny" }]]);
+    expect(calls("answer")).toEqual([]);
+    fireEvent.click(view.getByText("unsafe"));
+    expect(calls("answer")).toEqual([["answer", { callId: "c1", pick: "deny", reason: "unsafe" }]]);
     expect(calls("open")).toEqual([]);
     fireEvent.click(view.getByText("rename the ledger"));
     expect(calls("open")).toEqual([["open", "t1"]]);

@@ -42,28 +42,54 @@ export const stillWidth = 1008;
 export const stillHeight = 580;
 const accepting = process.env.BLOCK_SHOTS === "update";
 const counts = [1, 2, 5, 9, 16] as const;
+// Eighty whole towns are drawn in one case: under two seconds on a desk machine, over five on a runner.
+const bulkStillsMs = 60_000;
 const appearances: readonly Appearance[] = ["night", "day"];
+const lotOfNine = [1, 3, 10, 30, 100, 300, 3, 1, 10];
 
 describe("block world stills", () => {
-  for (const kit of kits) {
-    for (const appearance of appearances) {
-      it(`${kit.id} by ${appearance}: 1, 2, 5, 9 and 16 creatures from every side, level and raised`, () => {
-        const findings: string[] = [];
-        for (const count of counts) {
+  it(
+    "a lot of nine buildings from every side, in every kit by night and by day",
+    () => {
+      const findings: string[] = [];
+      for (const kit of kits) {
+        for (const appearance of appearances) {
           for (const [quarter, side] of sideNames.entries()) {
-            for (const [eye, named] of [
-              [levelEye, "level"],
-              [raisedEye, "raised"],
-            ] as const) {
-              const raster = still(kit, appearance, count, restCamera(quarter, eye), eye);
-              findings.push(
-                ...compare(`${kit.id}-${count}-${side}-${named}-${appearance}.png`, raster),
-              );
-            }
+            const raster = still(kit, appearance, 2, restCamera(quarter, raisedEye), raisedEye, {
+              [slugOf(0)]: plotProjects(9, lotOfNine),
+            });
+            findings.push(...compare(`${kit.id}-lot-of-nine-${side}-${appearance}.png`, raster));
           }
         }
-        expect(findings).toEqual([]);
-      });
+      }
+      expect(findings).toEqual([]);
+    },
+    bulkStillsMs,
+  );
+
+  for (const kit of kits) {
+    for (const appearance of appearances) {
+      it(
+        `${kit.id} by ${appearance}: 1, 2, 5, 9 and 16 creatures from every side, level and raised`,
+        () => {
+          const findings: string[] = [];
+          for (const count of counts) {
+            for (const [quarter, side] of sideNames.entries()) {
+              for (const [eye, named] of [
+                [levelEye, "level"],
+                [raisedEye, "raised"],
+              ] as const) {
+                const raster = still(kit, appearance, count, restCamera(quarter, eye), eye);
+                findings.push(
+                  ...compare(`${kit.id}-${count}-${side}-${named}-${appearance}.png`, raster),
+                );
+              }
+            }
+          }
+          expect(findings).toEqual([]);
+        },
+        bulkStillsMs,
+      );
 
       it(`${kit.id} by ${appearance}: mid-turn, on a corner, and a plot that grows towers`, () => {
         const turning = still(

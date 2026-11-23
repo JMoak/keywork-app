@@ -20,10 +20,13 @@ import {
   rememberableRules,
   untrustedAskReason,
 } from "./ask-card.tsx";
+import { answersNeverWait } from "./ask-card-guard-testing.ts";
 import { stopAskingWhy } from "./ask-card-why.ts";
 import { ConversationPane } from "./pane.tsx";
 
 const askedCallIds = ["g1", "g3", "g4", "g5"];
+
+answersNeverWait();
 
 afterEach(() => {
   cleanup();

@@ -124,7 +124,7 @@ import { yardToggleActionId } from "../yard/actions.ts";
 import type { PanelWay } from "../yard/entering.ts";
 import { createYardSurface, Yard } from "../yard/index.ts";
 import { panelIdAt } from "../yard/panels.ts";
-import { answerHeldAsk, askingRun } from "./answer-ask.ts";
+import { answerHeldAsk, askInReach } from "./answer-ask.ts";
 import { conversationHub, hubColumn, hubTabsHeight, tabbedOut } from "./conversation-hub.ts";
 import { createDraftLedger } from "./drafts.ts";
 import {
@@ -650,12 +650,12 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
   };
   const askWaitsInReach = (): boolean => {
     const holder = askHolder();
-    return askingRun(holder.store.projection(holder.sessionId)) !== undefined;
+    return askInReach(holder.store, { sessionId: holder.sessionId }) !== undefined;
   };
   const answerFocusedAsk = (pick: AskPick): void => {
     const holder = askHolder();
     const answering = { store: holder.store, approveKey: shell.keys.chord("ask.approve") };
-    void answerHeldAsk(answering, { sessionId: holder.sessionId }, pick).then((line) => {
+    void answerHeldAsk(answering, { sessionId: holder.sessionId }, pick, "key").then((line) => {
       if (line !== undefined) say(line);
     });
   };

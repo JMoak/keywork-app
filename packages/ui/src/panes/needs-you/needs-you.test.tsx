@@ -12,6 +12,7 @@ import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { keymapFromConfig } from "../../keys/index.ts";
+import { answersNeverWait } from "../../page/ask-card-guard-testing.ts";
 import { stopAskingWhy, whyLine } from "../../page/ask-card-why.ts";
 import { type NeedsYouItem, orderNeedsYou } from "../../shell/needs-you.ts";
 import type { NeedsYouQueue } from "../../shell/needs-you-queue.ts";
@@ -22,6 +23,8 @@ import { keyworkNight, themeNamed } from "../../theme/index.ts";
 import { mountPane, overviewShell } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { needsYouPane } from "./index.tsx";
+
+answersNeverWait();
 
 afterEach(() => {
   cleanup();
@@ -72,7 +75,7 @@ describe("the desk", () => {
     act("needs-you.deny");
     await settle();
     expect(desk.answered).toHaveLength(1);
-    expect(answers(container)).toEqual(["unsafe u", "not now n", "other o"]);
+    expect(answers(container)).toEqual(["unsafe u", "not now n", "other o", "back esc"]);
     expect(lineText(container)).toBe(whyLine);
     fireEvent.keyDown(container.querySelector(".kw-desk-row") as Element, { key: "u" });
     await settle();
@@ -128,18 +131,23 @@ describe("the desk", () => {
     expect(lineText(container)).toBe("keywork remembers nothing for this call");
   });
 
-  it("offers the answers only on the asking row under the cursor", () => {
+  it("offers the answers on every asking row and teaches the keys only on the row under the cursor", () => {
     const desk = deskHarness({
       waiting: [askItem("c1", { sessionId: "a" }), askItem("c2", { sessionId: "b" })],
       summaries: [summary("a", "first"), summary("b", "second")],
       projections: { a: asking("c1", []), b: asking("c2", []) },
     });
     const { container, act } = mount(desk);
-    expect(container.querySelectorAll(".kw-desk-answers")).toHaveLength(1);
+    expect(answersByRow(container)).toEqual([
+      ["once y", "deny n"],
+      ["once", "deny"],
+    ]);
     act("needs-you.down");
-    const cursor = container.querySelector(".kw-desk-row[data-cursor]");
-    expect(cursor?.querySelector(".kw-desk-name")?.textContent).toBe("second");
-    expect(cursor?.querySelector(".kw-desk-answers")).not.toBeNull();
+    expect(cursorName(container)).toBe("second");
+    expect(answersByRow(container)).toEqual([
+      ["once", "deny"],
+      ["once y", "deny n"],
+    ]);
   });
 
   it("moves with j and k, tabs to the next waiting row, and jumps or visits with enter", () => {
@@ -349,6 +357,12 @@ function rowLines(container: HTMLElement): string[][] {
 function answers(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".kw-desk-answer")].map(
     (answer) => answer.textContent ?? "",
+  );
+}
+
+function answersByRow(container: HTMLElement): string[][] {
+  return [...container.querySelectorAll(".kw-desk-row")].map((row) =>
+    [...row.querySelectorAll(".kw-desk-answer")].map((answer) => answer.textContent ?? ""),
   );
 }
 

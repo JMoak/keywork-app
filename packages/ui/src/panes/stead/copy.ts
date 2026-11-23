@@ -155,6 +155,7 @@ export function ageWord(ms: number): string {
 
 export const noThreadYet = (name: string): string => `${name} has no thread yet`;
 export const noAskHere = "nothing is asking on the porch";
+export const opensWord = "opens";
 export const acceptHint = (approve: string): string =>
   `${approve} accepts its grants · the bubble opens the chores pane`;
 export const acceptsOnly = (approve: string): string =>

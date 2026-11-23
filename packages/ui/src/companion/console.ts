@@ -140,7 +140,7 @@ export function followCompanion(seams: CompanionConsoleSeams): void {
   });
 
   onCleanup(
-    seams.host.onAnswerRequested(({ callId, pick, accept, overturn }) => {
+    seams.host.onAnswerRequested(({ callId, pick, reason, note, accept, overturn }) => {
       const said = (line: string | undefined): void => {
         if (line !== undefined) seams.say(line);
       };
@@ -154,7 +154,7 @@ export function followCompanion(seams: CompanionConsoleSeams): void {
       }
       const held = { sessionId: threadOfAsk(world(), callId), callId };
       const answering = { store: seams.store, approveKey: seams.approveKey() };
-      void answerHeldAsk(answering, held, pick).then(said);
+      void answerHeldAsk(answering, held, pick, "relayed", reason, note).then(said);
     }),
   );
   onCleanup(

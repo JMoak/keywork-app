@@ -69,23 +69,32 @@ export function changesBetween(before: BlockWorld, after: BlockWorld): TownChang
   return changes.sort((a, b) => rank[a.kind] - rank[b.kind]);
 }
 
+export function reframed(before: BlockWorld, after: BlockWorld): boolean {
+  return JSON.stringify(before.bounds) !== JSON.stringify(after.bounds);
+}
+
 export function ringFor(
   change: TownChange,
   x: number,
   y: number,
   artWidth: number,
   artHeight: number,
+  townReframed = false,
 ): Ring {
-  return change.kind === "creature"
-    ? {
-        x,
-        y,
-        from: wholePlace.from,
-        to: Math.max(artWidth, artHeight) * wholePlace.reach,
-        local: false,
-        delayMs: wholePlace.delayMs,
-        ms: wholePlace.ms,
-      }
+  const across = Math.max(artWidth, artHeight) * wholePlace.reach;
+  if (change.kind === "creature") {
+    return {
+      x,
+      y,
+      from: wholePlace.from,
+      to: across,
+      local: false,
+      delayMs: wholePlace.delayMs,
+      ms: wholePlace.ms,
+    };
+  }
+  return townReframed
+    ? { x, y, from: nearby.from, to: across, local: false, delayMs: 0, ms: wholePlace.ms }
     : { x, y, from: nearby.from, to: nearby.to, local: true, delayMs: 0, ms: nearby.ms };
 }
 

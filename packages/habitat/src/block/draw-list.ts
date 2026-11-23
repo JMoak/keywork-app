@@ -22,6 +22,7 @@ import {
   sideOnGrid,
   type Target,
   type Walker,
+  type WorldBounds,
 } from "./model.ts";
 import { seenThrough } from "./seen-through.ts";
 
@@ -51,11 +52,13 @@ export interface View {
   readonly height: number;
   readonly depth: number;
   readonly slab: number;
+  readonly corners?: boolean | undefined;
 }
 
 export interface Framing {
   readonly tight?: number | undefined;
   readonly slab?: number | undefined;
+  readonly corners?: boolean | undefined;
 }
 
 export interface Pivot {
@@ -89,26 +92,35 @@ export function viewOf(
   eye: number,
   framing: Framing = {},
 ): View {
-  const { minX, maxX, minZ, maxZ, height, slab } = world.bounds;
+  const { minX, maxX, minZ, maxZ, slab } = world.bounds;
   const across = maxX - minX;
   const deep = maxZ - minZ;
   const tight = framing.tight;
   const wide = tight === undefined ? Math.max(across, deep) : tight % 2 === 0 ? across : deep;
   const depth = tight === undefined ? Math.max(across, deep) : tight % 2 === 0 ? deep : across;
   const floor = framing.slab ?? slab;
+  const corners = framing.corners === true;
+  const tall = riseOf(world.bounds, depth, eye, corners) + floor + (depth / 2) * eye;
   const scale = Math.max(
     1,
-    Math.floor(
-      Math.min(deviceWidth / (wide + 12), deviceHeight / (height + floor + depth * eye + 10)),
-    ),
+    Math.floor(Math.min(deviceWidth / (wide + 12), deviceHeight / (tall + 10))),
   );
-  return { scale, width: deviceWidth, height: deviceHeight, depth, slab: floor };
+  return { scale, width: deviceWidth, height: deviceHeight, depth, slab: floor, corners };
+}
+
+export function riseOf(bounds: WorldBounds, depth: number, eye: number, corners = false): number {
+  const boxed = bounds.height + (depth / 2) * eye;
+  if (bounds.skyline === undefined) return boxed;
+  const seen = bounds.skyline.map(
+    (tall) => tall.reach + (corners ? tall.fromACorner : tall.fromASide) * eye,
+  );
+  return Math.min(boxed, Math.max(...seen));
 }
 
 export function pivotOf(world: BlockWorld, camera: Camera, view: View): Pivot {
   const { c, s, k } = axesOf(camera);
   const rest = (c === 0 || s === 0) && (k === 0 || k === 0.5);
-  const top = -world.bounds.height - (view.depth / 2) * k;
+  const top = -riseOf(world.bounds, view.depth, k, view.corners);
   const bottom = view.slab + (view.depth / 2) * k;
   const x = view.width / view.scale / 2;
   const y = view.height / view.scale / 2 - (top + bottom) / 2;

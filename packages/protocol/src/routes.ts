@@ -22,7 +22,7 @@ import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.12.0";
 
-export const contractVersion = "1.38";
+export const contractVersion = "1.39";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);

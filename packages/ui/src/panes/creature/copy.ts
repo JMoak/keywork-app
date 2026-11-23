@@ -333,6 +333,10 @@ export const classOfChoice: Readonly<Record<string, ModelClass>> = {
   v: "vision",
 };
 
+export const faceWords = { ledger: "ledger", profile: "profile" } as const;
+
+export const faceSpoken = { ledger: "its ledger", profile: "its profile" } as const;
+
 export type LedgerSign = "asks" | "asked" | "running" | "back" | "done" | "blocked";
 
 export const signGlyphs: Readonly<Record<LedgerSign, string>> = {

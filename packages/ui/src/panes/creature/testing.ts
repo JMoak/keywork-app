@@ -465,6 +465,7 @@ export function creatureHarness(staging: CreatureStaging = {}): CreatureHarness 
       state: { ...base.store.state, summaries: rows },
       summary: (id: string | undefined) => rows.find((held) => held.id === id),
       children: (parent: string) => (parent === "t1" ? [wrenChild] : []),
+      open: async () => undefined,
       memory: { state: { inbox: { count: staging.inbox ?? 1 } } },
       surfaces: {
         state: { bots, ordinals: {} },

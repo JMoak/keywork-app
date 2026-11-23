@@ -10,6 +10,7 @@ import {
 import { type Part, type Side, sides } from "../../model.ts";
 import { type Brush, mixedRole, type Role } from "../../texture.ts";
 import { capTop, cornice, finial, setbackPaint, sunburst } from "./deco.ts";
+import { familyFlag } from "./flag.ts";
 import { antenna } from "./props.ts";
 import {
   anchored,
@@ -100,6 +101,7 @@ export function project(style: SketchStyle, spec: ProjectSpec): Construction {
   });
   const [lastWidth = 0, lastDepth = 0] = plan.tiers[plan.tiers.length - 1] ?? [];
   const last = { width: lastWidth, depth: lastDepth };
+  crown.push(...flagOn(style, spec, last, y));
   if (style.piers) y = stepCrown(parts, crown, y, last, stage, spec);
   else y = plainCrown(parts, crown, y, last, plan, style, spec, stage);
   const [groundWidth = 0, groundDepth = 0, groundFloors = 1] = plan.tiers[0] ?? [];
@@ -119,6 +121,15 @@ export function project(style: SketchStyle, spec: ProjectSpec): Construction {
     ...(sign === undefined ? {} : { annexes: [sign] }),
     reach: y + (plan.spire ? 24 : style.piers ? 18 : 14),
   };
+}
+
+export const flagInset = 1;
+
+function flagOn(style: SketchStyle, spec: ProjectSpec, roof: Top, y: number): Crowning[] {
+  if (spec.family === undefined) return [];
+  const x = -roof.width / 2 + flagInset;
+  const z = roof.depth / 2 - flagInset;
+  return [familyFlag(style, spec.family, x, y, z)];
 }
 
 interface Level {
@@ -372,7 +383,10 @@ function shack(style: SketchStyle, spec: ProjectSpec): Construction {
           top: capTop(10, 10),
         }),
       ],
-      crown: sunburst(0, 3, 8, 3, "x", spec.lit),
+      crown: [
+        ...sunburst(0, 3, 8, 3, "x", spec.lit),
+        ...flagOn(style, spec, { width: 10, depth: 10 }, 8),
+      ],
       annexes: [lantern],
       reach: 14,
     };
@@ -406,6 +420,7 @@ function shack(style: SketchStyle, spec: ProjectSpec): Construction {
       }),
       box(-4, 4, 7, 9, -4, 0, { sides: sameSides(roofSide, "shack-roof"), top: filled("slateDk") }),
     ],
+    crown: flagOn(style, spec, { width: 8, depth: 8 }, 7),
     annexes: [lantern],
     reach: 14,
   };

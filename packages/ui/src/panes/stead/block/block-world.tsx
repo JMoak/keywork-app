@@ -20,11 +20,14 @@ import {
   type Picture,
   type PlaceRects,
   type ProjectSite,
+  pathKey,
   placeOfTarget,
   placeRectsOf,
   projectorOf,
   type Quad,
+  type Resident,
   rectOfPlace,
+  reframed,
   resolveBlockPalette,
   restCamera,
   ringFor,
@@ -40,7 +43,16 @@ import {
 } from "@keywork-app/habitat/block";
 import type { SteadPlace } from "@keywork-app/protocol";
 import "./block.css";
-import { createEffect, createMemo, createSignal, type JSX, on, onCleanup, onMount } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  type JSX,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import type { Rect } from "../../../layout/index.ts";
 import { inWindowOf, nothing } from "../../../surfaces/runtime/realm.ts";
 import { browserFieldHost, type FieldPicture, steadField } from "../field.ts";
@@ -69,6 +81,7 @@ import {
   turned,
 } from "./motion.ts";
 import { paintPicture, textureCache } from "./paint.ts";
+import { SiteCard } from "./site-card.tsx";
 import { herdOnTheStead, type Stances } from "./stances.ts";
 import {
   type Arrival,
@@ -93,6 +106,7 @@ export interface BlockWorldProps {
   readonly projects?: Readonly<Record<string, readonly ProjectSite[]>> | undefined;
   readonly partnerships?: readonly Partnership[] | undefined;
   readonly board?: SteadPlaceBoard | undefined;
+  readonly held?: SteadPlace | undefined;
   readonly label?: string | undefined;
   readonly children?: JSX.Element;
   readonly onPick?: ((hit: Hit) => void) | undefined;
@@ -174,9 +188,26 @@ export function placeOnStage(
   };
 }
 
+export function siteAt(
+  projects: BlockWorldProps["projects"],
+  place: SteadPlace | undefined,
+): ProjectSite | undefined {
+  if (place?.kind !== "project") return undefined;
+  const directory = pathKey(place.directory);
+  return projects?.[place.creature]?.find((site) => pathKey(site.id) === directory);
+}
+
 interface Layout {
   readonly rects: PlaceRects;
   readonly cssPerArt: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+interface Carded {
+  readonly site: ProjectSite;
+  readonly building: Rect;
+  readonly held: boolean;
 }
 
 export function BlockWorld(props: BlockWorldProps) {
@@ -196,9 +227,10 @@ export function BlockWorld(props: BlockWorldProps) {
   const [stances, setStances] = createSignal<Stances>({});
   const [side, setSide] = createSignal("front");
   const [layout, setLayout] = createSignal<Layout>(
-    { rects: new Map(), cssPerArt: 1 },
+    { rects: new Map(), cssPerArt: 1, width: 1, height: 1 },
     { equals: sameLayout },
   );
+  const [pointedAt, setPointedAt] = createSignal<SteadPlace>();
   const scene = createMemo<BlockScene>(() =>
     blockScene(without(props.world, withheld()), {
       kit: props.kit,
@@ -211,7 +243,8 @@ export function BlockWorld(props: BlockWorldProps) {
       stances: stances(),
     }),
   );
-  const eyeWanted = (): number => props.eye ?? eyeFor(scene().residents.length);
+  const eyeWanted = (): number =>
+    props.eye ?? eyeFor(scene().residents.length, buildingsOf(scene().residents, props.projects));
   let motion: CameraMotion = stillMotion(0, eyeWanted(), props.corners === true);
   let palette: BlockPalette | undefined;
   let shown: { picture: Picture; theme: string } | undefined;
@@ -258,7 +291,7 @@ export function BlockWorld(props: BlockWorldProps) {
     if (stage !== undefined) {
       size = deviceSizeOf(stage.clientWidth, stage.clientHeight, devicePixelRatioOf(stage));
     }
-    const view = viewOf(world, size.width, size.height, motion.eye);
+    const view = viewOf(world, size.width, size.height, motion.eye, { corners: motion.corner });
     const camera = cameraAt(motion, now);
     if (arrival !== undefined && arrived(arrival, now)) {
       arrival = undefined;
@@ -294,20 +327,26 @@ export function BlockWorld(props: BlockWorldProps) {
     if (change === undefined) return undefined;
     const before = snapshotOf(canvas);
     if (before === undefined) return undefined;
-    const [x, y] = projectorOf(world, camera, view)(change.at.x, 0, change.at.z);
-    const ring = ringFor(change, x, y, view.width / view.scale, view.height / view.scale);
+    const settledEye = { angle: camera.angle, eye: motion.eye };
+    const [x, y] = projectorOf(world, settledEye, view)(change.at.x, 0, change.at.z);
+    const ring = ringFor(
+      change,
+      x,
+      y,
+      view.width / view.scale,
+      view.height / view.scale,
+      reframed(painted, world) || !sameView(shown?.picture.list.view, view),
+    );
     return arrivalOf(change, ring, now, before);
   };
 
   const fresh = (change: TownChange, now: number): boolean => {
-    const since =
+    const heard =
       change.kind === "creature"
         ? Date.parse(props.world.creatures[change.creature]?.workshop.raisedAt ?? "")
-        : siteOf(change)?.[change.kind === "project" ? "since" : "latest"];
-    return since !== undefined && now - since < freshMs;
+        : props.projects?.[change.creature]?.find((site) => site.id === change.project)?.heardAt;
+    return heard !== undefined && now - heard < freshMs;
   };
-  const siteOf = (change: Exclude<TownChange, { kind: "creature" }>): ProjectSite | undefined =>
-    props.projects?.[change.creature]?.find((site) => site.id === change.project);
 
   const paint = (picture: Picture, now: number): void => {
     if (canvas === undefined) return;
@@ -325,7 +364,12 @@ export function BlockWorld(props: BlockWorldProps) {
     canvas.style.width = `${size.width / size.dpr}px`;
     canvas.style.height = `${size.height / size.dpr}px`;
     shown = { picture, theme: colours.key };
-    setLayout({ rects: placeRectsOf(picture.list), cssPerArt: picture.list.view.scale / size.dpr });
+    setLayout({
+      rects: placeRectsOf(picture.list),
+      cssPerArt: picture.list.view.scale / size.dpr,
+      width: size.width / size.dpr,
+      height: size.height / size.dpr,
+    });
     const context = canvas.getContext("2d");
     if (context === null) return;
     paintPicture(context, picture, colours, cache);
@@ -382,6 +426,21 @@ export function BlockWorld(props: BlockWorldProps) {
     if (best !== undefined && best.share > here) turn(best.steps);
   };
   props.onControls?.({ turn, face, onStage, side });
+
+  const carded = createMemo((): Carded | undefined => {
+    const pointed = pointedAt();
+    const place = pointed?.kind === "project" ? pointed : props.held;
+    const site = siteAt(props.projects, place);
+    const building = place === undefined || site === undefined ? undefined : onStage(place);
+    return site === undefined || building === undefined
+      ? undefined
+      : { site, building, held: samePlace(place, props.held) };
+  });
+  const point = (hit: Hit | undefined): void => {
+    hovered = hit;
+    setPointedAt(hit === undefined ? undefined : placeOfTarget(hit.target));
+    props.onHover?.(hit);
+  };
 
   const hitUnder = (event: MouseEvent): Hit | undefined => {
     if (shown === undefined || canvas === undefined || event.target !== canvas) return undefined;
@@ -448,20 +507,13 @@ export function BlockWorld(props: BlockWorldProps) {
       onPointerMove={(event) => {
         lastInputAt = Date.now();
         const hit = hitUnder(event);
-        if (!sameHit(hit, hovered)) {
-          hovered = hit;
-          props.onHover?.(hit);
-        }
+        if (!sameHit(hit, hovered)) point(hit);
       }}
-      onPointerLeave={() => {
-        hovered = undefined;
-        props.onHover?.(undefined);
-      }}
+      onPointerLeave={() => point(undefined)}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || hovered === undefined) return;
         event.preventDefault();
-        hovered = undefined;
-        props.onHover?.(undefined);
+        point(undefined);
       }}
       onClick={(event) => {
         const hit = hitUnder(event);
@@ -470,6 +522,17 @@ export function BlockWorld(props: BlockWorldProps) {
     >
       <canvas class="kw-stead-block-canvas" ref={canvas} />
       {props.children}
+      <Show when={carded()}>
+        {(card) => (
+          <SiteCard
+            site={card().site}
+            building={card().building}
+            stage={layout()}
+            held={card().held}
+            now={refreshedAt()}
+          />
+        )}
+      </Show>
     </div>
   );
 }
@@ -523,8 +586,25 @@ function clipped(rect: Rect, frame: Rect): Rect | undefined {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+function buildingsOf(
+  residents: readonly Resident[],
+  projects: BlockWorldProps["projects"],
+): number {
+  return residents.reduce((sum, resident) => sum + (projects?.[resident.slug]?.length ?? 0), 0);
+}
+
+function sameView(one: View | undefined, other: View): boolean {
+  return (
+    one !== undefined &&
+    one.scale === other.scale &&
+    one.width === other.width &&
+    one.height === other.height
+  );
+}
+
 function sameLayout(one: Layout, other: Layout): boolean {
   if (one.cssPerArt !== other.cssPerArt || one.rects.size !== other.rects.size) return false;
+  if (one.width !== other.width || one.height !== other.height) return false;
   for (const [key, rect] of one.rects) {
     const held = other.rects.get(key);
     if (

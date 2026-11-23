@@ -50,10 +50,14 @@ export function placeKey(place: SteadPlace): string {
     case "workshop":
       return `workshop ${place.creature}`;
     case "project":
-      return `project ${place.creature} ${forwardSlashed(place.directory)}`;
+      return `project ${place.creature} ${pathKey(place.directory)}`;
     default:
       return place.kind;
   }
+}
+
+export function pathKey(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
 export function samePlace(one: SteadPlace | undefined, other: SteadPlace | undefined): boolean {
@@ -95,8 +99,4 @@ function widened(held: Bounds | undefined, more: Bounds): Bounds {
 
 function rectOf({ left, top, right, bottom }: Bounds): ArtRect {
   return { x: left, y: top, width: right - left, height: bottom - top };
-}
-
-function forwardSlashed(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }

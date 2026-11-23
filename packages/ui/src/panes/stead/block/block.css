@@ -43,6 +43,47 @@
     linear-gradient(var(--kw-cursor-ink), var(--kw-cursor-ink)) bottom right / 2px 8px no-repeat;
 }
 
+.kw-stead-site {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-width: 26rem;
+  padding: 0.35rem 0.6rem;
+  color: var(--kw-text-mid);
+  background: var(--kw-panel);
+  border: 1px solid var(--kw-border);
+  border-radius: 0.3rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.kw-stead-site[data-held] {
+  border-color: var(--kw-accent);
+}
+
+.kw-stead-site-name {
+  overflow: hidden;
+  color: var(--kw-text);
+  font-weight: inherit;
+  text-overflow: ellipsis;
+}
+
+.kw-stead-site-family {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kw-stead-site-flag {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
 .kw-stead-controls {
   display: flex;
   flex-wrap: wrap;

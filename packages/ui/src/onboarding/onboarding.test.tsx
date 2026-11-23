@@ -5,6 +5,7 @@ import type { ShellSeams } from "../panes/registry.ts";
 import { reducedMotionQuery } from "../panes/stead/painter.ts";
 import { inertFeed, inertTrust } from "../shell/trust-testing.ts";
 import { createOnboardingController } from "./controller.ts";
+import { nextCoat, nextLook } from "./copy.ts";
 import { at, creatureMade, creatureOpened, localModels, noWorkshops } from "./fixtures.ts";
 import { OnboardingOnTheStead } from "./index.tsx";
 import { proposeNames } from "./names.ts";
@@ -71,6 +72,27 @@ describe("the hatching stage", () => {
     expect(showsOf(stage.root)).toBe("creature");
     expect(nameFieldOf(stage.root).value).toBe(proposedName);
     expect(frames().filter((frame) => hatchFrames.includes(frame))).toEqual([]);
+  });
+
+  it("by pointer alone, hatching, changing who and the colour, and keeping asks for the same creature the keys would", async () => {
+    const byKeys = await staged();
+    press(byKeys.root, "Enter");
+    await settle();
+    for (const key of ["ArrowRight", "ArrowUp", "Enter"]) press(nameFieldOf(byKeys.root), key);
+    await settle();
+    cleanup();
+
+    const byPointer = await staged();
+    fireEvent.click(byPointer.root.querySelector(".kw-hatch-egg") as Element);
+    await settle();
+    for (const control of [nextLook, nextCoat, "enter keeps"]) pressOn(byPointer.root, control);
+    await settle();
+
+    expect(byPointer.created).toEqual(byKeys.created);
+    expect(byPointer.patched).toEqual(byKeys.patched);
+    expect(byPointer.created).toHaveLength(1);
+    expect(byPointer.created[0]?.skin).not.toBe(lastOffered);
+    expect(byPointer.patched[0]?.[1]).not.toBe(seedForCoat(freeCoat([])));
   });
 });
 
@@ -172,6 +194,14 @@ async function settle(): Promise<void> {
 
 function press(target: Element, key: string): void {
   fireEvent.keyDown(target, { key });
+}
+
+function pressOn(root: HTMLElement, named: string): void {
+  const control = [...root.querySelectorAll("button")].find(
+    (button) => (button.getAttribute("aria-label") ?? button.textContent) === named,
+  );
+  if (control === undefined) throw new Error(`nothing to press on the stage: ${named}`);
+  fireEvent.click(control);
 }
 
 function nameFieldOf(root: HTMLElement): HTMLInputElement {

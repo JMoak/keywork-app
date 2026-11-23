@@ -31,27 +31,27 @@ export const firstSlots: readonly CellAddress[] = [
   [-4, 1],
 ].map(([cx, cz]) => ({ cx: cx ?? 0, cz: cz ?? 0 }));
 
-export const streetReach = 4;
-export const bandRows = 4;
+export const streetEnd = 4;
+export const besideTheStreet = 2;
 
 export function workshopCell(rank: number): CellAddress {
-  while (slotsKnown.length <= rank) growSlots();
-  return slotsKnown[rank] ?? { cx: 0, cz: 0 };
+  const first = firstSlots[rank];
+  if (first !== undefined) return first;
+  const past = rank - firstSlots.length;
+  const reach = streetEnd + 1 + Math.floor(past / (2 * besideTheStreet));
+  return {
+    cx: past % (2 * besideTheStreet) < besideTheStreet ? reach : -reach,
+    cz: past % besideTheStreet,
+  };
 }
 
 export function doorSideOf(cell: CellAddress): Side {
-  return ((cell.cz % bandRows) + bandRows) % bandRows === 1 ? "nz" : "pz";
+  return cell.cz >= 1 ? "nz" : "pz";
 }
 
-export function lotOf(cell: CellAddress): CellAddress {
-  return { cx: cell.cx, cz: cell.cz + (doorSideOf(cell) === "pz" ? -1 : 1) };
-}
-
-export function landTowardsTheStreet(cell: CellAddress): CellAddress[] {
-  const rows: number[] = [];
-  for (let cz = cell.cz - 1; cz > 1; cz -= 1) rows.push(cz);
-  for (let cz = cell.cz + 1; cz < 0; cz += 1) rows.push(cz);
-  return rows.map((cz) => ({ cx: cell.cx, cz }));
+export interface LotPlace {
+  readonly cell: CellAddress;
+  readonly at: Point;
 }
 
 export const lotSpots: readonly Point[] = [
@@ -61,9 +61,20 @@ export const lotSpots: readonly Point[] = [
   { x: -14, z: 13 },
 ];
 
-export function lotSpot(index: number, door: Side): Point | undefined {
-  const spot = lotSpots[index];
-  return spot === undefined || door === "pz" ? spot : { x: -spot.x, z: -spot.z };
+export function lotPlace(workshop: CellAddress, index: number): LotPlace {
+  const behind = doorSideOf(workshop) === "pz" ? -1 : 1;
+  const spot = lotSpots[index % lotSpots.length] ?? { x: 0, z: 0 };
+  return {
+    cell: {
+      cx: workshop.cx,
+      cz: workshop.cz + behind * (1 + Math.floor(index / lotSpots.length)),
+    },
+    at: { x: -behind * spot.x, z: -behind * spot.z },
+  };
+}
+
+export function lotOf(workshop: CellAddress): CellAddress {
+  return lotPlace(workshop, 0).cell;
 }
 
 export const shedSpots: readonly (ShedSpot & { readonly on?: number })[] = [
@@ -99,20 +110,4 @@ export const statueFrom = 8;
 
 export function monumentFor(creatures: number): MonumentTier {
   return creatures >= statueFrom ? 2 : creatures >= stoneFrom ? 1 : 0;
-}
-
-const slotsKnown: CellAddress[] = [...firstSlots];
-let bandsGrown = 0;
-
-function growSlots(): void {
-  bandsGrown += 1;
-  const columns = [0];
-  for (let reach = 1; reach <= streetReach; reach += 1) columns.push(-reach, reach);
-  const above = bandsGrown * bandRows;
-  for (const rows of [
-    [above, above + 1],
-    [1 - above, -above],
-  ]) {
-    for (const cx of columns) for (const cz of rows) slotsKnown.push({ cx, cz });
-  }
 }

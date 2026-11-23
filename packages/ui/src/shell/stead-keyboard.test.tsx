@@ -35,7 +35,7 @@ it("leaves Enter and Space to the stead's native controls through workspace key 
   await screen.findByText("sessions", { selector: ".kw-frame-name" });
   fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
   fireEvent.keyDown(document.body, { key: "0" });
-  const style = await screen.findByRole("button", { name: "Deco" });
+  const style = await screen.findByRole("button", { name: /^building style Neon/ });
   style.focus();
   for (const key of ["Enter", " "]) {
     const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
@@ -43,7 +43,7 @@ it("leaves Enter and Space to the stead's native controls through workspace key 
     expect(event.defaultPrevented).toBe(false);
   }
   fireEvent.click(style);
-  expect(style.getAttribute("aria-pressed")).toBe("true");
+  expect(style.getAttribute("aria-label")).toMatch(/^building style Lantern/);
   await waitFor(() =>
     expect(document.querySelector(".kw-stead .kw-ov-head-lead")?.textContent).toMatch(
       /^1 creature/,

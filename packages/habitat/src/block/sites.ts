@@ -1,16 +1,15 @@
+import type { CreatureWorksite, CreatureWorksiteChange } from "@keywork-app/protocol";
 import { parseTs } from "../clock/clock.ts";
-import { type HabitatState, type SessionId, type Slug, threadsOf } from "../world/types.ts";
-import { type ProjectStage, projectStages } from "./kit.ts";
+import type { Slug } from "../world/types.ts";
+import { familyFlags, type ProjectStage, projectStages } from "./kit.ts";
+import { pathKey } from "./places.ts";
 import type { ProjectSite } from "./scene.ts";
 
-export interface ConversationPlace {
-  readonly directory: string;
-  readonly startedAt: string;
-}
-
-export type ConversationPlaces = Readonly<Record<SessionId, ConversationPlace>>;
-
 export type TrackedFiles = Readonly<Record<string, number>>;
+
+export type HeardAt = ReadonlyMap<string, number>;
+
+export type LotOrder = Readonly<Record<Slug, readonly string[]>>;
 
 export const floorCap = 20;
 export const stageConversations = [1, 3, 10, 30, 100, 300] as const;
@@ -29,57 +28,117 @@ export function floorsFor(conversations: number): number {
 }
 
 export function projectSitesOf(
-  state: HabitatState,
-  places: ConversationPlaces,
+  worksites: readonly CreatureWorksite[],
   trackedFiles: TrackedFiles = {},
+  heardAt: HeardAt = neverHeard,
+  order: LotOrder = lotOrderAfter(noLots, worksites),
 ): Record<Slug, ProjectSite[]> {
-  return Object.fromEntries(
-    Object.keys(state.creatures)
-      .sort()
-      .map((slug) => [slug, sitesOf(state, slug, places, trackedFiles)] as const)
-      .filter(([, sites]) => sites.length > 0),
+  const flags = familyFlagsOf(worksites);
+  const sites: Record<Slug, ProjectSite[]> = {};
+  for (const worksite of worksites) {
+    const family = familyOf(worksite);
+    const lot = sites[worksite.creature] ?? [];
+    sites[worksite.creature] = lot;
+    lot.push({
+      id: worksite.directory,
+      floors: floorsFor(worksite.conversations),
+      lit: worksite.active,
+      conversations: worksite.conversations,
+      trackedFiles: trackedFiles[worksite.directory],
+      since: parseTs(worksite.since),
+      latest: parseTs(worksite.latest),
+      root: family === undefined ? undefined : worksite.root,
+      family: family === undefined ? undefined : flags.get(family),
+      heardAt: heardAt.get(worksiteKey(worksite)),
+      spot: spotOn(order, worksite),
+    });
+  }
+  for (const lot of Object.values(sites)) lot.sort((a, b) => (a.spot ?? 0) - (b.spot ?? 0));
+  return sites;
+}
+
+export function lotOrderAfter(
+  stored: LotOrder,
+  worksites: readonly CreatureWorksite[],
+  whole = true,
+): LotOrder {
+  const worked = new Map<Slug, string[]>();
+  for (const worksite of worksites) {
+    const lot = worked.get(worksite.creature) ?? [...(stored[worksite.creature] ?? [])];
+    worked.set(worksite.creature, lot);
+    const directory = pathKey(worksite.directory);
+    if (!lot.includes(directory)) lot.push(directory);
+  }
+  const kept = Object.entries(stored).filter(([creature]) => !whole && !worked.has(creature));
+  const after: LotOrder = Object.fromEntries([...kept, ...worked]);
+  return sameLotOrder(stored, after) ? stored : after;
+}
+
+export function sameLotOrder(one: LotOrder, other: LotOrder): boolean {
+  const creatures = Object.keys(one);
+  return (
+    creatures.length === Object.keys(other).length &&
+    creatures.every((creature) => {
+      const lot = one[creature] ?? [];
+      const held = other[creature];
+      return (
+        held !== undefined &&
+        held.length === lot.length &&
+        lot.every((directory, spot) => directory === held[spot])
+      );
+    })
   );
 }
 
-export function directoriesIn(places: ConversationPlaces): string[] {
-  return [...new Set(Object.values(places).map((place) => place.directory))].sort();
+export function inOrderOfFounding(worksites: readonly CreatureWorksite[]): CreatureWorksite[] {
+  return [...worksites].sort(
+    (a, b) =>
+      parseTs(a.since) - parseTs(b.since) ||
+      pathKey(a.directory).localeCompare(pathKey(b.directory)),
+  );
 }
 
-interface Worked {
-  readonly since: number;
-  readonly latest: number;
-  readonly conversations: number;
-  readonly lit: boolean;
+export function worksitesAfter(
+  held: readonly CreatureWorksite[],
+  { change, worksite }: CreatureWorksiteChange,
+): CreatureWorksite[] {
+  const key = worksiteKey(worksite);
+  const at = held.findIndex((each) => worksiteKey(each) === key);
+  if (change === "dropped") return held.filter((_, index) => index !== at);
+  return at < 0 ? [...held, worksite] : held.map((each, index) => (index === at ? worksite : each));
 }
 
-function sitesOf(
-  state: HabitatState,
-  slug: Slug,
-  places: ConversationPlaces,
-  trackedFiles: TrackedFiles,
-): ProjectSite[] {
-  const worked = new Map<string, Worked>();
-  for (const thread of threadsOf(state, slug)) {
-    const place = places[thread.id];
-    if (place === undefined) continue;
-    const held = worked.get(place.directory);
-    const startedAt = parseTs(place.startedAt);
-    worked.set(place.directory, {
-      since: Math.min(held?.since ?? startedAt, startedAt),
-      latest: Math.max(held?.latest ?? startedAt, startedAt),
-      conversations: (held?.conversations ?? 0) + 1,
-      lit: (held?.lit ?? false) || thread.turn !== undefined,
-    });
+export function worksiteKey(worksite: Pick<CreatureWorksite, "creature" | "directory">): string {
+  return `${worksite.creature} ${pathKey(worksite.directory)}`;
+}
+
+export function directoriesIn(worksites: readonly CreatureWorksite[]): string[] {
+  return [...new Set(worksites.map((worksite) => worksite.directory))].sort();
+}
+
+export function familyFlagsOf(worksites: readonly CreatureWorksite[]): ReadonlyMap<string, number> {
+  const founded = new Map<string, number>();
+  for (const worksite of worksites) {
+    const family = familyOf(worksite);
+    if (family === undefined) continue;
+    const since = parseTs(worksite.since);
+    founded.set(family, Math.min(founded.get(family) ?? since, since));
   }
-  return [...worked.entries()]
-    .sort(([a, first], [b, second]) => first.since - second.since || a.localeCompare(b))
-    .map(([directory, site]) => ({
-      id: directory,
-      floors: floorsFor(site.conversations),
-      lit: site.lit,
-      conversations: site.conversations,
-      trackedFiles: trackedFiles[directory],
-      since: site.since,
-      latest: site.latest,
-    }));
+  const oldestFirst = [...founded].sort(
+    ([a, first], [b, second]) => first - second || a.localeCompare(b),
+  );
+  return new Map(oldestFirst.map(([family], order) => [family, order % familyFlags]));
+}
+
+const neverHeard: HeardAt = new Map();
+const noLots: LotOrder = {};
+
+function spotOn(order: LotOrder, worksite: CreatureWorksite): number | undefined {
+  const spot = order[worksite.creature]?.indexOf(pathKey(worksite.directory)) ?? -1;
+  return spot < 0 ? undefined : spot;
+}
+
+function familyOf(worksite: CreatureWorksite): string | undefined {
+  const root = pathKey(worksite.root);
+  return root === pathKey(worksite.directory) ? undefined : root;
 }

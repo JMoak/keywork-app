@@ -220,6 +220,15 @@ p.kw-hatch-name {
   color: var(--kw-text-dim);
 }
 
+.kw-hatch-keys[data-aside] {
+  min-height: 0;
+  margin-top: 0.15rem;
+}
+
+.kw-hatch-keys .kw-key-act:focus {
+  outline: none;
+}
+
 @keyframes kw-hatch-arrives {
   from {
     opacity: 0;

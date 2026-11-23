@@ -1,5 +1,7 @@
 import type { CreatureLedgerEntry } from "@keywork-app/protocol";
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { NeedsYouAnswers } from "../../companion/bubble.tsx";
+import { NoteLine } from "../../page/note-line.tsx";
 import { observeSize } from "../../surfaces/runtime/realm.ts";
 import { keepInView } from "../overview/rows.tsx";
 import { loadSkin } from "../stead/habitat-render.ts";
@@ -25,6 +27,7 @@ import {
   unseen,
   waitsOnKeeper,
 } from "./ledger.ts";
+import type { LedgerAsks } from "./ledger-asks.ts";
 import type { LedgerReading } from "./ledger-book.ts";
 import { PortraitView } from "./portrait.tsx";
 
@@ -36,8 +39,10 @@ export interface LedgerPanelProps {
   readonly reading: LedgerReading;
   readonly summary: LedgerSummary;
   readonly cursor: number | undefined;
+  readonly held: number;
   readonly now: number;
   readonly hint: string | undefined;
+  readonly asks: LedgerAsks;
   onPress(index: number): void;
   onPoint(index: number): void;
 }
@@ -117,7 +122,10 @@ function LedgerList(props: LedgerPanelProps) {
             entry={entry}
             project={named() ? projectOf(entry.directory) : undefined}
             cursor={props.cursor === index()}
+            keyed={props.held === index()}
             now={props.now}
+            asks={props.asks}
+            at={index()}
             onPress={() => props.onPress(index())}
             onPoint={() => props.onPoint(index())}
           />
@@ -131,7 +139,10 @@ interface LedgerRowProps {
   readonly entry: CreatureLedgerEntry;
   readonly project: string | undefined;
   readonly cursor: boolean;
+  readonly keyed: boolean;
   readonly now: number;
+  readonly asks: LedgerAsks;
+  readonly at: number;
   onPress(): void;
   onPoint(): void;
 }
@@ -177,6 +188,27 @@ function LedgerRow(props: LedgerRowProps) {
         <span class="kw-ledger-words">{props.entry.title}</span>
         <span class="kw-ledger-meta">{metaOf(props.entry, props.now, props.project)}</span>
       </button>
+      <Show when={props.asks.runOf(props.entry)}>
+        {(run) => (
+          <Show
+            when={props.asks.wording(props.entry)}
+            fallback={
+              <NeedsYouAnswers
+                placement="ledger"
+                run={run()}
+                keys={props.asks.keys()}
+                keyless={!props.keyed}
+                onAnswer={(pick, by) => props.asks.answer(props.at, pick, by)}
+                onReason={(reason, by) => props.asks.giveReason(props.at, reason, by)}
+              />
+            }
+          >
+            <span class="kw-ledger-words-line">
+              <NoteLine onSend={props.asks.sendWords} />
+            </span>
+          </Show>
+        )}
+      </Show>
     </li>
   );
 }
