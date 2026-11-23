@@ -5,6 +5,7 @@ export type CompanionMenuAction =
   | "quiet"
   | "size"
   | "switch-creature"
+  | "show-stead"
   | "settings";
 
 export type CompanionMenuItem =
@@ -20,6 +21,7 @@ export interface CompanionMenuState {
   size: number;
   creatures: readonly { slug: string; name: string }[];
   current: string | undefined;
+  steadOut?: boolean | undefined;
 }
 
 export const sizeStops: readonly number[] = [50, 75, 100, 125, 150, 200];
@@ -28,6 +30,11 @@ export const defaultSize = 100;
 export function companionMenu(state: CompanionMenuState): CompanionMenuItem[] {
   return [
     { kind: "action", label: "Open the console", action: "open" },
+    {
+      kind: "action",
+      label: state.steadOut === true ? "Put the stead away" : "Show the stead",
+      action: "show-stead",
+    },
     { kind: "separator" },
     { kind: "action", label: "Hide", action: "hide" },
     { kind: "toggle", label: "Still", action: "still", checked: state.still },

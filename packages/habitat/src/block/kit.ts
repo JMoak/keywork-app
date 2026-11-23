@@ -20,6 +20,7 @@ export type Appearance = "night" | "day";
 
 export interface KitColours {
   readonly night: boolean;
+  readonly ground: string;
   readonly roles: Readonly<Record<Role, string>>;
   readonly hues: readonly string[];
   readonly ramps: Readonly<Record<string, string>>;
@@ -165,6 +166,7 @@ export interface ProjectSpec {
   readonly seed: number;
   readonly order: number;
   readonly lit: boolean;
+  readonly name?: string | undefined;
 }
 
 export interface ShedSpot extends Footprint {

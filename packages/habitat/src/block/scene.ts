@@ -1,4 +1,5 @@
 import { day, hour, parseTs } from "../clock/clock.ts";
+import { heldAtThePorch } from "../creature/creature.ts";
 import { type CreatureReading, creatureReading } from "../creature/semantic.ts";
 import { inOrderOfRaising } from "../render/stead.ts";
 import {
@@ -25,13 +26,12 @@ import {
 import {
   type CellAddress,
   doorSideOf,
-  greenSpots,
+  landTowardsTheStreet,
+  lotOf,
+  lotSpot,
+  lotSpots,
   monumentSpot,
-  porchSpot,
   reserved,
-  restsOnTheGreen,
-  shedSpot,
-  shedSpots,
   treeSpot,
   wellSpot,
   workshopCell,
@@ -40,6 +40,7 @@ import {
   along,
   type BlockWorld,
   type Box,
+  type CastMember,
   type Cell,
   cellCenter,
   cellPitch,
@@ -49,14 +50,17 @@ import {
   identityRamp,
   movedPart,
   type Part,
+  type Plot,
   type Point,
   type RampKey,
   type Side,
   sideAfter,
   type Target,
+  turnedAbout,
   type Walker,
 } from "./model.ts";
 import { layRoads, type RoadMap, type RoadRequest, type Route } from "./roads.ts";
+import { stageFor } from "./sites.ts";
 
 export interface ProjectSite {
   readonly id: string;
@@ -64,6 +68,8 @@ export interface ProjectSite {
   readonly lit: boolean;
   readonly conversations?: number | undefined;
   readonly trackedFiles?: number | undefined;
+  readonly since?: number | undefined;
+  readonly latest?: number | undefined;
 }
 
 export interface Partnership {
@@ -79,6 +85,8 @@ export interface Decoration {
 
 export const undecorated: Decoration = { garland: false, banner: 0, star: false };
 
+export type Stance = Extract<Doing, "idle" | "nap" | "sit">;
+
 export interface BlockSceneInput {
   readonly kit: Kit;
   readonly appearance: Appearance;
@@ -88,6 +96,8 @@ export interface BlockSceneInput {
   readonly readings?: Readonly<Record<Slug, CreatureReading>> | undefined;
   readonly projects?: Readonly<Record<Slug, readonly ProjectSite[]>> | undefined;
   readonly partnerships?: readonly Partnership[] | undefined;
+  readonly order?: readonly Slug[] | undefined;
+  readonly stances?: Readonly<Record<Slug, Stance>> | undefined;
 }
 
 export interface Resident {
@@ -113,6 +123,8 @@ export const heroSlab = 24;
 export const walkerPace = 1.4;
 export const walkerSpacing = 37;
 export const storehouseCells = 10;
+export const besideTheDoor = 19;
+export const besideThePorch = 28;
 
 export function blockScene(state: HabitatState, input: BlockSceneInput): BlockScene {
   return new SceneBuilder(state, input).build();
@@ -122,18 +134,37 @@ export function identityIndex(seed: number, identities: number): number {
   return Math.max(0, Math.floor(seed)) % Math.max(1, identities);
 }
 
-export function residentsOf(state: HabitatState, kit: Kit): Resident[] {
+export function residentsOf(
+  state: HabitatState,
+  kit: Kit,
+  stored: readonly Slug[] = [],
+): Resident[] {
   const alphabetical = Object.keys(state.creatures).sort();
-  return inOrderOfRaising(Object.values(state.creatures)).map((creature, order) => {
+  return addressesOf(state, stored).flatMap(({ slug, order }) => {
+    const creature = state.creatures[slug];
+    if (creature === undefined) return [];
     const cell = workshopCell(order);
-    return {
-      slug: creature.slug,
-      order,
-      identity: identityIndex(seedOf(creature, alphabetical), identityCount(kit)),
-      cell,
-      door: doorSideOf(cell),
-    };
+    return [
+      {
+        slug,
+        order,
+        identity: identityIndex(seedOf(creature, alphabetical), identityCount(kit)),
+        cell,
+        door: doorSideOf(cell),
+      },
+    ];
   });
+}
+
+function addressesOf(
+  state: HabitatState,
+  stored: readonly Slug[],
+): { readonly slug: Slug; readonly order: number }[] {
+  const kept = new Set(stored);
+  const arriving = inOrderOfRaising(Object.values(state.creatures))
+    .map((creature) => creature.slug)
+    .filter((slug) => !kept.has(slug));
+  return [...kept, ...arriving].map((slug, order) => ({ slug, order }));
 }
 
 export function wallsAround(door: Side): Readonly<Record<Side, WallMeaning>> {
@@ -205,6 +236,8 @@ class SceneBuilder {
   private readonly cells = new Map<string, CellDraft>();
   private readonly footprints = new Map<Slug, Footprint>();
   private readonly walkers: Walker[] = [];
+  private readonly cast: CastMember[] = [];
+  private porch: Plot | undefined;
   private reach = lowestReach;
 
   constructor(state: HabitatState, input: BlockSceneInput) {
@@ -215,13 +248,13 @@ class SceneBuilder {
     this.night = colours.night;
     this.pooled = colours.pool !== undefined;
     this.alphabetical = Object.keys(state.creatures).sort();
-    this.residents = residentsOf(state, input.kit);
+    this.residents = residentsOf(state, input.kit, input.order);
     this.readings =
       input.readings ??
       Object.fromEntries(
         this.residents.map((resident) => [
           resident.slug,
-          creatureReading(state, resident.slug, input.now),
+          heldAtThePorch(creatureReading(state, resident.slug, input.now), state, resident.slug),
         ]),
       );
   }
@@ -256,6 +289,14 @@ class SceneBuilder {
       night: this.night,
     });
     this.place(reserved.house, "house", built, { target: { kind: "house" } });
+    if (built.foot !== undefined) {
+      this.porch = {
+        cell: reserved.house,
+        ground: built.foot,
+        door: "pz",
+        beside: besideThePorch,
+      };
+    }
     if (this.landmark("tree") !== undefined) {
       this.place(reserved.house, "tree", this.kit.prop({ kind: "tree" }), { at: treeSpot });
     }
@@ -335,25 +376,26 @@ class SceneBuilder {
         { ramp, anchor: { x: annex.x, z: annex.z } },
       );
     }
-    this.sheds(resident, creature);
+    for (const land of landTowardsTheStreet(resident.cell)) this.cell(land);
+    this.projects(resident, creature);
   }
 
-  private sheds(resident: Resident, creature: Creature): void {
-    const sites = (this.input.projects?.[creature.slug] ?? []).slice(0, shedSpots.length);
+  private projects(resident: Resident, creature: Creature): void {
+    const lot = lotOf(resident.cell);
+    this.cell(lot);
+    const sites = (this.input.projects?.[creature.slug] ?? []).slice(0, lotSpots.length);
     sites.forEach((site, index) => {
-      const spot = shedSpot(index, resident.door);
-      if (spot === undefined) return;
-      const topped = sites.some((_, later) => later > index && shedSpots[later]?.on === index);
-      const built = this.kit.shed({
+      const at = lotSpot(index, resident.door);
+      if (at === undefined) return;
+      const built = this.kit.project({
+        stage: stageFor(site.conversations ?? 1, site.trackedFiles),
         seed: seedOf(creature, this.alphabetical),
         order: resident.order,
-        spot,
-        floors: Math.max(1, Math.floor(site.floors)),
         lit: site.lit,
-        roofed: !topped,
-        trackedFiles: site.trackedFiles,
+        name: lastPartOf(site.id),
       });
-      this.place(resident.cell, "shed", built, {
+      this.place(lot, "project", resident.door === "pz" ? built : facingAway(built), {
+        at,
         target: { kind: "shed", creature: creature.slug, project: site.id },
         ramp: identityRamp(resident.identity),
       });
@@ -402,57 +444,53 @@ class SceneBuilder {
       if (!firstRoad.has(pair.a.slug)) firstRoad.set(pair.a.slug, route);
       if (!firstRoad.has(pair.b.slug)) firstRoad.set(pair.b.slug, route);
     });
-    let onTheGreen = 0;
-    for (const resident of this.residents) {
+    this.residents.forEach((resident, index) => {
       const creature = this.state.creatures[resident.slug];
-      if (creature === undefined || creature.workshop.boardedAt !== undefined) continue;
-      const doing = doingOf(
-        this.state,
-        resident.slug,
-        this.readings[resident.slug],
-        this.input.now,
-      );
-      const parts = critterParts(figureFor(creature.skin), doing, resident.order);
-      const target: Target = { kind: "creature", creature: resident.slug };
+      const ground = this.footprints.get(resident.slug);
+      if (creature === undefined || ground === undefined) return;
+      if (creature.workshop.boardedAt !== undefined) return;
+      const doing = this.doingOf(creature);
+      const figure = figureFor(creature.skin, creature.seed);
+      const parts = critterParts(figure, doing, resident.order);
       const ramp = identityRamp(resident.identity);
-      if (doing === "walk") {
-        const route = firstRoad.get(resident.slug) ?? routes[1 + resident.order];
-        if (route !== undefined) {
-          this.walkers.push({
-            what: "creature",
-            path: route.points,
-            phase: resident.order * walkerSpacing,
-            pace: walkerPace,
-            parts,
-            ramp,
-            target,
-          });
-          continue;
-        }
-      }
-      const standing: Construction = { parts, reach: 0 };
-      const green =
-        (doing === "nap" || doing === "idle") &&
-        restsOnTheGreen(seedOf(creature, this.alphabetical))
-          ? greenSpots[onTheGreen]
-          : undefined;
-      if (doing === "porch") {
-        this.place(reserved.house, "creature", standing, { at: porchSpot, target, ramp });
-      } else if (green !== undefined) {
-        this.place(reserved.green, "creature", standing, { at: green, target, ramp });
-        onTheGreen += 1;
-      } else {
-        const footprint = this.footprints.get(resident.slug);
-        if (footprint === undefined) continue;
-        const spot = along(footprint, resident.door, 19, 5);
-        const center = cellCenter(resident.cell.cx, resident.cell.cz);
-        this.place(resident.cell, "creature", standing, {
-          at: { x: spot.x - center.x, z: spot.z - center.z },
-          target,
+      const toThePorch = routes[1 + index];
+      const route = firstRoad.get(resident.slug) ?? toThePorch;
+      if (doing === "walk" && route !== undefined) {
+        this.walkers.push({
+          what: "creature",
+          path: route.points,
+          phase: resident.order * walkerSpacing,
+          pace: walkerPace,
+          parts,
           ramp,
+          target: { kind: "creature", creature: resident.slug },
         });
+        return;
       }
-    }
+      const home: Plot = {
+        cell: resident.cell,
+        ground,
+        door: resident.door,
+        beside: besideTheDoor,
+      };
+      this.cast.push({
+        slug: resident.slug,
+        order: resident.order,
+        home,
+        stands: doing === "porch" && toThePorch !== undefined ? (this.porch ?? home) : home,
+        road: toThePorch?.points ?? [],
+        still: doing === "nap" || doing === "sit",
+        parts,
+        ramp,
+      });
+    });
+  }
+
+  private doingOf(creature: Creature): Doing {
+    const read = doingOf(this.state, creature.slug, this.readings[creature.slug], this.input.now);
+    if (read !== "idle" && read !== "nap") return read;
+    const chosen = this.input.stances?.[creature.slug];
+    return chosen === undefined || chosen === "idle" ? read : chosen;
   }
 
   private finish(roads: RoadMap): BlockWorld {
@@ -498,6 +536,7 @@ class SceneBuilder {
     return {
       cells,
       walkers: this.walkers,
+      cast: this.cast,
       bounds: {
         minX: Math.min(...xs) - halfCell,
         maxX: Math.max(...xs) + halfCell,
@@ -585,6 +624,41 @@ class SceneBuilder {
   }
 }
 
+function facingAway(built: Construction): Construction {
+  return {
+    ...built,
+    parts: built.parts.map(turnedAbout),
+    ...(built.crown === undefined
+      ? {}
+      : {
+          crown: built.crown.map((crowning) => ({
+            x: -crowning.x,
+            z: -crowning.z,
+            part: turnedAbout(crowning.part),
+          })),
+        }),
+    ...(built.annexes === undefined
+      ? {}
+      : {
+          annexes: built.annexes.map((annex) => ({
+            ...annex,
+            x: -annex.x,
+            z: -annex.z,
+            parts: annex.parts.map(turnedAbout),
+          })),
+        }),
+  };
+}
+
+function lastPartOf(directory: string): string {
+  return (
+    directory
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .at(-1) ?? directory
+  );
+}
+
 function anchorOf(built: Construction, at: Point): Point {
   const first = built.parts.find((part) => "box" in part);
   if (first === undefined || !("box" in first)) {
@@ -615,8 +689,9 @@ function ivyOf(creature: Creature, now: number): number {
 }
 
 function napping(state: HabitatState, slug: Slug, now: number): boolean {
+  const raised = state.creatures[slug]?.workshop.raisedAt;
   const latest = Math.max(
-    Number.NEGATIVE_INFINITY,
+    raised === undefined ? Number.NEGATIVE_INFINITY : parseTs(raised),
     ...threadsOf(state, slug).map((thread) => parseTs(thread.lastActivityAt)),
   );
   return now - latest >= napAfterMs;

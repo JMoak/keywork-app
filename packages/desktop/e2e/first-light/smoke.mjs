@@ -5,7 +5,7 @@
 // trusted from inside before the launch and untrusted after. The engine and the trust keep their
 // state in a scratch home beside the folder, so ~/.keywork is never read or written. The driver
 // types only what the screen offers a new keeper: the first-run lessons and the keys overlay they
-// point to, the onboarding card's own keys, a request in the conversation, `y` on the ask, the
+// point to, the hatching stage's own keys, a request in the conversation, `y` on the ask, the
 // chores pane's buttons and the chord it prints.
 //
 //   bun run --cwd packages/desktop build      (once: the smoke runs packages/desktop/out)
@@ -23,7 +23,7 @@
 //   stead        stead profile, started exactly as Stead's entry starts it but from this build: a
 //                project the engine refuses for want of a model says so in the yard; then step 4
 //                at home, where this profile keeps a creature's chores on screen (/chores): a
-//                creature made through "Customize first" on the creature its first frame meets,
+//                creature hatched on the stage its first frame opens,
 //                a read-only chore that completes and a write chore that parks.
 //   creature     stead profile, started at home with no project: the creature's model sets out a
 //                note with a rung and a size and it opens beside the hub; the keeper dismisses it
@@ -270,8 +270,8 @@ async function stepTwo(world) {
   await page.waitForSelector(".kw-help", { state: "detached" });
   const chord = make.keys.split(" · ")[0];
   await pressChord(page, chord);
-  await page.waitForSelector(".kw-stead .kw-onboard[data-phase=step]", { timeout: 90_000 });
-  const cardLines = await walkTheOnboardingCard(page);
+  await page.waitForSelector(".kw-stead .kw-hatch[data-phase=egg]", { timeout: 90_000 });
+  const stageLines = await hatchAndKeepACreature(page);
   await page.waitForSelector(presentedConversation, { timeout: 60_000 }).catch(async () => {
     throw new Error(`the stead never presented the creature's thread: ${await screenText(page)}`);
   });
@@ -296,7 +296,7 @@ async function stepTwo(world) {
     .catch(() => {
       throw new Error("the creature's first words never reached the thread the stead presents");
     });
-  return `${help.chord} showed every key and ${chord} made a creature on the stead; ${creature.name} (${creature.slug}) made in the creature home through ${cardLines.length} card lines; its thread presented in the stead pane, introduced in ${wordCount(introduction)} words after a frame`;
+  return `${help.chord} showed every key and ${chord} made a creature on the stead; ${creature.name} (${creature.slug}) made in the creature home through ${stageLines.length} stage lines; its thread presented in the stead pane, introduced in ${wordCount(introduction)} words after a frame`;
 }
 
 async function stepThree(world) {
@@ -401,43 +401,31 @@ async function stepHomeChores(world) {
   const { page } = world;
   await page.click(".kw-open-failure-card button:has-text('dismiss')");
   await page.waitForSelector(".kw-open-failure-card", { state: "detached", timeout: 10_000 });
-  await customizeTheCreatureItMeets(page);
-  await walkTheOnboardingCard(page);
-  await page.waitForSelector(".kw-onboard[data-phase=made]", { timeout: 60_000 });
+  await hatchAndKeepACreature(page);
   const creatures = await served(page, "/creatures", world.creatureHome);
   expect(creatures.creatures?.length === 1, `GET /creatures lists ${creatures.creatures?.length}`);
   world.creature = creatures.creatures[0].slug;
   return stepFour(world);
 }
 
-async function customizeTheCreatureItMeets(page) {
-  const meeting = page.locator(".kw-meet-creature");
-  await meeting.waitFor({ timeout: 60_000 }).catch(async () => {
-    throw new Error(`the stead never offered to meet a creature: ${await screenText(page)}`);
-  });
-  await meeting.getByRole("button", { name: "Customize first", exact: true }).click();
-  await page.waitForSelector(".kw-onboard[data-phase=step] .kw-onboard-step[data-current]", {
-    timeout: 60_000,
-  });
-}
-
-async function walkTheOnboardingCard(page) {
-  const cardLines = [];
-  for (const step of ["name", "skin", "workshop", "models"]) {
-    await page.waitForSelector(`.kw-onboard[data-phase=step] .kw-onboard-step[data-current]`);
-    const current = await page.evaluate(currentOnboardingStep);
-    expect(current.step === step, `onboarding is at ${current.step}, not ${step}`);
-    expect(current.focused, `the onboarding card lost the keyboard at ${step}`);
-    cardLines.push(...current.lines);
-    await page.keyboard.press(step === "name" ? "1" : "Enter");
-    await page.waitForFunction(
-      (left) =>
-        document.querySelector(".kw-onboard-step[data-current]")?.textContent?.trim() !== left ||
-        document.querySelector(".kw-onboard[data-phase=step]") === null,
-      current.step,
-    );
+async function hatchAndKeepACreature(page) {
+  const stageLines = [];
+  for (const phase of ["egg", "meet"]) {
+    await page
+      .waitForSelector(`.kw-hatch[data-phase=${phase}]`, { timeout: 60_000 })
+      .catch(async () => {
+        throw new Error(`the hatching stage never reached ${phase}: ${await screenText(page)}`);
+      });
+    const current = await page.evaluate(currentHatchingStage);
+    expect(current.focused, `the hatching stage lost the keyboard at ${phase}`);
+    stageLines.push(...current.lines);
+    await page.keyboard.press("Enter");
   }
-  return cardLines;
+  await page.waitForSelector(".kw-hatch[data-phase=made]", { timeout: 60_000 });
+  stageLines.push(...(await page.evaluate(currentHatchingStage)).lines);
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".kw-hatch", { state: "detached", timeout: 10_000 });
+  return stageLines;
 }
 
 async function stepTrail(world) {
@@ -566,11 +554,7 @@ async function stepCreatureSetsOut(world) {
   const { page } = world;
   mkdirSync(creatureShots, { recursive: true });
   await page.waitForSelector(".kw-yard[data-mode='yard'] .kw-stead", { timeout: 120_000 });
-  await customizeTheCreatureItMeets(page);
-  await walkTheOnboardingCard(page);
-  await page.waitForSelector(".kw-onboard[data-phase=made]", { timeout: 60_000 });
-  await page.keyboard.press("Enter");
-  await page.waitForSelector(".kw-onboard", { state: "detached", timeout: 10_000 });
+  await hatchAndKeepACreature(page);
   const creatures = await until(page, async () => {
     const listed = await served(page, "/creatures");
     return listed.creatures?.length === 1 ? listed.creatures : undefined;
@@ -1040,14 +1024,14 @@ async function served(page, path, workspace = openedFolder) {
   return JSON.parse(answer.text);
 }
 
-function currentOnboardingStep() {
-  const card = document.querySelector(".kw-onboard");
+function currentHatchingStage() {
+  const stage = document.querySelector(".kw-hatch");
   return {
-    step: card?.querySelector(".kw-onboard-step[data-current]")?.textContent?.trim() ?? null,
-    lines: [...(card?.querySelectorAll(".kw-onboard-line, .kw-onboard-ask") ?? [])].map(
+    phase: stage?.getAttribute("data-phase") ?? null,
+    lines: [...(stage?.querySelectorAll(".kw-hatch-line, .kw-hatch-keys") ?? [])].map(
       (line) => line.textContent ?? "",
     ),
-    focused: card?.contains(document.activeElement) ?? false,
+    focused: stage?.contains(document.activeElement) ?? false,
   };
 }
 

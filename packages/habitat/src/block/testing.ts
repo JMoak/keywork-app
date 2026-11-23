@@ -10,7 +10,7 @@ import {
   type Shelf,
   type Thread,
 } from "../world/types.ts";
-import { critterParts, figureFor } from "./figures.ts";
+import { critterParts, figureFor, figureNames } from "./figures.ts";
 import type { Appearance, Construction, Kit, MonumentTier, ProjectStage } from "./kit.ts";
 import { bearingOf } from "./kits/sketch/style.ts";
 import { monumentFor } from "./layout.ts";
@@ -58,7 +58,7 @@ export const sketchStates: readonly SketchState[] = [
   "walk",
 ];
 
-export const sketchForms = ["kid", "cairn", "tessera", "folio", "purl", "hush", "knot"] as const;
+export const sketchForms = figureNames;
 
 export const sketchPairs: readonly (readonly [number, number, 1 | 2 | 3])[] = [
   [0, 1, 3],
@@ -109,7 +109,7 @@ export function sketchCreature(index: number): SketchCreature {
     chores,
     crates,
     child,
-    form: sketchForms[(index * 3 + (index > 6 ? 1 : 0)) % 7] ?? "kid",
+    form: sketchForms[(index * 4 + (index > 8 ? 1 : 0)) % sketchForms.length] ?? "cairn",
     ivy: index < 3 ? 3 : index < 7 ? 2 : index < 11 ? 1 : 0,
     state: sketchStates[index % sketchStates.length] ?? "idle",
   };
@@ -230,12 +230,13 @@ export function sketchMonument(count: number): MonumentTier {
 
 export function plotProjects(
   count: number,
-  floors: readonly number[] = [],
+  conversations: readonly number[] = [],
 ): readonly ProjectSite[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `/work/project-${index}`,
-    floors: floors[index] ?? 1,
+    floors: 1,
     lit: index % 2 === 0,
+    conversations: conversations[index] ?? 1,
   }));
 }
 
@@ -245,6 +246,7 @@ export interface LadderPlot {
   readonly stage: ProjectStage;
   readonly cell: readonly [number, number];
   readonly at: readonly [number, number];
+  readonly name?: string;
 }
 
 export const ladderCreature = 5;
@@ -254,9 +256,9 @@ export const ladderPlots: readonly LadderPlot[] = [
   { stage: "shack", cell: [0, 0], at: [4, 4] },
   { stage: "shed", cell: [0, 0], at: [18, 2] },
   { stage: "house", cell: [1, 0], at: [-14, 0] },
-  { stage: "tower", cell: [1, 0], at: [12, 0] },
-  { stage: "high-rise", cell: [2, 0], at: [0, 0] },
-  { stage: "skyscraper", cell: [3, 0], at: [0, 0] },
+  { stage: "tower", cell: [1, 0], at: [12, 0], name: "docs" },
+  { stage: "high-rise", cell: [2, 0], at: [0, 0], name: "engine" },
+  { stage: "skyscraper", cell: [3, 0], at: [0, 0], name: "stead-site" },
 ];
 
 export const ladderFraming = { tight: 0, slab: 12 } as const;
@@ -275,7 +277,13 @@ export function ladderWorld(kit: Kit, appearance: Appearance): BlockWorld {
     const centre = cellCenter(cx, cz);
     const dx = centre.x + plot.at[0];
     const dz = centre.z + plot.at[1];
-    const built = kit.project({ stage: plot.stage, seed, order: ladderCreature, lit: true });
+    const built = kit.project({
+      stage: plot.stage,
+      seed,
+      order: ladderCreature,
+      lit: true,
+      name: plot.name,
+    });
     reach = Math.max(reach, built.reach);
     into(cx, cz, placedItem("project", built, dx, dz, ramp));
     for (const annex of built.annexes ?? []) {
@@ -322,6 +330,7 @@ export function ladderWorld(kit: Kit, appearance: Appearance): BlockWorld {
   return {
     cells,
     walkers: [],
+    cast: [],
     bounds: {
       minX: -halfCell,
       maxX: 3 * cellPitch + halfCell,

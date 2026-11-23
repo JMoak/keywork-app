@@ -12,7 +12,19 @@ export type Side = (typeof sides)[number];
 
 export type FaceKey = Side | "top";
 
-export type FacePaint = { readonly texture: IndexedTexture } | { readonly fill: Role };
+export type QuadPaint = { readonly texture: IndexedTexture } | { readonly fill: Role };
+
+export type FacePaint =
+  | { readonly texture: IndexedTexture; readonly sideOn?: IndexedTexture }
+  | { readonly fill: Role };
+
+export interface Grid {
+  readonly x: number;
+  readonly z: number;
+}
+
+export const frontOnGrid: Grid = { x: 1, z: topTexel };
+export const sideOnGrid: Grid = { x: topTexel, z: 1 };
 
 export type RampKey = string;
 
@@ -80,6 +92,35 @@ export interface Walker {
   readonly target?: Target;
 }
 
+export interface Plot {
+  readonly cell: { readonly cx: number; readonly cz: number };
+  readonly ground: Footprint;
+  readonly door: Side;
+  readonly beside: number;
+}
+
+export interface CastMember {
+  readonly slug: Slug;
+  readonly order: number;
+  readonly home: Plot;
+  readonly stands: Plot;
+  readonly road: readonly Point[];
+  readonly still: boolean;
+  readonly parts: readonly Part[];
+  readonly ramp: RampKey;
+}
+
+export interface Stand extends Point {
+  readonly stride?: number;
+}
+
+export type Standing = ReadonlyMap<Slug, Stand>;
+
+export interface Staging {
+  readonly standing?: Standing | undefined;
+  readonly lifts?: ReadonlyMap<string, number> | undefined;
+}
+
 export interface Cell {
   readonly cx: number;
   readonly cz: number;
@@ -101,12 +142,17 @@ export interface WorldBounds {
 export interface BlockWorld {
   readonly cells: readonly Cell[];
   readonly walkers: readonly Walker[];
+  readonly cast: readonly CastMember[];
   readonly bounds: WorldBounds;
 }
 
 export interface Point {
   readonly x: number;
   readonly z: number;
+}
+
+export function cellKey(cell: { readonly cx: number; readonly cz: number }): string {
+  return `${cell.cx},${cell.cz}`;
 }
 
 export function cellCenter(cx: number, cz: number): Point {
@@ -124,6 +170,21 @@ export function identityRamp(identity: number): RampKey {
 export function identityOfRamp(ramp: RampKey | undefined): number | undefined {
   const match = ramp === undefined ? null : /^identity:(\d+)$/.exec(ramp);
   return match === null ? undefined : Number(match[1]);
+}
+
+export function turnedAbout(part: Part): Part {
+  if ("sprite" in part) return { sprite: { ...part.sprite, x: -part.sprite.x, z: -part.sprite.z } };
+  const { box } = part;
+  const about: Readonly<Record<FaceKey, FaceKey>> = {
+    pz: "nz",
+    nz: "pz",
+    px: "nx",
+    nx: "px",
+    top: "top",
+  };
+  const faces: Partial<Record<FaceKey, FacePaint>> = {};
+  for (const [key, paint] of Object.entries(box.faces)) faces[about[key as FaceKey]] = paint;
+  return { box: { ...box, x0: -box.x1, x1: -box.x0, z0: -box.z1, z1: -box.z0, faces } };
 }
 
 export function movedBox(box: Box, dx: number, dz: number, dy = 0): Box {

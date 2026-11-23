@@ -1,5 +1,4 @@
 import { emptyProjection, projectAll, type SessionProjection } from "@keywork-app/client";
-import { coldStart } from "@keywork-app/habitat";
 import type {
   AnswerOutcome,
   AskScope,
@@ -9,10 +8,9 @@ import type {
   CreatureSummary,
   DenyReason,
   PermissionRule,
-  RoutineView,
   SessionRow,
 } from "@keywork-app/protocol";
-import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanionController } from "../../companion/floating.ts";
@@ -26,9 +24,7 @@ import { morningTriage } from "../chores/testing.ts";
 import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { acceptHint, acceptsOnly, overturnHint, overturnsOnly } from "./copy.ts";
-import { seatCreatures } from "./habitat.ts";
-import { composeStead } from "./habitat-render.ts";
-import { answerHint, type SteadSpec, steadKeys, steadPane } from "./index.tsx";
+import { answerHint, steadKeys, steadPane } from "./index.tsx";
 
 afterEach(() => {
   cleanup();
@@ -42,24 +38,6 @@ const keys = {
 };
 
 describe("the stead pane", () => {
-  it("seats every creature GET /creatures lists, lists them under the canvas, and names the place in the head", async () => {
-    const stead = steadHarness({});
-    const { container } = mount(stead);
-    expect(creatureLabels(container)).toEqual([]);
-    await settle();
-    expect(creatureLabels(container)).toEqual([
-      "reviewer, idle, 0 active threads",
-      "scribe, idle, 0 active threads",
-    ]);
-    expect(rowNames(container)).toEqual(["reviewer", "scribe"]);
-    expect(container.querySelector(".kw-ov-head-lead")?.textContent).toMatch(
-      /^2 creatures · (night|dawn|day|dusk) \d\d:\d\d$/,
-    );
-    expect(container.querySelector("canvas.kw-stead-canvas")).not.toBeNull();
-    expect(container.querySelector(".kw-empty")).toBeNull();
-    expect(creatureButton(container, "reviewer").dataset.clip).toBe("idle");
-  });
-
   it("offers a held chore's accept in the bubble ahead of a finished crate, by the companion's rule, and y accepts its grants", async () => {
     const posted: string[] = [];
     vi.stubGlobal(
@@ -85,7 +63,6 @@ describe("the stead pane", () => {
         }),
       ]);
       await settle();
-      expect(creatureLabels(container)[0]).toBe("reviewer, at the porch, 0 active threads");
       const bubble = container.querySelector(".kw-stead-bubble");
       expect(bubble?.querySelector(".kw-stead-bubble-title")?.textContent).toBe(
         "reviewer · triage",
@@ -124,7 +101,6 @@ describe("the stead pane", () => {
     });
     const { container, act } = mount(stead);
     await settle();
-    expect(creatureLabels(container)[0]).toBe("reviewer, at the porch, 0 active threads");
     const bubble = container.querySelector(".kw-stead-bubble");
     expect(bubble?.querySelector(".kw-stead-bubble-title")?.textContent).toBe("rename the ledger");
     expect(bubble?.querySelector(".kw-stead-bubble-line")?.textContent).toBe(
@@ -145,24 +121,6 @@ describe("the stead pane", () => {
     expect(stead.opened).toEqual(["t1"]);
   });
 
-  it("posts the chore board in readable text: the next chore, who runs it and when, read from the wire", async () => {
-    const soon = new Date(Date.now() + 2 * 60_000).toISOString();
-    const stead = steadHarness({
-      routines: (creature) =>
-        creature === "reviewer" ? [routineView("docs-changes", "docs changes", soon)] : [],
-    });
-    const { container } = mount(stead);
-    await settle();
-    await settle();
-    const board = container.querySelector(".kw-stead-board");
-    expect(board?.getAttribute("aria-label")).toBe("chore board");
-    expect(board?.textContent).toMatch(
-      /^chore board · next: docs changes \(reviewer\) at \d\d:\d\d$/,
-    );
-    expect(board?.getAttribute("data-next-at")).toBe(soon);
-    expect(container.querySelector(".kw-stead")?.textContent).toContain("docs changes");
-  });
-
   it("brings a creature to the porch when its thread asks: the bubble, the vocabulary and the desk keys", async () => {
     const stead = steadHarness({
       summaries: [row("t1", "fix the flaky trash test", "reviewer")],
@@ -181,8 +139,6 @@ describe("the stead pane", () => {
       }),
     ]);
     await settle();
-    expect(creatureLabels(container)[0]).toBe("reviewer, at the porch, 0 active threads");
-    expect(rowStates(container)[0]).toBe("at the porch");
     const bubble = container.querySelector(".kw-stead-bubble");
     expect(bubble?.querySelector(".kw-stead-bubble-title")?.textContent).toBe(
       "fix the flaky trash test",
@@ -207,63 +163,6 @@ describe("the stead pane", () => {
     fireEvent.click(bubble?.querySelector(".kw-stead-bubble-open") as Element);
     expect(stead.opened).toEqual(["t1"]);
   });
-
-  it("opens the thread a creature is on: by its pixels, by enter, by its button, never after a drag", async () => {
-    const stead = steadHarness({
-      summaries: [row("t1", "rename the tiler verbs", "reviewer", { working: true })],
-    });
-    const { container, act } = mount(stead);
-    await settle();
-    const button = creatureButton(container, "reviewer");
-    expect(button.getAttribute("aria-label")).toBe("reviewer, working, 1 active thread");
-    expect(container.querySelector(".kw-stead-badge")?.textContent).toBe("1");
-    expect(container.querySelector(".kw-ov-head-lead")?.textContent).toContain("1 working");
-    const box = boxOf(button);
-    const stage = stageOf(container);
-    const body = { clientX: box.left + box.width / 2, clientY: box.top + box.height * 0.8 };
-    fireEvent.pointerDown(stage, body);
-    fireEvent.click(stage, { ...body, detail: 1 });
-    expect(stead.opened).toEqual(["t1"]);
-    fireEvent.pointerDown(stage, { clientX: box.left, clientY: box.top + 10 });
-    fireEvent.click(stage, { ...body, detail: 1 });
-    expect(stead.opened).toEqual(["t1"]);
-    fireEvent.click(button);
-    expect(stead.opened).toEqual(["t1", "t1"]);
-    act("stead.open");
-    expect(stead.opened).toEqual(["t1", "t1", "t1"]);
-    const corner = { clientX: box.left + 1, clientY: box.top + 1 };
-    fireEvent.pointerDown(stage, corner);
-    fireEvent.click(stage, { ...corner, detail: 1 });
-    expect(stead.opened).toHaveLength(3);
-  });
-
-  it("opens what a building stands for: the porch opens the desk, the storehouse the sessions", async () => {
-    const stead = steadHarness({});
-    const { container } = mount(stead);
-    await settle();
-    const stage = stageOf(container);
-    const cssPerArt = boxOf(creatureButton(container, "reviewer")).width / 48;
-    const iso = new Date().toISOString();
-    const scene = composeStead(
-      seatCreatures(coldStart({ at: iso, sessions: [], offsetMinutes: 0 }), stead.creatures),
-      Date.now(),
-    );
-    for (const [kind, pane] of [
-      ["porch", "needs-you"],
-      ["storehouse", "tree"],
-    ] as const) {
-      const spot = scene.hotspots.find((each) => each.target.kind === kind);
-      expect(spot, kind).toBeDefined();
-      if (spot === undefined) continue;
-      const point = {
-        clientX: (spot.x + 2) * cssPerArt,
-        clientY: (spot.y + spot.height - 2) * cssPerArt,
-      };
-      fireEvent.pointerDown(stage, point);
-      fireEvent.click(stage, { ...point, detail: 1 });
-      expect(stead.panes.at(-1), kind).toBe(pane);
-    }
-  });
 });
 
 type Answered =
@@ -276,14 +175,13 @@ interface Staging {
   summaries?: SessionRow[];
   projections?: Record<string, SessionProjection>;
   waiting?: NeedsYouItem[];
-  routines?: (creature: string) => readonly RoutineView[];
 }
 
 function steadHarness(staging: Staging) {
   return createRoot(() => {
     const bots = staging.bots ?? [bot("reviewer"), bot("scribe")];
     const creatures = staging.creatures ?? bots.map(creatureOnTheWire);
-    const [summaries, setSummaries] = createSignal<SessionRow[]>(staging.summaries ?? []);
+    const [summaries] = createSignal<SessionRow[]>(staging.summaries ?? []);
     const projections = staging.projections ?? {};
     const listeners = new Set<(batch: readonly BusEnvelope[]) => void>();
     const opened: string[] = [];
@@ -292,8 +190,7 @@ function steadHarness(staging: Staging) {
     const answered: Answered[] = [];
     const overturned: string[] = [];
     const dismissed: string[] = [];
-    let handoffReads = 0;
-    const [items, setWaiting] = createSignal<readonly NeedsYouItem[]>(staging.waiting ?? []);
+    const [items] = createSignal<readonly NeedsYouItem[]>(staging.waiting ?? []);
     const base = overviewShell({ summaries: summaries() }).shell;
     const store = {
       ...base.store,
@@ -336,15 +233,12 @@ function steadHarness(staging: Staging) {
     const client = {
       ...base.client,
       creatures: async () => creatures,
-      routines: async (creature: string) => staging.routines?.(creature) ?? [],
+      routines: async () => [],
       overturnCreatureDecision: async (slug: string, recordId: string) => {
         overturned.push(`${slug}/${recordId}`);
         return { overturned: true, recordId, ruleClass: "shell.read", demoted: [] };
       },
-      creatureHandoffs: async () => {
-        handoffReads += 1;
-        return [];
-      },
+      creatureHandoffs: async () => [],
     } as unknown as ShellSeams["client"];
     const companion = createCompanionController();
     const shell: ShellSeams = {
@@ -374,39 +268,12 @@ function steadHarness(staging: Staging) {
     const emit = (envelopes: readonly BusEnvelope[]): void => {
       for (const listener of listeners) listener(envelopes);
     };
-    return {
-      shell,
-      companion,
-      creatures,
-      opened,
-      loaded,
-      panes,
-      answered,
-      overturned,
-      dismissed,
-      emit,
-      setWaiting,
-      setSummaries,
-      handoffReads: () => handoffReads,
-    };
+    return { shell, opened, loaded, panes, answered, overturned, dismissed, emit };
   });
 }
 
 function mount(stead: ReturnType<typeof steadHarness>) {
   return mountPane(steadPane.component, { kind: "stead" }, stead.shell);
-}
-
-function mountUnfocused(stead: ReturnType<typeof steadHarness>) {
-  const Stead = steadPane.component;
-  return render(() => (
-    <Stead
-      id="p1"
-      spec={{ kind: "stead" }}
-      focused={false}
-      shell={stead.shell}
-      onAction={() => undefined}
-    />
-  ));
 }
 
 const heldChore: ChoreWaiting = {
@@ -421,20 +288,6 @@ const heldChore: ChoreWaiting = {
   runId: "run-1",
   digest: "3f9c1a2b",
 };
-
-function routineView(id: string, title: string, nextRunAt: string | null): RoutineView {
-  return {
-    creature: "reviewer",
-    id,
-    file: `${id}.md`,
-    routine: { id, title } as unknown as RoutineView["routine"],
-    problem: null,
-    grants: null,
-    schedule: { enabled: true, disabled: null, nextRunAt, consecutiveErrors: 0, retryAt: null },
-    activeRunId: null,
-    lastRun: null,
-  };
-}
 
 function bot(name: string): BotSummary {
   return { name, sigil: "◆", source: "project", sessions: 1, lastUsed: minutesAgo(90) };
@@ -499,50 +352,6 @@ function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-function creatureLabels(container: HTMLElement): string[] {
-  return [...container.querySelectorAll(".kw-stead-creature")].map(
-    (button) => button.getAttribute("aria-label") ?? "",
-  );
-}
-
-function creatureButton(container: HTMLElement, slug: string): HTMLButtonElement {
-  const button = container.querySelector<HTMLButtonElement>(
-    `.kw-stead-creature[data-slug="${slug}"]`,
-  );
-  if (button === null) throw new Error(`no creature button for ${slug}`);
-  return button;
-}
-
-function stageOf(container: HTMLElement): HTMLElement {
-  return container.querySelector(".kw-stead-field") as HTMLElement;
-}
-
-function boxOf(element: HTMLElement): { left: number; top: number; width: number; height: number } {
-  const px = (value: string): number => Number.parseFloat(value);
-  return {
-    left: px(element.style.left),
-    top: px(element.style.top),
-    width: px(element.style.width),
-    height: px(element.style.height),
-  };
-}
-
-function rowNames(container: HTMLElement): string[] {
-  return [...container.querySelectorAll(".kw-stead-row .kw-stead-name")].map(
-    (name) => name.textContent ?? "",
-  );
-}
-
-function rowStates(container: HTMLElement): string[] {
-  return [...container.querySelectorAll(".kw-stead-row .kw-stead-state")].map(
-    (state) => state.textContent ?? "",
-  );
-}
-
-function headText(container: HTMLElement): string {
-  return container.querySelector(".kw-ov-head-lead")?.textContent ?? "";
-}
-
 function answers(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".kw-stead-answer")].map(
     (button) => button.textContent?.replace(/\s+/g, " ").trim() ?? "",
@@ -552,287 +361,3 @@ function answers(container: HTMLElement): string[] {
 function lineText(container: HTMLElement): string | undefined {
   return container.querySelector(".kw-ov-line")?.textContent ?? undefined;
 }
-
-describe("the stead pane's power tiers", () => {
-  it("idles on timers alone: ten seconds without a pointer schedule no animation frame and few wakes", () => {
-    vi.useFakeTimers();
-    const animationFrame = vi.fn((callback: FrameRequestCallback): number =>
-      Number(setTimeout(() => callback(Date.now()), 16)),
-    );
-    vi.stubGlobal("requestAnimationFrame", animationFrame);
-    vi.stubGlobal("cancelAnimationFrame", (handle: number) => clearTimeout(handle));
-    try {
-      const { container } = mount(steadHarness({}));
-      vi.advanceTimersByTime(10_000);
-      const field = stageOf(container);
-      expect(animationFrame).not.toHaveBeenCalled();
-      expect(field.dataset.tier).toBe("ambient");
-      expect(field.dataset.frames).toBe("0");
-      expect(Number(field.dataset.wakes)).toBeLessThanOrEqual(wakeBudgetPerTenSeconds);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.useRealTimers();
-    }
-  });
-
-  it("rests when the window is unfocused though the stead is the focused pane, and wakes to ambient when the window is focused again", async () => {
-    vi.useFakeTimers();
-    const animationFrame = vi.fn((callback: FrameRequestCallback): number =>
-      Number(setTimeout(() => callback(Date.now()), 16)),
-    );
-    vi.stubGlobal("requestAnimationFrame", animationFrame);
-    vi.stubGlobal("cancelAnimationFrame", (handle: number) => clearTimeout(handle));
-    try {
-      const { container } = mount(steadHarness({}));
-      const field = stageOf(container);
-      expect(field.dataset.tier).toBe("ambient");
-      window.dispatchEvent(new Event("blur"));
-      await Promise.resolve();
-      const blurredAt = Number(field.dataset.wakes);
-      vi.advanceTimersByTime(10_000);
-      expect(field.dataset.tier).toBe("rest");
-      expect(animationFrame).not.toHaveBeenCalled();
-      expect(field.dataset.frames).toBe("0");
-      expect(Number(field.dataset.wakes) - blurredAt).toBeLessThanOrEqual(10);
-      window.dispatchEvent(new Event("focus"));
-      await Promise.resolve();
-      vi.advanceTimersByTime(200);
-      expect(field.dataset.tier).toBe("ambient");
-    } finally {
-      vi.unstubAllGlobals();
-      vi.useRealTimers();
-    }
-  });
-
-  it("paints nothing when a draw finds the world and every figure unchanged", async () => {
-    vi.useFakeTimers();
-    const painted = vi.fn();
-    const context = {
-      imageSmoothingEnabled: true,
-      fillStyle: "",
-      fillRect: () => undefined,
-      clearRect: painted,
-    };
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
-    try {
-      const { container } = mountUnfocused(steadHarness({}));
-      const field = stageOf(container);
-      expect(painted).toHaveBeenCalledTimes(1);
-      const wakes = Number(field.dataset.wakes);
-      document.dispatchEvent(new Event("visibilitychange"));
-      await Promise.resolve();
-      expect(Number(field.dataset.wakes)).toBe(wakes + 1);
-      expect(painted).toHaveBeenCalledTimes(1);
-    } finally {
-      getContext.mockRestore();
-      vi.useRealTimers();
-    }
-  });
-});
-
-const wakeBudgetPerTenSeconds = 80;
-
-describe("the stead's optional courtyards", () => {
-  it("expands into bounded neighborhoods and preserves architectural choices, gardens and addresses", async () => {
-    const listed = Array.from({ length: 33 }, (_, index) => ({
-      ...creatureOnTheWire(bot(`c${String(index).padStart(2, "0")}`)),
-      created: "2026-11-17T12:00:00Z",
-    }));
-    const stead = steadHarness({ creatures: listed });
-    const saved: SteadSpec[] = [];
-    const { container } = mountPane(
-      steadPane.component,
-      { kind: "stead", view: "courtyards" },
-      {
-        ...stead.shell,
-        rebind: (_id, spec) => {
-          saved.push(spec as SteadSpec);
-        },
-      },
-    );
-    await settle();
-    expect(container.querySelectorAll("[data-courtyard]")).toHaveLength(16);
-    expect(container.querySelectorAll(".kw-stead-row")).toHaveLength(16);
-    const firstFamily = container
-      .querySelector('[data-courtyard="c00"] [data-workshop]')
-      ?.getAttribute("data-workshop");
-    expect(firstFamily).toBe("gable");
-    const neighborhood = container.querySelector<HTMLSelectElement>(
-      'select[aria-label="Neighborhood"]',
-    );
-    expect(neighborhood?.options).toHaveLength(3);
-    fireEvent.change(neighborhood as HTMLSelectElement, { target: { value: "1" } });
-    await settle();
-    expect(container.querySelector(".kw-courtyard-cell")?.getAttribute("data-address")).toBe(
-      "Court 17",
-    );
-    fireEvent.click(container.querySelector('[data-courtyard="c16"]') as Element);
-    await settle();
-    expect(container.querySelectorAll(".kw-stead-creature")).toHaveLength(16);
-    expect(container.querySelector(".kw-stead-field")?.getAttribute("data-district")).toBe("1");
-    fireEvent.change(container.querySelector('select[aria-label="Workshop style"]') as Element, {
-      target: { value: "lantern" },
-    });
-    fireEvent.change(container.querySelector('select[aria-label="Garden"]') as Element, {
-      target: { value: "flowers" },
-    });
-    expect(saved.at(-1)?.workshopStyles).toEqual({ c16: "lantern" });
-    expect(saved.at(-1)?.gardens).toEqual({ c16: "flowers" });
-    const undo = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === "Undo arrangement",
-    );
-    fireEvent.click(undo as Element);
-    expect(saved.at(-1)?.gardens).toBeUndefined();
-    expect(saved.at(-1)?.workshopStyles).toEqual({ c16: "lantern" });
-    fireEvent.change(container.querySelector('select[aria-label="Garden"]') as Element, {
-      target: { value: "mushrooms" },
-    });
-    const fold = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === "Fold back to courtyards",
-    );
-    fireEvent.click(fold as Element);
-    await settle();
-    const building = container.querySelector('[data-courtyard="c16"] [data-workshop]');
-    expect(building?.getAttribute("data-workshop")).toBe("lantern");
-    expect(building?.getAttribute("data-garden")).toBe("mushrooms");
-    const compact = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === "Arrange courts compactly",
-    );
-    fireEvent.click(compact as Element);
-    expect(container.querySelector(".kw-courtyards")?.getAttribute("data-alignment")).toBe(
-      "compact",
-    );
-    expect(saved.at(-1)?.courtOrder?.[16]).toBe("c16");
-    listed.push({ ...creatureOnTheWire(bot("new-but-old")), created: "2020-01-01T00:00:00Z" });
-    stead.emit([envelope(100, "", "creature.changed", { slug: "new-but-old", change: "created" })]);
-    await waitFor(() => expect(saved.at(-1)?.courtOrder).toHaveLength(34));
-    expect(saved.at(-1)?.courtOrder?.[33]).toBe("new-but-old");
-    expect(saved.at(-1)?.courtOrder?.[0]).toBe("c00");
-    const restored = saved.at(-1) as SteadSpec;
-    cleanup();
-    const again = mountPane(steadPane.component, restored, stead.shell);
-    await settle();
-    expect(again.container.querySelector(".kw-courtyards")?.getAttribute("data-alignment")).toBe(
-      "compact",
-    );
-    fireEvent.change(
-      again.container.querySelector('select[aria-label="Neighborhood"]') as Element,
-      { target: { value: "1" } },
-    );
-    await settle();
-    expect(
-      again.container
-        .querySelector('[data-courtyard="c16"] [data-workshop]')
-        ?.getAttribute("data-workshop"),
-    ).toBe("lantern");
-    expect(
-      again.container
-        .querySelector('[data-courtyard="c16"] [data-workshop]')
-        ?.getAttribute("data-garden"),
-    ).toBe("mushrooms");
-  });
-
-  it("remembers the chosen view and restores focus and scroll when opening and folding a court", async () => {
-    const stead = steadHarness({});
-    const rebind = vi.fn();
-    const { container } = mountPane(
-      steadPane.component,
-      { kind: "stead" },
-      { ...stead.shell, rebind },
-    );
-    await settle();
-    const choose = [
-      ...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button"),
-    ].find((button) => button.textContent === "Courtyards");
-    expect(choose).toBeDefined();
-    fireEvent.click(choose as HTMLButtonElement);
-    await settle();
-    expect(rebind).toHaveBeenLastCalledWith("p1", {
-      kind: "stead",
-      view: "courtyards",
-      courtOrder: ["reviewer", "scribe"],
-    });
-    const stage = container.querySelector<HTMLDivElement>(".kw-stead-stage");
-    expect(stage?.hidden).toBe(true);
-    fireEvent.click(container.querySelector('[data-courtyard="reviewer"]') as HTMLButtonElement);
-    await settle();
-    expect(stage?.hidden).toBe(false);
-    expect(document.activeElement?.textContent).toBe("reviewer's courtyard");
-    if (stage !== null) stage.scrollLeft = 137;
-    const fold = [...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button")].find(
-      (button) => button.textContent === "Fold back to courtyards",
-    );
-    fireEvent.click(fold as HTMLButtonElement);
-    await settle();
-    expect(stage?.hidden).toBe(true);
-    expect((document.activeElement as HTMLElement)?.dataset.courtyard).toBe("reviewer");
-    fireEvent.click(document.activeElement as HTMLButtonElement);
-    await settle();
-    expect(stage?.scrollLeft).toBe(137);
-    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
-    await settle();
-    expect((document.activeElement as HTMLElement)?.dataset.courtyard).toBe("reviewer");
-  });
-
-  it("keeps porch needs visible and live while the scene is folded", async () => {
-    const stead = steadHarness({});
-    const { container } = mountPane(
-      steadPane.component,
-      { kind: "stead", view: "courtyards", courtOrder: ["scribe", "reviewer"] },
-      stead.shell,
-    );
-    await settle();
-    expect(
-      [...container.querySelectorAll<HTMLElement>("[data-courtyard]")].map(
-        (court) => court.dataset.courtyard,
-      ),
-    ).toEqual(["scribe", "reviewer"]);
-    stead.setWaiting([heldChore]);
-    await settle();
-    expect(container.querySelector('[data-courtyard="reviewer"]')?.getAttribute("data-state")).toBe(
-      "porch",
-    );
-    expect(headText(container)).toContain("1 needs you");
-    const needs = [...container.querySelectorAll<HTMLButtonElement>(".kw-stead-views button")].find(
-      (button) => button.textContent === "1 needs you",
-    );
-    fireEvent.click(needs as HTMLButtonElement);
-    expect(stead.panes).toEqual(["needs-you"]);
-    stead.setWaiting([]);
-    await settle();
-    expect(container.querySelector('[data-courtyard="reviewer"]')?.getAttribute("data-state")).toBe(
-      "idle",
-    );
-  });
-
-  it("opens the request instead of answering a hidden ask from an overview shortcut", async () => {
-    const stead = steadHarness({ waiting: [heldChore] });
-    const { act, container } = mountPane(
-      steadPane.component,
-      { kind: "stead", view: "courtyards" },
-      stead.shell,
-    );
-    await settle();
-    for (const action of [
-      "stead.approve",
-      "stead.once",
-      "stead.session",
-      "stead.workspace",
-      "stead.deny",
-      "stead.overturn",
-    ])
-      act(action);
-    expect(stead.panes).toEqual(Array(6).fill("needs-you"));
-    expect(stead.answered).toEqual([]);
-    expect(stead.overturned).toEqual([]);
-    expect(lineText(container)).toBe("Open the request to review it.");
-    expect(
-      container.querySelector("[data-courtyard]")?.closest("[data-native-activation]"),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(".kw-stead-views button")?.closest("[data-native-activation]"),
-    ).not.toBeNull();
-  });
-});

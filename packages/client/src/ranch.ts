@@ -4,6 +4,9 @@ import {
   type CreatureDraft,
   type CreatureHandoff,
   type CreatureHandoffs,
+  type CreatureLedgerEntry,
+  type CreatureLedgerEntryAnswer,
+  type CreatureLedgerView,
   type CreatureMessageDraft,
   type CreatureMessageSent,
   type CreaturePatch,
@@ -71,6 +74,10 @@ export interface RanchClient {
     choice?: CreatureRemovalChoice,
   ): Promise<CreatureRemovalOutcome | ServedRefusal>;
   creatureHandoffs(): Promise<readonly CreatureHandoff[] | ServedRefusal>;
+  creatureLedger(slug: string): Promise<CreatureLedgerView | ServedRefusal>;
+  markLedgerEntrySeen(slug: string, id: string): Promise<CreatureLedgerEntry | ServedRefusal>;
+  openLedgerConversation(slug: string, id: string): Promise<CreatureLedgerEntry | ServedRefusal>;
+  closeLedgerConversation(slug: string, id: string): Promise<CreatureLedgerEntry | ServedRefusal>;
   routines(creature: string): Promise<readonly RoutineView[] | ServedRefusal>;
   routine(creature: string, id: string): Promise<RoutineView | ServedRefusal>;
   putRoutine(creature: string, id: string, file: RoutineFile): Promise<RoutinePut | ServedRefusal>;
@@ -172,6 +179,10 @@ export const ranchOperations = {
   resumeCreature: "resumeCreature",
   removeCreature: "removeCreature",
   creatureHandoffs: "listCreatureHandoffs",
+  creatureLedger: "readCreatureLedger",
+  markLedgerEntrySeen: "markCreatureLedgerEntrySeen",
+  openLedgerConversation: "openLedgerConversation",
+  closeLedgerConversation: "closeLedgerConversation",
   routines: "listRoutines",
   routine: "readRoutine",
   putRoutine: "putRoutine",
@@ -227,6 +238,9 @@ export function ranchRoutes(request: RanchRequest): RanchClient {
   const routine = (slug: string, id: string, tail = ""): string =>
     creature(slug, `/routines/${encodeURIComponent(id)}${tail}`);
   const workshop = (id: string, tail = ""): string => `/workshops/${encodeURIComponent(id)}${tail}`;
+  const ledgerEntry = (slug: string, id: string, tail: string): string =>
+    creature(slug, `/ledger/${encodeURIComponent(id)}${tail}`);
+  const entryOf = (body: CreatureLedgerEntryAnswer): CreatureLedgerEntry => body.entry;
   const answered = async <T>(response: Response): Promise<T | ServedRefusal> =>
     (await servedRefusalOf(response)) ?? ((await response.json()) as T);
   const exchanged = async (response: Response): Promise<CreatureMcpExchange | ServedRefusal> => {
@@ -266,6 +280,13 @@ export function ranchRoutes(request: RanchRequest): RanchClient {
     },
     creatureHandoffs: async () =>
       picked(await request("GET", "/creature-handoffs"), (body: CreatureHandoffs) => body.handoffs),
+    creatureLedger: async (slug) => answered(await request("GET", creature(slug, "/ledger"))),
+    markLedgerEntrySeen: async (slug, id) =>
+      picked(await request("POST", ledgerEntry(slug, id, "/seen")), entryOf),
+    openLedgerConversation: async (slug, id) =>
+      picked(await request("POST", ledgerEntry(slug, id, "/conversation")), entryOf),
+    closeLedgerConversation: async (slug, id) =>
+      picked(await request("POST", ledgerEntry(slug, id, "/conversation/close")), entryOf),
     routines: async (slug) =>
       picked(
         await request("GET", creature(slug, "/routines")),

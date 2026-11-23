@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { skinIds } from "../skins/index.ts";
-import {
-  critterParts,
-  type Doing,
-  figureArts,
-  figureFor,
-  figureOfSkin,
-  neutralFigure,
-} from "./figures.ts";
+import { critterParts, type Doing, figureArts, figureFor, figureNames } from "./figures.ts";
 import { kits } from "./kits/index.ts";
 import { identityRamp } from "./model.ts";
 import { resolveBlockPalette } from "./palette.ts";
@@ -16,28 +8,34 @@ import { pageGround } from "./testing.ts";
 const doings: readonly Doing[] = ["work", "porch", "walk", "nap", "idle", "blocked", "sit"];
 
 describe("the creatures in the town", () => {
-  it("names a figure for every skin the app has, and the neutral one for a skin with none", () => {
-    expect(Object.keys(figureOfSkin).sort()).toEqual(skinIds().sort());
-    expect(figureFor("kid").name).toBe("kid");
-    expect(figureFor("tessera").name).toBe("tessera");
-    expect(figureFor("cairn").name).toBe("cairn");
-    for (const skin of [
-      "carter",
-      "joiner",
-      "placeholder",
-      "unheard-of",
-      "constructor",
-      undefined,
-    ]) {
-      expect(figureFor(skin), String(skin)).toBe(neutralFigure);
+  it("draws a retired look as one of the nine, the same one for the same seed", () => {
+    expect(figureNames).toEqual([
+      "cairn",
+      "tessera",
+      "folio",
+      "purl",
+      "hush",
+      "knot",
+      "beaver",
+      "newfie",
+      "hippo",
+    ]);
+    for (const look of ["kid", "carter", "joiner", "placeholder", "constructor", undefined]) {
+      for (const seed of [0, 1, 8, 9, 25, 4_000_000_000, -1]) {
+        const drawn = figureFor(look, seed);
+        expect(drawn, `${look} ${seed}`).toBe(figureArts[figureNames[(seed >>> 0) % 9] ?? "cairn"]);
+        expect(figureFor(look, seed), `${look} ${seed}`).toBe(drawn);
+      }
     }
+    expect(figureFor("kid", 6).name).toBe("beaver");
+    expect(figureFor("hippo", 6).name).toBe("hippo");
   });
 
   it("paints every figure in every doing from roles each kit resolves, in any of the eight colours", () => {
     for (const kit of kits) {
       for (const appearance of ["night", "day"] as const) {
         const palette = resolveBlockPalette(kit, appearance, pageGround[appearance]);
-        for (const figure of [...Object.values(figureArts), neutralFigure]) {
+        for (const figure of Object.values(figureArts)) {
           for (const doing of doings) {
             for (const part of critterParts(figure, doing, 3)) {
               if (!("sprite" in part)) continue;

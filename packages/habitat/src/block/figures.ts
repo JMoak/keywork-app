@@ -1,4 +1,4 @@
-import { type FigureArt, figureArts, neutralFigure } from "./figure-art.ts";
+import { type FigureArt, type FigureName, figureArts, figureNames } from "./figure-art.ts";
 import type { Part, Sprite } from "./model.ts";
 import {
   type IndexedTexture,
@@ -8,22 +8,13 @@ import {
   textureMemo,
 } from "./texture.ts";
 
-export { type FigureArt, figureArts, neutralFigure };
-
-export const figureOfSkin: Readonly<Record<string, string>> = {
-  kid: "kid",
-  tessera: "tessera",
-  cairn: "cairn",
-  carter: neutralFigure.name,
-  joiner: neutralFigure.name,
-  placeholder: neutralFigure.name,
-};
+export { type FigureArt, type FigureName, figureArts, figureNames };
 
 export type Doing = "work" | "porch" | "walk" | "nap" | "idle" | "blocked" | "sit";
 
-export function figureFor(skin: string | undefined): FigureArt {
-  const name = skin === undefined ? undefined : (ownEntry(figureOfSkin, skin) ?? skin);
-  return (name === undefined ? undefined : ownEntry(figureArts, name)) ?? neutralFigure;
+export function figureFor(skin: string | undefined, seed = 0): FigureArt {
+  const own = skin === undefined ? undefined : ownEntry(figureArts, skin);
+  return own ?? figureArts[figureNames[(seed >>> 0) % figureNames.length] ?? "cairn"];
 }
 
 export function critterParts(figure: FigureArt, doing: Doing, order: number): Part[] {
@@ -35,8 +26,25 @@ export function critterParts(figure: FigureArt, doing: Doing, order: number): Pa
 
 export function bobAt(doing: Doing, order: number, tick: number): number {
   if (doing === "nap" || doing === "sit" || tick === 0) return 0;
-  return Math.floor((tick + order * 3) / 4) % 2;
+  return Math.floor((tick + phaseOf(order)) / breathOf(order)) % 2;
 }
+
+export function breathOf(order: number): number {
+  return slowestBreath - (Math.abs(Math.floor(order)) % breaths);
+}
+
+export function phaseOf(order: number): number {
+  return Math.floor(order / breaths) * 7 + order * 2;
+}
+
+export function sparkEvery(order: number): number {
+  return quickestSpark + (Math.abs(Math.floor(order)) % sparks);
+}
+
+export const slowestBreath = 6;
+export const breaths = 3;
+export const quickestSpark = 6;
+export const sparks = 4;
 
 const figureLegend: Readonly<Record<string, string>> = {
   o: "ink",
@@ -54,7 +62,6 @@ const figureLegend: Readonly<Record<string, string>> = {
 };
 
 const memo = textureMemo(512);
-const cycle = 8;
 
 function artOf(figure: FigureArt): IndexedTexture {
   return memo(`figure|${figure.name}`, () => textureFromRows(figure.rows, figureLegend));
@@ -92,7 +99,9 @@ function body(figure: FigureArt, doing: Doing, order: number): Sprite {
     top,
     sequence: still
       ? []
-      : Array.from({ length: cycle }, (_, tick) => bobAt(doing, order, tick + cycle)),
+      : Array.from({ length: cycleOf(order) }, (_, tick) =>
+          bobAt(doing, order, tick + cycleOf(order)),
+        ),
     phase: 0,
     rest: still ? undefined : 0,
   };
@@ -176,7 +185,7 @@ function glyph(figure: FigureArt, doing: "porch" | "blocked", order: number): Sp
     ),
   );
   const liftAt = (tick: number): number =>
-    bobAt("work", order, tick) + (Math.floor((tick + order) / 4) % 2);
+    bobAt("work", order, tick) + (Math.floor((tick + order) / breathOf(order)) % 2);
   return {
     x: 0,
     y: 0,
@@ -184,9 +193,9 @@ function glyph(figure: FigureArt, doing: "porch" | "blocked", order: number): Sp
     frames,
     left: -2,
     top,
-    sequence: Array.from({ length: cycle }, (_, tick) => liftAt(tick + cycle)),
+    sequence: Array.from({ length: cycleOf(order) }, (_, tick) => liftAt(tick + cycleOf(order))),
     phase: 0,
-    rest: Math.floor(order / 4) % 2,
+    rest: Math.floor(order / breathOf(order)) % 2,
   };
 }
 
@@ -209,10 +218,16 @@ function spark(figure: FigureArt, order: number): Sprite {
     frames,
     left: ox - 5,
     top: -8,
-    sequence: Array.from({ length: 6 }, (_, tick) => ((tick + order * 2) % 6 < 2 ? 1 : 0)),
+    sequence: Array.from({ length: sparkEvery(order) }, (_, tick) =>
+      (tick + order * 5) % sparkEvery(order) < 2 ? 1 : 0,
+    ),
     phase: 0,
     rest: 0,
   };
+}
+
+function cycleOf(order: number): number {
+  return 2 * breathOf(order);
 }
 
 function ownEntry<T>(record: Readonly<Record<string, T>>, key: string): T | undefined {

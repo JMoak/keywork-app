@@ -1,6 +1,5 @@
 import "../overview/overview.css";
 import "./creature.css";
-import { type CreatureReading, creatureReading, type Thread } from "@keywork-app/habitat";
 import type { BusEnvelope, ForgetSourcePlan } from "@keywork-app/protocol";
 import {
   createEffect,
@@ -8,9 +7,11 @@ import {
   createResource,
   createSignal,
   For,
+  Match,
   on,
   onCleanup,
   Show,
+  Switch,
 } from "solid-js";
 import { z } from "zod";
 import type { LifecycleState } from "../../chrome/pane-frame.tsx";
@@ -30,10 +31,10 @@ import {
 import { ForgetCard } from "../memory/forget-card.tsx";
 import { ChoiceLine, createCursor, DraftLine, NoticeLine, OverviewRow } from "../overview/rows.tsx";
 import { definePane, type PaneLocalAction, type PaneProps, type ShellSeams } from "../registry.ts";
-import { timeWord, whatAreYouDoing } from "../stead/copy.ts";
+import { timeWord } from "../stead/copy.ts";
 import { creatureHomeShell, InCreatureHome } from "../stead/creature-home.tsx";
 import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "../stead/habitat.ts";
-import { skinIds } from "../stead/habitat-render.ts";
+import { resolveSkinId, skinIds } from "../stead/habitat-render.ts";
 import { coatOf } from "../stead/herd.ts";
 import {
   badModelReference,
@@ -54,6 +55,7 @@ import {
   handleLine,
   hostWorkshopLine,
   keyHints,
+  ledgerHint,
   memoryLine,
   modelLabel,
   modelPlaceholder,
@@ -93,6 +95,8 @@ import {
   noCraftToForget,
 } from "./craft.tsx";
 import { DeleteCard } from "./delete-card.tsx";
+import { createLedgerDesk } from "./ledger-desk.ts";
+import { LedgerPanel } from "./ledger-panel.tsx";
 import { PortraitView } from "./portrait.tsx";
 import {
   choresOf,
@@ -133,7 +137,7 @@ export type CreatureSpec = z.output<typeof creatureSpec>;
 
 export const creaturePane = definePane<CreatureSpec>({
   kind: "creature",
-  heading: "in a creature's profile",
+  heading: "in a creature's panel",
   spec: creatureSpec,
   home: "main",
   attire: "house",
@@ -148,10 +152,11 @@ export const creaturePane = definePane<CreatureSpec>({
   summon: {
     action: "creature.summon",
     chords: "leader shift+i",
-    help: "a creature's profile: body, workshop, models, threads, usage, firsts",
+    help: "a creature's panel: its projects, then its ledger, questions for you first",
     command: {
       name: "creature",
-      description: "open a creature's profile, the one place that owns who it is",
+      description:
+        "open a creature's panel: its ledger, and behind it the profile that owns who it is",
       aliases: ["profile"],
       argument: {
         hint: "[slug]",
@@ -170,23 +175,24 @@ export const creaturePane = definePane<CreatureSpec>({
     }),
   },
   localActions: {
-    "creature.down": action(
-      ["j", "down"],
-      "next thread",
-      "creature-next",
-      "move to the next thread",
-    ),
+    "creature.down": action(["j", "down"], "next row", "creature-next", "move to the next row"),
     "creature.up": action(
       ["k", "up"],
-      "previous thread",
+      "previous row",
       "creature-previous",
-      "move to the previous thread",
+      "move to the previous row",
     ),
     "creature.open": action(
       "enter",
-      "open the thread under the cursor",
+      "talk about the row, or open the thread",
       "creature-open",
-      "open the thread under the cursor",
+      "open the short conversation about the ledger row under the cursor, or the thread in its profile",
+    ),
+    "creature.profile": action(
+      "i",
+      "its profile, or back to its ledger",
+      "creature-profile",
+      "turn between the creature's ledger and its profile",
     ),
     "creature.conversation": action(
       "c",
@@ -302,6 +308,8 @@ interface Card {
   readonly keep: boolean;
 }
 
+type Face = "ledger" | "profile";
+
 function CreatureProfile(props: PaneProps<CreatureSpec>) {
   const keyboard = useKeyboardScope();
   let root: HTMLElement | undefined;
@@ -369,27 +377,22 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     const held = slug() ?? "";
     return coatOf(world().creatures[held], Math.max(0, seated.indexOf(held)));
   };
-  const reading = createMemo((): CreatureReading | undefined => {
-    const held = slug();
-    return held === undefined ? undefined : creatureReading(world(), held, now());
-  });
-  const telling = (): string | undefined => {
-    const read = reading();
-    if (read === undefined) return undefined;
-    const carried = read.carrier?.thread;
-    const thread: Thread | undefined = carried === undefined ? undefined : world().threads[carried];
-    return whatAreYouDoing({
-      reading: read,
-      thread,
-      chores: chores(),
-      parcelFogged: undefined,
-      now: now(),
-      offsetMinutes,
-      asOf: world().asOf ?? creature()?.created,
-      lastEvent: undefined,
-    });
-  };
+  const [face, setFace] = createSignal<Face>("ledger");
+  const ledger = createLedgerDesk(shell, slug, setNotice);
+  const ledgerKeys = (): string | undefined =>
+    props.focused
+      ? ledgerHint(
+          {
+            open: shell.keys.chord("creature.open"),
+            down: shell.keys.chord("creature.down"),
+            up: shell.keys.chord("creature.up"),
+            face: shell.keys.chord("creature.profile"),
+          },
+          ledger.rows().length,
+        )
+      : undefined;
   const keys = () => ({
+    face: shell.keys.chord("creature.profile"),
     rename: shell.keys.chord("creature.rename"),
     skin: shell.keys.chord("creature.skin"),
     policy: shell.keys.chord("creature.policy"),
@@ -580,13 +583,16 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
       return;
     }
     const held = creature();
+    const onLedger = face() === "ledger";
     switch (action) {
       case "creature.down":
-        return cursor.move(1);
+        return onLedger ? ledger.move(1) : cursor.move(1);
       case "creature.up":
-        return cursor.move(-1);
+        return onLedger ? ledger.move(-1) : cursor.move(-1);
       case "creature.open":
-        return openThread(rows()[cursor.index()]?.id);
+        return onLedger ? ledger.talk() : openThread(rows()[cursor.index()]?.id);
+      case "creature.profile":
+        return setFace(onLedger ? "profile" : "ledger");
       case "creature.conversation":
         return openThread(held?.conversation);
       case "creature.rename":
@@ -640,140 +646,160 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
       <Show when={slug()} fallback={<EmptyState line={creaturePane.emptyState(shell.keys)} />}>
         <Show when={creature()} fallback={<NoticeLine text={problemOf(detail())} tone="error" />}>
           {(held) => (
-            <>
-              <header class="kw-creature-head">
-                <PortraitView skin={held().skin} hueStop={hue()} name={held().name} />
-                <div class="kw-creature-identity">
-                  <p class="kw-creature-title">
-                    <span class="kw-creature-name">{held().name}</span>
-                    <span class="kw-creature-handle">{handleLine(held().slug)}</span>
-                  </p>
-                  <p class="kw-creature-telling">{telling()}</p>
-                  <p class="kw-creature-hints">{keyHints(keys())}</p>
-                </div>
-              </header>
-              <dl class="kw-creature-facts" aria-label="identity">
-                <dt>{sectionWords.body}</dt>
-                <dd data-fact="body">
-                  <span>{bodyLine(held().skin, held().seed)}</span>
-                </dd>
-                <dt>{sectionWords.workshop}</dt>
-                <dd data-fact="workshop" data-health={readValue(health())?.health}>
-                  <span>{workshopText(held(), health())}</span>
-                  <Show when={workshopId()}>
+            <Switch>
+              <Match when={face() === "ledger"}>
+                <LedgerPanel
+                  name={held().name}
+                  skin={resolveSkinId(held().skin, held().seed)}
+                  hue={hue()}
+                  rows={ledger.rows()}
+                  reading={ledger.reading()}
+                  summary={ledger.summary()}
+                  cursor={props.focused ? ledger.cursor() : undefined}
+                  now={now()}
+                  hint={ledgerKeys()}
+                  onPress={(index) => ledger.talk(index)}
+                  onPoint={(index) => ledger.point(index)}
+                />
+              </Match>
+              <Match when={face() === "profile"}>
+                <header class="kw-creature-head">
+                  <PortraitView
+                    skin={resolveSkinId(held().skin, held().seed)}
+                    hueStop={hue()}
+                    name={held().name}
+                  />
+                  <div class="kw-creature-identity">
+                    <p class="kw-creature-title">
+                      <span class="kw-creature-name">{held().name}</span>
+                      <span class="kw-creature-handle">{handleLine(held().slug)}</span>
+                    </p>
+                    <p class="kw-creature-hints">{keyHints(keys())}</p>
+                  </div>
+                </header>
+                <dl class="kw-creature-facts" aria-label="identity">
+                  <dt>{sectionWords.body}</dt>
+                  <dd data-fact="body">
+                    <span>{bodyLine(held().skin, held().seed)}</span>
+                  </dd>
+                  <dt>{sectionWords.workshop}</dt>
+                  <dd data-fact="workshop" data-health={readValue(health())?.health}>
+                    <span>{workshopText(held(), health())}</span>
+                    <Show when={workshopId()}>
+                      <span class="kw-creature-opens">
+                        {opensLine(shell.keys.chord("creature.workshop"), "it")}
+                      </span>
+                    </Show>
+                  </dd>
+                  <For each={policyRows(held().models)}>
+                    {(row) => (
+                      <>
+                        <dt>{row.modelClass}</dt>
+                        <dd
+                          data-fact={row.modelClass}
+                          data-inherit={row.choice === "inherit" ? "" : undefined}
+                        >
+                          <span>{row.line}</span>
+                        </dd>
+                      </>
+                    )}
+                  </For>
+                </dl>
+                <h3 class="kw-creature-heading">{sectionWords.threads}</h3>
+                <ol class="kw-creature-rows kw-ov-list" aria-label={sectionWords.threads}>
+                  <For each={groupedRows(rows())}>
+                    {(entry) =>
+                      entry.kind === "group" ? (
+                        <li class="kw-creature-group">{groupWords[entry.group]}</li>
+                      ) : (
+                        <OverviewRow
+                          cursor={props.focused && cursor.index() === entry.index}
+                          indent={entry.row.group === "children"}
+                          mark={markOf(entry.row.state)}
+                          aside={asideOf(entry.row, now())}
+                          onClick={() => {
+                            cursor.set(entry.index);
+                            openThread(entry.row.id);
+                          }}
+                        >
+                          {entry.row.title}{" "}
+                          <span class="kw-creature-state" data-state={entry.row.state}>
+                            {stateWordOf(entry.row.state)}
+                          </span>
+                        </OverviewRow>
+                      )
+                    }
+                  </For>
+                </ol>
+                <h3 class="kw-creature-heading">{sectionWords.usage}</h3>
+                <table class="kw-creature-usage">
+                  <thead>
+                    <tr>
+                      <For each={usageHeadings}>{(heading) => <th>{heading}</th>}</For>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={usageRows(held(), shell.store.state.summaries, now())}>
+                      {(row) => (
+                        <tr data-period={row.period}>
+                          <td>{usagePeriods[row.period]}</td>
+                          <td>{row.sessions}</td>
+                          <td>
+                            {costWord(row.costNanos)}
+                            {row.unpriced > 0 ? ` (${row.unpriced} ${unpricedWord})` : ""}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+                <dl class="kw-creature-facts" aria-label="keeping">
+                  <dt>{sectionWords.chores}</dt>
+                  <dd data-fact="chores">
+                    <span>{choresText(chores(), readValue(routines()), now(), offsetMinutes)}</span>
                     <span class="kw-creature-opens">
-                      {opensLine(shell.keys.chord("creature.workshop"), "it")}
+                      {opensLine(shell.keys.chord("creature.chores"), "the chore board")}
                     </span>
-                  </Show>
-                </dd>
-                <For each={policyRows(held().models)}>
-                  {(row) => (
-                    <>
-                      <dt>{row.modelClass}</dt>
-                      <dd
-                        data-fact={row.modelClass}
-                        data-inherit={row.choice === "inherit" ? "" : undefined}
-                      >
-                        <span>{row.line}</span>
-                      </dd>
-                    </>
-                  )}
-                </For>
-              </dl>
-              <h3 class="kw-creature-heading">{sectionWords.threads}</h3>
-              <ol class="kw-creature-rows kw-ov-list" aria-label={sectionWords.threads}>
-                <For each={groupedRows(rows())}>
-                  {(entry) =>
-                    entry.kind === "group" ? (
-                      <li class="kw-creature-group">{groupWords[entry.group]}</li>
-                    ) : (
-                      <OverviewRow
-                        cursor={props.focused && cursor.index() === entry.index}
-                        indent={entry.row.group === "children"}
-                        mark={markOf(entry.row.state)}
-                        aside={asideOf(entry.row, now())}
-                        onClick={() => {
-                          cursor.set(entry.index);
-                          openThread(entry.row.id);
-                        }}
-                      >
-                        {entry.row.title}{" "}
-                        <span class="kw-creature-state" data-state={entry.row.state}>
-                          {stateWordOf(entry.row.state)}
-                        </span>
-                      </OverviewRow>
-                    )
-                  }
-                </For>
-              </ol>
-              <h3 class="kw-creature-heading">{sectionWords.usage}</h3>
-              <table class="kw-creature-usage">
-                <thead>
-                  <tr>
-                    <For each={usageHeadings}>{(heading) => <th>{heading}</th>}</For>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={usageRows(held(), shell.store.state.summaries, now())}>
-                    {(row) => (
-                      <tr data-period={row.period}>
-                        <td>{usagePeriods[row.period]}</td>
-                        <td>{row.sessions}</td>
-                        <td>
-                          {costWord(row.costNanos)}
-                          {row.unpriced > 0 ? ` (${row.unpriced} ${unpricedWord})` : ""}
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-              <dl class="kw-creature-facts" aria-label="keeping">
-                <dt>{sectionWords.chores}</dt>
-                <dd data-fact="chores">
-                  <span>{choresText(chores(), readValue(routines()), now(), offsetMinutes)}</span>
-                  <span class="kw-creature-opens">
-                    {opensLine(shell.keys.chord("creature.chores"), "the chore board")}
-                  </span>
-                </dd>
-                <dt>{sectionWords.memory}</dt>
-                <dd data-fact="memory">
-                  <span>{memoryLine(noteCount(), inbox())}</span>
-                  <span class="kw-creature-opens">
-                    {opensLine(shell.keys.chord("creature.memory"), "the memory pane")}
-                  </span>
-                </dd>
-              </dl>
-              <h3 class="kw-creature-heading">{sectionWords.remembered}</h3>
-              <Show
-                when={rememberedRows(world().landmarks, held().slug).length > 0}
-                fallback={<p class="kw-creature-shadow-opening">{nothingRemembered}</p>}
-              >
-                <ul class="kw-creature-remembered" aria-label={sectionWords.remembered}>
-                  <For each={rememberedRows(world().landmarks, held().slug)}>
-                    {(row) => (
-                      <li data-landmark={row.kind}>
-                        <time dateTime={row.at}>{dayWord(row.at)}</time>
-                        <span>{row.line}</span>
-                        <span class="kw-creature-landmark">{row.kind}</span>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </Show>
-              <CraftSection
-                rows={craft()}
-                focused={craftAt()}
-                hint={craftHint({
-                  next: shell.keys.chord("creature.craft"),
-                  edit: shell.keys.chord("creature.craft-edit"),
-                  forget: shell.keys.chord("creature.craft-forget"),
-                })}
-              />
-              <h3 class="kw-creature-heading">{sectionWords.shadow}</h3>
-              <p class="kw-creature-shadow-opening">{nothingEnforced}</p>
-              <ShadowSummary report={report()} />
-            </>
+                  </dd>
+                  <dt>{sectionWords.memory}</dt>
+                  <dd data-fact="memory">
+                    <span>{memoryLine(noteCount(), inbox())}</span>
+                    <span class="kw-creature-opens">
+                      {opensLine(shell.keys.chord("creature.memory"), "the memory pane")}
+                    </span>
+                  </dd>
+                </dl>
+                <h3 class="kw-creature-heading">{sectionWords.remembered}</h3>
+                <Show
+                  when={rememberedRows(world().landmarks, held().slug).length > 0}
+                  fallback={<p class="kw-creature-shadow-opening">{nothingRemembered}</p>}
+                >
+                  <ul class="kw-creature-remembered" aria-label={sectionWords.remembered}>
+                    <For each={rememberedRows(world().landmarks, held().slug)}>
+                      {(row) => (
+                        <li data-landmark={row.kind}>
+                          <time dateTime={row.at}>{dayWord(row.at)}</time>
+                          <span>{row.line}</span>
+                          <span class="kw-creature-landmark">{row.kind}</span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+                <CraftSection
+                  rows={craft()}
+                  focused={craftAt()}
+                  hint={craftHint({
+                    next: shell.keys.chord("creature.craft"),
+                    edit: shell.keys.chord("creature.craft-edit"),
+                    forget: shell.keys.chord("creature.craft-forget"),
+                  })}
+                />
+                <h3 class="kw-creature-heading">{sectionWords.shadow}</h3>
+                <p class="kw-creature-shadow-opening">{nothingEnforced}</p>
+                <ShadowSummary report={report()} />
+              </Match>
+            </Switch>
           )}
         </Show>
       </Show>

@@ -1,4 +1,5 @@
 import type { LandmarkKind } from "@keywork-app/habitat";
+import type { QuestionAnswer } from "@keywork-app/protocol";
 import { formatCost } from "../../instruments/format.ts";
 import type { ModelChoice, ModelClass, ThreadState, WorkshopHealthWord } from "./wire.ts";
 
@@ -101,6 +102,7 @@ export function handleLine(slug: string): string {
 }
 
 export function keyHints(keys: {
+  face: string;
   rename: string;
   skin: string;
   policy: string;
@@ -109,6 +111,7 @@ export function keyHints(keys: {
   remove: string;
 }): string {
   return [
+    `${keys.face} ledger`,
     `${keys.rename} rename`,
     `${keys.skin} body`,
     `${keys.policy} models`,
@@ -329,6 +332,135 @@ export const classOfChoice: Readonly<Record<string, ModelClass>> = {
   d: "decide",
   v: "vision",
 };
+
+export type LedgerSign = "asks" | "asked" | "running" | "back" | "done" | "blocked";
+
+export const signGlyphs: Readonly<Record<LedgerSign, string>> = {
+  asks: "?",
+  asked: "?",
+  running: "▸",
+  back: "●",
+  done: "✓",
+  blocked: "!",
+};
+
+export const signWords: Readonly<Record<LedgerSign, string>> = {
+  asks: "Question waiting on you",
+  asked: "Question, answered",
+  running: "Task, running",
+  back: "Task, finished, not yet seen",
+  done: "Task, done",
+  blocked: "Task, blocked",
+};
+
+export const answerWords: Readonly<Record<QuestionAnswer, string>> = {
+  granted: "allowed",
+  denied: "not allowed",
+  lapsed: "lapsed",
+};
+
+export const conversationWords = {
+  open: "talking",
+  ended: "talk ended",
+  closed: "talk closed",
+} as const;
+
+export const spokenConversationWords = {
+  open: "a conversation about it is open",
+  ended: "its conversation ended with the answer",
+  closed: "you closed its conversation",
+} as const;
+
+export const nowWord = "now";
+
+export function doingLine(projects: readonly string[], running: readonly string[]): string {
+  const working = workingWords(running);
+  if (projects.length === 0)
+    return working === undefined ? "No project yet." : `${upFirst(working)}.`;
+  const named =
+    projects.length > 3 ? [...projects.slice(0, 2), `${projects.length - 2} more`] : projects;
+  return `On ${joinWithAnd(named)}${working === undefined ? "" : `, ${working}`}.`;
+}
+
+export function waitingLine(waiting: number): string {
+  if (waiting === 0) return "Nothing waits on you.";
+  return waiting === 1 ? "One question waits on you." : `${waiting} questions wait on you.`;
+}
+
+function workingWords(running: readonly string[]): string | undefined {
+  const [first] = running;
+  if (first === undefined) return undefined;
+  const more = running.length === 1 ? "" : ` and ${running.length - 1} more`;
+  return `working on "${first}"${more}`;
+}
+
+function upFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function waitingCount(waiting: number): string {
+  if (waiting === 0) return "nothing waiting";
+  return waiting === 1 ? "1 question" : `${waiting} questions`;
+}
+
+export function formWord(displayName: string): string {
+  return displayName.charAt(0).toLowerCase() + displayName.slice(1);
+}
+
+export function ledgerLabel(name: string): string {
+  return `${name}'s ledger: questions for you first, then tasks`;
+}
+
+export function emptyLedgerLine(name: string): string {
+  return `Nothing on ${name}'s ledger yet. Its questions and tasks gather here.`;
+}
+
+export const noLedgerLine =
+  "This engine keeps no ledger yet · questions and tasks appear once it does";
+export const readingLedgerLine = "reading the ledger";
+export const answeredAlreadyLine =
+  "That question is already answered · nothing is left to talk through";
+
+export function conversationRefusedLine(detail: string): string {
+  return `Blocked: the conversation did not open, ${detail}.`;
+}
+
+export function ledgerHint(
+  keys: { open: string; down: string; up: string; face: string },
+  rows: number,
+): string {
+  const profile = `${keys.face} its profile`;
+  return rows === 0
+    ? profile
+    : `${keys.open} talk it over · ${keys.down} ${keys.up} move · ${profile}`;
+}
+
+export function spokenRow(facts: {
+  sign: LedgerSign;
+  title: string;
+  project: string | undefined;
+  answer: QuestionAnswer | null;
+  conversation: keyof typeof spokenConversationWords | undefined;
+  age: string | undefined;
+}): string {
+  const parts = [
+    `${signWords[facts.sign]}: ${facts.title}`,
+    facts.project === undefined ? undefined : `in ${facts.project}`,
+    facts.answer === null ? undefined : answerWords[facts.answer],
+    facts.conversation === undefined ? undefined : spokenConversationWords[facts.conversation],
+    facts.age,
+  ];
+  return parts.filter((part): part is string => part !== undefined).join(", ");
+}
+
+export function spokenAge(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
 
 function joinWithAnd(items: readonly string[]): string {
   if (items.length <= 1) return items.join("");

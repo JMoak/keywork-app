@@ -34,6 +34,7 @@ import { telemetry } from "../chrome/telemetry.ts";
 import { createUpdateOffer, updateCommands } from "../chrome/update-offer.ts";
 import { followCompanion } from "../companion/console.ts";
 import { createCompanionController } from "../companion/floating.ts";
+import { createSteadBeside } from "../companion/stead-beside.ts";
 import { followActivations } from "../host/activation.ts";
 import { openInEditorWith } from "../host/editor.ts";
 import { describeFailure, type HostPort } from "../host/port.ts";
@@ -96,6 +97,7 @@ import { holdKeysWherePressed, sendStrayKeysHome } from "../panes/keyboard-home.
 import { workingSession } from "../panes/overview/working-session.ts";
 import { createCloseGate, type PaneActionHandler } from "../panes/registry.ts";
 import { kindWorkedIn, settingShownBy } from "../panes/setting/index.tsx";
+import { createSteadPlaceBoard } from "../panes/stead/block/board.ts";
 import { type SteadHomeScope, shellForStead } from "../panes/stead/home-scope.ts";
 import { steadPane } from "../panes/stead/index.tsx";
 import { postureStorageKey } from "../posture/record.ts";
@@ -144,7 +146,7 @@ import { choreAcceptedLine, heldChoresAmong } from "./needs-you.ts";
 import { createJumps, type NeedsYouPlace } from "./needs-you-jumps.ts";
 import type { NeedsYouQueue } from "./needs-you-queue.ts";
 import { connectingPane, OpenFailureCard, type OpenFailureNotice } from "./open-failure.tsx";
-import { createOutsidePanes, outsideNotices } from "./outside-panes.ts";
+import { createOutsidePanes, kindsKeptInside, outsideNotices } from "./outside-panes.ts";
 import { decidedAmong, overturnStanding } from "./overturn.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import { toggleSessionQuiet } from "./quiet.ts";
@@ -496,6 +498,13 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     if (looking !== undefined) reads.read(looking);
   });
 
+  const steadPlaces = createSteadPlaceBoard();
+  const openInside = (spec: PaneSpec): void => {
+    if (spec.kind === "conversation" && spec.sessionId !== undefined)
+      shell.sessions.openSession(spec.sessionId);
+    else shell.openPane(spec);
+  };
+
   const shell: ShellSeams = {
     get steadHome() {
       return steadHome();
@@ -533,6 +542,21 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     openPane: (spec) => {
       const parsed = parsePaneSpec(spec);
       if (parsed !== undefined) act(tiler.summon(parsed, screen()));
+    },
+    steadPlaces,
+    setOut: (spec, place) => {
+      companion.choosePlace(place);
+      const parsed = parsePaneSpec(spec);
+      if (parsed === undefined) return;
+      const standing = tiler.findPane((held) => sameSpec(held, parsed));
+      if (standing !== undefined) act(tiler.focus(standing));
+      else if (!outsidePanes.reachesOutside || kindsKeptInside.has(parsed.kind)) openInside(parsed);
+      else
+        void outsidePanes
+          .standOutside(parsed, { origin: "keeper", focus: true, follows: true, place })
+          .then((pane) => {
+            if (pane === undefined) openInside(parsed);
+          });
     },
     closePane: (paneId) => act(closePane(paneId)),
     openFromSetting: (settingId, what) => {
@@ -738,8 +762,16 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     backOnTheRail: (pane, why) => settingPanes.backOnTheRail(pane, why),
     putAway: (pane) => settingPanes.putAway(pane),
     setOutAgain: (seats) => settingPanes.setOutAgain(seats),
+    placeOnPage: steadPlaces.onPage,
   });
   onCleanup(offerSurfacesPerfHook(window, () => ({ popOutside: outsidePanes.popOutside })));
+  const steadBeside = createSteadBeside({
+    tiler,
+    outside: outsidePanes,
+    deliver: (pane, action, argument) => deliverToPane(pane, action, argument),
+    summonInside: () => void summon(definitionOf(steadPane.kind)),
+  });
+  onCleanup(steadBeside.dispose);
   const waitingForRoom = (onto: Screen): number =>
     tiler.shelf(onto).filter((entry) => entry.why === "tucked").length;
   const unfoldingWouldCrowd = (): boolean => {
@@ -830,6 +862,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     requestOnboarding: () => (steadHome()?.shell.onboarding ?? onboarding).request(),
     toggleCompanion: () => void companion.toggle()?.toggle(),
     switchCompanion: companion.switchTo,
+    toggleCompanionStead: companion.toggleStead,
     closePane: closeFocusedPane,
     zoomPane: () => reshape(() => tiler.zoom(), refusalNotices.nothingFocused),
     floatPane: () => reshape(floatFocused, refusalNotices.nothingFocused),
@@ -928,6 +961,11 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           props.needsYou.items().filter((item) => item.workspace === resident.workspace);
         followCompanion({
           controller: companion,
+          stead: steadBeside,
+          hatch: () => {
+            target.requestOnboarding();
+            target.summon(steadPane.kind);
+          },
           onboarding: () => onboarding.active() !== undefined,
           host: companionHost,
           store: resident.store,
@@ -939,6 +977,7 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
           decided: () => decidedAmong(waiting()),
           needsYou: waiting,
           creatures: () => resident.client.creatures(),
+          creature: (slug) => resident.client.creature(slug),
           openChores: () => resident.openPane({ kind: "chores" }),
           overturn: (recordId) => overturnStanding(resident.client, props.needsYou, recordId),
           acceptChore: async (chore) => {
@@ -1606,6 +1645,10 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
 }
 
 export const layerChangeMs = 160;
+
+function sameSpec(one: PaneSpec, other: PaneSpec): boolean {
+  return JSON.stringify(one) === JSON.stringify(other);
+}
 
 function markedNotice(count: number): string {
   const carry = count === 1 ? "carries" : "carry";

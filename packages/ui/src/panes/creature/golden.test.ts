@@ -18,7 +18,7 @@ afterEach(() => {
 describe("the profile as text", () => {
   it("reads top to bottom as the committed golden", async () => {
     const harness = creatureHarness({ report: wrenReport() });
-    const { container } = mountPane(
+    const { container, act } = mountPane(
       creaturePane.component,
       { kind: "creature", slug: "wren" },
       harness.shell,
@@ -26,6 +26,7 @@ describe("the profile as text", () => {
     await settle();
     await settle();
     await settle();
+    act("creature.profile");
     await expect(profileText(container)).toMatchFileSnapshot("./golden/wren.txt");
     harness.dispose();
   });

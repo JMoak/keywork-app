@@ -20,8 +20,11 @@ export function createOnboardingController() {
       return () => setCard((current) => (current === root ? undefined : current));
     },
     take: (action: string): boolean => {
+      const staged = active();
+      if (staged === undefined) return false;
       const verb = steadVerbs[action];
-      return verb !== undefined && (active()?.act(verb) ?? false);
+      if (verb !== undefined) staged.act(verb);
+      return true;
     },
   };
 }
@@ -29,7 +32,9 @@ export function createOnboardingController() {
 export type OnboardingController = ReturnType<typeof createOnboardingController>;
 
 export const steadVerbs: Readonly<Record<string, Verb>> = {
-  "stead.down": "down",
+  "stead.open": "accept",
   "stead.up": "up",
-  "stead.open": "keep",
+  "stead.down": "down",
+  "stead.turn-left": "previous",
+  "stead.turn-right": "next",
 };

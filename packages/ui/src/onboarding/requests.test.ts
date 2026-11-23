@@ -75,12 +75,12 @@ describe("the onboarding requests", () => {
 
   it("reads the creatures on the stead from the listing as the server serves it, { creatures }, and from a bare array", () => {
     const rows = [
-      { slug: "osk", name: "Osk", seed: 0, sigil: "o", workshop: "host" },
+      { slug: "osk", name: "Osk", seed: 0, skin: "cairn", sigil: "o", workshop: "host" },
       { slug: "tam", name: "Tam", sigil: "t", workshop: "host" },
     ];
     const expected = [
-      { slug: "osk", name: "Osk", seed: 0 },
-      { slug: "tam", name: "Tam", seed: undefined },
+      { slug: "osk", name: "Osk", seed: 0, skin: "cairn" },
+      { slug: "tam", name: "Tam", seed: undefined, skin: undefined },
     ];
     expect(creaturesOnTheStead({ status: 200, body: { creatures: rows } })).toEqual(expected);
     expect(creaturesOnTheStead({ status: 200, body: rows })).toEqual(expected);

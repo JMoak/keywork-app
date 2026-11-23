@@ -3,6 +3,7 @@ import type { KitColours } from "../../kit.ts";
 import { gold } from "./colours.ts";
 
 export interface SketchColours {
+  readonly bg: string;
   readonly ink: string;
   readonly paper: string;
   readonly star: string | undefined;
@@ -24,6 +25,7 @@ export interface SketchColours {
   readonly chalk: string;
   readonly smoke: string;
   readonly trim?: string;
+  readonly gold?: string;
   readonly hues: readonly string[];
   readonly sky: readonly string[];
   readonly orb: string | undefined;
@@ -38,6 +40,7 @@ export function derived(base: SketchColours, night: boolean): KitColours {
   const toward = (from: string, to: string, share: number): string => mixHex(from, to, share);
   const { ink, paper } = base;
   const trim = base.trim ?? base.timber;
+  const reward = base.gold ?? (night ? gold.night : gold.day);
   const roles: Record<string, string> = {
     ink,
     paper,
@@ -77,14 +80,15 @@ export function derived(base: SketchColours, night: boolean): KitColours {
     trim,
     trimHi: toward(trim, paper, 0.4),
     trimLo: toward(trim, ink, 0.42),
-    gold: night ? gold.night : gold.day,
-    goldHi: toward(night ? gold.night : gold.day, paper, 0.55),
-    goldDk: toward(night ? gold.night : gold.day, ink, 0.38),
+    gold: reward,
+    goldHi: toward(reward, paper, 0.55),
+    goldDk: toward(reward, ink, 0.38),
     ...(base.star === undefined ? {} : { star: base.star }),
     ...(base.pool === undefined ? {} : { pool: base.pool }),
   };
   return {
     night,
+    ground: base.bg,
     roles,
     hues: base.hues,
     ramps: { slate: base.slate, accent: base.accent },

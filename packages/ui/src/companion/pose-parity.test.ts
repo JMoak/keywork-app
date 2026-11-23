@@ -11,7 +11,7 @@ import {
   type StepContext,
   step,
 } from "@keywork-app/habitat";
-import { loadSkin } from "@keywork-app/habitat/skins";
+import { defaultSkinId, loadSkin } from "@keywork-app/habitat/skins";
 import type { BusEnvelope } from "@keywork-app/protocol";
 import { describe, expect, it } from "vitest";
 import { createMirror, followSnapshot, type Mirror } from "./beats.ts";
@@ -35,7 +35,7 @@ async function firstLight(): Promise<BusEnvelope[]> {
 describe("the companion and the stead, driven from one world", () => {
   it("play the same clip at every tick of first light, and the same frame whenever a clip began together", async () => {
     const stream = await firstLight();
-    const loaded = loadSkin("kid");
+    const loaded = loadSkin(defaultSkinId);
     if (!loaded.ok) throw new Error(loaded.faults.join("; "));
     const rows = loaded.skin.rows;
     const born = Date.parse(stream[0]?.ts ?? "") + 1;

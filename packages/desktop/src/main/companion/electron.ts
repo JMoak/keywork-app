@@ -331,6 +331,11 @@ function windowLike(native: BrowserWindow): CompanionWindowLike {
     showInactive: () => native.showInactive(),
     hide: () => native.hide(),
     isVisible: () => native.isVisible(),
+    focus: () => native.focus(),
+    blur: () => native.blur(),
+    isFocused: () => native.isFocused(),
+    setFocusable: (focusable) => native.setFocusable(focusable),
+    setSkipTaskbar: (skip) => native.setSkipTaskbar(skip),
     getBounds: () => native.getBounds(),
     setBounds: (bounds) => native.setBounds(bounds),
     setPosition: (x, y) => native.setPosition(x, y),
@@ -340,7 +345,10 @@ function windowLike(native: BrowserWindow): CompanionWindowLike {
       if (event === "closed") native.once("closed", listener);
       else native.once("ready-to-show", listener);
     },
-    on: (event, listener) => void native.on(event, listener),
+    on: (event, listener) => {
+      if (event === "blur") native.on("blur", listener);
+      else native.on("closed", listener);
+    },
   };
 }
 

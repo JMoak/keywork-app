@@ -23,6 +23,7 @@ import {
   spriteOf,
   topPainted,
 } from "./shapes.ts";
+import { nameSign } from "./sign.ts";
 import type { SketchStyle } from "./style.ts";
 
 export interface StagePlan {
@@ -58,6 +59,7 @@ export const stagePlans: Readonly<Record<Exclude<ProjectStage, "shack">, StagePl
 };
 
 export const floorPitch = 6;
+export const signFromStage = 3;
 export const litShare = { on: 0.8, off: 0.15 } as const;
 export const tierCornice = 4;
 
@@ -100,7 +102,23 @@ export function project(style: SketchStyle, spec: ProjectSpec): Construction {
   const last = { width: lastWidth, depth: lastDepth };
   if (style.piers) y = stepCrown(parts, crown, y, last, stage, spec);
   else y = plainCrown(parts, crown, y, last, plan, style, spec, stage);
-  return { parts, crown, reach: y + (plan.spire ? 24 : style.piers ? 18 : 14) };
+  const [groundWidth = 0, groundDepth = 0, groundFloors = 1] = plan.tiers[0] ?? [];
+  const sign =
+    stage < signFromStage
+      ? undefined
+      : nameSign(spec.name, {
+          left: -groundWidth / 2 + 1,
+          front: groundDepth / 2,
+          height: (groundFloors - 1) * floorPitch + 10,
+          lit: spec.lit,
+          brass: style.piers,
+        });
+  return {
+    parts,
+    crown,
+    ...(sign === undefined ? {} : { annexes: [sign] }),
+    reach: y + (plan.spire ? 24 : style.piers ? 18 : 14),
+  };
 }
 
 interface Level {

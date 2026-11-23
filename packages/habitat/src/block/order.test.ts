@@ -19,12 +19,16 @@ describe("draw order at the four rest positions", () => {
     }
   });
 
-  it("never draws a nearer thing before a farther one it overlaps, except what stands on a cell border as in the sketch, and the overlaps form no cycle", () => {
+  it("never draws a nearer thing before a farther one it overlaps, except what stands on a cell border as in the sketch and a creature shown through a wall, and the overlaps form no cycle", () => {
     for (const count of [1, 5, 9, 16]) {
       const world = worldOf(count);
       for (const quarter of quarters) {
         for (const eye of [levelEye, raisedEye]) {
-          const units = drawUnits(world, restCamera(quarter, eye), viewOf(world, 1008, 580, eye));
+          const units = drawUnits(
+            world,
+            restCamera(quarter, eye),
+            viewOf(world, 1008, 580, eye),
+          ).filter((unit) => unit.through !== true);
           const axes = axesOf(restCamera(quarter, eye));
           const findings = occlusionFindings(units, axes);
           expect(findings.wrong, `${count} creatures, quarter ${quarter}, eye ${eye}`).toEqual([]);

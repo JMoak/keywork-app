@@ -33,8 +33,24 @@ describe("project buildings from the directories a creature has worked in", () =
     };
     const sites = projectSitesOf(state, places, { "/work/lamps": 120 });
     expect(sites[ada]).toEqual([
-      { id: "/work/bells", floors: 1, lit: false, conversations: 1, trackedFiles: undefined },
-      { id: "/work/lamps", floors: 1, lit: true, conversations: 3, trackedFiles: 120 },
+      {
+        id: "/work/bells",
+        floors: 1,
+        lit: false,
+        conversations: 1,
+        trackedFiles: undefined,
+        since: Date.parse("2024-03-01T00:00:00.000Z"),
+        latest: Date.parse("2024-03-01T00:00:00.000Z"),
+      },
+      {
+        id: "/work/lamps",
+        floors: 1,
+        lit: true,
+        conversations: 3,
+        trackedFiles: 120,
+        since: Date.parse("2025-01-02T00:00:00.000Z"),
+        latest: Date.parse("2026-11-22T11:00:00.000Z"),
+      },
     ]);
     expect(sites[slugOf(1)]?.map((site) => site.id)).toEqual(["/work/bells"]);
     expect(directoriesIn(places)).toEqual(["/work/bells", "/work/lamps", "/work/nowhere"]);

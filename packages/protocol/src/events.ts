@@ -2,6 +2,7 @@ import type { ChildFinished, ChildStarted } from "./children.ts";
 import type { CacheMiss, SendBehavior, SessionState } from "./controls.ts";
 import type { CreatureChanged, CreatureHandoffChange, PromptOrigin } from "./creatures.ts";
 import type { MemoryDecision } from "./decisions.ts";
+import type { CreatureLedgerChange } from "./ledger.ts";
 import type {
   MeshGrantChange,
   MeshListenerChange,
@@ -59,6 +60,7 @@ export const serverEventTypes = [
   "session.settled",
   "creature.changed",
   "creature.handoff",
+  "creature.ledger",
   "routine.fired",
   "routine.finished",
   "routine.needs",
@@ -114,6 +116,7 @@ export interface ServerPayloads {
   "session.settled": SessionSettlement;
   "creature.changed": CreatureChanged;
   "creature.handoff": CreatureHandoffChange;
+  "creature.ledger": CreatureLedgerChange;
   "routine.fired": RoutineFired;
   "routine.finished": RoutineFinished;
   "routine.needs": RoutineNeeds;

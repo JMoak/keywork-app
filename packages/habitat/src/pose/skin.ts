@@ -50,12 +50,19 @@ export interface Skin {
   readonly cell: { readonly width: number; readonly height: number };
   readonly atlas: IndexedBitmap;
   readonly palette: PaletteRoles;
+  readonly fixed?: readonly string[];
   readonly rows: Readonly<Record<PoseName, Row>>;
   readonly groundLine: number;
   readonly gaze?: { readonly row: number; readonly directions: 8 | 16 };
 }
 
-export const paletteIndexLimit = 16;
+export const sharedPaletteSize = 23;
+export const paletteIndexLimit = 256;
+export const fixedColourLimit = paletteIndexLimit - sharedPaletteSize;
+
+export function paletteSizeOf(skin: Skin): number {
+  return sharedPaletteSize + (skin.fixed?.length ?? 0);
+}
 
 export const defaultPaletteRoles: PaletteRoles = {
   identity: [1, 2, 3, 4],
@@ -120,8 +127,17 @@ export function validateSkin(skin: Skin): string[] {
       `atlas holds ${skin.atlas.indices.length} indices for a ${skin.atlas.width}x${skin.atlas.height} grid`,
     );
   }
-  if (skin.atlas.indices.some((index) => index >= paletteIndexLimit)) {
-    faults.push(`atlas uses a palette index at or above ${paletteIndexLimit}`);
+  const paletteSize = paletteSizeOf(skin);
+  if (skin.atlas.indices.some((index) => index >= paletteSize)) {
+    faults.push(`atlas uses a palette index at or above ${paletteSize}`);
+  }
+  if ((skin.fixed?.length ?? 0) > fixedColourLimit) {
+    faults.push(
+      `${skin.fixed?.length} fixed colours exceed the ${fixedColourLimit} a skin may keep`,
+    );
+  }
+  for (const colour of skin.fixed ?? []) {
+    if (!/^#[0-9a-f]{6}$/.test(colour)) faults.push(`fixed colour ${colour} is not six hex digits`);
   }
   if (skin.groundLine <= 0 || skin.groundLine > skin.cell.height) {
     faults.push(`ground line ${skin.groundLine} is outside the cell`);

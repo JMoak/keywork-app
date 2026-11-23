@@ -4,6 +4,8 @@ import {
   type CompanionSnapshot,
   companionChannels,
   type Presence,
+  type SteadAsk,
+  type SteadRequest,
 } from "../main/companion/channels.ts";
 import type { CompanionPreferences, PreferencePatch } from "../main/companion/preferences.ts";
 
@@ -21,6 +23,12 @@ export interface CompanionHost {
   onOpenRequested(listener: (threadId: string | undefined) => void): () => void;
   onSettingsRequested(listener: () => void): () => void;
   onSwitchRequested(listener: (creature: string) => void): () => void;
+  askForStead(ask: SteadAsk): void;
+  takeKeyboardBack(): Promise<void>;
+  steadPutAway(tookTheKeyboard: boolean): void;
+  onChooseRequested(listener: (creature: string) => void): () => void;
+  onHatchRequested(listener: () => void): () => void;
+  onSteadRequested(listener: (request: SteadRequest) => void): () => void;
 }
 
 export function companionHostPort(ipc: CompanionIpc): CompanionHost {
@@ -44,5 +52,11 @@ export function companionHostPort(ipc: CompanionIpc): CompanionHost {
     onOpenRequested: subscribe<string | undefined>(companionChannels.openRequested),
     onSettingsRequested: subscribe<void>(companionChannels.settingsRequested),
     onSwitchRequested: subscribe<string>(companionChannels.switchRequested),
+    askForStead: (ask) => ipc.send(companionChannels.stead, ask),
+    takeKeyboardBack: () => ipc.invoke(companionChannels.steadAway) as Promise<void>,
+    steadPutAway: (tookTheKeyboard) => ipc.send(companionChannels.steadGone, tookTheKeyboard),
+    onChooseRequested: subscribe<string>(companionChannels.chooseRequested),
+    onHatchRequested: subscribe<void>(companionChannels.hatchRequested),
+    onSteadRequested: subscribe<SteadRequest>(companionChannels.steadRequested),
   };
 }

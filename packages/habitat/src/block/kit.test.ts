@@ -81,7 +81,7 @@ describe("a kit", () => {
       }
     });
 
-    it(`${kit.id}: sizes every face texture to its face, tops at half resolution`, () => {
+    it(`${kit.id}: sizes every face texture to its face, tops to the grid they are seen on`, () => {
       const world = worldOf(kit, 9, "night");
       for (const cell of world.cells) {
         expectTexturesFit([
@@ -97,9 +97,11 @@ describe("a kit", () => {
 });
 
 describe("the block palette", () => {
-  it("takes only the pane's ground from the app theme", () => {
+  it("takes its ground from the kit's own theme and light unless one is given", () => {
     const kit = kits[0];
     if (kit === undefined) throw new Error("no kit");
+    expect(resolveBlockPalette(kit, "night").background).toBe(kit.colours.night.ground);
+    expect(resolveBlockPalette(kit, "day").background).toBe(kit.colours.day.ground);
     const one = resolveBlockPalette(kit, "night", pageGround.night);
     const other = resolveBlockPalette(kit, "night", pageGround.day);
     expect(one.background).toBe(pageGround.night);
@@ -156,11 +158,13 @@ function expectTexturesFit(parts: readonly Part[]): void {
       nz: [across, tall],
       px: [deep, tall],
       nx: [deep, tall],
-      top: [across / topTexel, deep / topTexel],
+      top: [across, deep / topTexel],
     };
     for (const [face, paint] of Object.entries(box.faces)) {
       if (!("texture" in paint)) continue;
       expect([paint.texture.width, paint.texture.height], face).toEqual(sizes[face]);
+      if (paint.sideOn !== undefined)
+        expect([paint.sideOn.width, paint.sideOn.height]).toEqual([across / topTexel, deep]);
     }
   }
 }

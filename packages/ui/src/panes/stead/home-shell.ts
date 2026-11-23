@@ -35,6 +35,7 @@ export function homeShell(
     ...(surface.creatureNames !== undefined && { creatureNames: surface.creatureNames }),
     ...(surface.needsYou !== undefined && { needsYou: surface.needsYou }),
     ...(surface.drafts !== undefined && { drafts: surface.drafts }),
+    ...(surface.steadPlaces !== undefined && { steadPlaces: surface.steadPlaces }),
     currentSession: () => undefined,
     focusedPane: surface.focusedPane,
     openPane,

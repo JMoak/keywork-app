@@ -135,6 +135,7 @@ export {
   ownerKeyOf,
   ownerOf,
   type Placement,
+  placeOf,
   type Rect,
   type RuleLasts,
   rankOf,

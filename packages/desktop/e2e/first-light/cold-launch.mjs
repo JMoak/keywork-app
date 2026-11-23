@@ -36,7 +36,7 @@ const firstFrameWaits = {
   ],
   stead: [
     [".kw-stead, .kw-open-failure", 120_000],
-    [".kw-onboard[data-phase=step]", 90_000],
+    [".kw-hatch[data-phase=egg]", 90_000],
   ],
 };
 
@@ -145,7 +145,7 @@ async function readFirstFrame(workspace) {
     focused: held.hasAttribute("data-focused"),
     left: held.closest(".kw-slot")?.style.left ?? "",
   }));
-  const card = document.querySelector(".kw-onboard");
+  const card = document.querySelector(".kw-hatch");
   const served = async (path) => {
     const host = window.keyworkHost;
     if (host === undefined || workspace === null) return "no host port";
@@ -165,9 +165,7 @@ async function readFirstFrame(workspace) {
         ? null
         : {
             phase: card.getAttribute("data-phase"),
-            step: card.querySelector(".kw-onboard-step[data-current]")?.textContent ?? null,
-            title: card.querySelector(".kw-onboard-title")?.textContent ?? null,
-            lines: [...card.querySelectorAll(".kw-onboard-line, .kw-onboard-ask")].map(
+            lines: [...card.querySelectorAll(".kw-hatch-line, .kw-hatch-keys")].map(
               (line) => line.textContent ?? "",
             ),
             focused: document.activeElement !== null && card.contains(document.activeElement),

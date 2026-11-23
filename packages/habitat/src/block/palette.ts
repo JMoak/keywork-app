@@ -32,7 +32,7 @@ export function rampRole(step: RampStep): Role {
 export function resolveBlockPalette(
   kit: Kit,
   appearance: Appearance,
-  background: string,
+  background: string = kit.colours[appearance].ground,
 ): BlockPalette {
   const colours = kit.colours[appearance];
   const ink = colours.roles.ink ?? background;

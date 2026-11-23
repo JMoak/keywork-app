@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { companionMenu, sizeStops } from "./menu.ts";
 
 describe("companionMenu", () => {
-  it("always offers Open, Hide, Still, Quiet, Size and Settings, in that order", () => {
+  it("always offers Open, the stead, Hide, Still, Quiet, Size and Settings, in that order", () => {
     const items = companionMenu({
       still: true,
       quiet: false,
@@ -12,6 +12,7 @@ describe("companionMenu", () => {
     });
     expect(items.map((item) => ("label" in item ? item.label : "—"))).toEqual([
       "Open the console",
+      "Show the stead",
       "—",
       "Hide",
       "Still",
@@ -20,8 +21,8 @@ describe("companionMenu", () => {
       "—",
       "Settings…",
     ]);
-    expect(items[3]).toEqual({ kind: "toggle", label: "Still", action: "still", checked: true });
-    const size = items[5];
+    expect(items[4]).toEqual({ kind: "toggle", label: "Still", action: "still", checked: true });
+    const size = items[6];
     if (size?.kind !== "submenu") throw new Error("no size submenu");
     expect(size.items.filter((item) => item.kind === "choice").map((item) => item.label)).toEqual(
       sizeStops.map((stop) => `${stop}%`),

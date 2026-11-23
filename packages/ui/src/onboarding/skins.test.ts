@@ -1,26 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chosenSkin, offeredSkins, rolledSkin, surprise, surpriseMe } from "./skins.ts";
+import { defaultSkinId } from "../panes/stead/habitat-render.ts";
+import { offeredSkins } from "./skins.ts";
 
 describe("the skins on offer", () => {
-  it("rolls only other available designs and stays put when there is no alternative", () => {
-    expect(rolledSkin("kid", ["kid", "tessera", "cairn"], () => 0)).toBe("tessera");
-    expect(rolledSkin("kid", ["kid", "tessera", "cairn"], () => 0.99)).toBe("cairn");
-    expect(rolledSkin("kid", ["kid", "kid"])).toBe("kid");
-    expect(rolledSkin("kid", [])).toBe("kid");
-  });
-  it("offers every registered skin but the placeholder, and the tinkerer when nothing else is registered", () => {
-    expect(offeredSkins()).toEqual(["kid", "carter", "joiner", "tessera", "cairn"]);
+  it("offers every registered skin but the placeholder, and the default when nothing else is registered", () => {
+    expect(offeredSkins()).not.toContain("placeholder");
     expect(offeredSkins(["kid", "placeholder", "owl"])).toEqual(["kid", "owl"]);
-    expect(offeredSkins(["placeholder"])).toEqual(["kid"]);
-  });
-
-  it("resolves surprise me to a registered skin, the same one for the same workspace", () => {
-    const offered = ["kid", "owl", "fox"];
-    const picked = surprise("C:/src/stead", offered);
-    expect(offered).toContain(picked);
-    expect(surprise("C:/src/stead", offered)).toBe(picked);
-    expect(chosenSkin(surpriseMe, "C:/src/stead", offered)).toBe(picked);
-    expect(chosenSkin("owl", "C:/src/stead", offered)).toBe("owl");
-    expect(chosenSkin(surpriseMe, "anywhere", ["kid"])).toBe("kid");
+    expect(offeredSkins(["placeholder"])).toEqual([defaultSkinId]);
   });
 });

@@ -50,6 +50,16 @@ export interface DrillOut {
 
 export const arrivalTiming = { maxGliding: 6 } as const;
 
+export const riseTiming = { steps: 8, stepMs: 60 } as const;
+
+// The desktop refuses a pane window smaller than this (its surface minimum), and a window the
+// desktop resized on its own reads as one the keeper moved, so no step may go below it.
+export const windowFloor = { width: 200, height: 120 } as const;
+
+export type Places = ReadonlyMap<SurfaceId, ScreenRect>;
+
+export const noPlaces: Places = new Map();
+
 export const glideTiming = { shortestMs: 140, longestMs: 200, nearPx: 240, farPx: 1200 } as const;
 
 export const typingHold = { quietMs: 400, longestMs: 2000 } as const;
@@ -69,6 +79,7 @@ export function arrivalPlan(
   starts: readonly Start[],
   prefs: MotionPrefs,
   pacing: Pacing = briskly,
+  places: Places = noPlaces,
 ): Plan {
   const style = motionStyle(prefs);
   const pace = paceUnder(style, pacing);
@@ -76,11 +87,13 @@ export function arrivalPlan(
   const entrances = inTurn(turnsUnder(style, starts, pace), shows, (show) => show.id);
   return planOf(
     style,
-    entrances.flatMap(({ item: show, atMs }) =>
-      style === "glide"
+    entrances.flatMap(({ item: show, atMs }) => {
+      if (style !== "glide") return [shownInPlace(show, atMs)];
+      const place = places.get(show.id);
+      return place === undefined
         ? flownFrom(emergeStart(desk, show.bounds), show, atMs, pace)
-        : [shownInPlace(show, atMs)],
-    ),
+        : risenFrom(place, show, atMs, pace);
+    }),
   );
 }
 
@@ -90,18 +103,47 @@ export function recallPlan(
   starts: readonly Start[],
   prefs: MotionPrefs,
   pacing: Pacing = briskly,
+  places: Places = noPlaces,
 ): Plan {
   const style = motionStyle(prefs);
   const pace = paceUnder(style, pacing);
   const exits = inTurn(turnsUnder(style, starts, pace), outside, (pane) => pane.id);
   return planOf(
     style,
-    exits.flatMap(({ item: pane, atMs }) =>
-      style === "glide"
+    exits.flatMap(({ item: pane, atMs }) => {
+      if (style !== "glide") return [hidden(pane.id, atMs)];
+      const place = places.get(pane.id);
+      return place === undefined
         ? flownInto(recallEnd(desk, pane.bounds), pane, atMs, pace)
-        : [hidden(pane.id, atMs)],
-    ),
+        : steppedInto(place, pane, atMs, pace);
+    }),
   );
+}
+
+export function steppedBetween(from: ScreenRect, to: ScreenRect): ScreenRect[] {
+  const { steps } = riseTiming;
+  const start = atLeastAWindow(from);
+  return Array.from({ length: steps }, (_, step) => {
+    const done = 1 - (1 - (step + 1) / steps) ** 2;
+    const at = (begin: number, end: number): number => Math.round(begin + (end - begin) * done);
+    return atLeastAWindow({
+      x: at(start.x, to.x),
+      y: at(start.y, to.y),
+      width: at(start.width, to.width),
+      height: at(start.height, to.height),
+    });
+  });
+}
+
+export function atLeastAWindow(rect: ScreenRect): ScreenRect {
+  const width = Math.max(windowFloor.width, Math.round(rect.width));
+  const height = Math.max(windowFloor.height, Math.round(rect.height));
+  return {
+    x: Math.round(rect.x + (rect.width - width) / 2),
+    y: Math.round(rect.y + (rect.height - height) / 2),
+    width,
+    height,
+  };
 }
 
 export function arisePlan(
@@ -323,6 +365,29 @@ function flownInto(home: ScreenRect, pane: Standing, atMs: number, pace: Pacing)
     { atMs, kind: "glide", glide: { moves, durationMs } },
     hidden(pane.id, atMs + durationMs),
   ];
+}
+
+function risenFrom(place: ScreenRect, show: SurfaceShow, atMs: number, pace: Pacing): Cue[] {
+  const stepMs = pacedMs(riseTiming.stepMs, pace);
+  return [
+    { atMs, kind: "show", show: { ...show, bounds: atLeastAWindow(place) } },
+    ...steppedBetween(place, show.bounds).map((bounds, step) =>
+      jumped(show.id, bounds, atMs + (step + 1) * stepMs),
+    ),
+  ];
+}
+
+function steppedInto(place: ScreenRect, pane: Standing, atMs: number, pace: Pacing): Cue[] {
+  const stepMs = pacedMs(riseTiming.stepMs, pace);
+  const steps = steppedBetween(pane.bounds, place);
+  return [
+    ...steps.map((bounds, step) => jumped(pane.id, bounds, atMs + step * stepMs)),
+    hidden(pane.id, atMs + steps.length * stepMs),
+  ];
+}
+
+function jumped(id: SurfaceId, bounds: ScreenRect, atMs: number): Cue {
+  return { atMs, kind: "glide", glide: { moves: [{ id, bounds }], durationMs: 0 } };
 }
 
 function glidden(

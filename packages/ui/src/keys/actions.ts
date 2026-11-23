@@ -1,4 +1,9 @@
-import { companionSwitchAction, companionSwitchActionId } from "../companion/floating.ts";
+import {
+  companionSteadAction,
+  companionSteadActionId,
+  companionSwitchAction,
+  companionSwitchActionId,
+} from "../companion/floating.ts";
 import { companionToggleAction, companionToggleActionId } from "../companion/switch.tsx";
 import type { Direction } from "../layout/geometry.ts";
 import type { DockSide } from "../layout/index.ts";
@@ -33,6 +38,7 @@ export interface ActionTarget extends OutsideHandlers {
   requestOnboarding(): void;
   toggleCompanion(): void;
   switchCompanion(creature: string | undefined): void;
+  toggleCompanionStead(): void;
   closePane(): void;
   zoomPane(): void;
   floatPane(): void;
@@ -82,6 +88,7 @@ export const coreActions: Record<string, AppAction> = {
   [onboardingActionId]: onboardingAction,
   [companionToggleActionId]: companionToggleAction,
   [companionSwitchActionId]: companionSwitchAction,
+  [companionSteadActionId]: companionSteadAction,
   [yardRailActionId]: yardRailAction,
   [yardToggleActionId]: yardToggleAction,
   [yardTrailActionId]: yardTrailAction,

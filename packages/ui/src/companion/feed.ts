@@ -10,6 +10,7 @@ import {
   threadReading,
   threadsOf,
 } from "@keywork-app/habitat";
+import { resolveSkinId } from "../panes/stead/habitat-render.ts";
 import { coatOf } from "../panes/stead/herd.ts";
 import type {
   AnswerPick,
@@ -57,7 +58,10 @@ export function creatureSnapshot(
       name: resident.name,
       hueStop: resident.hueStop,
       slug: resident.slug,
-      skin: world.creatures[resident.slug]?.skin,
+      skin: resolveSkinId(
+        world.creatures[resident.slug]?.skin,
+        world.creatures[resident.slug]?.seed ?? 0,
+      ),
     },
     facts,
     heldChoreOf(world, resident.slug),

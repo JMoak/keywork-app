@@ -23,6 +23,8 @@ export const selfTestRecordSchema = z
     "The last transparency self-test and the GPU it ran on; exists because about five percent of Windows machines paint transparent windows black and the test must rerun only when the GPU changes.",
   );
 
+export const defaultShortcut = "Alt+Shift+K";
+
 export const companionPreferencesSchema = z
   .object({
     version: z.literal(1),
@@ -81,9 +83,17 @@ export const companionPreferencesSchema = z
       .string()
       .min(1)
       .nullable()
+      .default(defaultShortcut)
+      .describe(
+        "The global chord that summons the companion: it shows a hidden creature, lands the keyboard on the team, and pressed again with the companion focused brings up the stead; null disables it, and a chord an OS or launcher uses is refused. It has a default because the everyday front door needs one way in from the keeper's own work without the pointer.",
+      ),
+    creature: z
+      .string()
+      .min(1)
+      .nullable()
       .default(null)
       .describe(
-        "The global show-or-hide chord, none by default; changeable and disableable from day one, and refused when it collides with a chord an OS or launcher uses.",
+        "The creature last chosen, by slug; exists so the companion after a restart is the one the keeper was last with, and null until a choice is made.",
       ),
     motion: z
       .enum(["system", "reduce", "full"])
@@ -135,8 +145,18 @@ export function preferenceBook(file: string, seams: FileSeams): PreferenceBook {
 
 export function parsePreferences(text: string | undefined): CompanionPreferences {
   if (text === undefined) return defaultPreferences;
-  const parsed = companionPreferencesSchema.safeParse(tryJson(text));
+  const parsed = companionPreferencesSchema.safeParse(withoutAnUnchosenShortcut(tryJson(text)));
   return parsed.success ? parsed.data : defaultPreferences;
+}
+
+function withoutAnUnchosenShortcut(stored: unknown): unknown {
+  if (!writtenBeforeAShortcutCouldBeChosen(stored)) return stored;
+  const { shortcut, ...kept } = stored;
+  return shortcut === null ? kept : stored;
+}
+
+function writtenBeforeAShortcutCouldBeChosen(stored: unknown): stored is Record<string, unknown> {
+  return typeof stored === "object" && stored !== null && !("creature" in stored);
 }
 
 export function patched(

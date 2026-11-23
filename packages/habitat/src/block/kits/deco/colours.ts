@@ -15,6 +15,7 @@ const decoNightHues = [
 export const decoColours: Readonly<Record<Appearance, KitColours>> = {
   night: derived(
     {
+      bg: "#1a1b26",
       ink: "#070d0c",
       paper: "#fff3d6",
       star: "#8d8662",
@@ -36,6 +37,7 @@ export const decoColours: Readonly<Record<Appearance, KitColours>> = {
       chalk: "#fff3d6",
       smoke: "#7f8c8c",
       trim: "#c9a04e",
+      gold: "#ffe07a",
       hues: decoNightHues,
       sky: ["#171d30", "#1b2a3a", "#213a42", "#2a4a46"],
       orb: "#ffd98a",
@@ -48,6 +50,7 @@ export const decoColours: Readonly<Record<Appearance, KitColours>> = {
   ),
   day: derived(
     {
+      bg: "#e9ebf3",
       ink: "#22302e",
       paper: "#ffffff",
       star: undefined,

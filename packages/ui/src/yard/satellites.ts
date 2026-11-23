@@ -42,15 +42,16 @@ export function satelliteOf(setting: Shown): Satellite {
     case "note":
       return { kind: "note", text: ref };
     case "pane":
-      return ownPaneOf(ref, setting.sessionId);
+      return ownPaneOf(ref, setting);
   }
 }
 
 // One of the console's own panes, by the name the engine keeps it under. A name this console
 // does not know (a newer engine's) is said in words, where a pane would have stood.
-function ownPaneOf(name: string, sessionId: string): Satellite {
+function ownPaneOf(name: string, setting: Shown): Satellite {
   const known = settingPanes.find((pane) => pane === name);
   if (known === undefined) return { kind: "note", text: unknownPaneWords(name) };
+  const { sessionId, creature } = setting;
   switch (known) {
     case "sessions":
       return { kind: "pane", spec: { kind: "tree" } };
@@ -60,11 +61,25 @@ function ownPaneOf(name: string, sessionId: string): Satellite {
       return { kind: "pane", spec: { kind: "browser" } };
     case "context":
       return { kind: "pane", spec: { kind: "context", sessionId } };
+    case "workshop":
+      return {
+        kind: "pane",
+        spec: creature === null ? { kind: "workshop" } : { kind: "workshop", creature },
+      };
+    case "terminal":
+      return { kind: "pane", spec: { kind: "terminal", mode: "mirror", sessionId } };
     case "memory":
     case "needs-you":
     case "permissions":
     case "mcp":
     case "workspaces":
+    case "mills":
+    case "parcels":
+    case "bots":
+    case "campaigns":
+    case "themes":
+    case "posture":
+    case "stead":
       return { kind: "pane", spec: { kind: known } };
   }
 }

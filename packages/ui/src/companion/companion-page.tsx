@@ -1,6 +1,7 @@
 import { type MotionPrefs, type Rows, referenceRows } from "@keywork-app/habitat";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { cardKeys } from "../page/ask-card.tsx";
+import { steadName } from "../panes/stead/copy.ts";
 import { wearRememberedTheme } from "../theme/wardrobe.ts";
 import { accessibleName } from "./announce.ts";
 import {
@@ -44,6 +45,8 @@ import {
   tokensFromStyle,
 } from "./renderer.ts";
 import { bubbleShown } from "./snapshot.ts";
+import { groundRow, teamRows, zoomFor } from "./team-figures.ts";
+import { TeamStrip, type TeamStripHandle } from "./team-strip.tsx";
 import { effectiveTier, type SchedulerHost, tierScheduler } from "./tier-scheduler.ts";
 import "./companion.css";
 
@@ -53,6 +56,8 @@ export interface PageHost extends SchedulerHost {
   readToken(name: string): string;
   viewport(): { width: number; height: number };
   storage: Pick<Storage, "getItem"> | undefined;
+  onWindowFocus?(listener: () => void): () => void;
+  onWindowBlur?(listener: () => void): () => void;
 }
 
 export interface CompanionPageProps {
@@ -79,6 +84,14 @@ export function browserPageHost(): PageHost {
     readToken: (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim(),
     viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
     storage: storageOrNone(),
+    onWindowFocus: (listener) => {
+      window.addEventListener("focus", listener);
+      return () => window.removeEventListener("focus", listener);
+    },
+    onWindowBlur: (listener) => {
+      window.addEventListener("blur", listener);
+      return () => window.removeEventListener("blur", listener);
+    },
   };
 }
 
@@ -97,9 +110,15 @@ export function CompanionPage(props: CompanionPageProps) {
   const [hovering, setHovering] = createSignal(false);
   const [dragging, setDragging] = createSignal(false);
   const [reacting, setReacting] = createSignal(false);
+  const [strip, setStrip] = createSignal<TeamStripHandle>();
+  const [airUnderFeet, setAirUnderFeet] = createSignal(0);
   let stage: HTMLDivElement | undefined;
+  let creature: HTMLButtonElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
   let mask: HitMask | undefined;
+  let lastFrame: RenderedFrame | undefined;
+  let maskStale = false;
+  let leastAir = Number.POSITIVE_INFINITY;
   let interactive = false;
   let painted = false;
   let shown: Look | undefined;
@@ -117,8 +136,10 @@ export function CompanionPage(props: CompanionPageProps) {
     conditions().motion === "reduce" ||
     (conditions().motion === "system" && host.systemReducesMotion());
   const still = () => conditions().still || reducedMotion();
+  const team = () => snapshot()?.team;
+  const steadOut = () => snapshot()?.steadOut === true;
   const desire = (): Tier => {
-    if (dragging() || hovering()) return "interact";
+    if (dragging() || hovering() || strip()?.lively() === true) return "interact";
     return reacting() ? "active" : "ambient";
   };
   const tier = () => effectiveTier(conditions().ceiling, desire());
@@ -153,6 +174,7 @@ export function CompanionPage(props: CompanionPageProps) {
       mirroredRenderer = selected;
       mirroredResident = resident;
       shown = undefined;
+      leastAir = Number.POSITIVE_INFINITY;
     }
     mirror = followSnapshot(mirror, current, now, prefs(), rows());
     const pose = shownPose(mirror.body, rows(), prefs());
@@ -176,16 +198,20 @@ export function CompanionPage(props: CompanionPageProps) {
               forcedColors: look.forcedColors,
             });
       paintFrame(canvas, frame, host.devicePixelRatio());
+      lastFrame = frame;
+      standOn(frame);
       refreshMask(frame);
       if (selected === undefined) setInteractive(false);
-    }
+    } else if (maskStale && lastFrame !== undefined) refreshMask(lastFrame);
+    maskStale = false;
+    const teamWakeAt = team() === undefined ? undefined : strip()?.paint(now);
     if (!painted) {
       painted = true;
       props.port.ready();
     }
     report(now);
     if (reacting() && mirror.body.clip.lane !== "input") setReacting(false);
-    return selected === undefined ? undefined : pose.nextWakeAt;
+    return together(selected === undefined ? undefined : pose.nextWakeAt, teamWakeAt, now);
   };
   const scheduler = tierScheduler(host, draw);
 
@@ -201,6 +227,13 @@ export function CompanionPage(props: CompanionPageProps) {
     if (conditions().wantsMask) props.port.sendMask(mask);
   };
 
+  const standOn = (frame: RenderedFrame): void => {
+    const air = rowsUnderTheFeet(frame);
+    if (air === undefined || air >= leastAir) return;
+    leastAir = air;
+    setAirUnderFeet(air / host.devicePixelRatio());
+  };
+
   const report = (now: number): void => {
     if (now - lastReport < wakeupReportEveryMs) return;
     lastReport = now;
@@ -214,6 +247,26 @@ export function CompanionPage(props: CompanionPageProps) {
   };
 
   const open = (): void => props.port.open(snapshot()?.threadId);
+
+  const askForStead = (): void =>
+    props.port.askForStead({ creature: strip()?.under() ?? snapshot()?.creature.slug });
+
+  const teamChanged = (): void => {
+    maskStale = true;
+    scheduler.poke();
+  };
+
+  const restsOnAnotherControl = (held: Element | null): boolean =>
+    held !== null &&
+    held !== stage &&
+    stage?.contains(held) === true &&
+    held.closest("[data-team-key]") === null;
+
+  const landKeyboard = (): void => {
+    if (restsOnAnotherControl(document.activeElement)) return;
+    if (team() !== undefined && strip() !== undefined) strip()?.land();
+    else creature?.focus();
+  };
 
   const step = (input: DragInput): void => {
     const result = advanceDrag(drag, input);
@@ -295,16 +348,25 @@ export function CompanionPage(props: CompanionPageProps) {
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
-    const nudge = nudgeOf(event.key);
-    if (nudge !== undefined) {
-      event.preventDefault();
-      props.port.nudge(nudge);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      props.port.home();
-    }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const act = event.shiftKey ? movingKeys[event.key] : teamKeys[event.key];
+    if (act === undefined || (act === "reveal" && !steadKeyReaches(event.target, stage))) return;
+    event.preventDefault();
+    if (act === "reveal") askForStead();
+    else if (act === "before") strip()?.step(-1);
+    else if (act === "after") strip()?.step(1);
+    else if (act === "leave") stepBack();
+    else if (act === "home") props.port.home();
+    else props.port.nudge(act);
+  };
+
+  const stepBack = (): void => {
+    if (steadOut()) askForStead();
+    else props.port.release();
+  };
+
+  const onKeyUp = (event: KeyboardEvent): void => {
+    if (event.key === " " && steadKeyReaches(event.target, stage)) event.preventDefault();
   };
 
   const onContextMenu = (event: MouseEvent): void => {
@@ -348,7 +410,13 @@ export function CompanionPage(props: CompanionPageProps) {
 
   onMount(() => {
     wearRememberedTheme({ storage: host.storage });
-    const stops = [props.port.onSnapshot(receive), props.port.onConditions(setConditions)];
+    const stops = [
+      props.port.onSnapshot(receive),
+      props.port.onConditions(setConditions),
+      props.port.onSteadKey(askForStead),
+      host.onWindowFocus?.(landKeyboard) ?? (() => undefined),
+      host.onWindowBlur?.(() => strip()?.rest()) ?? (() => undefined),
+    ];
     onCleanup(() => {
       for (const stop of stops) stop();
     });
@@ -376,6 +444,7 @@ export function CompanionPage(props: CompanionPageProps) {
       onPointerUp={onPointerUp}
       onPointerCancel={() => step({ type: "cancel" })}
       onKeyDown={onKeyDown}
+      onKeyUp={onKeyUp}
       onContextMenu={onContextMenu}
     >
       <Show when={bubble()} fallback={<span />}>
@@ -401,31 +470,70 @@ export function CompanionPage(props: CompanionPageProps) {
           />
         )}
       </Show>
-      <button
-        type="button"
-        class="kw-companion-creature"
-        data-hit={unavailable() ? "" : undefined}
-        aria-label={label()}
-        tabIndex={conditions().keyboardReachable ? 0 : -1}
-        onClick={(event) => {
-          if (event.detail === 0) open();
-        }}
-      >
-        <canvas ref={canvas} class="kw-companion-canvas" hidden={unavailable()} />
-        <Show when={unavailable()}>
-          <span class="kw-companion-unavailable" role="status">
-            appearance unavailable
-          </span>
+      <div class="kw-companion-floor">
+        <Show when={team()}>
+          {(standing) => (
+            <div
+              class="kw-companion-team"
+              style={{
+                "margin-bottom": `${airUnderFeet() - airUnderTheTeam(conditions().scale, host.devicePixelRatio())}px`,
+              }}
+            >
+              <TeamStrip
+                ref={setStrip}
+                team={standing()}
+                current={snapshot()?.creature.slug}
+                scale={conditions().scale}
+                still={still()}
+                quiet={conditions().quiet}
+                forcedColors={conditions().forcedColors}
+                host={host}
+                onChoose={(slug) => props.port.choose(slug)}
+                onWhereItLives={(slug) => props.port.askForStead({ creature: slug })}
+                onHatch={() => props.port.hatch()}
+                onChanged={teamChanged}
+              />
+            </div>
+          )}
         </Show>
-        <Badge
-          activeThreads={snapshot()?.activeThreads ?? 0}
-          finishedUnseen={snapshot()?.finishedUnseen ?? 0}
-          waiting={snapshot()?.waiting ?? 0}
-        />
-      </button>
+        <button
+          ref={creature}
+          type="button"
+          class="kw-companion-creature"
+          data-hit={unavailable() ? "" : undefined}
+          aria-label={label()}
+          aria-keyshortcuts="Enter Space"
+          tabIndex={conditions().keyboardReachable ? 0 : -1}
+          onClick={(event) => {
+            if (event.detail === 0) open();
+          }}
+        >
+          <canvas ref={canvas} class="kw-companion-canvas" hidden={unavailable()} />
+          <Show when={unavailable()}>
+            <span class="kw-companion-unavailable" role="status">
+              appearance unavailable
+            </span>
+          </Show>
+          <Badge
+            activeThreads={snapshot()?.activeThreads ?? 0}
+            finishedUnseen={snapshot()?.finishedUnseen ?? 0}
+            waiting={snapshot()?.waiting ?? 0}
+          />
+        </button>
+      </div>
       <div class="kw-companion-controls">
         <button type="button" class="kw-companion-control" data-hit onClick={open}>
-          open
+          talk
+        </button>
+        <button
+          type="button"
+          class="kw-companion-control"
+          data-hit
+          aria-pressed={steadOut()}
+          aria-keyshortcuts="Space"
+          onClick={askForStead}
+        >
+          {steadName} <kbd>space</kbd>
         </button>
         <button
           type="button"
@@ -441,19 +549,53 @@ export function CompanionPage(props: CompanionPageProps) {
   );
 }
 
-function nudgeOf(key: string): NudgeStep | undefined {
-  switch (key) {
-    case "ArrowLeft":
-      return { dx: -1, dy: 0 };
-    case "ArrowRight":
-      return { dx: 1, dy: 0 };
-    case "ArrowUp":
-      return { dx: 0, dy: -1 };
-    case "ArrowDown":
-      return { dx: 0, dy: 1 };
-    default:
-      return undefined;
+type KeyAct = "reveal" | "before" | "after" | "leave" | "home" | NudgeStep;
+
+export const teamKeys: Readonly<Record<string, KeyAct>> = {
+  " ": "reveal",
+  ArrowLeft: "before",
+  ArrowRight: "after",
+  Escape: "leave",
+  Home: "home",
+};
+
+export const movingKeys: Readonly<Record<string, KeyAct>> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+};
+
+function steadKeyReaches(target: EventTarget | null, stage: HTMLElement | undefined): boolean {
+  if (!(target instanceof Element)) return false;
+  return target === stage || target.closest("[data-team-key], .kw-companion-creature") !== null;
+}
+
+function airUnderTheTeam(sizePercent: number, devicePixelRatio: number): number {
+  return ((teamRows - groundRow) * zoomFor(sizePercent, devicePixelRatio)) / devicePixelRatio;
+}
+
+function rowsUnderTheFeet(frame: RenderedFrame): number | undefined {
+  for (let row = frame.height - 1; row >= 0; row -= 1) {
+    const from = row * frame.width;
+    for (let at = from; at < from + frame.width; at += 1) {
+      if ((frame.alpha[at] ?? 0) !== 0) return frame.height - 1 - row;
+    }
   }
+  return undefined;
+}
+
+export const teamWaitsMs = 125;
+
+function together(
+  creatureWakeAt: number | undefined,
+  teamWakeAt: number | undefined,
+  now: number,
+): number | undefined {
+  if (creatureWakeAt === undefined || teamWakeAt === undefined) return creatureWakeAt ?? teamWakeAt;
+  const wait = creatureWakeAt - teamWakeAt;
+  const teamCanWait = teamWakeAt > now && wait >= 0 && wait <= teamWaitsMs;
+  return teamCanWait ? creatureWakeAt : Math.min(creatureWakeAt, teamWakeAt);
 }
 
 interface Look {

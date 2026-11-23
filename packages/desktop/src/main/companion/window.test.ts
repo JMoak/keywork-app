@@ -12,12 +12,12 @@ import {
 
 describe("windowSizeFor", () => {
   it("is the creature plus at most 24 DIP of margin, the controls strip, and the bubble when needed", () => {
-    expect(creatureBox(100)).toEqual({ width: 96, height: 104 });
+    expect(creatureBox(100)).toEqual({ width: 166, height: 124 });
     expect(chromeMargin).toBe(24);
-    expect(windowSizeFor(100, { bubble: false })).toEqual({ width: 144, height: 180 });
-    expect(windowSizeFor(100, { bubble: true })).toEqual({ width: 288, height: 236 });
-    expect(windowSizeFor(50, { bubble: false })).toEqual({ width: 96, height: 114 });
-    expect(windowSizeFor(200, { bubble: false })).toEqual({ width: 240, height: 312 });
+    expect(windowSizeFor(100, { bubble: false })).toEqual({ width: 214, height: 200 });
+    expect(windowSizeFor(100, { bubble: true })).toEqual({ width: 288, height: 256 });
+    expect(windowSizeFor(50, { bubble: false })).toEqual({ width: 131, height: 124 });
+    expect(windowSizeFor(200, { bubble: false })).toEqual({ width: 380, height: 352 });
   });
 });
 

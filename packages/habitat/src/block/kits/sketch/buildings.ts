@@ -238,14 +238,14 @@ function flatRoof(
   const penthouse: Paint = (brush, width, tall) => {
     brush.rect(0, 0, width, tall, "plaster");
     brush.rect(0, 0, width, 1, "plasterHi");
-    brush.rect(2, 3, width - 4, 3, spec.lit ? lightColour : "glass");
+    brush.rect(2, 3, width - 4, 3, spec.loft ? lightColour : "glass");
   };
   const crown: Crowning[] = [
     {
       x: x0 + 8,
       z: z0 + 7,
       part: box(x0 + 2, x0 + 14, height + 3, height + 11, z0 + 2, z0 + 12, {
-        sides: sameSides(penthouse, `penthouse|${spec.lit}|${lightColour}`),
+        sides: sameSides(penthouse, `penthouse|${spec.loft}|${lightColour}`),
         top: filled("hue.b"),
       }),
     },

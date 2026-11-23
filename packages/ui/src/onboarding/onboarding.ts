@@ -1,17 +1,12 @@
 import type { CreatureSummary } from "@keywork-app/protocol";
-import { createMemo, createSignal } from "solid-js";
+import { batch, createSignal } from "solid-js";
 import { z } from "zod";
 import { hueStop, rampStops } from "../chrome/pane-frame.tsx";
+import { prefersReducedMotion } from "../chrome/stamp.ts";
 import {
-  cloudNeverRequired,
-  hostLimitation,
-  inheritWord,
-  localFirstWord,
-  madeLine,
-  skinLabel,
-  substrateWords,
-  surpriseWord,
-  threadLine,
+  nameRefused,
+  nameTaken,
+  readyLine,
   threadRefusedLine,
   threadWaitsLine,
   workshopRaisedLine,
@@ -23,13 +18,16 @@ import {
   inheritEverywhere,
   introductionOf,
   localFirst,
-  proposePolicy,
+  type ModelClass,
+  type ModelPolicy,
+  modelClasses,
   type Reach,
   reachOf,
 } from "./models.ts";
-import { plainNames, proposeNames, slugOf } from "./names.ts";
+import { nameOf, plainNames, proposeNames, slugOf } from "./names.ts";
 import {
   type CreatureOnTheStead,
+  type CreatureRequest,
   conversationOf,
   creatureMadeOf,
   creaturesOnTheStead,
@@ -37,61 +35,67 @@ import {
   refusalOf,
   workshopOwnersOnTheNode,
 } from "./requests.ts";
-import {
-  back as backOne,
-  begun,
-  creatureRequestOf,
-  keep as keepOne,
-  type Proposals,
-  type Sequence,
-  type Settled,
-  type Step,
-  settle,
-  skipRest as skipAll,
-  skip as skipOne,
-  stepOf,
-} from "./sequence.ts";
-import { chosenSkin, offeredSkins, surpriseMe } from "./skins.ts";
-import type { ServerReading, WorkshopSupport } from "./workshop.ts";
-import {
-  substrateReportServed,
-  workshopChoiceOf,
-  workshopChoices,
-  workshopSupportOf,
-} from "./workshop.ts";
+import { hatchlingAmong, lookBeside, offeredSkins } from "./skins.ts";
+import type { ServerReading, Substrate } from "./workshop.ts";
+import { substrateReportServed, workshopChoiceOf, workshopSupportOf } from "./workshop.ts";
+
+export type Beat = "still" | "crack" | "split" | "glow" | "open" | "light" | "arrive";
+
+export interface ScoreStep {
+  readonly beat: Beat;
+  readonly ms: number;
+  readonly waitsForProposals?: true;
+}
+
+export const hatchScore: readonly ScoreStep[] = [
+  { beat: "crack", ms: 125 },
+  { beat: "split", ms: 250 },
+  { beat: "glow", ms: 500, waitsForProposals: true },
+  { beat: "open", ms: 125 },
+  { beat: "light", ms: 125 },
+  { beat: "arrive", ms: 1000 },
+];
+
+export const stillScore: readonly ScoreStep[] = [{ beat: "still", ms: 0, waitsForProposals: true }];
+
+export const madeLingerMs = 5000;
 
 export type Phase =
-  | { readonly kind: "reading" }
-  | { readonly kind: "step"; readonly step: Step }
-  | { readonly kind: "making"; readonly name: string }
+  | { readonly kind: "egg" }
+  | { readonly kind: "hatching"; readonly beat: Beat }
+  | { readonly kind: "meet" }
+  | { readonly kind: "making" }
   | { readonly kind: "made"; readonly made: Made }
-  | { readonly kind: "failed"; readonly reason: string }
   | { readonly kind: "closed" };
+
+export type Next =
+  | { readonly kind: "conversation"; readonly sessionId: string }
+  | { readonly kind: "connect" }
+  | { readonly kind: "nothing" };
 
 export interface Made {
   readonly slug: string;
   readonly name: string;
-  readonly conversation: string | undefined;
   readonly lines: readonly string[];
+  readonly next: Next;
 }
 
-export interface Choice {
-  readonly key: string;
-  readonly label: string;
-  readonly detail?: string | undefined;
+export interface Proposals {
+  readonly names: readonly string[];
+  readonly skins: readonly string[];
+  readonly workshop: Substrate;
+  readonly raising: boolean;
+  readonly workshopRefusal: string | undefined;
+  readonly policy: ModelPolicy;
 }
 
-export type Verb =
-  | "down"
-  | "up"
-  | "keep"
-  | "skip"
-  | "rest"
-  | "back"
-  | "close"
-  | "dismiss"
-  | "connect"
-  | "install";
+export interface Hatchling {
+  readonly name: string;
+  readonly skin: string;
+  readonly coat: number;
+}
+
+export type Verb = "accept" | "leave" | "previous" | "next" | "up" | "down" | "another";
 
 export interface OnboardingStorage {
   getItem(key: string): string | null;
@@ -103,6 +107,8 @@ export interface OnboardingRecord {
   readonly dismissedAt?: string | undefined;
 }
 
+export type Cancel = () => void;
+
 export interface OnboardingSeams {
   readonly client: OnboardingClient;
   readonly workspace: string;
@@ -111,30 +117,25 @@ export interface OnboardingSeams {
   inject(sessionId: string, text: string, creature: string): Promise<unknown>;
   openThread(sessionId: string): void;
   openConnect(): void;
-  openInstall(): void;
   readonly storage: OnboardingStorage | undefined;
   readonly skins?: readonly string[] | undefined;
   readonly now?: (() => number) | undefined;
+  readonly random?: (() => number) | undefined;
+  readonly still?: (() => boolean) | undefined;
+  readonly after?: ((ms: number, run: () => void) => Cancel) | undefined;
 }
 
 export interface Onboarding {
   phase(): Phase;
-  step(): Step | undefined;
-  proposals(): Proposals | undefined;
-  reach(): Reach | undefined;
-  sequence(): Sequence;
-  choices(): readonly Choice[];
-  cursor(): number;
-  shownSkin(): string;
-  coat(): number;
+  coat(): number | undefined;
+  hatchling(): Hatchling | undefined;
+  trouble(): string | undefined;
+  shakes(): number;
   begin(): Promise<void>;
-  name(name: string): void;
-  point(index: number): void;
+  rename(text: string): void;
+  wear(coat: number): void;
   act(verb: Verb): boolean;
 }
-
-export const localPolicyKey = "local";
-export const inheritPolicyKey = "inherit";
 
 const noWorkshopsDetail = "this node serves no workshops";
 const nameTakenStatus = 409;
@@ -144,8 +145,11 @@ export function onboardingStorageKey(workspace: string): string {
 }
 
 export function freeCoat(taken: readonly number[]): number {
-  const stops = Array.from({ length: rampStops }, (_, index) => hueStop(index));
-  return stops.find((stop) => !taken.includes(stop)) ?? hueStop(taken.length);
+  return coats().find((stop) => !taken.includes(stop)) ?? hueStop(taken.length);
+}
+
+export function coats(): number[] {
+  return Array.from({ length: rampStops }, (_, index) => hueStop(index));
 }
 
 export function coatsTaken(creatures: readonly CreatureOnTheStead[]): number[] {
@@ -168,281 +172,336 @@ export function namesLeft(
   return left.length === 0 ? [...plainNames] : left;
 }
 
-export function choicesFor(step: Step | undefined, proposals: Proposals | undefined): Choice[] {
-  if (proposals === undefined) return [];
-  switch (step) {
-    case "skin":
-      return [
-        ...proposals.skins.map((id) => ({ key: id, label: skinLabel(id) })),
-        { key: surpriseMe, label: surpriseWord },
-      ];
-    case "workshop":
-      return proposals.workshops.map((substrate) => ({
-        key: substrate,
-        label: substrateWords[substrate],
-        detail:
-          substrate === "host" ? (proposals.workshop.limitation ?? hostLimitation) : undefined,
-      }));
-    case "models":
-      return [
-        ...(localFirst(proposals.policy) ? [{ key: localPolicyKey, label: localFirstWord }] : []),
-        { key: inheritPolicyKey, label: inheritWord, detail: cloudNeverRequired },
-      ];
-    default:
-      return [];
-  }
+export function creatureRequestOf(chosen: Hatchling, known: Proposals): CreatureRequest {
+  return {
+    name: chosen.name,
+    skin: chosen.skin,
+    ...(known.raising && { substrate: known.workshop }),
+    ...(localFirst(known.policy) && { models: classesChosenIn(known.policy) }),
+  };
 }
 
 export function startOnboarding(seams: OnboardingSeams): Onboarding {
-  const [phase, setPhase] = createSignal<Phase>({ kind: "reading" });
+  const [phase, setPhase] = createSignal<Phase>({ kind: "egg" });
   const [proposals, setProposals] = createSignal<Proposals>();
-  const [reach, setReach] = createSignal<Reach>();
-  const [support, setSupport] = createSignal<WorkshopSupport>();
-  const [sequence, setSequence] = createSignal<Sequence>(begun);
-  const [pointed, setPointed] = createSignal(0);
-  const [neighbours, setNeighbours] = createSignal<readonly CreatureOnTheStead[]>([]);
-  const [takenOnTheNode, setTakenOnTheNode] = createSignal<readonly string[]>([]);
+  const [coat, setCoat] = createSignal<number>();
+  const [skin, setSkin] = createSignal<string>();
+  const [nameAt, setNameAt] = createSignal(0);
+  const [typed, setTyped] = createSignal<string>();
+  const [trouble, setTrouble] = createSignal<string>();
+  const [shakes, setShakes] = createSignal(0);
+  let reach: Reach | undefined;
+  let neighbours: readonly CreatureOnTheStead[] = [];
+  let takenOnTheNode: readonly string[] = [];
+  let reading = 0;
+  let readingFailed = false;
+  let released: (() => void) | undefined;
+  let stopClock: Cancel = nothing;
+
   const seed = seams.workspace;
-  const freeNames = (): string[] => proposeNames(seed, namesLeft(neighbours(), takenOnTheNode()));
   const now = seams.now ?? Date.now;
+  const random = seams.random ?? Math.random;
+  const still = seams.still ?? prefersReducedMotion;
+  const after = seams.after ?? afterOnTheClock;
   const storageKey = onboardingStorageKey(seams.workspace);
   const remember = (change: OnboardingRecord): void =>
     rememberOnboarding(seams.storage, storageKey, {
       ...rememberedOnboarding(seams.storage, storageKey),
       ...change,
     });
-
-  const step = (): Step | undefined => {
-    const current = phase();
-    return current.kind === "step" ? current.step : undefined;
-  };
-  const choices = createMemo(() => choicesFor(step(), proposals()));
-  const cursor = (): number => Math.min(Math.max(0, pointed()), Math.max(0, choices().length - 1));
-  const skins = (): readonly string[] => proposals()?.skins ?? offeredSkins();
-  const shownSkin = (): string => {
-    const underCursor = step() === "skin" ? choices()[cursor()]?.key : undefined;
-    const picked = underCursor ?? sequence().chosen.skin ?? skins()[0] ?? "";
-    return chosenSkin(picked, seed, skins());
+  const freeNames = (): string[] => {
+    const left = namesLeft(neighbours, takenOnTheNode);
+    return proposeNames(seed, left, left.length);
   };
 
-  const show = (next: Sequence): void => {
-    setSequence(next);
-    setPointed(0);
-    const current = stepOf(next);
-    if (current === undefined) void make(next);
-    else setPhase({ kind: "step", step: current });
-  };
-
-  const make = async (final: Sequence): Promise<void> => {
+  const hatchling = (): Hatchling | undefined => {
     const known = proposals();
-    if (known === undefined) return;
-    const settled = settle(final, known, seed);
-    setPhase({ kind: "making", name: settled.name });
+    const look = skin();
+    const worn = coat();
+    if (known === undefined || look === undefined || worn === undefined) return undefined;
+    return { name: typed() ?? known.names[nameAt()] ?? "", skin: look, coat: worn };
+  };
+
+  const begin = (): Promise<void> => {
+    reset();
+    return read();
+  };
+
+  const read = async (): Promise<void> => {
+    const mine = ++reading;
+    readingFailed = false;
     try {
-      const outcome = await makeCreature(settled, known);
-      setPhase(
-        typeof outcome === "string"
-          ? { kind: "failed", reason: outcome }
-          : { kind: "made", made: outcome },
-      );
+      const onTheStead = readNeighbours(seams.client).then((creatures) => {
+        if (mine === reading) setCoat(freeCoat(coatsTaken(creatures)));
+        return creatures;
+      });
+      const [creatures, listing, report, models] = await Promise.all([
+        onTheStead,
+        seams.client.workshops(),
+        readSubstrateReport(seams.client),
+        seams.client.models(),
+      ]);
+      if (mine !== reading) return;
+      const support = workshopSupportOf(report ?? listing);
+      const offered = seams.skins ?? offeredSkins();
+      const reached = reachOf(models, seams.cloud());
+      neighbours = creatures;
+      takenOnTheNode = workshopOwnersOnTheNode(listing);
+      reach = reached;
+      batch(() => {
+        setSkin(hatchlingAmong(offered, wornOnTheStead(creatures), random));
+        setProposals({
+          names: freeNames(),
+          skins: offered,
+          workshop: workshopChoiceOf(support).substrate,
+          raising: support.served,
+          workshopRefusal: support.served ? undefined : (support.detail ?? noWorkshopsDetail),
+          policy: inheritEverywhere,
+        });
+      });
+      release();
     } catch (error) {
-      setPhase({ kind: "failed", reason: messageOf(error) });
+      if (mine === reading) failReading(messageOf(error));
     }
   };
 
-  const makeCreature = async (settled: Settled, known: Proposals): Promise<Made | string> => {
-    const raising = support()?.served === true;
-    const creation = await seams.client.createCreature(creatureRequestOf(settled, raising));
+  const reset = (): void => {
+    stopClock();
+    released = undefined;
+    batch(() => {
+      setPhase({ kind: "egg" });
+      setProposals(undefined);
+      setCoat(undefined);
+      setSkin(undefined);
+      setNameAt(0);
+      setTyped(undefined);
+      setTrouble(undefined);
+    });
+  };
+
+  const failReading = (reason: string): void => {
+    readingFailed = true;
+    if (phase().kind !== "hatching") return;
+    stopClock();
+    released = undefined;
+    batch(() => {
+      setPhase({ kind: "egg" });
+      setTrouble(reason);
+    });
+  };
+
+  const release = (): void => {
+    const held = released;
+    released = undefined;
+    held?.();
+  };
+
+  const hatch = (): void => {
+    setTrouble(undefined);
+    if (readingFailed) void read();
+    play(still() ? stillScore : hatchScore);
+  };
+
+  const play = (score: readonly ScoreStep[], at = 0): void => {
+    const step = score[at];
+    if (step === undefined) {
+      setPhase({ kind: "meet" });
+      return;
+    }
+    setPhase({ kind: "hatching", beat: step.beat });
+    const onward = (): void => play(score, at + 1);
+    const breathe = (): void => (step.waitsForProposals ? whenRead(onward) : onward());
+    if (step.ms > 0) stopClock = after(step.ms, breathe);
+    else breathe();
+  };
+
+  const whenRead = (run: () => void): void => {
+    if (proposals() === undefined) released = run;
+    else run();
+  };
+
+  const turnLook = (step: number): void => {
+    const known = proposals();
+    const look = skin();
+    if (known !== undefined && look !== undefined) setSkin(lookBeside(look, known.skins, step));
+  };
+
+  const turnCoat = (step: number): void => {
+    const worn = coat();
+    if (worn !== undefined) setCoat(hueStop(seedForCoat(worn) + step + rampStops));
+  };
+
+  const anotherName = (): void => {
+    const names = proposals()?.names ?? [];
+    if (names.length === 0) return;
+    batch(() => {
+      setNameAt((at) => (at + 1) % names.length);
+      setTyped(undefined);
+      setTrouble(undefined);
+    });
+  };
+
+  const refuse = (reason: string, shake: boolean): void => {
+    batch(() => {
+      setPhase({ kind: "meet" });
+      setTrouble(reason);
+      if (shake) setShakes((count) => count + 1);
+    });
+  };
+
+  const keep = (): void => {
+    const known = proposals();
+    const chosen = hatchling();
+    if (known === undefined || chosen === undefined) return;
+    const name = nameOf(chosen.name);
+    if (name === undefined) refuse(nameRefused, true);
+    else void make({ ...chosen, name }, known);
+  };
+
+  const make = async (chosen: Hatchling, known: Proposals): Promise<void> => {
+    batch(() => {
+      setTrouble(undefined);
+      setPhase({ kind: "making" });
+    });
+    try {
+      const outcome = await makeCreature(chosen, known);
+      if ("refused" in outcome) refuse(outcome.refused, outcome.taken);
+      else settle(outcome);
+    } catch (error) {
+      refuse(messageOf(error), false);
+    }
+  };
+
+  const makeCreature = async (chosen: Hatchling, known: Proposals): Promise<Made | Refusal> => {
+    const creation = await seams.client.createCreature(creatureRequestOf(chosen, known));
     const creature = creatureMadeOf(creation);
-    if (creature === undefined) return refusedName(creation, settled.name);
+    if (creature === undefined) return refusalIn(creation, chosen.name);
     remember({ made: { slug: creature.slug, at: new Date(now()).toISOString() } });
-    await wearCoat(creature.slug, known.coat);
+    await wearCoat(creature.slug, chosen.coat);
     await seams.seat();
-    const lines = [madeLine(creature.name), workshopLine(settled, raising)];
     const opened = await seams.client.readCreature(creature.slug);
     const conversation = conversationOf(opened);
-    lines.push(
-      conversation === undefined
-        ? threadRefusedLine(refusalOf(opened))
-        : await openFirstThread(conversation, creature, settled, known),
-    );
-    return { slug: creature.slug, name: creature.name, conversation, lines };
+    const workshop = workshopLine(known);
+    if (conversation === undefined) {
+      const lines = [threadRefusedLine(refusalOf(opened)), workshop];
+      return { ...creature, lines, next: { kind: "nothing" } };
+    }
+    const introduction = introductionOf(reach, known.policy.strong);
+    if (introduction.kind === "waits") {
+      const lines = [threadWaitsLine(introduction.detail), workshop];
+      return { ...creature, lines, next: { kind: "connect" } };
+    }
+    const frame = introductionFrame({ name: creature.name, workspace: seams.workspace });
+    await seams.inject(conversation, frame, creature.slug);
+    const next: Next = { kind: "conversation", sessionId: conversation };
+    return { ...creature, lines: [readyLine, workshop], next };
   };
 
-  const refusedName = (creation: ServerReading, name: string): string => {
-    if (creation.status === nameTakenStatus) setAside(slugOf(name));
-    return refusalOf(creation);
+  const refusalIn = (creation: ServerReading, name: string): Refusal => {
+    if (creation.status !== nameTakenStatus) return { refused: refusalOf(creation), taken: false };
+    setAside(name);
+    return { refused: nameTaken, taken: true };
   };
 
-  const setAside = (slug: string): void => {
-    setTakenOnTheNode((taken) => [...taken, slug]);
+  const setAside = (name: string): void => {
+    takenOnTheNode = [...takenOnTheNode, slugOf(name)];
     const known = proposals();
-    if (known !== undefined) setProposals({ ...known, names: freeNames() });
+    if (known === undefined) return;
+    const names = freeNames();
+    batch(() => {
+      setProposals({ ...known, names });
+      setNameAt(names.length - 1);
+      setTyped(name);
+    });
   };
 
-  const wearCoat = async (slug: string, coat: number | undefined): Promise<void> => {
+  const wearCoat = async (slug: string, worn: number): Promise<void> => {
     const patch = seams.client.patchCreature;
-    if (coat === undefined || patch === undefined) return;
-    await patch.call(seams.client, slug, { body: { seed: seedForCoat(coat) } });
+    if (patch !== undefined)
+      await patch.call(seams.client, slug, { body: { seed: seedForCoat(worn) } });
   };
 
-  const workshopLine = (settled: Settled, raising: boolean): string =>
-    raising
-      ? workshopRaisedLine(settled.workshop)
-      : workshopRefusedLine(support()?.detail ?? noWorkshopsDetail);
-
-  const openFirstThread = async (
-    conversation: string,
-    creature: { readonly slug: string; readonly name: string },
-    settled: Settled,
-    known: Proposals,
-  ): Promise<string> => {
-    const name = creature.name;
-    const introduction = introductionOf(reach(), settled.models.strong);
-    if (introduction.kind === "promised") {
-      const frame = introductionFrame({
-        name,
-        workspace: seams.workspace,
-        named: settled.named,
-        names: known.names,
-      });
-      await seams.inject(conversation, frame, creature.slug);
-    }
-    seams.openThread(conversation);
-    return introduction.kind === "promised"
-      ? threadLine(name, introduction.through)
-      : threadWaitsLine(name, introduction.detail);
+  const settle = (made: Made): void => {
+    setPhase({ kind: "made", made });
+    if (made.next.kind === "conversation") stopClock = after(madeLingerMs, () => finish(true));
   };
 
-  const keepCursor = (): void => {
-    const known = proposals();
-    const choice = choices()[cursor()];
-    if (known === undefined || choice === undefined) return;
-    switch (step()) {
-      case "skin":
-        show(keepOne(sequence(), "skin", choice.key));
-        return;
-      case "workshop": {
-        const substrate = known.workshops.find((each) => each === choice.key);
-        if (substrate !== undefined) show(keepOne(sequence(), "workshop", substrate));
-        return;
-      }
-      case "models":
-        show(
-          keepOne(
-            sequence(),
-            "models",
-            choice.key === localPolicyKey ? known.policy : inheritEverywhere,
-          ),
-        );
-        return;
-      default:
-        return;
-    }
+  const finish = (accepted: boolean): void => {
+    const current = phase();
+    if (current.kind !== "made") return;
+    stopClock();
+    setPhase({ kind: "closed" });
+    if (!accepted) return;
+    if (current.made.next.kind === "conversation") seams.openThread(current.made.next.sessionId);
+    else if (current.made.next.kind === "connect") seams.openConnect();
   };
 
-  const close = (): void => {
+  const dismiss = (): void => {
+    stopClock();
+    released = undefined;
+    remember({ dismissedAt: new Date(now()).toISOString() });
     setPhase({ kind: "closed" });
   };
 
-  const actInStep = (verb: Verb): boolean => {
+  const actWhileMeeting = (verb: Verb): boolean => {
     switch (verb) {
-      case "down":
-        setPointed(cursor() + 1);
+      case "accept":
+        keep();
+        return true;
+      case "leave":
+        dismiss();
+        return true;
+      case "previous":
+        turnLook(-1);
+        return true;
+      case "next":
+        turnLook(1);
         return true;
       case "up":
-        setPointed(cursor() - 1);
+        turnCoat(1);
         return true;
-      case "keep":
-        if (step() === "name") return false;
-        keepCursor();
+      case "down":
+        turnCoat(-1);
         return true;
-      case "skip":
-        show(skipOne(sequence()));
-        return true;
-      case "rest":
-        show(skipAll(sequence()));
-        return true;
-      case "back":
-        show(backOne(sequence()));
-        return true;
-      case "connect":
-        if (step() !== "models") return false;
-        seams.openConnect();
-        return true;
-      case "install":
-        if (step() !== "workshop" || proposals()?.workshop.installStep === undefined) return false;
-        seams.openInstall();
-        return true;
-      case "close":
-      case "dismiss":
-        remember({ dismissedAt: new Date(now()).toISOString() });
-        close();
+      case "another":
+        anotherName();
         return true;
     }
   };
 
   return {
     phase,
-    step,
-    proposals,
-    reach,
-    sequence,
-    choices,
-    cursor,
-    shownSkin,
-    coat: () => proposals()?.coat ?? hueStop(0),
-    begin: async () => {
-      setPhase({ kind: "reading" });
-      try {
-        const [listing, report, models, onTheStead] = await Promise.all([
-          seams.client.workshops(),
-          readSubstrateReport(seams.client),
-          seams.client.models(),
-          readNeighbours(seams.client),
-        ]);
-        const support = workshopSupportOf(report ?? listing);
-        setSupport(support);
-        setNeighbours(onTheStead);
-        setTakenOnTheNode(workshopOwnersOnTheNode(listing));
-        const reached = reachOf(models, seams.cloud());
-        setReach(reached);
-        setProposals({
-          names: freeNames(),
-          skins: seams.skins ?? offeredSkins(),
-          coat: freeCoat(coatsTaken(onTheStead)),
-          workshop: workshopChoiceOf(support),
-          workshops: workshopChoices(support),
-          policy: proposePolicy(reached),
-        });
-        show(begun);
-      } catch (error) {
-        setPhase({ kind: "failed", reason: messageOf(error) });
-      }
+    coat,
+    hatchling,
+    trouble,
+    shakes,
+    begin,
+    rename: (text) => {
+      if (phase().kind !== "meet") return;
+      batch(() => {
+        setTyped(text);
+        setTrouble(undefined);
+      });
     },
-    name: (name) => {
-      if (step() === "name") show(keepOne(sequence(), "name", name));
+    wear: (worn) => {
+      if (phase().kind === "meet") setCoat(worn);
     },
-    point: setPointed,
     act: (verb) => {
-      switch (phase().kind) {
-        case "step":
-          return actInStep(verb);
-        case "made":
-          if (verb !== "keep" && verb !== "close" && verb !== "dismiss") return false;
-          close();
-          return true;
-        case "failed":
-          if (verb === "back") {
-            show({ ...sequence(), at: 0 });
-            return true;
-          }
-          if (verb !== "close" && verb !== "dismiss") return false;
-          close();
-          return true;
-        default:
-          return false;
+      const kind = phase().kind;
+      if (kind === "meet") return actWhileMeeting(verb);
+      if (kind === "made" && (verb === "accept" || verb === "leave")) {
+        finish(verb === "accept");
+        return true;
       }
+      if (kind === "egg" && verb === "accept") {
+        hatch();
+        return true;
+      }
+      if ((kind === "egg" || kind === "hatching") && verb === "leave") {
+        dismiss();
+        return true;
+      }
+      return kind === "hatching" && verb === "accept";
     },
   };
 }
@@ -484,6 +543,38 @@ export function rememberOnboarding(
   try {
     storage?.setItem(key, JSON.stringify(record));
   } catch {}
+}
+
+interface Refusal {
+  readonly refused: string;
+  readonly taken: boolean;
+}
+
+const nothing: Cancel = () => undefined;
+
+function afterOnTheClock(ms: number, run: () => void): Cancel {
+  const timer = setTimeout(run, ms);
+  return () => clearTimeout(timer);
+}
+
+function workshopLine(known: Proposals): string {
+  return known.workshopRefusal === undefined
+    ? workshopRaisedLine(known.workshop)
+    : workshopRefusedLine(known.workshopRefusal);
+}
+
+function wornOnTheStead(creatures: readonly CreatureOnTheStead[]): string[] {
+  return creatures.flatMap((creature) => (creature.skin === undefined ? [] : [creature.skin]));
+}
+
+function classesChosenIn(
+  policy: ModelPolicy,
+): Partial<Record<ModelClass, ModelPolicy[ModelClass]>> {
+  return Object.fromEntries(
+    modelClasses
+      .filter((modelClass) => policy[modelClass] !== "inherit")
+      .map((modelClass) => [modelClass, policy[modelClass]]),
+  );
 }
 
 async function readSubstrateReport(client: OnboardingClient): Promise<ServerReading | undefined> {

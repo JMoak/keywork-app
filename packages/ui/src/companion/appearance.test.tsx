@@ -1,6 +1,6 @@
 import { type HabitatState, type Rows, referenceRows } from "@keywork-app/habitat";
 import type { PaletteSource } from "@keywork-app/habitat/render";
-import { loadSkin } from "@keywork-app/habitat/skins";
+import { defaultSkinId, loadSkin, resolveSkinId } from "@keywork-app/habitat/skins";
 import type { BusEnvelope, CreatureSummary } from "@keywork-app/protocol";
 import { cleanup, render } from "@solidjs/testing-library";
 import { createRoot } from "solid-js";
@@ -20,6 +20,7 @@ import {
 } from "./port.ts";
 import type { Pose, Renderer } from "./renderer.ts";
 import { skinnedRenderer } from "./skinned-renderer.ts";
+import { frontDoorPortUnused } from "./testing.ts";
 
 afterEach(cleanup);
 
@@ -101,20 +102,20 @@ describe("the floating creature's appearance", () => {
   it("carries refreshed native identity through the world and serialized feed into the real skin renderer", async () => {
     const native = nativeIdentity();
     const page = mount((id) => {
-      const loaded = loadSkin(id ?? "kid");
+      const loaded = loadSkin(id ?? defaultSkinId);
       return loaded.ok ? skinnedRenderer(loaded.skin, nightSource) : undefined;
     });
     try {
       page.port.conditions({ ...restingConditions, motion: "reduce", wantsMask: true });
       await settled();
       const initial = wireSnapshot(native.world());
-      expect(initial.creature).toMatchObject({ slug: "pip", name: "Pip", skin: "kid" });
+      expect(initial.creature).toMatchObject({ slug: "pip", name: "Pip", skin: "hush" });
       page.port.snapshot(initial);
       const originalMask = page.port.masks.at(-1)?.bits;
-      native.change({ skin: "carter", name: "Pebble", seed: 2 });
+      native.change({ skin: "knot", name: "Pebble", seed: 2 });
       await settled();
       const updated = wireSnapshot(native.world());
-      expect(updated.creature).toMatchObject({ slug: "pip", name: "Pebble", skin: "carter" });
+      expect(updated.creature).toMatchObject({ slug: "pip", name: "Pebble", skin: "knot" });
       expect(updated.creature.hueStop).not.toBe(initial.creature.hueStop);
       expect(seedOf(updated.creature)).toBe(seedOf(initial.creature));
       page.port.snapshot(updated);
@@ -122,10 +123,12 @@ describe("the floating creature's appearance", () => {
       expect(
         page.view.getByRole("button", { name: "Pebble, idle, 0 active threads" }),
       ).toBeTruthy();
-      native.change({ skin: "not-installed" });
+      native.change({ skin: "kid" });
       await settled();
-      page.port.snapshot(wireSnapshot(native.world()));
-      expect(page.view.getByRole("status").textContent).toBe("appearance unavailable");
+      const retired = wireSnapshot(native.world());
+      expect(retired.creature.skin).toBe(resolveSkinId("kid", 2));
+      page.port.snapshot(retired);
+      expect(page.view.queryByRole("status")).toBeNull();
     } finally {
       native.dispose();
     }
@@ -176,6 +179,7 @@ function testPort() {
   let ready = 0;
   const masks: HitMask[] = [];
   const port: CompanionPort = {
+    ...frontDoorPortUnused,
     onSnapshot: (listener) => {
       receiveSnapshot = listener;
       return () => undefined;
@@ -257,7 +261,7 @@ function nativeIdentity() {
       slug: "pip",
       name: "Pip",
       sigil: "P",
-      skin: "kid",
+      skin: "hush",
       seed: 1,
       created: "2026-11-17T00:00:00.000Z",
       workshop: "host",

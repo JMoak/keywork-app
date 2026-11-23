@@ -171,11 +171,13 @@ function expectTexturesFit(parts: readonly Part[]): void {
       nz: [x1 - x0, y1 - y0],
       px: [z1 - z0, y1 - y0],
       nx: [z1 - z0, y1 - y0],
-      top: [(x1 - x0) / topTexel, (z1 - z0) / topTexel],
+      top: [x1 - x0, (z1 - z0) / topTexel],
     };
     for (const [face, paint] of Object.entries(faces)) {
-      if ("texture" in paint)
-        expect([paint.texture.width, paint.texture.height], face).toEqual(sizes[face]);
+      if (!("texture" in paint)) continue;
+      expect([paint.texture.width, paint.texture.height], face).toEqual(sizes[face]);
+      if (paint.sideOn !== undefined)
+        expect([paint.sideOn.width, paint.sideOn.height]).toEqual([(x1 - x0) / topTexel, z1 - z0]);
     }
   }
 }

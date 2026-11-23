@@ -8,6 +8,7 @@ import type {
   ToolPreview,
   Usage,
 } from "./events.ts";
+import type { LedgerEntryRef } from "./ledger.ts";
 import type { AskRefusal, PermissionRule } from "./permissions.ts";
 import type { FileSlice } from "./workspace.ts";
 
@@ -56,6 +57,9 @@ export interface SessionDetail extends SessionSummary {
   outcomes?: readonly OutcomeMark[];
   parentSession?: string;
   forkedFrom?: ForkOrigin;
+  // Since contract 1.38: the ledger entry a short conversation is about, and when it ended.
+  ledgerEntry?: LedgerEntryRef;
+  endedAt?: string;
 }
 
 export const turnOutcomes = ["completed", "interrupted", "failed", "shutdown"] as const;

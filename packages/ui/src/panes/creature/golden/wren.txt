@@ -1,7 +1,6 @@
-[portrait Wren, idle · skin kid · 192px x 208px]
+[portrait Wren, idle · skin newfie · 324px x 248px]
 Wren @wren
-Working on docs index since HH:MM.
-r rename · b body · m models · c conversation · p pause · d delete
+i ledger · r rename · b body · m models · c conversation · p pause · d delete
 body  kid · seed 7
 workshop  ws-wren · sbx · up w opens it
 strong  anthropic/claude-sonnet-4-5

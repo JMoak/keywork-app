@@ -1,4 +1,4 @@
-import type { Lane, Pose, PowerTier } from "@keywork-app/habitat";
+import type { PowerTier } from "@keywork-app/habitat";
 import { type SchedulerHost, tierScheduler } from "../../companion/tier-scheduler.ts";
 import { requestFrame } from "../../surfaces/runtime/realm.ts";
 
@@ -36,18 +36,6 @@ export function tierAt(
   if (hidden) return "hidden";
   if (now - lastInputAt < interactHoldMs) return "interact";
   return resting ? "rest" : "ambient";
-}
-
-export function standingStill(pose: Pose): boolean {
-  return pose.heading === undefined && pose.lift === 0 && pose.gaze === undefined;
-}
-
-export function restfulMotion(pose: Pose, lane: Lane): boolean {
-  return standingStill(pose) || lane === "ambient";
-}
-
-export function samplingTier(tier: PowerTier, everyoneStill: boolean): PowerTier {
-  return tier === "ambient" && everyoneStill ? "rest" : tier;
 }
 
 export function steadField(host: SchedulerHost, sense: FieldSense, drawAt: DrawField): SteadField {

@@ -1,5 +1,5 @@
 import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
-import { fromOf, originOf, stillShown, type YardSetting } from "@keywork-app/habitat";
+import { fromOf, originOf, placeOf, stillShown, type YardSetting } from "@keywork-app/habitat";
 import type {
   Arrangement,
   ArrangementAnswer,
@@ -180,6 +180,7 @@ export function createSettingPanes(seams: SettingPanesSeams): SettingPanes {
       leads: weight === "lead",
       mood: setting.mood,
       arranging: why === "arranged",
+      place: placeOf(setting),
     };
   };
 
@@ -288,7 +289,7 @@ export function createSettingPanes(seams: SettingPanesSeams): SettingPanes {
     departing.delete(id);
     const pane = paneOf(id);
     if (pane === undefined) return;
-    if (tiler.isOutside(pane)) await outside.leave(pane, moods.get(id));
+    if (tiler.isOutside(pane)) await outside.leave(pane, moods.get(id), true);
     moods.delete(id);
     tiler.close(pane);
   };

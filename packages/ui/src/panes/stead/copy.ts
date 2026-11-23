@@ -1,7 +1,6 @@
 import type {
   Chore,
   CreatureReading,
-  HabitatState,
   Semantic,
   SkyPhase,
   Thread,
@@ -62,35 +61,6 @@ export function headLine(facts: {
     `${skyWords[facts.phase]} ${facts.clock}`,
   ];
   return parts.filter((part) => part !== undefined).join(" · ");
-}
-
-export interface ChoreBoard {
-  readonly line: string;
-  readonly nextAt: string | undefined;
-}
-
-export const boardWords = {
-  lead: "chore board",
-  nothing: "nothing scheduled",
-} as const;
-
-export function choreBoard(
-  world: Pick<HabitatState, "creatures">,
-  now: number,
-  offsetMinutes: number,
-): ChoreBoard {
-  const next = Object.values(world.creatures)
-    .flatMap((creature) => creature.chores.map((chore) => ({ keeper: creature.name, chore })))
-    .filter((posted) => posted.chore.nextAt !== undefined)
-    .sort((a, b) => (a.chore.nextAt ?? "").localeCompare(b.chore.nextAt ?? ""))[0];
-  if (next === undefined) {
-    return { line: `${boardWords.lead} · ${boardWords.nothing}`, nextAt: undefined };
-  }
-  const when = timeWord(next.chore.nextAt, now, offsetMinutes);
-  return {
-    line: `${boardWords.lead} · next: ${next.chore.title} (${next.keeper}) at ${when}`,
-    nextAt: next.chore.nextAt,
-  };
 }
 
 export function bubbleLine(thread: Pick<Thread, "asks" | "failure" | "back">): string {
@@ -183,10 +153,7 @@ export function ageWord(ms: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-export const noPaneYet = (thing: string): string => `no pane for ${thing} yet`;
 export const noThreadYet = (name: string): string => `${name} has no thread yet`;
-export const skinRefusedLine = (slug: string, id: string, fault: string): string =>
-  `${slug} stays off the stead: skin ${id} refused, ${fault}`;
 export const noAskHere = "nothing is asking on the porch";
 export const acceptHint = (approve: string): string =>
   `${approve} accepts its grants · the bubble opens the chores pane`;

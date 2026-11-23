@@ -6,7 +6,8 @@ import type { NeedsYouItem } from "../shell/needs-you.ts";
 import { askItem } from "../shell/needs-you-testing.ts";
 import type { SessionStore } from "../shell/session-store.ts";
 import { followCompanion } from "./console.ts";
-import type { CompanionHost, CompanionPreferences, CompanionSnapshot } from "./port.ts";
+import type { CompanionHost, CompanionSnapshot } from "./port.ts";
+import { frontDoorHostUnused, offPreferences } from "./testing.ts";
 
 const now = Date.parse("2026-11-06T06:23:10.000Z");
 
@@ -58,21 +59,6 @@ const beaOnTheWire: CreatureSummary = {
   threads: 0,
 };
 
-const offPreferences: CompanionPreferences = {
-  version: 1,
-  enabled: false,
-  optInOffered: true,
-  mode: "floating",
-  hidden: false,
-  still: false,
-  quiet: false,
-  onlyWhileBusy: false,
-  size: 100,
-  shortcut: null,
-  motion: "system",
-  positions: {},
-};
-
 function companionFixture() {
   return createRoot((dispose) => {
     const published: CompanionSnapshot[] = [];
@@ -120,6 +106,7 @@ function companionFixture() {
 
 function quietHost(publish: (snapshot: CompanionSnapshot) => void): CompanionHost {
   return {
+    ...frontDoorHostUnused,
     publish,
     preferences: async () => offPreferences,
     setPreferences: async () => offPreferences,

@@ -4,7 +4,6 @@ import {
   ageWord,
   askLine,
   bubbleLine,
-  choreBoard,
   type Telling,
   timeWord,
   trimmedFromTheLeft,
@@ -13,48 +12,6 @@ import {
 
 const noon = Date.UTC(2026, 10, 5, 12, 0, 0);
 
-describe("the chore board", () => {
-  const creature = (name: string, chores: { id: string; nextAt: string | undefined }[]) => ({
-    slug: name,
-    name,
-    skin: undefined,
-    seed: undefined,
-    workshop: {
-      raisedAt: at(60),
-      parcel: undefined,
-      substrate: undefined,
-      health: undefined,
-      boardedAt: undefined,
-    },
-    conversation: undefined,
-    chores: chores.map((chore) => ({
-      ...chore,
-      title: chore.id.replace("-", " "),
-      lastRanAt: undefined,
-      running: undefined,
-    })),
-  });
-
-  it("names the soonest next run across every creature, with who runs it and when", () => {
-    const board = choreBoard(
-      {
-        creatures: {
-          vey: creature("vey", [
-            { id: "stamp-note", nextAt: undefined },
-            { id: "docs-changes", nextAt: at(-2) },
-          ]),
-          mab: creature("mab", [{ id: "nightly", nextAt: at(-120) }]),
-        },
-      },
-      noon,
-      0,
-    );
-    expect(board).toEqual({
-      line: "chore board · next: docs changes (vey) at 12:02",
-      nextAt: at(-2),
-    });
-  });
-});
 const at = (minutesBefore: number): string => new Date(noon - minutesBefore * 60_000).toISOString();
 
 describe("the stead's words", () => {

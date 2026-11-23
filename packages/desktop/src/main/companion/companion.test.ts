@@ -13,7 +13,7 @@ import {
 } from "./testing.ts";
 import { firstPaintBudgetMs } from "./tiers.ts";
 
-const home = { x: 1760, y: 844, width: 144, height: 180 };
+const home = { x: 1690, y: 824, width: 214, height: 200 };
 
 describe("the master switch", () => {
   it("off creates no window, registers no shortcut and never wakes on a publish", async () => {
@@ -224,21 +224,21 @@ describe("position", () => {
     const pet = ports.petSender();
     ports.ipc.emit(companionChannels.drag, pet, { dx: -1700, dy: -300 });
     ports.ipc.emit(companionChannels.drag, pet, { dx: -100, dy: 0 });
-    expect(window.getBounds()).toMatchObject({ x: 0, y: 544 });
+    expect(window.getBounds()).toMatchObject({ x: 0, y: 524 });
     ports.ipc.emit(companionChannels.dragEnd, pet);
     await companion.settle();
     const key = layoutKeyOf([primaryDisplay, secondDisplay]);
     expect(companion.preferences().positions[key]).toMatchObject({
       displayId: 1,
       edge: "left",
-      u: 0.075,
+      u: 214 / 1920,
     });
     ports.screen.set([secondDisplay]);
     await companion.settle();
-    expect(window.getBounds()).toEqual({ x: 4320, y: 1204, width: 144, height: 180 });
+    expect(window.getBounds()).toEqual({ x: 4250, y: 1184, width: 214, height: 200 });
     ports.screen.set([primaryDisplay, secondDisplay]);
     await companion.settle();
-    expect(window.getBounds()).toMatchObject({ x: 0, y: 544 });
+    expect(window.getBounds()).toMatchObject({ x: 0, y: 524 });
   });
 
   it("nudges by arrow steps and Escape sends it home", async () => {
@@ -248,7 +248,7 @@ describe("position", () => {
     if (window === undefined) throw new Error("no window");
     const pet = ports.petSender();
     ports.ipc.emit(companionChannels.nudge, pet, { dx: -1, dy: -1 });
-    expect(window.getBounds()).toMatchObject({ x: 1752, y: 836 });
+    expect(window.getBounds()).toMatchObject({ x: 1682, y: 816 });
     ports.ipc.emit(companionChannels.home, pet);
     await companion.settle();
     expect(window.getBounds()).toEqual(home);
@@ -290,7 +290,7 @@ describe("input", () => {
     ]);
   });
 
-  it("the context menu offers Hide, Still, Quiet, Size and Settings and acts on them", async () => {
+  it("the context menu offers the stead, Hide, Still, Quiet, Size and Settings and acts on them", async () => {
     const ports = fakePorts({ prefs: { enabled: true } });
     const companion = await startCompanion(ports);
     const window = ports.windows.created[0];
@@ -299,12 +299,20 @@ describe("input", () => {
     const popup = ports.popups[0];
     if (popup === undefined) throw new Error("no popup");
     const labels = popup.items.flatMap((item) => ("label" in item ? [item.label] : []));
-    expect(labels).toEqual(["Open the console", "Hide", "Still", "Quiet", "Size", "Settings…"]);
+    expect(labels).toEqual([
+      "Open the console",
+      "Show the stead",
+      "Hide",
+      "Still",
+      "Quiet",
+      "Size",
+      "Settings…",
+    ]);
     popup.act("still");
     popup.act("size", "150");
     await companion.settle();
     expect(companion.preferences()).toMatchObject({ still: true, size: 150 });
-    expect(window.getBounds()).toEqual({ x: 1712, y: 778, width: 192, height: 246 });
+    expect(window.getBounds()).toEqual({ x: 1607, y: 748, width: 297, height: 276 });
     expect(lastConditions(window)).toMatchObject({ still: true, scale: 150 });
     popup.act("settings");
     expect(ports.console.sent.at(-1)).toEqual([companionChannels.settingsRequested, undefined]);
@@ -315,8 +323,8 @@ describe("input", () => {
 });
 
 describe("the shortcut", () => {
-  it("refuses an OS chord, registers a free one once, toggles Hide, and lets go when disabled", async () => {
-    const ports = fakePorts({ prefs: { enabled: true } });
+  it("refuses an OS chord, registers a free one once, summons a hidden companion onto the keyboard, and lets go when disabled", async () => {
+    const ports = fakePorts({ prefs: { enabled: true, hidden: true } });
     const companion = await startCompanion(ports);
     await companion.setPreferences({ shortcut: "Ctrl+Space" });
     expect(ports.shortcuts.registered.size).toBe(0);
@@ -326,7 +334,12 @@ describe("the shortcut", () => {
     expect([...ports.shortcuts.registered.keys()]).toEqual(["Control+Alt+K"]);
     ports.shortcuts.registered.get("Control+Alt+K")?.();
     await companion.settle();
-    expect(companion.preferences().hidden).toBe(true);
+    expect(companion.preferences().hidden).toBe(false);
+    expect(ports.windows.created[0]?.calls.slice(-3)).toEqual([
+      "setFocusable:true",
+      "setSkipTaskbar:true",
+      "focus",
+    ]);
     await companion.setPreferences({ shortcut: null });
     expect(ports.shortcuts.registered.size).toBe(0);
   });

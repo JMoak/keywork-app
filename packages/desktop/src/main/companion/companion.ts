@@ -10,13 +10,15 @@ import {
   type MenuRequest,
   type NudgeStep,
   type Presence,
+  type SteadAsk,
+  type SteadRequest,
   type Tier,
 } from "./channels.ts";
 import { type SamplerPorts, startCpuSampler } from "./cpu-sampler.ts";
 import type { ForegroundProbe } from "./foreground.ts";
 import { type CompanionMenuAction, type CompanionMenuItem, companionMenu } from "./menu.ts";
 import { type Mover, windowMover } from "./mover.ts";
-import { type DisplayLike, type Point, restoreBounds } from "./placement.ts";
+import { type DisplayLike, displayOf, type Point, restoreBounds, type Size } from "./placement.ts";
 import {
   type CompanionPreferences,
   type PreferenceBook,
@@ -46,9 +48,10 @@ import {
   type CompanionWindowLike,
   companionWindowOptions,
   ignoreOptions,
-  keyboardReachable,
   prepareFloating,
+  takeKeyboard,
   windowSizeFor,
+  yieldKeyboard,
 } from "./window.ts";
 
 export interface SenderLike {
@@ -186,6 +189,8 @@ class CompanionRuntime {
   latest: CompanionSnapshot | undefined;
   mask: HitMask | undefined;
   mouse: MouseMode = "forwarding";
+  keyboardReturns = false;
+  summoned = false;
   wakeups = 0;
   rendererTier: Tier = "hidden";
   askedToShowAt: number | undefined;
@@ -310,11 +315,10 @@ class CompanionRuntime {
   }
 
   publish(snapshot: CompanionSnapshot): void {
-    const grows = this.needsBubble(snapshot) !== this.latestNeedsBubble();
     this.latest = snapshot;
     this.controller.update({ busyNow: snapshot.state !== "idle" });
     this.enqueue(() => {
-      if (grows) this.mover?.fit();
+      this.mover?.fit();
       this.sendSnapshot();
     });
   }
@@ -370,11 +374,29 @@ class CompanionRuntime {
   }
 
   applyShortcut(): void {
-    const standing = this.keeper.apply(
-      this.prefs.shortcut,
-      () => void this.setHidden(!this.prefs.hidden),
-    );
+    const standing = this.keeper.apply(this.prefs.shortcut, () => void this.summon());
     if (standing.reason !== undefined) this.ports.log(`companion shortcut: ${standing.reason}`);
+  }
+
+  async summon(): Promise<void> {
+    const window = this.window;
+    if (window?.isVisible() !== true) {
+      this.summoned = true;
+      await this.setHidden(false);
+      this.summoned = false;
+    } else if (window.isFocused()) {
+      window.webContents.send(companionChannels.steadKey, undefined);
+    } else this.holdKeyboard();
+  }
+
+  holdKeyboard(): void {
+    const window = this.window;
+    if (window?.isVisible() === true) takeKeyboard(window, this.ports.platform);
+  }
+
+  releaseKeyboard(): void {
+    const window = this.window;
+    if (window?.isFocused() === true) window.blur();
   }
 
   setContext(patch: Partial<TierContext>): void {
@@ -409,6 +431,7 @@ class CompanionRuntime {
     if (this.prewarmed) this.mover?.rehome();
     this.prewarmed = false;
     if (!window.isVisible()) window.showInactive();
+    if (this.summoned) this.holdKeyboard();
     this.reportPaint();
     this.setMouse("forwarding");
     if (!this.untestedWindow) return;
@@ -471,6 +494,7 @@ class CompanionRuntime {
     window.on("closed", () => {
       if (this.window === window) this.forgetWindow();
     });
+    window.on("blur", () => yieldKeyboard(window, this.ports.platform));
     this.untestedWindow = true;
     this.mover = windowMover(window, {
       displays: () => screen.displays(),
@@ -491,8 +515,26 @@ class CompanionRuntime {
     ];
   }
 
-  wantedSize() {
-    return windowSizeFor(this.prefs.size, { bubble: this.latestNeedsBubble() });
+  wantedSize(): Size {
+    return this.sizeOn(this.displayScale());
+  }
+
+  sizeOn(displayScale: number): Size {
+    const team = this.latest?.team;
+    return windowSizeFor(this.prefs.size, {
+      bubble: this.latestNeedsBubble(),
+      displayScale,
+      ...(team !== undefined && { team: { members: team.members.length, pitch: team.pitch } }),
+    });
+  }
+
+  displayScale(): number {
+    const { screen } = this.ports;
+    const displays = screen.displays();
+    const standing =
+      this.window?.getBounds() ??
+      restoreBounds(this.prefs.positions, displays, this.sizeOn(1), screen.cursor());
+    return displayOf(standing, displays).scaleFactor;
   }
 
   async passesSelfTest(window: CompanionWindowLike): Promise<boolean> {
@@ -534,6 +576,7 @@ class CompanionRuntime {
     this.pagePainted = false;
     this.paintReported = false;
     this.mouse = "forwarding";
+    this.keyboardReturns = false;
     this.context = { ...this.context, windowShown: false, foregroundBusy: false };
     this.controller.update({ foregroundBusy: false });
   }
@@ -554,7 +597,7 @@ class CompanionRuntime {
       motion: this.prefs.motion,
       reducedTransparency: this.ports.theme.reducedTransparency(),
       forcedColors: this.ports.theme.forcedColors(),
-      keyboardReachable: keyboardReachable(this.ports.platform),
+      keyboardReachable: true,
       wantsMask: this.ports.platform === "linux" && !this.ports.wayland,
     };
   }
@@ -699,6 +742,30 @@ class CompanionRuntime {
       companionChannels.wakeups,
       pet((report: WakeupReport) => this.countWakeups(report)),
     );
+    ipc.on(
+      companionChannels.choose,
+      pet((creature: string) => this.choose(creature)),
+    );
+    ipc.on(
+      companionChannels.hatch,
+      pet(() => this.hatch()),
+    );
+    ipc.on(
+      companionChannels.release,
+      pet(() => this.releaseKeyboard()),
+    );
+    ipc.on(
+      companionChannels.stead,
+      this.petOrConsole((ask: SteadAsk) => this.askForStead(ask)),
+    );
+    ipc.handle(
+      companionChannels.steadAway,
+      console(() => this.holdKeyboard()),
+    );
+    ipc.on(
+      companionChannels.steadGone,
+      console((tookTheKeyboard: boolean) => this.steadPutAway(tookTheKeyboard === true)),
+    );
   }
 
   consoleOnly<Payload>(act: (payload: Payload) => unknown) {
@@ -709,6 +776,13 @@ class CompanionRuntime {
   petOnly<Payload>(act: (payload: Payload) => unknown) {
     return (sender: SenderLike, payload: unknown): unknown =>
       sender.id === this.window?.webContents.id ? act(payload as Payload) : undefined;
+  }
+
+  petOrConsole<Payload>(act: (payload: Payload) => unknown) {
+    return (sender: SenderLike, payload: unknown): unknown =>
+      sender.id === this.window?.webContents.id || this.ports.console.isConsole(sender)
+        ? act(payload as Payload)
+        : undefined;
   }
 
   keepMask(mask: HitMask): void {
@@ -738,6 +812,7 @@ class CompanionRuntime {
       size: this.prefs.size,
       creatures: residentsOf(this.latest),
       current: this.latest?.creature.slug ?? this.latest?.creature.name,
+      steadOut: this.latest?.steadOut,
     });
     this.ports.windows.popup(
       window,
@@ -766,6 +841,9 @@ class CompanionRuntime {
       case "switch-creature":
         this.ports.console.send(companionChannels.switchRequested, payload);
         return;
+      case "show-stead":
+        this.askForStead({ creature: this.latest?.creature.slug });
+        return;
       case "settings":
         this.ports.console.send(companionChannels.settingsRequested, undefined);
         this.ports.console.focusThread(undefined);
@@ -776,6 +854,29 @@ class CompanionRuntime {
     const target = threadId ?? this.latest?.threadId;
     this.ports.console.focusThread(target);
     this.ports.console.send(companionChannels.openRequested, target);
+  }
+
+  choose(creature: string): void {
+    this.ports.console.focusThread(undefined);
+    this.ports.console.send(companionChannels.chooseRequested, creature);
+  }
+
+  hatch(): void {
+    this.ports.console.focusThread(undefined);
+    this.ports.console.send(companionChannels.hatchRequested, undefined);
+  }
+
+  askForStead(ask: SteadAsk | undefined): void {
+    const window = this.window;
+    if (window === undefined) return;
+    if (this.latest?.steadOut !== true) this.keyboardReturns = window.isFocused();
+    const request: SteadRequest = { creature: ask?.creature, beside: window.getBounds() };
+    this.ports.console.send(companionChannels.steadRequested, request);
+  }
+
+  steadPutAway(tookTheKeyboard: boolean): void {
+    if (tookTheKeyboard && !this.keyboardReturns) this.releaseKeyboard();
+    this.keyboardReturns = false;
   }
 
   notePaint(): void {

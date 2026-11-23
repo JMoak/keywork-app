@@ -12,16 +12,11 @@ describe("the onboarding copy speaks in the creature's voice", () => {
     expect(source).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
-  it("teaches esc as not now on every step and never as a way to make the creature", () => {
-    const stepKeys = [
-      copy.nameKeys("Wren"),
-      copy.skinKeys,
-      copy.workshopKeys(true),
-      copy.modelsKeys,
-      copy.notMadeLine("no room"),
-    ];
+  it("teaches esc as not now wherever the stage waits and never as a way to make the creature", () => {
+    const waiting = [copy.eggKeys, copy.retryKeys, copy.meetKeys, copy.connectKeys];
     expect(copy.notNowKey).toBe("esc not now");
-    expect(copy.nameKeys("Wren")).toContain(copy.notNowKey);
-    for (const line of stepKeys) expect(line).not.toMatch(/esc skips/);
+    expect(copy.eggKeys).toContain(copy.notNowKey);
+    expect(copy.retryKeys).toContain(copy.notNowKey);
+    for (const line of waiting) expect(line).not.toMatch(/esc (skips|keeps|hatches)/);
   });
 });

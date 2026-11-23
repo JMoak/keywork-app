@@ -1,5 +1,5 @@
 import { type Extent, type MotionPrefs, overlaps, type Random } from "@keywork-app/habitat";
-import type { SettingSignal } from "@keywork-app/protocol";
+import type { SettingSignal, SteadPlace } from "@keywork-app/protocol";
 import { type Accessor, createEffect, createSignal, type Setter } from "solid-js";
 import { render } from "solid-js/web";
 import {
@@ -21,8 +21,10 @@ import {
   keeperTyped,
   movePlan,
   nextReleaseAt,
+  noPlaces,
   nothingHeld,
   offered,
+  type Places,
   type Plan,
   recallPlan,
   regroupedBy,
@@ -110,6 +112,7 @@ export interface Sending {
   readonly leads?: boolean | undefined;
   readonly mood?: Mood | undefined;
   readonly arranging?: boolean | undefined;
+  readonly place?: SteadPlace | undefined;
 }
 
 export type Placer = "creature" | "keeper" | "console";
@@ -221,6 +224,7 @@ export interface PanesOutsideOptions {
   noRoom?(tenants: readonly Tenant[]): void;
   steppedAside?(tenants: readonly Tenant[]): void;
   setOutAgain?(seats: ReadonlyMap<string, ScreenRect>): void;
+  placeOnDesk?(place: SteadPlace, desk: Desk): ScreenRect | undefined;
   now?(): number;
   readonly random?: Random | undefined;
 }
@@ -229,7 +233,7 @@ export interface PanesOutside {
   readonly holdingFocus: Accessor<string | undefined>;
   readonly hinting: Accessor<boolean>;
   send(tenant: Tenant, sending: Sending): Promise<Arrived | undefined>;
-  recall(keys: readonly string[], mood?: Mood): Promise<readonly string[]>;
+  recall(keys: readonly string[], mood?: Mood, intoPlace?: boolean): Promise<readonly string[]>;
   toggleSpread(): Promise<SpreadVerdict>;
   deal(): Promise<DealVerdict>;
   compose(authored: Authored): Promise<ComposeVerdict>;
@@ -519,8 +523,20 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     arriving: readonly Stand[],
     turns: readonly Start[],
     pacing: Pacing,
-  ): Plan =>
-    arrivalPlan(desk, seatedForReal(arriving).map(showOf), turns, options.motion(), pacing);
+  ): Plan => {
+    const seated = seatedForReal(arriving);
+    const places = placesOf(desk, seated);
+    return arrivalPlan(desk, seated.map(showOf), turns, options.motion(), pacing, places);
+  };
+
+  const placesOf = (desk: Desk, standing: readonly Stand[]): Places =>
+    new Map(
+      standing.flatMap((stand) => {
+        const place = stand.request.sending.place;
+        const rect = place === undefined ? undefined : options.placeOnDesk?.(place, desk);
+        return rect === undefined ? [] : [[stand.pane.id, rect] as const];
+      }),
+    );
 
   const entrances = (
     desk: Desk,
@@ -532,8 +548,9 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     const seated = seatedForReal(entering);
     const arising = seated.filter((stand) => parentStood(stand) !== undefined);
     const arriving = seated.filter((stand) => !arising.includes(stand));
+    const places = placesOf(desk, arriving);
     return [
-      arrivalPlan(desk, arriving.map(showOf), turns, options.motion(), pacing),
+      arrivalPlan(desk, arriving.map(showOf), turns, options.motion(), pacing, places),
       ...arising.flatMap((stand) => {
         const from = parentStood(stand);
         return from === undefined
@@ -1453,7 +1470,11 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     void easedAfter([stand]);
   };
 
-  const recall = async (keys: readonly string[], mood?: Mood): Promise<readonly string[]> => {
+  const recall = async (
+    keys: readonly string[],
+    mood?: Mood,
+    intoPlace = false,
+  ): Promise<readonly string[]> => {
     for (const key of keys) withdraw(key);
     const returning = keys
       .flatMap((key) => stands.get(key) ?? [])
@@ -1461,13 +1482,17 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     if (returning.length === 0) return [];
     for (const stand of returning) stand.returning = true;
     const heldFocus = returning.some((stand) => stand.request.focused());
-    await flownHome(returning, pacingOf([], mood ?? "brisk")).catch(desktopRefused);
+    await flownHome(returning, pacingOf([], mood ?? "brisk"), intoPlace).catch(desktopRefused);
     const home = returning.filter(standsStill).map(comeHome);
     if (heldFocus) port.focusConsole().catch(desktopRefused);
     return home;
   };
 
-  const flownHome = async (returning: readonly Stand[], pacing: Pacing): Promise<void> => {
+  const flownHome = async (
+    returning: readonly Stand[],
+    pacing: Pacing,
+    intoPlace: boolean,
+  ): Promise<void> => {
     const desk = await port.desk();
     const eased = drillsEasedBy(returning, desk);
     remark();
@@ -1475,8 +1500,9 @@ export function createPanesOutside(options: PanesOutsideOptions): PanesOutside {
     const home = returning.filter((stand) => !retreats.some(({ child }) => child === stand));
     const leaves = inTurn(topFirst(home).map((stand) => stand.pane.id));
     const motion = options.motion();
+    const places = intoPlace ? placesOf(desk, home) : noPlaces;
     const plans = [
-      recallPlan(desk, home.flatMap(standingOf), leaves, motion, pacing),
+      recallPlan(desk, home.flatMap(standingOf), leaves, motion, pacing, places),
       ...retreats.flatMap(({ child, into }) =>
         standingOf(child).map((leaving) => retreatPlan(desk, into, leaving, motion, pacing)),
       ),

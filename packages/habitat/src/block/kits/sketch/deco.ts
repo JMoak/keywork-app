@@ -39,9 +39,12 @@ export function chevronPaint(): Paint {
 }
 
 export function capTop(across: number, deep: number, inner: Role = "timberDk") {
-  return topPainted(`cap|${inner}`, across, deep, (brush, width, height) => {
-    brush.rect(0, 0, width, height, "trimLo");
-    brush.rect(2, 2, width - 4, height - 4, inner);
+  return topPainted(`cap|${inner}`, across, deep, (brush, width, height, grid) => {
+    const edge = { x: grid.x === 1 ? 1 : 0, z: grid.z === 1 ? 1 : 0 };
+    const rim = { x: edge.x + grid.x, z: edge.z + grid.z };
+    brush.rect(0, 0, width, height, "timberDk");
+    brush.rect(edge.x, edge.z, width - 2 * edge.x, height - 2 * edge.z, "trimLo");
+    brush.rect(rim.x, rim.z, width - 2 * rim.x, height - 2 * rim.z, inner);
   });
 }
 

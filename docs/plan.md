@@ -2479,10 +2479,11 @@ unbounded storage/mill artwork. A proposed opt-in cultivation-to-decoration loop
 places are specified separately; the implemented gardens do not grow, wilt or yield items.
 This remains canonical source work, not published SDK adoption or an installed Stead update.
 
-### Block world ledger (2026-11-22, behind a switch)
+### Block world ledger (2026-11-22; the stead itself since the same evening)
 
-The stead drawn as a world of blocks, after `docs/design/block-world/sketch.html`, built beside
-the strip and the courtyards, which stay the default. `packages/habitat/src/block/` is pure
+The stead drawn as a world of blocks, after `docs/design/block-world/sketch.html`. It is what the
+stead pane shows: the switch, the strip and the courtyard overview are gone (see "Buildings are
+places" below for what was carried over). `packages/habitat/src/block/` is pure
 TypeScript: the model (cells on a 56-unit pitch, boxes with five faces, sprites, crowns, walkers),
 the camera (quarter turns, corner rests, level and raised eyes), a draw-list builder that turns a
 world into ordered quads with affine matrices, the sky backdrop and the drifting night lights, hit
@@ -2494,8 +2495,7 @@ art stays indexed, and only the pane ground comes from the app theme. `raster.ts
 whose alpha blending matches Chrome's canvas, so stills compare pixel for pixel with the sketch.
 `packages/ui/src/panes/stead/block/` paints the same draw list with Canvas 2D under the stead's
 power tiers, turns on the pane's left and right keys, and reports what is under the pointer.
-`VITE_STEAD_BLOCK_WORLD=1` at build or dev time shows it in place of the strip; unset, nothing
-differs. `BLOCK_SHOTS=update bun run test` writes stills to `artifacts/shots/block-world/stills`.
+`BLOCK_SHOTS=update bun run test` writes stills to `artifacts/shots/block-world/stills`.
 
 The creatures in the town are the sketch's six generated figures (folio, tessera, cairn, purl, hush,
 knot, about 26 by 22) and its hand-made kid, held as indexed rows in `block/figure-art.ts` and drawn in
@@ -2533,7 +2533,7 @@ creature is removed), the road between them is taken up: a stretch only that roa
 grass, a stretch it shared falls to the best road still using it (the porch paths stay trodden), and
 its lamps go where no other paved road meets (`droppedPairTakesItsRoadUp` in the same module is the one
 switch for this; not yet ruled on). The removed creature's workshop stays, boarded, with its own path
-to the porch. Switched off, the stead never asks for the tally.
+to the porch.
 
 Art Deco is a fourth kit, chosen by the same kit buttons as the other three: jade stone walls with
 brass pilasters and columns of amber windows, a fanned door, a blade sign by the door in the
@@ -2544,8 +2544,10 @@ jobs; the kit interface grew so any kit can supply them: `Kit.project` builds a 
 an `Annex` names what it is (the awning, the blade sign, the porch, a lantern), `KitColours.orbRays`
 asks the sky for rays, and the sketch construction takes the style flags `roof: "step"`, `piers`,
 `stone`, `blade` and `inlay` with the `trim` colour family. Neon and Terrace still have no place
-for a child at work, as the sheet says. Deco's reward gold is the gold every kit shares (the kit
-test holds it the same everywhere), not the brighter gold the sheet gives Deco by night.
+for a child at work, as the sheet says. A kit may set its own reward gold (`gold` in its colours);
+Deco's is the brighter one the sheet gives it by night. A top face is painted for the screen grid it
+is seen on: one unit across and two deep seen front on, the other way seen side on
+(`frontOnGrid`, `sideOnGrid`), so Deco's brass rims and the road inlay read one pixel thick.
 
 The six project stages (shack, shed, house, tower, high-rise, skyscraper) are built by every kit
 (`kits/sketch/projects.ts`; Deco adds a chevron cornice at each setback and its sunburst crown)
@@ -2566,6 +2568,30 @@ the same loft reason, a town of one by under 72 pixels, and corner views along r
 Not done: decorations have no earning rule; the map of machines; the tracked-file count is not drawn. A creature has seven building spots, so its eighth
 directory onward has no building. Four of the six figures (folio, purl, hush, knot) have no skin in
 the app yet. Server lane: `cwd` on the session list would replace one detail read per conversation.
+
+**Buildings are places (contract 1.38).** Each place (a creature's workshop, a project building,
+the porch, the storehouse, the mill) has a rectangle on screen, the union of its quads in the
+latest draw list (`placeRectsOf` in `block/places.ts`), so it follows turning and zoom. The block
+world stands on the console page's place board (`steadPlaces` on the shell) and answers where a
+place is on the page while the stead shows it. A setting's `place` (1.38; an older engine sends
+none and the console reads the creature's workshop, or the porch for a conversation with no
+creature) rides on the sending to the outside panes, which turn the page rectangle into a screen
+one with the console's own bounds. A pane with a place rises from it in eight whole-pixel steps,
+60 ms apart and paced by its mood (`riseTiming`), never smaller than the desktop's 200 by 120 window
+floor, and steps back into it when the session withdraws it; with no stead on screen it emerges
+from the console's nearest edge as before, and under reduced motion it is simply there. A project
+place rises from its own building, else from its creature's workshop. Pressing a place sets out its
+pane through the shell's `setOut` with that place: a workshop's door its conversation, the bench
+window the running thread, the shelf the creature's profile, the chore board its chores, a project
+building the files at its directory, the porch what needs you, the storehouse the parcels, the
+mill the mills; outside the window when the console reaches outside, inside otherwise. The keyboard
+walks the places with `j` and `k` (brackets in the creature's colour mark the one chosen) and
+`enter` opens the thread it is on; a bar over the world names the place, shows the creature's
+portrait and offers its four faces. The keeper's town style, eye and corners are kept in the pane's
+spec, and each creature's plot is kept by the stored `courtOrder`, so nothing built moves. The herd
+(`gatherHerd`, `stepHerd`) runs under the block world: an idle creature's chosen activity takes it
+to its door, the green, the storehouse, the mill or the porch, on spots that never overlap, and the
+porch keeps its bubble and answer keys.
 
 ## What is deliberately not in this plan
 

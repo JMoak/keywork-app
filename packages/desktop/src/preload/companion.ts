@@ -9,6 +9,7 @@ import {
   type HitMask,
   type MenuRequest,
   type NudgeStep,
+  type SteadAsk,
   type Tier,
 } from "../main/companion/channels.ts";
 import { servesRendererPage } from "../shared/renderer-page.ts";
@@ -36,6 +37,11 @@ const port = {
   answer: (request: AnswerRequest) => ipcRenderer.send(companionChannels.answer, request),
   reportWakeups: (report: { count: number; tier: Tier }) =>
     ipcRenderer.send(companionChannels.wakeups, report),
+  choose: (creature: string) => ipcRenderer.send(companionChannels.choose, creature),
+  hatch: () => ipcRenderer.send(companionChannels.hatch),
+  askForStead: (ask: SteadAsk) => ipcRenderer.send(companionChannels.stead, ask),
+  release: () => ipcRenderer.send(companionChannels.release),
+  onSteadKey: subscribe<void>(companionChannels.steadKey),
 };
 
 if (servesRendererPage(process.argv, location.href)) {

@@ -77,13 +77,14 @@ export function reachOf(reading: ServerReading, cloud: CloudStanding): Reach {
 }
 
 export function introductionOf(reach: Reach | undefined, strong: ModelChoice): Introduction {
-  if (reach === undefined || nothingReachable(reach)) return { kind: "waits", detail: undefined };
-  if (strong !== "inherit" || reach.inherited === undefined) {
-    return { kind: "promised", through: undefined };
+  const inherited = strong === "inherit" ? reach?.inherited : undefined;
+  if (inherited !== undefined && !("refused" in inherited)) {
+    return { kind: "promised", through: `${inherited.provider}/${inherited.model}` };
   }
-  return "refused" in reach.inherited
-    ? { kind: "waits", detail: reach.inherited.detail }
-    : { kind: "promised", through: `${reach.inherited.provider}/${reach.inherited.model}` };
+  if (reach === undefined || nothingReachable(reach)) return { kind: "waits", detail: undefined };
+  return inherited === undefined
+    ? { kind: "promised", through: undefined }
+    : { kind: "waits", detail: inherited.detail };
 }
 
 export function proposePolicy(reach: Reach): ModelPolicy {

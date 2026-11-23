@@ -3,21 +3,9 @@ import { createRoot } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CompanionHost, CompanionPreferences, PreferencePatch, Presence } from "./port.ts";
 import { CompanionSwitchRow, companionSwitch, offerDue } from "./switch.tsx";
+import { frontDoorHostUnused, offPreferences as offered } from "./testing.ts";
 
-const offPreferences: CompanionPreferences = {
-  version: 1,
-  enabled: false,
-  optInOffered: false,
-  mode: "floating",
-  hidden: false,
-  still: false,
-  quiet: false,
-  onlyWhileBusy: false,
-  size: 100,
-  shortcut: null,
-  motion: "system",
-  positions: {},
-};
+const offPreferences: CompanionPreferences = { ...offered, optInOffered: false };
 
 const floating: Presence = { mode: "floating", window: "shown", reason: "floating" };
 const off: Presence = { mode: "off", window: "none", reason: "companions are off" };
@@ -32,6 +20,7 @@ function fakeHost(initial: Partial<CompanionPreferences> = {}): FakeHost {
   let presence: Presence = initial.enabled === true ? floating : off;
   let onPresence: ((presence: Presence) => void) | undefined;
   const host: FakeHost = {
+    ...frontDoorHostUnused,
     stored: { ...offPreferences, ...initial },
     patches: [],
     emitPresence: (next) => {

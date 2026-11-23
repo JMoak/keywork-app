@@ -1,0 +1,120 @@
+.kw-team {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: grid;
+  grid-template-rows: calc(24px * var(--kw-companion-scale)) auto;
+  justify-items: start;
+  align-self: end;
+  min-width: 0;
+}
+
+.kw-team-tags {
+  position: relative;
+  width: 100%;
+}
+
+.kw-team-tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  height: calc(20px * var(--kw-companion-scale));
+  margin: 0;
+  padding: 0 0.5em;
+  white-space: nowrap;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: none;
+  box-shadow: inset 0 0 0 1px var(--kw-border);
+  cursor: pointer;
+}
+.kw-team-tag[data-egg] {
+  color: var(--kw-text-mid);
+  cursor: default;
+}
+.kw-team-tag:hover:not([data-egg]),
+.kw-team-tag:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--kw-accent);
+}
+
+.kw-team-home {
+  width: calc(9px * var(--kw-companion-scale));
+  height: calc(9px * var(--kw-companion-scale));
+  fill: var(--kw-accent);
+}
+
+.kw-team-telling {
+  color: var(--kw-text-mid);
+}
+
+.kw-team-hint {
+  display: none;
+}
+
+.kw-team-row {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.kw-team-row::-webkit-scrollbar {
+  display: none;
+}
+.kw-team-row[data-more-before] {
+  mask-image: linear-gradient(to right, transparent, currentColor 16px);
+}
+.kw-team-row[data-more-after] {
+  mask-image: linear-gradient(to left, transparent, currentColor 16px);
+}
+.kw-team-row[data-more-before][data-more-after] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    currentColor 16px,
+    currentColor calc(100% - 16px),
+    transparent
+  );
+}
+
+.kw-team-canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.kw-team-figure {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.kw-team-figure:focus {
+  outline: none;
+}
+.kw-team-figure[data-cursor] {
+  outline: 1px solid var(--kw-border-focus);
+  outline-offset: -1px;
+}
+
+.kw-companion[data-plate] .kw-team-row {
+  background: var(--kw-panel);
+  box-shadow: inset 0 0 0 1px var(--kw-border);
+}
+
+.kw-companion[data-forced-colors] .kw-team-row,
+.kw-companion[data-forced-colors] .kw-team-tag {
+  forced-color-adjust: none;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: inset 0 0 0 1px CanvasText;
+}

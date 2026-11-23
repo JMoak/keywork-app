@@ -1,3 +1,4 @@
+import { firstFixed } from "../skins/legend.ts";
 import type { Season, SkyPhase } from "../world/sky.ts";
 
 export type Palette = readonly string[];
@@ -39,6 +40,13 @@ export const paletteRoles: readonly PaletteRole[] = [
   { index: 13, role: "glass" },
   { index: 14, role: "fog" },
   { index: 15, role: "dim" },
+  { index: 16, role: "creature ink" },
+  { index: 17, role: "coat deep" },
+  { index: 18, role: "coat shade" },
+  { index: 19, role: "coat base" },
+  { index: 20, role: "coat light" },
+  { index: 21, role: "coat highlight" },
+  { index: 22, role: "paper" },
 ];
 
 export const transparentColor = "transparent";
@@ -70,6 +78,8 @@ export const groundGreenShare = 0.15;
 export const seasonShare = 0.2;
 export const timberShare = 0.2;
 
+export const coatShares = { deep: 0.42, shade: 0.16, light: 0.3, highlight: 0.62 } as const;
+
 export function resolvePalette(source: PaletteSource, options: PaletteOptions = {}): Palette {
   if (options.forcedColors === true) return forcedPalette;
   const ink = source.read("--kw-terminal-black");
@@ -100,8 +110,21 @@ export function resolvePalette(source: PaletteSource, options: PaletteOptions = 
     source.read("--kw-panel"),
     source.read("--kw-text-faint"),
     source.read("--kw-text-dim"),
+    ...coatRoles(source, identity, paper),
   ];
 }
+
+export function withFixedColours(palette: Palette, fixed: readonly string[] | undefined): Palette {
+  if (fixed === undefined || fixed.length === 0) return palette;
+  const kept = palette === forcedPalette ? fixed.map(() => forcedFixedColour) : fixed;
+  const shared = Array.from(
+    { length: firstFixed },
+    (_, index) => palette[index] ?? transparentColor,
+  );
+  return [...shared, ...kept];
+}
+
+export const forcedFixedColour = "Canvas";
 
 export const forcedPalette: Palette = [
   transparentColor,
@@ -120,6 +143,13 @@ export const forcedPalette: Palette = [
   "Canvas",
   "GrayText",
   "GrayText",
+  "CanvasText",
+  "Canvas",
+  "Canvas",
+  "Canvas",
+  "Canvas",
+  "Canvas",
+  "Canvas",
 ];
 
 export interface SkyColors {
@@ -215,6 +245,21 @@ export function unresolvedRoles(palette: Palette): PaletteRole[] {
     const color = palette[role.index];
     return role.index !== 0 && (color === undefined || color.trim() === "");
   });
+}
+
+function coatRoles(source: PaletteSource, identity: string, paper: string): string[] {
+  const ink = source.read(source.appearance === "dark" ? "--kw-terminal-black" : "--kw-text");
+  const towardLight = sameColor(identity, paper) ? ink : paper;
+  const towardDark = sameColor(identity, ink) ? paper : ink;
+  return [
+    ink,
+    source.mix(identity, towardDark, coatShares.deep),
+    source.mix(identity, towardDark, coatShares.shade),
+    identity,
+    source.mix(identity, towardLight, coatShares.light),
+    source.mix(identity, towardLight, coatShares.highlight),
+    paper,
+  ];
 }
 
 function sameColor(a: string, b: string): boolean {

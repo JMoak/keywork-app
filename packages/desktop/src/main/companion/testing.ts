@@ -19,9 +19,10 @@ export interface FakeWindow extends CompanionWindowLike {
   calls: string[];
   sent: Array<[string, unknown]>;
   visible: boolean;
+  focused: boolean;
   destroyed: boolean;
   ignores: Array<{ ignore: boolean; forward: boolean | undefined }>;
-  emit(event: "ready-to-show" | "closed"): void;
+  emit(event: "ready-to-show" | "closed" | "blur"): void;
 }
 
 export function fakeWindow(options: BrowserWindowConstructorOptions, id: number): FakeWindow {
@@ -41,6 +42,7 @@ export function fakeWindow(options: BrowserWindowConstructorOptions, id: number)
     calls: [],
     sent: [],
     visible: false,
+    focused: false,
     destroyed: false,
     ignores: [],
     webContents: {
@@ -67,6 +69,18 @@ export function fakeWindow(options: BrowserWindowConstructorOptions, id: number)
       window.visible = false;
     },
     isVisible: () => window.visible,
+    focus: () => {
+      window.calls.push("focus");
+      window.focused = true;
+    },
+    blur: () => {
+      window.calls.push("blur");
+      window.focused = false;
+      window.emit("blur");
+    },
+    isFocused: () => window.focused,
+    setFocusable: (focusable) => window.calls.push(`setFocusable:${focusable}`),
+    setSkipTaskbar: (skip) => window.calls.push(`setSkipTaskbar:${skip}`),
     getBounds: () => bounds,
     setBounds: (next) => {
       window.calls.push(`setBounds:${next.x},${next.y},${next.width}x${next.height}`);

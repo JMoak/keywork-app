@@ -188,3 +188,50 @@
   padding: 0.25rem 0.75rem 0;
   color: var(--kw-text-dim);
 }
+
+.kw-talk-band {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  border: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.3rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  color: var(--kw-text-dim);
+  font-family: var(--kw-font-mono);
+}
+
+.kw-talk-acts {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+}
+
+.kw-talk-act {
+  flex: none;
+  padding: 0.2rem 0.75rem;
+  font: inherit;
+  color: var(--kw-text);
+  background: var(--kw-panel-lift);
+  border: 1px solid var(--kw-border);
+  cursor: pointer;
+}
+.kw-talk-act:hover {
+  border-color: var(--kw-accent);
+}
+.kw-talk-act:focus-visible {
+  outline: 2px solid var(--kw-border-focus);
+  outline-offset: 1px;
+}
+
+.kw-talk-ended {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  background: var(--kw-panel);
+  color: var(--kw-text-mid);
+  font-family: var(--kw-font-mono);
+}

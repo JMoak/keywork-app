@@ -48,7 +48,7 @@ export function createProjectSites(
 export function placeSeamsOf(shell: Pick<ShellSeams, "client" | "host">): PlaceSeams {
   const { host } = shell;
   return {
-    readSession: (id) => shell.client.session(id),
+    readSession: async (id) => await shell.client.session(id),
     trackedFiles:
       host.trackedFiles === undefined
         ? undefined

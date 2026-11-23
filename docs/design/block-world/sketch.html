@@ -165,6 +165,7 @@ ol.steps b{font-weight:600}
     <div class="grp"><button id="less" type="button" aria-label="One creature fewer">−</button><output id="count" for="less more">5 creatures · a hamlet</output><button id="more" type="button" aria-label="One creature more">+</button></div>
     <div class="grp"><button id="eyeLevel" type="button" aria-pressed="false">Level eye</button><button id="eyeRaised" type="button" aria-pressed="true">Raised eye</button><button id="corner" type="button" aria-pressed="false">Rest on corners</button></div>
     <div class="grp"><button id="alive" type="button" aria-pressed="true">Moving</button><button id="nextWho" type="button">Next creature</button></div>
+    <div class="grp"><button id="change" type="button">Something changes</button><span class="side" id="news" role="status"></span></div>
     <div class="grp" id="themes"><button type="button" data-world="lantern" aria-pressed="true">Lantern</button><button type="button" data-world="neon" aria-pressed="false">Neon</button><button type="button" data-world="terrace" aria-pressed="false">Terrace</button><button type="button" data-world="deco" aria-pressed="false">Deco</button></div>
   </div>
   <p class="note">Main mode is the companion: the creature you last chose floats over your work, and the small team strip beside it picks another. Talk opens its conversation; Stead, or the M key, reveals the stead below to press things in. The panels work together. Press a workshop or a creature in the stead and the creature panel shows its summary and its ledger, questions first. Press a row in the ledger and that question or task opens in a short conversation of its own, beside the main one. Press the house for everything waiting on you. All of it runs in the page, on plain canvas. Lantern, Neon, Terrace and Deco are four themes, each a building style with its own colours. Switch the page between dark and light to see night and day. The drawing is a stand-in for scale, light and structure; the real art pass is the first step below. With the picture focused, the arrow keys turn it.</p>
@@ -274,9 +275,12 @@ ol.steps b{font-weight:600}
     <figure><img alt="Six creatures drawn large in the new look: a leaf-winged dragon, a mosaic-shelled crab, a ring of floating stones, a striped cuttlefish, a stone ring holding a storm, and a knotted ribbon." src="__CONCEPT_PNG__"><figcaption><b>A first try at the new large drawing.</b> Generated with Codex from one prompt.</figcaption></figure>
   </div>
   <figure><img class="wide" alt="The same six creatures on a true pixel grid, each repainted in eight colours." src="__RECOLOUR_PNG__"><figcaption><b>The same six after a cleanup script.</b> Each is now on a true pixel grid about 50 pixels across, and every pixel has a role in place of a colour, so any creature can take any of the eight colours.</figcaption></figure>
-  <div class="grp" id="who"><button type="button" data-who="folio" aria-pressed="true">Folio</button><button type="button" data-who="tessera" aria-pressed="false">Tessera</button><button type="button" data-who="cairn" aria-pressed="false">Cairn</button><button type="button" data-who="purl" aria-pressed="false">Purl</button><button type="button" data-who="hush" aria-pressed="false">Hush</button><button type="button" data-who="knot" aria-pressed="false">Knot</button></div>
+  <figure><img class="wide" alt="A beaver, a Newfoundland dog with round glasses and a hippo, each repainted in eight colours." src="__NEW3_PNG__"><figcaption><b>Three more to choose from:</b> a beaver with character, a charming Newfoundland with glasses and a hippo with a sense of humour. Drawn with Codex against the first six so the size and finish match, and cleaned by the same script. The goat is retired.</figcaption></figure>
+  <div class="grp" id="who"><button type="button" data-who="folio" aria-pressed="true">Folio</button><button type="button" data-who="tessera" aria-pressed="false">Tessera</button><button type="button" data-who="cairn" aria-pressed="false">Cairn</button><button type="button" data-who="purl" aria-pressed="false">Purl</button><button type="button" data-who="hush" aria-pressed="false">Hush</button><button type="button" data-who="knot" aria-pressed="false">Knot</button><button type="button" data-who="beaver" aria-pressed="false">Beaver</button><button type="button" data-who="newfie" aria-pressed="false">Newfie</button><button type="button" data-who="hippo" aria-pressed="false">Hippo</button></div>
   <div class="clips" id="poses"></div>
-  <p class="note">Six creatures, twelve poses each, from Codex, put on the grid by the same script and playing here, each strip in a different colour. Each moves and works in its own way.</p>
+  <p class="note">Nine creatures, twelve poses each, from Codex, put on the grid by the same script and playing here, each strip in a different colour. Each moves and works in its own way.</p>
+  <div class="clips" id="poses2"></div>
+  <p class="note">A second sheet for each creature: reading, sitting, fine work, carrying, delivering, ringing the bell, waiting, celebrating, stumbling and stuck. With the first sheet, every pose the app has now has a drawing, with three shared: the hammer uses each creature's own way of working, and stretching, greeting and raising a hand reuse the breath and the wave.</p>
   <div class="clips" id="turns"></div>
   <p class="note">Each creature from eight directions, turning in place: the four sides and four corners the world can be seen from. Until now a creature was one flat drawing that always faced the same way.</p>
   <p>Three distances. In the world a creature is a small figure. Step into its workshop and it is drawn large and fine, with all its poses. And it can float beside your work as a companion, as the companion window does today.</p>
@@ -311,6 +315,13 @@ ol.steps b{font-weight:600}
   <figure><canvas class="still" style="height:clamp(300px,62vw,620px)" data-world="ladder" data-eye="level"></canvas><figcaption><b>Six stages.</b> A tiny shack for a project that is mostly empty, then a shed, a house, a tower, a high-rise and a skyscraper.</figcaption></figure>
   <figure><canvas class="still" style="height:clamp(300px,62vw,620px)" data-world="ladder" data-eye="raised" data-corner="1"></canvas><figcaption><b>The same six from a corner.</b> They are built of blocks, so every side and every corner view of them already exists.</figcaption></figure>
   <figure><img class="wide" alt="Six buildings in a row from a tiny shack to a skyscraper, lit in orange." src="__STAGES_PNG__"><figcaption><b>The design sheet behind them</b>, generated with Codex. I rebuilt its six designs in blocks at the town's own pixel size.</figcaption></figure>
+  <h3>Where a project stands</h3>
+  <p>Nothing built ever moves, so a project needs a place that can hold any stage from the day it is founded. A skyscraper does not fit in a workshop's yard. Three ways to settle it, each with the same three creatures and five projects:</p>
+  <div class="row">
+    <figure><canvas class="still" style="height:400px" data-world="lots" data-n="0" data-eye="raised" data-corner="1"></canvas><figcaption><span class="pick">My pick</span><b>Behind its creature.</b> Each creature's land is two plots deep: the workshop in front, four lots for its projects behind. What rises behind a workshop tells you about its creature. The town's rows get deeper.</figcaption></figure>
+    <figure><canvas class="still" style="height:400px" data-world="lots" data-n="1" data-eye="raised" data-corner="1"></canvas><figcaption><b>A project quarter.</b> Projects stand together in their own part of town, each in its creature's colour, in the order they were founded. A skyline forms and the town's layout stays as it is. A project is no longer beside its creature.</figcaption></figure>
+    <figure><canvas class="still" style="height:400px" data-world="tall" data-eye="raised" data-corner="1"></canvas><figcaption><b>In the yard, drawn slender.</b> Projects stay around the workshop and a big one only grows upward on a shed's footprint. Nothing about the town changes, but the wide stages above are lost.</figcaption></figure>
+  </div>
   <p>Nothing is scanned for this. Every conversation already records its directory, so the count is free. A repository states its number of tracked files in the first twelve bytes of its index. A folder that is not a repository grows only by the files the creature has touched.</p>
 </section>
 
@@ -328,6 +339,17 @@ ol.steps b{font-weight:600}
 <section>
   <h2>The map</h2>
   <figure><canvas class="still" style="height:clamp(280px,48vw,470px)" data-world="map" data-eye="raised"></canvas><figcaption>Step back once more and each machine is its own piece of land. A plank lane is a direct link, stepping stones are a relayed one, and a machine that is offline fades. The map turns the same way.</figcaption></figure>
+</section>
+
+<section>
+  <h2>How a change arrives</h2>
+  <p>Try it above: press + to add a creature, or Something changes. A change is never just there, and never a show.</p>
+  <ul class="plain">
+    <li><b>One ring of light</b> opens from the place where it happened, and the new state is behind its edge. A lamp lit, a road paved, a storey added and a star earned all arrive this way, so you learn one thing and can read every change.</li>
+    <li><b>New land rises first.</b> A creature's plot comes up from below and settles by a pixel before the ring opens. A new tier, hamlet or town, is the same ring crossing the whole place while the camera steps back.</li>
+    <li><b>Pixel motion.</b> Time moves in steps, the edge is dithered and nothing is blended or scaled by a fraction. It is over in about a second.</li>
+    <li><b>Quiet when asked.</b> With reduced motion, or the picture set to Still, the change is simply there and the line of text says what it was.</li>
+  </ul>
 </section>
 
 <section>
@@ -370,7 +392,11 @@ ol.steps b{font-weight:600}
     <li><div><h3>What moves a project up a stage</h3><p class="why">Six stages, from a tiny shack to a skyscraper.</p></div>
       <ul><li><span class="pick">My pick</span>Conversations: 1, 3, 10, 30, 100 and 300 reach each stage in turn. A repository with over 2,000 tracked files stands one stage higher.</li><li>Files alone, or a stage you set by hand.</li></ul></li>
     <li><div><h3>Where a big project stands</h3><p class="why">A skyscraper does not fit in a workshop's yard, and nothing built may move.</p></div>
-      <ul><li><span class="pick">My pick</span>Every project gets a lot of its own beside its creature's workshop, four lots to a plot. A tiny shack starts on an empty lot and grows there.</li><li>Projects stay in the yard and big ones are drawn slender.</li></ul></li>
+      <ul><li><span class="pick">My pick</span>Behind its creature: four lots on a second plot. A tiny shack starts on an empty lot and grows there.</li><li>A project quarter that all creatures share.</li><li>Projects stay in the yard and big ones are drawn slender.</li><li>All three are drawn under "Project directories become buildings".</li></ul></li>
+    <li><div><h3>Deco's windows</h3><p class="why">Neon lights each workshop in its creature's colour. Deco does not, yet.</p></div>
+      <ul><li><span class="pick">My pick</span>Amber for every window. The creature's colour sits on the door fan, the sign by the door, the sunburst and the pennant.</li><li>Windows lit in the creature's colour, as in Neon. One switch in the style.</li></ul></li>
+    <li><div><h3>How a question's own conversation ends</h3><p class="why">The engine has no ended state for a conversation today, so this has to be decided before it is built.</p></div>
+      <ul><li><span class="pick">My pick</span>Pressing a ledger row opens a short thread about that one row. It ends when the question is answered or you close it. Ended, it stays on the row to read, and leaves one line in the creature's main conversation.</li><li>No separate thread: the row takes you to that moment in the main conversation.</li><li>A separate thread that never ends, like any other.</li></ul></li>
     <li><div><h3>Four sides, four panes</h3><p class="why">Door, bench window, shelf, chore board.</p></div>
       <ul><li><span class="pick">My pick</span>Yes. Each side opens its pane.</li><li>No. The whole workshop opens the creature.</li></ul></li>
     <li><div><h3>The renderer</h3><p class="why">The 5 Nov decision chose canvas with no library.</p></div>
@@ -480,19 +506,23 @@ function box(x0,x1,y0,y1,z0,z1,p){ return {x0:x0,x1:x1,y0:y0,y1:y1,z0:z0,z1:z1,p
 /* ---------- figures ---------- */
 function art(rows){ var w=0,i; for(i=0;i<rows.length;i++) w=Math.max(w,rows[i].length); for(i=0;i<rows.length;i++) while(rows[i].length<w) rows[i]+='.'; return {w:w,h:rows.length,rows:rows}; }
 var ART={
- kid:art(["o...........o","oo.........oo",".oo.......oo.","..ooooooooo..",".obbbbbbbbbo.","obbbbbbbbbblo","obbebbbbebblo","obbbbllbbbbbo",".obbbllbbbbo.","..ooooooooo..","...okkkkko...","..obkkkkkbo..","..obkkkkkbo..","...okkkkko...","...ob...bo...","...oo...oo..."]),
  cairn:art(["...........oooooo...........",".........oohhhhbboo.........","........ohhhhhhbbmmoo.......",".......ohhhhhbmbbbbmo.......","......oobbmdmddbbblbdo......","......obbbboooooobmddo......","..oo..obbbmo....o.bbmo..oo..",".omlo.odddoo.....oblbo.olbo.","ohllloobbbo......olbloollbbo","ohllbbobbbo......ollbolllblo","ommmmmolbbo......odddommmmmo",".ommm.obbblo...o.bmmdoommmo.",".oomo.obbbmdoooobbbbdo.ommo.","..oo..oodddllllbmbbmoo..oo..",".......ommdllllmdmddo.......",".......oomdmlbbbdddoo.......",".........oommmmmmoo.........","...........oooooo..........."]),
  tessera:art([".........ooooooo........",".......oohhlldbboo......","......ohhhhlldbbbboo....",".....ohhhhhlbdmbbbbo....","....ohhhhlddblddmbbmo...","....ommmmdllllbbdddmo...","...ollllldlllbbbdbmmmo..","..odhlllldllbbbbdmmmmo..","..omllllbddbbmbddmmmmo..",".oommllb.......dmmmmmmo.",".ommmmmo.........mmmmmo.",".ommooo..h...h...ooommo.",".ooodmo..h...h...omdooo.","..ommooooo....ooooommo..",".oddoollbboddollbbooddo.","olbmollbbbboolllbbbombmo","obboobbbooboolombbboombo","obo.oobbooooooo.bmoo.obo","ooo..oobmo....obboo..ooo","......oooo....oooo......"]),
  folio:art([".....ooo...oo.......oooooo","....ohbo.ooho.....oolllblo","...ohbooohboo...oolllllllo","...obm.bbboo...ohlllldlbo.","...obbbbboooo.olldlldllbo.",".ohmbbbbmbbboollldldllhoo.",".obbmoombdoooblllddllllo..","ombbowombbmoollldllllhoo..","ombbommmmmmolllddlllloo...","ombbbmmddooobbddlllloooo..",".ooooodmmo.olddhhlddmbbbo.",".....ommmoobbdddddbbbbboo.","....obbmmoommbmbbbbbbboo..","...ohhhmbodoooombbbmoo....","...ohhhbmmddddooooooooo...","...obbbbmmmmmmdo..ombmoo..","...oohhbmbmbdmbdo.omombo..","....ohhhmmmddmmmdoooommo..","....mohhdbmddmmmdmooommo..","..oommooobbooommmmmmmmoo..","..ohbboohhmo.ohbmooooo....","..oooooooooo.oooo........."]),
  purl:art(["................oooooo....",".............oooommmmo....","...........oolbbmmdmmmo...","........o.hhhbbbbbmddmo...",".......olhhhmmmmbbmdddo...",".....oomhhhlmmmmdmmbddoo..",".....oohhhbbbbbbdddmmdmm..","...ooohhhhbbbbbbdddmmdmmoo","...olbllmmmmmmbbbddddmmboo","...ollbddddddddbbmmddblboo","...oobmhhhlllbddmmmdbblloo",".....omohhbooooddmdmbhoo..",".....obbooobbbmoddmbblo...",".....oobbbbb.oooobbbllo...",".....ohobbboohoomollloo...",".ooooohobbbohhommooooo....","oolbmooblbbboommoooo......","ollmmollllbbbmommmmoo.....","oloooollollbdbmommmbo.....","omoollllollbobbmooobo.....",".oolbbboobllombbmoooo.....","..olboo.olllooobbo........","..ollo.obbloo.obmo........","..oooo.obloo.obbo.........",".......oooo..oooo........."]),
  hush:art(["..........ooooo..........",".........olllbdooo.......","......ooolllbbdmmmoo.....","....oohlbdbbbbdbmmdoo....","...ollllloooooombddbbo...","..ollllloo.....oodbbbbo..","..ohlllo...o..oo..mbbb.o.","..oblo....ohllbbo..obmmo.","oooddo.....llhlbd..odddoo","olllo..oolllhbllboo.odbbo","olbboo.lblllhhbhhhboombbo","olbboohhllllllmhhlblommbo","obbboommmmmmmmmmmmmmommmo","oodd...ooooollooooo.oddoo",".odbbo......hh......bbbo.",".obbboo....hhhh....olbbo.",".obbbmo.....dh.....obbbo.","..obbbdo....h.....omdbo..","...odmbboo......oolmmdo..","...oodddmoooooooblmmmo...","....ooodmmdbbbmdmbdooo...","...olbbodmdmmmmdmdolloo..",".oollmmmomdmmmmdmollbmoo.",".obbbmmmmoooooo.ombbbmmo.",".ombbmmmdo......ombbbmmo.",".ooooooooo......oooooooo."]),
- knot:art(["...........ooooo.........",".........oohhbbbo........",".......oohhhhbbbmo.......","......oobhhll..ddmo......","......obblo.....dmo......","...o.oobmoh.oh..mmo......","..oo...o..h..h..mmo......","..lllbbbo....o.bmboooo...","oollllbbbo...oommombbbmo.","oblooo.bbmo.obbbmmbbbbboo","obdo..oomoohlllbooooombmo","obddo..oohlhhloo....oodmo","omdmmddolhhhloo....ooddmo",".ommmdolhllodddooooddmddo","..ommdobboommdmmommmmmdo.","...oooomdooommmbodmmmoo..","......omddodobbbbooooo...","......omddddoobbbo.......",".....ooommmmo.obbbo......","...oollmbmbo..olbboo.....","..ollllbmoo...olbbmooo...",".olllhlmoo.....olbbbmmo..",".ollllloo......olbbbbbmo.",".oloollo........olbboooo.",".ooo.llo.........obmo....",".....ooo..........ooo...."])
+ knot:art(["...........ooooo.........",".........oohhbbbo........",".......oohhhhbbbmo.......","......oobhhll..ddmo......","......obblo.....dmo......","...o.oobmoh.oh..mmo......","..oo...o..h..h..mmo......","..lllbbbo....o.bmboooo...","oollllbbbo...oommombbbmo.","oblooo.bbmo.obbbmmbbbbboo","obdo..oomoohlllbooooombmo","obddo..oohlhhloo....oodmo","omdmmddolhhhloo....ooddmo",".ommmdolhllodddooooddmddo","..ommdobboommdmmommmmmdo.","...oooomdooommmbodmmmoo..","......omddodobbbbooooo...","......omddddoobbbo.......",".....ooommmmo.obbbo......","...oollmbmbo..olbboo.....","..ollllbmoo...olbbmooo...",".olllhlmoo.....olbbbmmo..",".ollllloo......olbbbbbmo.",".oloollo........olbboooo.",".ooo.llo.........obmo....",".....ooo..........ooo...."]),
+ beaver:art(["......l.........","....olm.d.o.l...","....obblmlbbbo..",".......lbmobwd..","......olbbbb.bd.","......lbbobblll.","...oo.ombbbhohd.","..ldlollmmmooo..","oldbdlbbmbllmbbo","olddmbbombhhmobo","obdddobbbhhhlmm.","..mdmdodblhhmm..","..mmdobbmbhmmmo.","...omddmmmmomo..",".....llbo..momb.",".....oooo..oooo."]),
+ newfie:art(["........mmo....","......ohhl.....",".....ohmm.moo..","....ohmmwwww...","....hmmmwoww.d.","...lhmdodwboo.o","...lmddobmbmloo","...obmmommoood.",".....oommmbolm.","...llmmlbmmlblo","....mbbollbbboo",".ohhmmbmdobblo.","..hmm.lbbbdodo.","ohmdddobblddmo.",".mdd.bbobbommb.","...oboooblbmm.o","....ooooooooooo"]),
+ hippo:art(["......oh.oolm....","......oml.mboo...",".......obmmm.wo..","....ooohbowbhlbmo","....hhhhblbhmmldl","..ohhmdmollllllbl","..hbbbmbb.mbmbbmo","..bbllbdlbmowdow.","ohbbbbbddmbmommo.","dmdbbbllbdoo.oo..","obmdbdlbbbmmmmo..",".mbdmmblbdmmdmo..","..bmdoomb.odmm...","..dww.owww.wwdo..","..ooo.oooo.oooo.."])
 };
-var FORMS=['kid','cairn','tessera','folio','purl','hush','knot'];
+var FORMS=['cairn','tessera','folio','purl','hush','knot','beaver','newfie','hippo'];
 var HOVER={cairn:2};
 var POSESETS=__POSES_JSON__, poseName='folio';
+var POSESETS_B=__POSES_B_JSON__;
+var CLIPS_B=[{name:'Reading',f:[0],hue:1},{name:'Sitting',f:[1],hue:3},{name:'Fine work',f:[2,2,3,3],hue:5},{name:'Carrying',f:[4,5],hue:2},{name:'Delivering',f:[4,5,4,5,6,6,6,6],hue:4},{name:'Ringing',f:[7],hue:7},{name:'Waiting',f:[8],hue:0},{name:'Celebrating',f:[9,9,8,8],hue:6},{name:'Stumbling',f:[10],hue:5},{name:'Stuck',f:[11],hue:1}];
 var TURNSETS=__TURNS_JSON__;
-var TURNS=['folio','tessera','cairn','purl','hush','knot'].map(function(n,i){ return {name:n.charAt(0).toUpperCase()+n.slice(1),f:[0,1,2,3,4,5,6,7],hue:[0,2,5,6,1,4][i],set:TURNSETS[n],slow:true}; });
+var TURNS=['folio','tessera','cairn','purl','hush','knot','beaver','newfie','hippo'].map(function(n,i){ return {name:n.charAt(0).toUpperCase()+n.slice(1),f:[0,1,2,3,4,5,6,7],hue:[0,2,5,6,1,4,5,1,6][i],set:TURNSETS[n],slow:true}; });
 var WORK=[8,8,9,9,8,8,9,9];
 var TOOLCLIPS=[{name:'Wood',f:WORK,hue:0,tool:'wood'},{name:'Iron',f:WORK,hue:0,tool:'iron'},{name:'Gold',f:WORK,hue:0,tool:'gold'},{name:'Star metal',f:WORK,hue:0,tool:'star'},{name:'A medal',f:[0,0,0,0,1,0,0,0],hue:0,medal:true}];
 var TIERS={wood:{d:'#4a2f2a',m:'#6e4a3c',b:'#946a50',l:'#b98d6a',h:'#d9b38c'},iron:{d:'#3a3f55',m:'#5b6280',b:'#8a92b2',l:'#b8c0dc',h:'#e6ebff'},gold:{d:'#8a5a12',m:'#c98a1e',b:'#f2b53a',l:'#ffd76a',h:'#fff3c0'},star:{d:'#145a78',m:'#1f9cc0',b:'#46d6f0',l:'#9af0ff',h:'#f0feff'}};
@@ -807,7 +837,7 @@ function addMill(w,cell,busy){
 }
 function creature(i){
  var r=rng(1000+i*77), shelf=Math.min(6,((r()*4)|0)+(i<4?3:i<9?1:0));
- return {i:i,hue:i%8,form:FORMS[(i*3+(i>6?1:0))%7],seed:(r()*1e6)|0,shelf:shelf,storeys:1+(shelf>=3?1:0)+(shelf>=6?1:0),
+ return {i:i,hue:i%8,form:FORMS[(i*4+(i>8?1:0))%9],seed:(r()*1e6)|0,shelf:shelf,storeys:1+(shelf>=3?1:0)+(shelf>=6?1:0),
   roof:['gx','gz','hip'][(r()*3)|0],wide:r()<.5,deep:r()<.4,chimney:r()<.75,ivy:i<3?3:i<7?2:i<11?1:0,lamps:(r()*4)|0,chores:1+((r()*3)|0),crates:(r()*3)|0,child:r()<.3,lit:false,door:'pz',garland:false,banner:0,star:false};
 }
 function walker(cr,pts,phase){
@@ -821,17 +851,20 @@ var PAIRS=[[0,1,3],[1,2,2],[0,3,2],[3,4,3],[2,5,1],[4,6,2],[5,7,3],[6,8,1],[7,9,
 // An idle creature rests by its own door. One in four is out on the green, which has a few
 // fixed spots that never overlap.
 var GREEN=[[-16,-16],[15,-14],[1,6],[-17,22]];
-function town(n){
+function freshTw(){ return {state:{},up:{},star:{},pave:{}}; }
+var TW0=freshTw();
+function town(n,tw){
+ tw=tw||TW0;
  var w=new World(), i, cs=[], idle=0;
  var house=addHouse(w,w.cell(0,0),n>=2), store=addStore(w,w.cell(1,0),Math.min(10,2+n)), green=w.cell(0,1);
  if(n>=4) green.items.push({t:'spr',x:-20,z:U+2,s:sWell(-20,U+2)});
  if(n>=3) green.items.push({t:'spr',x:18,z:U+22,s:n>=8?sStatue(18,U+22):sStone(18,U+22)});
  if(n>=3) addMill(w,w.cell(2,-1),true);
- for(i=0;i<n;i++){ var cr=creature(i); cr.state=STATES[i]; cr.lit=cr.state==='work'||cr.state==='walk'; cr.door=SLOTS[i][1]>=1?'nz':'pz'; cr.garland=i<6; cr.banner=i<2?2:i<5?1:0; cr.star=i<2; addWorkshop(w,w.cell(SLOTS[i][0],SLOTS[i][1]),cr); cs.push(cr); }
+ for(i=0;i<n;i++){ var cr=creature(i); cr.state=tw.state[i]||STATES[i]; cr.lit=cr.state==='work'||cr.state==='walk'; cr.door=SLOTS[i][1]>=1?'nz':'pz'; cr.garland=i<6; cr.banner=i<2?2:i<5?1:0; cr.star=i<2||!!tw.star[i]; if(tw.up[i]) cr.storeys=Math.min(3,cr.storeys+tw.up[i]); addWorkshop(w,w.cell(SLOTS[i][0],SLOTS[i][1]),cr); cs.push(cr); }
  w.road(store,house,1);
  for(i=0;i<n;i++) w.road(cs[i].b,house,1);
  var paths={};
- PAIRS.forEach(function(p){ if(p[0]<n&&p[1]<n){ var pts=w.road(cs[p[0]].b,cs[p[1]].b,p[2]); if(pts){ if(!paths[p[0]]) paths[p[0]]=pts; if(!paths[p[1]]) paths[p[1]]=pts; } } });
+ PAIRS.forEach(function(p,pk){ if(p[0]<n&&p[1]<n){ var pts=w.road(cs[p[0]].b,cs[p[1]].b,tw.pave[pk]||p[2]); if(pts){ if(!paths[p[0]]) paths[p[0]]=pts; if(!paths[p[1]]) paths[p[1]]=pts; } } });
  for(i=0;i<n;i++){ var c=cs[i], b=c.b, pos;
   if(c.state==='walk'){ var pts=paths[i]||w.road(b,house,1); if(pts){ var wk=walker(c,pts,i*37); wk.cr=c; w.walkers.push(wk); continue; } }
   if(c.state==='porch'){ pos=[8,25]; w.cell(0,0).items.push({t:'spr',x:pos[0],z:pos[1],s:critter(c,pos[0],pos[1],'porch'),pick:{kind:'creature',cr:c}}); continue; }
@@ -988,6 +1021,20 @@ function ladderWorld(){
  a.items.push({t:'spr',x:-14,z:18,s:critter(cr,-14,18,'idle')});
  return w.finish();
 }
+function lotsWorld(mode){
+ var w=new World(), cs=[], i, own=[[5,0],[3,2],[1]], lit=[[1,0],[1,0],[1]], spots=[[-14,-13],[14,13],[14,-13],[-14,13]];
+ for(i=0;i<3;i++){ var cr=creature(i); cr.door='pz'; cr.lit=i<2; cr.state=i<2?'work':'idle'; cr.crates=0; addWorkshop(w,w.cell(i,0),cr); w.cell(i,1); cs.push(cr); }
+ w.road(cs[0].b,cs[1].b,3); w.road(cs[1].b,cs[2].b,1);
+ if(mode){
+  var lots=[[3,0,0],[3,0,1],[4,0,0],[4,0,1],[3,-1,1]], order=[[0,0],[1,1],[1,0],[0,1],[2,0]];
+  order.forEach(function(o,k){ var L=lots[k], sp=spots[L[2]]; addProject(w,w.cell(L[0],L[1]),cs[o[0]],own[o[0]][o[1]],sp[0],sp[1],!!lit[o[0]][o[1]]); });
+  w.cell(3,1); w.cell(4,1); for(i=2;i<5;i++) w.mark('h',i,1,2);
+ } else {
+  for(i=0;i<3;i++) own[i].forEach(function(st,k){ addProject(w,w.cell(i,-1),cs[i],st,spots[k][0],spots[k][1],!!lit[i][k]); });
+ }
+ for(i=0;i<3;i++){ var q=along(cs[i].b,19,5); cs[i].cell.items.push({t:'spr',x:q[0],z:q[1],s:critter(cs[i],q[0],q[1],cs[i].state)}); }
+ return w.finish();
+}
 function mapWorld(){
  var w=new World(), i, house=addHouse(w,w.cell(0,0),false), store=addStore(w,w.cell(1,0),6); w.cell(0,1);
  [[-1,0],[-1,1],[1,1]].forEach(function(s,i){ var cr=creature(i); cr.door=s[1]>=1?'nz':'pz'; cr.lit=i!==1; addWorkshop(w,w.cell(s[0],s[1]),cr); w.road(cr.b,house,2); });
@@ -1007,7 +1054,7 @@ var TONE={pz:0,px:.07,nx:-.1,nz:-.16,top:.08};
 function tex(b,key,w,h,tone,fog){ if(b._ep!==epoch){ b._tx={}; b._ep=epoch; } var c=b._tx[key]; if(!c){ c=document.createElement('canvas'); c.width=w; c.height=h; var g=G(c.getContext('2d')); g.tone=tone; g.fog=fog; b.p[key](g,w,h); b._tx[key]=c; } return c; }
 function View(canvas,opt){ this.c=canvas; this.ctx=canvas.getContext('2d'); this.g=G(this.ctx); this.q=opt.q||0; this.th=this.q*Math.PI/2; this.k=opt.eye==='level'?0:.5; this.kT=this.k; this.tight=!!opt.tight; this.stars=!!opt.stars; this.slab=opt.slab; this.S=1; this.life=!!opt.life; this.theme=opt.theme||null; if(opt.corner) this.th+=Math.PI/4; }
 View.prototype.withTheme=function(fn){ var sp=P, ss=ST; if(this.theme) usePalette(this.theme); try{ return fn(); } finally{ P=sp; ST=ss; } };
-View.prototype.render=function(tick){ var self=this; this.withTheme(function(){ self._render(tick); }); };
+View.prototype.render=function(tick){ var self=this; this.withTheme(function(){ self._render(tick); }); if(this.after) this.after(); };
 var DITH={};
 function dither(ctx,col,S){ var k=col+'|'+S, pt=DITH[k]; if(!pt){ var c=document.createElement('canvas'); c.width=c.height=2*S; var x=c.getContext('2d'); x.fillStyle=col; x.fillRect(0,0,S,S); x.fillRect(S,S,S,S); pt=DITH[k]=ctx.createPattern(c,'repeat'); } return pt; }
 function drawSky(ctx,W,H,S){
@@ -1040,7 +1087,8 @@ View.prototype._render=function(tick){
  var yTop=-b.h-this.dep/2*k, yBot=this.sl+this.dep/2*k, cx=W/S/2, cy=H/S/2-(yTop+yBot)/2;
  if(rest){ cx=Math.round(cx); cy=Math.round(cy); }
  var E=1e-4, hits=this.hits=[];
- function proj(x,y,z){ x-=b.cx; z-=b.cz; return [cx+x*c-z*s, cy-y+(x*s+z*c)*k]; }
+ var lift=0; this._o={cx:cx,cy:cy,c:c,s:s,k:k,bx:b.cx,bz:b.cz};
+ function proj(x,y,z){ x-=b.cx; z-=b.cz; return [cx+x*c-z*s, cy-y+(x*s+z*c)*k+lift]; }
  function face(bx,key,o,ux,uy,vx,vy,fw,fh,fog){ var p=bx.p[key]; if(!p||fw<=0||fh<=0) return; ctx.setTransform(S*ux,S*uy,S*vx,S*vy,S*o[0],S*o[1]); if(typeof p==='string'){ ctx.fillStyle=shade(p,TONE[key],fog); ctx.fillRect(0,0,fw,fh); } else ctx.drawImage(tex(bx,key,fw,fh,TONE[key],fog),0,0); if(haze>.01){ ctx.globalAlpha=haze; ctx.fillStyle=hazeCol; ctx.fillRect(0,0,fw,fh); ctx.globalAlpha=1; } }
  function drawBox(bx,fog){ var fw=bx.x1-bx.x0, fh=bx.y1-bx.y0, fd=bx.z1-bx.z0;
   if(c>E) face(bx,'pz',proj(bx.x0,bx.y1,bx.z1),c,s*k,0,1,fw,fh,fog);
@@ -1060,13 +1108,13 @@ View.prototype._render=function(tick){
  for(i=0;i<w.walkers.length;i++){ var sp=w.walkers[i].at(tick), cl=w.at(sp.x+3*s,sp.z+3*c); if(!cl||!cl.land) cl=w.at(sp.x-3*s,sp.z-3*c); if(!cl) continue; if(!dyn.has(cl)) dyn.set(cl,[]); dyn.get(cl).push({t:'spr',x:sp.x,z:sp.z,s:sp,pick:w.walkers[i].cr?{kind:'creature',cr:w.walkers[i].cr}:null}); }
  var byDepth=function(a,d){ return (a.x*s+a.z*c)-(d.x*s+d.z*c); };
  var dmax=-1e9, haze=0, hazeCol=P.sky?P.sky[P.sky.length-1]:P.bg; for(i=0;i<cells.length;i++) dmax=Math.max(dmax,cells[i].cx*s+cells[i].cz*c);
- for(i=0;i<cells.length;i++){ var cell=cells[i], fog=cell.fog; haze=Math.min(1,(dmax-(cell.cx*s+cell.cz*c))/4)*P.haze;
+ for(i=0;i<cells.length;i++){ var cell=cells[i], fog=cell.fog; lift=cell.lift?cell.lift():0; haze=Math.min(1,(dmax-(cell.cx*s+cell.cz*c))/4)*P.haze;
   if(cell.land){ drawBox(cell.keel,fog); drawBox(cell.ground,fog); }
   var items=cell.items, d=dyn.get(cell); if(d) items=items.concat(d);
   if(items.length>1) items=items.slice().sort(byDepth);
   for(j=0;j<items.length;j++) drawItem(items[j],fog);
  }
- ctx.setTransform(1,0,0,1,0,0);
+ lift=0; ctx.setTransform(1,0,0,1,0,0);
  if(this.sel){ for(i=hits.length-1;i>=0;i--){ var hh=hits[i]; if((hh.pick.kind==='workshop'&&hh.pick.cr===this.sel)||hh.pick.kind===this.sel){ ctx.fillStyle=P.accent; var L=5*S, T=S, ax=hh.x0-2*S, ay=hh.y0-2*S, bx2=hh.x1+2*S, by2=hh.y1+2*S; [[ax,ay,1,1],[bx2,ay,-1,1],[ax,by2,1,-1],[bx2,by2,-1,-1]].forEach(function(q){ ctx.fillRect(q[2]>0?q[0]:q[0]-L,q[3]>0?q[1]:q[1]-T,L,T); ctx.fillRect(q[2]>0?q[0]:q[0]-T,q[3]>0?q[1]:q[1]-L,T,L); }); break; } } }
  if(this.life&&P.pool){ var fr=rng(11); ctx.fillStyle=P.lampHi; for(i=0;i<10;i++){ var bx=(fr()-.5)*W/S*.6, by=(fr()-.7)*H/S*.34, px=Math.round(W/S/2+bx+Math.sin(tick*.06+i*1.9)*7), py=Math.round(cy+by+Math.cos(tick*.045+i*2.3)*5); ctx.globalAlpha=.4+.3*Math.sin(tick*.25+i*1.3); ctx.fillRect(px*S,py*S,S,S); } ctx.globalAlpha=1; }
 };
@@ -1074,11 +1122,11 @@ View.prototype._render=function(tick){
 /* ---------- page wiring ---------- */
 var qs=new URLSearchParams(location.search);
 var reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-var hero={sel:-1,selKind:null,n:+(qs.get('n')||5),q:+(qs.get('q')||0),eyeAuto:!qs.get('eye'),eye:qs.get('eye')||null,moving:!reduced&&!qs.get('still'),corner:!!qs.get('corner')};
+var hero={tw:freshTw(),sel:-1,selKind:null,n:+(qs.get('n')||5),q:+(qs.get('q')||0),eyeAuto:!qs.get('eye'),eye:qs.get('eye')||null,moving:!reduced&&!qs.get('still'),corner:!!qs.get('corner')};
 function restAngle(){ return (((hero.q%4)+4)%4)*Math.PI/2+(hero.corner?Math.PI/4:0); }
 var heroC=document.getElementById('hero'), view, stills=[], tick=0, raf=0, anim=null, seen=true;
 var SIDES=['from the front','from the right','from the back','from the left'];
-function builders(kind,n,grade){ if(kind==='pair') return pairWorld(grade); if(kind==='solo') return soloWorld(n); if(kind==='one') return oneWorld(); if(kind==='map') return mapWorld(); if(kind==='plot') return plotWorld(n); if(kind==='tall') return tallWorld(); if(kind==='earn') return earnWorld(n); if(kind==='ladder') return ladderWorld(); return town(n); }
+function builders(kind,n,grade){ if(kind==='pair') return pairWorld(grade); if(kind==='solo') return soloWorld(n); if(kind==='one') return oneWorld(); if(kind==='map') return mapWorld(); if(kind==='plot') return plotWorld(n); if(kind==='tall') return tallWorld(); if(kind==='earn') return earnWorld(n); if(kind==='ladder') return ladderWorld(); if(kind==='lots') return lotsWorld(n); return town(n); }
 function autoEye(){ return hero.n<=2?'level':'raised'; }
 function label(){
  var n=hero.n, kind=n<=2?'a stead':n<=7?'a hamlet':'a town';
@@ -1090,6 +1138,52 @@ function label(){
  var tb=document.querySelectorAll('#themes button'); for(var ti=0;ti<tb.length;ti++) tb[ti].setAttribute('aria-pressed',String(tb[ti].getAttribute('data-world')===themeId));
  document.getElementById('alive').textContent=hero.moving?'Moving':'Still';
 }
+/* How a change arrives. One ring of light opens from the place where it happened and the new
+   state is behind its edge. Time moves in steps, the edge is dithered, nothing is blended.
+   A new plot first rises from below. With reduced motion the change is simply there. */
+var trans=null, B4=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function spotOf(cellX,cellZ){ var o=view._o; if(!o) return [heroC.width/2,heroC.height/2]; var x=cellX*U-o.bx, z=cellZ*U-o.bz; return [(o.cx+x*o.c-z*o.s)*view.S,(o.cy+(x*o.s+z*o.c)*o.k)*view.S]; }
+function news(text){ var n=document.getElementById('news'); if(n) n.textContent=text; }
+function change(apply,where,reach,rise){
+ if(!hero.moving||reduced||!heroC.width||!view.W){ apply(); view.fit(); label(); kick(); return; }
+ var prev=document.createElement('canvas'); prev.width=heroC.width; prev.height=heroC.height; prev.getContext('2d').drawImage(heroC,0,0);
+ apply(); view.fit(); label();
+ var t0=performance.now();
+ if(rise&&where){ var cell=view.world.cells.get(where[0]+','+where[1]); if(cell) cell.lift=function(){ if(trans&&trans.freeze!=null) return 0; var f=(performance.now()-t0)/520; if(f>=1) return 0; var q=Math.floor(f*10)/10; return q>.85?-1:Math.round((1-q)*(1-q)*30); }; }
+ view.render(tick);
+ var at=where?spotOf(where[0],where[1]):[heroC.width/2,heroC.height*.55];
+ trans={t0:t0,delay:rise?440:0,ms:reach?800:1250,prev:prev,x:at[0],y:at[1],r0:rise?44:5,r1:reach||Math.max(heroC.width,heroC.height)/view.S*1.25,local:!!reach};
+ kick();
+}
+function drawTransition(now){
+ var tr=trans, f=tr.freeze!=null?tr.freeze:(now-tr.t0-tr.delay)/tr.ms; if(f>=1){ trans=null; return false; }
+ var q=f<=0?0:Math.floor(f*14)/14, e=1-(1-q)*(1-q), S=view.S, W=heroC.width, H=heroC.height, mw=Math.ceil(W/S), mh=Math.ceil(H/S);
+ var m=tr.m||(tr.m=document.createElement('canvas')), g=tr.g||(tr.g=document.createElement('canvas')); if(m.width!==mw||m.height!==mh){ m.width=g.width=mw; m.height=g.height=mh; }
+ var mx=m.getContext('2d'), gx=g.getContext('2d'), mi=mx.createImageData(mw,mh), gi=gx.createImageData(mw,mh), md=mi.data, gd=gi.data;
+ var ox=tr.x/S, oy=tr.y/S, R=tr.r0+(tr.r1-tr.r0)*e, lamp=h2(P.lampHi), thin=tr.local?16*(1-q*.8):12, x, y, i=0;
+ for(y=0;y<mh;y++){ for(x=0;x<mw;x++,i+=4){
+  var dx=x-ox, dy=(y-oy)*2, dist=Math.sqrt(dx*dx+dy*dy), b=B4[(y&3)*4+(x&3)], edge=dist-R+(b-7.5)*.45;
+  if(edge>0){ if(!tr.local||dist<=tr.r1+3) md[i+3]=255; }
+  else if(edge>-3&&f>0&&b<thin){ gd[i]=lamp[0]; gd[i+1]=lamp[1]; gd[i+2]=lamp[2]; gd[i+3]=edge>-1.4?235:110; }
+ } }
+ mx.putImageData(mi,0,0); gx.putImageData(gi,0,0);
+ var t=tr.t||(tr.t=document.createElement('canvas')); if(t.width!==W||t.height!==H){ t.width=W; t.height=H; }
+ var tx=t.getContext('2d'); tx.globalCompositeOperation='source-over'; tx.clearRect(0,0,W,H); tx.drawImage(tr.prev,0,0); tx.globalCompositeOperation='destination-in'; tx.imageSmoothingEnabled=false; tx.drawImage(m,0,0,mw*S,mh*S);
+ var ctx=heroC.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false; ctx.drawImage(t,0,0); ctx.drawImage(g,0,0,mw*S,mh*S);
+ return true;
+}
+var changeTurn=0;
+function somethingChanges(){
+ var n=hero.n, tw=hero.tw, cast=view.world.cast||[], opts=[], i;
+ for(i=0;i<n;i++) if(cast[i].state!=='work'&&cast[i].state!=='walk'){ opts.push({where:SLOTS[i],text:nameOf(cast[i])+' lit the lamp and went to work.',apply:(function(i){ return function(){ tw.state[i]='work'; }; })(i)}); break; }
+ PAIRS.some(function(pr,pk){ if(pr[0]<n&&pr[1]<n&&(tw.pave[pk]||pr[2])<3){ opts.push({where:SLOTS[pr[0]],text:'The road between '+nameOf(cast[pr[0]])+' and '+nameOf(cast[pr[1]])+' was paved.',apply:function(){ tw.pave[pk]=3; }}); return true; } return false; });
+ for(i=0;i<n;i++) if(cast[i].storeys<3){ opts.push({where:SLOTS[i],text:nameOf(cast[i])+' added a storey.',apply:(function(i){ return function(){ tw.up[i]=(tw.up[i]||0)+1; }; })(i)}); break; }
+ for(i=0;i<n;i++) if(!cast[i].star){ opts.push({where:SLOTS[i],text:nameOf(cast[i])+' earned a star.',apply:(function(i){ return function(){ tw.star[i]=true; }; })(i)}); break; }
+ if(!opts.length){ hero.tw=freshTw(); view.world=town(hero.n,hero.tw); reselect(); news('A fresh start.'); kick(); return; }
+ var o=opts[changeTurn++%opts.length];
+ change(function(){ o.apply(); view.world=town(hero.n,hero.tw); reselect(); },o.where,130,false);
+ news(o.text);
+}
 function frame(now){
  raf=0; var busy=false;
  if(anim){ var f=Math.min(1,(now-anim.t0)/anim.ms), e=f<.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2;
@@ -1097,16 +1191,22 @@ function frame(now){
   if(anim.k!=null) view.k=anim.k0+(anim.k-anim.k0)*e;
   if(f>=1){ if(anim.th!=null) view.th=restAngle(); if(anim.k!=null) view.k=anim.k; anim=null; } else busy=true; }
  view.render(tick);
+ if(trans&&trans.freeze==null) busy=true;
  if(busy) kick();
 }
 function kick(){ if(!raf) raf=requestAnimationFrame(frame); }
 function turn(dir){ if(anim&&anim.th!=null) return; if(anim){ view.k=anim.k; anim=null; } hero.q+=dir; var th0=view.th, th=th0+dir*Math.PI/2; view.q=((hero.q%4)+4)%4; label(); if(reduced){ view.th=restAngle(); kick(); return; } anim={t0:performance.now(),ms:620,th0:th0,th:th}; kick(); }
 function setCorner(on){ if(anim){ if(anim.k!=null) view.k=anim.k; anim=null; } hero.corner=on; label(); var th0=view.th, th=th0+(on?1:-1)*Math.PI/4; if(reduced){ view.th=restAngle(); kick(); return; } anim={t0:performance.now(),ms:380,th0:th0,th:th}; kick(); }
 function setEye(e,instant){ var k=e==='level'?0:.5; if(view.kT===k) return; view.kT=k; view.fit(); label(); if(instant||reduced){ view.k=k; kick(); return; } anim={t0:performance.now(),ms:420,k0:view.k,k:k}; kick(); }
-function setN(n){ hero.n=Math.max(1,Math.min(16,n)); view.world=town(hero.n); reselect(); if(hero.eyeAuto){ var k=autoEye()==='level'?0:.5; view.kT=k; view.k=k; } view.fit(); label(); kick(); }
+function setN(n){
+ n=Math.max(1,Math.min(16,n)); var grew=n===hero.n+1;
+ var apply=function(){ hero.n=n; hero.tw=freshTw(); view.world=town(hero.n,hero.tw); reselect(); if(hero.eyeAuto){ var k=autoEye()==='level'?0:.5; view.kT=k; view.k=k; } };
+ if(grew){ change(apply,SLOTS[n-1],0,true); news(n===3?'It is a hamlet now.':n===8?'It is a town now.':GIVEN[(n-1)%GIVEN.length]+' moved in.'); }
+ else { trans=null; apply(); view.fit(); label(); kick(); news(''); }
+}
 function buildAll(){
  usePalette(themeId); epoch++; memo.clear();
- view.world=town(hero.n); reselect(); view.fit(); view.render(tick);
+ view.world=town(hero.n,hero.tw); reselect(); view.fit(); view.render(tick);
  stills.forEach(function(s){ s.v.withTheme(function(){ s.v.world=builders(s.kind,s.n,s.grade); }); if(s.v.fit()) s.v.render(0); });
  drawForms(); drawPoses(tick);
 }
@@ -1133,7 +1233,7 @@ function drawClips(id,clips,t,set){
   if(c.medal){ var px=function(x,y,w,h,k){ ctx.fillStyle=k; ctx.fillRect(ox+x*S,oy+y*S,w*S,h*S); }; px(19,23,1,3,P.err); px(18,25,3,1,P.ink); px(18,26,3,3,P.gold); px(18,26,1,1,P.goldHi); px(20,28,1,1,P.goldDk); }
  }
 }
-function drawPoses(t){ drawClips('poses',CLIPS,t,POSESETS[poseName]); drawClips('tools',TOOLCLIPS,t,POSESETS.folio); drawClips('turns',TURNS,t,TURNSETS.folio); }
+function drawPoses(t){ drawClips('poses',CLIPS,t,POSESETS[poseName]); drawClips('poses2',CLIPS_B,t,POSESETS_B[poseName]); drawClips('tools',TOOLCLIPS,t,POSESETS.folio); drawClips('turns',TURNS,t,TURNSETS.folio); }
 var GIVEN=['Wren','Moss','Ash','Ivy','Sol','Fen','Rue','Oak','Pip','Bo','Kit','Lark','Nell','Tam','Zed','Mab'];
 var SAY={work:['working','Its lamp is lit: a thread is running.','Running the checks on the branch. Two files changed so far.'],
  walk:['handing work over','On the road with a crate for another creature.','Taking the summary across. Back in a moment.'],
@@ -1271,6 +1371,7 @@ function init(){
  if(THEMES[qs.get('world')]) themeId=qs.get('world');
  usePalette(themeId);
  view=new View(heroC,{q:((hero.q%4)+4)%4,eye:hero.eye||autoEye(),stars:true,life:true});
+ view.after=function(){ if(trans) drawTransition(performance.now()); };
  var list=document.querySelectorAll('canvas.still');
  for(var i=0;i<list.length;i++){ var c=list[i], kind=c.getAttribute('data-world'), s={kind:kind,n:+(c.getAttribute('data-n')||0),grade:+(c.getAttribute('data-grade')||0)}; s.v=new View(c,{q:+(c.getAttribute('data-q')||0),eye:c.getAttribute('data-eye'),tight:c.getAttribute('data-corner')!=='1',corner:c.getAttribute('data-corner')==='1',slab:kind==='one'||kind==='solo'||kind==='pair'||kind==='plot'||kind==='tall'||kind==='earn'||kind==='ladder'?12:null,theme:c.getAttribute('data-theme'),stars:kind==='town'||kind==='map'}); stills.push(s); }
  if(qs.get('deg')) view.th=+qs.get('deg')*Math.PI/180; else view.th=restAngle();
@@ -1282,6 +1383,9 @@ function init(){
  document.getElementById('eyeLevel').onclick=function(){ hero.eyeAuto=false; setEye('level'); };
  document.getElementById('eyeRaised').onclick=function(){ hero.eyeAuto=false; setEye('raised'); };
  document.getElementById('corner').onclick=function(){ setCorner(!hero.corner); };
+ document.getElementById('change').onclick=somethingChanges;
+ // for looking at one moment of a change: ?grow=0.5 adds a creature and holds the ring there; ?shift=0.5 does the same for a small change
+ if(qs.get('grow')||qs.get('shift')){ var was=hero.moving; hero.moving=true; if(qs.get('grow')) setN(hero.n+1); else somethingChanges(); if(trans) trans.freeze=+(qs.get('grow')||qs.get('shift')); hero.moving=was; label(); }
  var tbs=document.querySelectorAll('#themes button, button.setworld');
  for(i=0;i<tbs.length;i++) tbs[i].onclick=function(){ themeId=this.getAttribute('data-world'); buildAll(); label(); if(this.className==='setworld') heroC.scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'}); };
  var who=document.querySelectorAll('#who button');

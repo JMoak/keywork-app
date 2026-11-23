@@ -1,22 +1,29 @@
 import { type Axes, axesOf, type Camera } from "./camera.ts";
+import { castItems, standingFor } from "./cast.ts";
 import {
   type BlockWorld,
   type Box,
   type Cell,
   type CrownPart,
   cellAt,
+  cellKey,
   type FaceKey,
   type FacePaint,
+  frontOnGrid,
+  type Grid,
   type Item,
   type Part,
   type Point,
+  type QuadPaint,
   type RampKey,
   type Side,
   type Sprite,
+  type Staging,
+  sideOnGrid,
   type Target,
-  topTexel,
   type Walker,
 } from "./model.ts";
+import { seenThrough } from "./seen-through.ts";
 
 export type Affine = readonly [number, number, number, number, number, number];
 
@@ -30,7 +37,7 @@ export interface Quad {
   readonly matrix: Affine;
   readonly width: number;
   readonly height: number;
-  readonly paint: FacePaint;
+  readonly paint: QuadPaint;
   readonly ramp: RampKey | undefined;
   readonly light: FaceKey | undefined;
   readonly fog: number;
@@ -68,7 +75,10 @@ export interface DrawUnit {
   readonly cell: Cell;
   readonly item: Item | undefined;
   readonly quads: readonly Quad[];
+  readonly through?: true;
 }
+
+export type Projector = (x: number, y: number, z: number) => readonly [number, number];
 
 export const hazeReach = 4;
 
@@ -111,9 +121,10 @@ export function drawList(
   view: View,
   tick = 0,
   haze = 0,
+  staging: Staging = {},
 ): DrawList {
   const pivot = pivotOf(world, camera, view);
-  const quads = drawUnits(world, camera, view, tick, haze).flatMap((unit) => unit.quads);
+  const quads = drawUnits(world, camera, view, tick, haze, staging).flatMap((unit) => unit.quads);
   return { view, pivot, quads, atRest: pivot.rest };
 }
 
@@ -123,25 +134,18 @@ export function drawUnits(
   view: View,
   tick = 0,
   haze = 0,
+  staging: Staging = {},
 ): DrawUnit[] {
   const axes = axesOf(camera);
-  const pivot = pivotOf(world, camera, view);
-  const center = {
-    x: (world.bounds.minX + world.bounds.maxX) / 2,
-    z: (world.bounds.minZ + world.bounds.maxZ) / 2,
-  };
-  const point: Projector = (x, y, z) => {
-    const dx = x - center.x;
-    const dz = z - center.z;
-    return [
-      pivot.x + dx * axes.c - dz * axes.s,
-      pivot.y - y + (dx * axes.s + dz * axes.c) * axes.k,
-    ];
-  };
+  const point = projectorOf(world, camera, view);
   const cells = cellOrder(world.cells, axes);
-  const moving = walkersByCell(world, axes, tick);
+  const standing = staging.standing ?? standingFor(world, camera);
+  const moving = byCell(world, [
+    ...walkersNow(world, axes, tick),
+    ...castItems(world, standing).map((item) => ({ item, tries: [item, ...beside(item, axes)] })),
+  ]);
   const farthest = Math.max(...cells.map((cell) => cellDepth(cell, axes)));
-  return cells.flatMap((cell) => {
+  const units = cells.flatMap((cell): DrawUnit[] => {
     const hazed = Math.min(1, (farthest - cellDepth(cell, axes)) / hazeReach) * haze;
     const ground: Quad[] = [];
     for (const box of cell.ground) {
@@ -162,6 +166,25 @@ export function drawUnits(
       }),
     ];
   });
+  const lifted = staging.lifts === undefined ? units : raised(units, staging.lifts);
+  return [...lifted, ...seenThrough(lifted)];
+}
+
+export function projectorOf(world: BlockWorld, camera: Camera, view: View): Projector {
+  const axes = axesOf(camera);
+  const pivot = pivotOf(world, camera, view);
+  const center = {
+    x: (world.bounds.minX + world.bounds.maxX) / 2,
+    z: (world.bounds.minZ + world.bounds.maxZ) / 2,
+  };
+  return (x, y, z) => {
+    const dx = x - center.x;
+    const dz = z - center.z;
+    return [
+      pivot.x + dx * axes.c - dz * axes.s,
+      pivot.y - y + (dx * axes.s + dz * axes.c) * axes.k,
+    ];
+  };
 }
 
 export function cellOrder(cells: readonly Cell[], axes: Axes): Cell[] {
@@ -211,16 +234,16 @@ export function frameIndex(sprite: Sprite, tick: number): number {
 
 export function moves(world: BlockWorld): boolean {
   if (world.walkers.length > 0) return true;
-  return world.cells.some((cell) =>
-    cell.items.some((item) =>
-      [...item.parts, ...(item.crown ?? []).map((crowned) => crowned.part)].some(
-        (part) => "sprite" in part && part.sprite.sequence.length > 1,
+  const animated = (part: Part): boolean => "sprite" in part && part.sprite.sequence.length > 1;
+  return (
+    world.cast.some((member) => member.parts.some(animated)) ||
+    world.cells.some((cell) =>
+      cell.items.some((item) =>
+        [...item.parts, ...(item.crown ?? []).map((crowned) => crowned.part)].some(animated),
       ),
-    ),
+    )
   );
 }
-
-type Projector = (x: number, y: number, z: number) => readonly [number, number];
 
 const edge = 1e-4;
 
@@ -232,18 +255,14 @@ function crownOrder(crown: readonly CrownPart[], axes: Axes): CrownPart[] {
   return [...crown].sort((a, b) => depthOf(a, axes) - depthOf(b, axes));
 }
 
-function walkersByCell(world: BlockWorld, axes: Axes, tick: number): Map<Cell, Item[]> {
-  const byAddress = new Map(world.cells.map((cell) => [`${cell.cx},${cell.cz}`, cell]));
-  const found = (x: number, z: number): Cell | undefined => {
-    const { cx, cz } = cellAt(x, z);
-    return byAddress.get(`${cx},${cz}`);
-  };
-  const placed = new Map<Cell, Item[]>();
-  for (const walker of world.walkers) {
+interface Placed {
+  readonly item: Item;
+  readonly tries: readonly Point[];
+}
+
+function walkersNow(world: BlockWorld, axes: Axes, tick: number): Placed[] {
+  return world.walkers.map((walker) => {
     const at = walkerAt(walker, tick);
-    let cell = found(at.x + 3 * axes.s, at.z + 3 * axes.c);
-    if (cell === undefined || !cell.land) cell = found(at.x - 3 * axes.s, at.z - 3 * axes.c);
-    if (cell === undefined) continue;
     const item: Item = {
       what: walker.what,
       x: at.x,
@@ -256,9 +275,41 @@ function walkersByCell(world: BlockWorld, axes: Axes, tick: number): Map<Cell, I
       ...(walker.ramp === undefined ? {} : { ramp: walker.ramp }),
       ...(walker.target === undefined ? {} : { target: walker.target }),
     };
-    placed.set(cell, [...(placed.get(cell) ?? []), item]);
+    return { item, tries: beside(at, axes) };
+  });
+}
+
+function beside(at: Point, axes: Axes): Point[] {
+  const stepped = (along: number, across: number): Point => ({
+    x: at.x + along * axes.s + across * axes.c,
+    z: at.z + along * axes.c - across * axes.s,
+  });
+  return [stepped(3, 0), stepped(-3, 0), stepped(0, 3), stepped(0, -3)];
+}
+
+function byCell(world: BlockWorld, placed: readonly Placed[]): Map<Cell, Item[]> {
+  const byAddress = new Map(world.cells.map((cell) => [cellKey(cell), cell]));
+  const found = (x: number, z: number): Cell | undefined => byAddress.get(cellKey(cellAt(x, z)));
+  const held = new Map<Cell, Item[]>();
+  for (const { item, tries } of placed) {
+    const cell = tries.map((point) => found(point.x, point.z)).find((each) => each?.land);
+    if (cell !== undefined) held.set(cell, [...(held.get(cell) ?? []), item]);
   }
-  return placed;
+  return held;
+}
+
+function raised(units: readonly DrawUnit[], lifts: ReadonlyMap<string, number>): DrawUnit[] {
+  return units.map((unit) => {
+    const lift = lifts.get(cellKey(unit.cell)) ?? 0;
+    if (lift === 0) return unit;
+    return {
+      ...unit,
+      quads: unit.quads.map((quad) => {
+        const [a, b, c, d, e, f] = quad.matrix;
+        return { ...quad, matrix: [a, b, c, d, e, f + lift] as const };
+      }),
+    };
+  });
 }
 
 function pushPart(
@@ -316,12 +367,12 @@ function pushBox(
   ): void => {
     const paint = box.faces[key];
     if (paint === undefined || width <= 0 || height <= 0) return;
-    const texel = key === "top" ? topTexel : 1;
+    const grid = key === "top" ? topGridSeen(axes) : wallGrid;
     quads.push({
-      matrix: [u[0] * texel, u[1] * texel, v[0] * texel, v[1] * texel, origin[0], origin[1]],
-      width: width / texel,
-      height: height / texel,
-      paint,
+      matrix: [u[0] * grid.x, u[1] * grid.x, v[0] * grid.z, v[1] * grid.z, origin[0], origin[1]],
+      width: width / grid.x,
+      height: height / grid.z,
+      paint: paintSeen(paint, grid),
       ramp,
       light: key,
       fog,
@@ -335,6 +386,18 @@ function pushBox(
   if (s > edge) face("px", point(box.x1, box.y1, box.z1), [s, -c * k], down, deep, tall);
   if (s < -edge) face("nx", point(box.x0, box.y1, box.z0), [-s, c * k], down, deep, tall);
   if (k > edge) face("top", point(box.x0, box.y1, box.z0), [c, s * k], [-s, c * k], across, deep);
+}
+
+const wallGrid: Grid = { x: 1, z: 1 };
+
+export function topGridSeen(axes: Axes): Grid {
+  return Math.abs(axes.c) >= Math.abs(axes.s) ? frontOnGrid : sideOnGrid;
+}
+
+function paintSeen(paint: FacePaint, grid: Grid): QuadPaint {
+  if (!("texture" in paint)) return paint;
+  const sideOn = grid === sideOnGrid ? paint.sideOn : undefined;
+  return { texture: sideOn ?? paint.texture };
 }
 
 function hitOf(target: Target, box: Box, key: FaceKey): Hit {

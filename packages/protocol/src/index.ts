@@ -194,6 +194,22 @@ export {
   type WorkspaceChanged,
 } from "./events.ts";
 export {
+  type CreatureLedgerAbout,
+  type CreatureLedgerChange,
+  type CreatureLedgerChangeKind,
+  type CreatureLedgerEntry,
+  type CreatureLedgerEntryAnswer,
+  type CreatureLedgerKind,
+  type CreatureLedgerState,
+  type CreatureLedgerView,
+  type LedgerConversation,
+  type LedgerConversationEnd,
+  type LedgerConversationState,
+  type LedgerEntryRef,
+  ledgerRoutes,
+  type QuestionAnswer,
+} from "./ledger.ts";
+export {
   type DiscardTrashedOutcome,
   lifecycleRoutes,
   type PurgedTrash,
@@ -525,7 +541,9 @@ export {
   arrangementShapes,
   type IsoTime,
   type KeeperShowOutcome,
+  type MarkTone,
   type Mood,
+  markTones,
   moods,
   type Placement,
   type PlacementMover,
@@ -562,6 +580,8 @@ export {
   type ShowSettledBy,
   type Stage,
   type StageRoom,
+  type SteadPlace,
+  type SteadPlaceKind,
   settingKinds,
   settingOrigins,
   settingPanes,
@@ -575,6 +595,7 @@ export {
   showOutcomes,
   showRoutes,
   stageLattice,
+  steadPlaceKinds,
 } from "./show.ts";
 export {
   type ArcCloseOutcome,

@@ -1,4 +1,5 @@
 import type { MotionPrefs } from "@keywork-app/habitat";
+import type { SteadPlace } from "@keywork-app/protocol";
 import { type Accessor, createEffect, on, onCleanup } from "solid-js";
 import type { PaneSignal } from "../chrome/signals.ts";
 import { type Chord, chordsOfKey } from "../keys/chord.ts";
@@ -56,6 +57,7 @@ export interface OutsidePanesSeams {
   backOnTheRail?(pane: PaneId, why: CameHome): boolean;
   putAway?(pane: PaneId): boolean;
   setOutAgain?(seats: ReadonlyMap<PaneId, ScreenRect>): void;
+  placeOnPage?(place: SteadPlace): Rect | undefined;
 }
 
 export interface OutsidePanes extends OutsideHandlers {
@@ -64,7 +66,7 @@ export interface OutsidePanes extends OutsideHandlers {
   restore(which?: (spec: PaneSpec) => boolean): void;
   popOutside(): Promise<PoppedOutside>;
   standOutside(spec: PaneSpec, sending: Sending): Promise<PaneId | undefined>;
-  leave(pane: PaneId, mood?: Mood): Promise<void>;
+  leave(pane: PaneId, mood?: Mood, intoPlace?: boolean): Promise<void>;
   arrange(asked: Arranging): Promise<Arranged | "desktop-refused">;
   settle(company?: string): Promise<void>;
   standings(): ReadonlyMap<PaneId, Placed>;
@@ -137,6 +139,10 @@ export function createOutsidePanes(seams: OutsidePanesSeams): OutsidePanes {
     noRoom: (tenants) => seams.say(outsideNotices.noRoomOutside(tenants.length)),
     steppedAside: (tenants) => seams.say(outsideNotices.steppedAside(tenants.length)),
     setOutAgain: (seats) => seams.setOutAgain?.(seats),
+    placeOnDesk: (place, desk) => {
+      const onPage = seams.placeOnPage?.(place);
+      return onPage === undefined ? undefined : pageOnDesk(desk.console, seams.viewport(), onPage);
+    },
   });
   onCleanup(outside.dispose);
 
@@ -306,8 +312,8 @@ export function createOutsidePanes(seams: OutsidePanesSeams): OutsidePanes {
     holdingFocus: outside.holdingFocus,
     reachesOutside: true,
     standOutside,
-    leave: async (pane, mood) => {
-      await outside.recall([pane], mood);
+    leave: async (pane, mood, intoPlace) => {
+      await outside.recall([pane], mood, intoPlace);
     },
     arrange: outside.arrange,
     settle: outside.settle,

@@ -19,23 +19,22 @@ afterEach(() => {
 });
 
 describe("a stead connected to its creature home", () => {
-  it("saves automatic addresses and view choices to the host pane without presenting another stead", async () => {
+  it("saves automatic addresses and the town's style to the host pane without presenting another stead", async () => {
     const held = connectedHome();
     const { container } = mountPane(steadPane.component, { kind: "stead" }, held.shell);
     await waitFor(() =>
       expect(held.hostRebind).toHaveBeenLastCalledWith("p1", {
         kind: "stead",
-        view: "scene",
         courtOrder: ["alpha", "missing"],
       }),
     );
     expect(held.homeRebind).not.toHaveBeenCalled();
     expect(container.querySelectorAll(".kw-stead")).toHaveLength(1);
-    fireEvent.click(within(container).getByRole("button", { name: /^Courtyards$/ }));
+    fireEvent.click(within(container).getByRole("button", { name: "Deco" }));
     expect(held.hostRebind).toHaveBeenLastCalledWith("p1", {
       kind: "stead",
-      view: "courtyards",
       courtOrder: ["alpha", "missing"],
+      kit: "deco",
     });
     expect(held.homeRebind).not.toHaveBeenCalled();
     held.dispose();
@@ -43,16 +42,15 @@ describe("a stead connected to its creature home", () => {
 
   it("keeps missing-artwork residents as the target of navigation, conversations and project actions", async () => {
     const held = connectedHome();
-    const { container, act } = mountPane(
-      steadPane.component,
-      { kind: "stead", view: "courtyards" },
-      held.shell,
-    );
+    const { container, act } = mountPane(steadPane.component, { kind: "stead" }, held.shell);
     const page = within(container);
-    fireEvent.click(await page.findByRole("button", { name: /Open Missing's courtyard/ }));
+    await page.findByRole("button", { name: "Open Alpha’s conversation" });
+    act("stead.down");
+    act("stead.down");
     await settle();
-    expect(container.querySelector("[data-court-detail]")?.textContent).toBe("Missing's courtyard");
-    expect(container.querySelector('[data-slug="missing"]')).toBeNull();
+    expect(container.querySelector(".kw-stead-place")?.getAttribute("aria-label")).toBe(
+      "Missing's workshop",
+    );
     expect(page.queryByRole("button", { name: "Open Alpha’s conversation" })).toBeNull();
     fireEvent.click(page.getByRole("button", { name: "Open Missing’s conversation" }));
     await waitFor(() =>

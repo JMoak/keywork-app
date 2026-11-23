@@ -1,13 +1,20 @@
 import type { Construction, GroundSpec, RoadGrade } from "../../kit.ts";
-import { cellPitch, halfCell } from "../../model.ts";
+import { cellPitch, type Grid, halfCell } from "../../model.ts";
 import type { Brush, Role } from "../../texture.ts";
-import { box, type Paint, sameSides, sketchRandom, topPainted, truncated } from "./shapes.ts";
+import {
+  box,
+  type Paint,
+  sameSides,
+  sketchRandom,
+  type TopPaint,
+  topPainted,
+  truncated,
+} from "./shapes.ts";
 import type { SketchStyle } from "./style.ts";
 
 export const soilDepth = 16;
 export const keelDepth = 8;
 export const keelInset = 8;
-export const inlayWidth = 2;
 
 export function groundsOf(style: SketchStyle): (spec: GroundSpec) => Construction {
   return (spec) => ({
@@ -58,8 +65,8 @@ const rockPaint: Paint = (brush, width, height) => {
 
 type Edge = "north" | "south" | "west" | "east";
 
-function topPaint(spec: GroundSpec, inlay: boolean): Paint {
-  return (brush) => {
+function topPaint(spec: GroundSpec, inlay: boolean): TopPaint {
+  return (brush, _across, _deep, grid) => {
     const r = brush.rect;
     r(0, 0, cellPitch, cellPitch, "grass");
     const random = sketchRandom(spec.cx * 31 + spec.cz * 17 + 99);
@@ -68,8 +75,9 @@ function topPaint(spec: GroundSpec, inlay: boolean): Paint {
       const y = truncated(random() * 27) * 2;
       r(x, y, 2, 2, random() < 0.6 ? "grassHi" : "grassLo");
     }
+    const inlayOf = inlay ? grid : undefined;
     for (const edge of ["north", "south", "west", "east"] as const) {
-      edgeRoad(brush, edge, spec.roads[edge], inlay);
+      edgeRoad(brush, edge, spec.roads[edge], inlayOf);
     }
     const corners = [
       [false, false, spec.roads.northWest],
@@ -77,7 +85,7 @@ function topPaint(spec: GroundSpec, inlay: boolean): Paint {
       [false, true, spec.roads.southWest],
       [true, true, spec.roads.southEast],
     ] as const;
-    for (const [east, south, grade] of corners) corner(brush, east, south, grade, inlay);
+    for (const [east, south, grade] of corners) corner(brush, east, south, grade, inlayOf);
     const foot = spec.worn;
     if (foot !== undefined) {
       const shade = spec.shadow;
@@ -109,7 +117,7 @@ function topPaint(spec: GroundSpec, inlay: boolean): Paint {
   };
 }
 
-function edgeRoad(brush: Brush, edge: Edge, grade: RoadGrade, inlay: boolean): void {
+function edgeRoad(brush: Brush, edge: Edge, grade: RoadGrade, inlay: Grid | undefined): void {
   if (grade === 0) return;
   const put = (a: number, b: number, along: number, across: number, role: Role): void => {
     if (edge === "north") brush.rect(8 + a, b, along, across, role);
@@ -129,7 +137,9 @@ function edgeRoad(brush: Brush, edge: Edge, grade: RoadGrade, inlay: boolean): v
   put(0, 0, 40, 6, "cobble");
   put(0, 6, 40, 2, "cobbleLo");
   for (let a = 0; a < 40; a += 4) put(a, ((a / 4) % 3) * 2, 2, 2, "cobbleLo");
-  if (inlay) put(0, 0, 40, inlayWidth, "cobbleInlay");
+  if (inlay === undefined) return;
+  const pixel = edge === "north" || edge === "south" ? inlay.z : inlay.x;
+  put(0, 0, 40, pixel, "cobbleInlay");
 }
 
 function corner(
@@ -137,7 +147,7 @@ function corner(
   east: boolean,
   south: boolean,
   grade: RoadGrade,
-  inlay: boolean,
+  inlay: Grid | undefined,
 ): void {
   if (grade === 0) return;
   const put = (a: number, b: number, width: number, height: number, role: Role): void =>
@@ -162,9 +172,9 @@ function corner(
   put(2, 2, 2, 2, "cobbleLo");
   put(6, 0, 2, 2, "cobbleLo");
   put(0, 6, 2, 2, "cobbleLo");
-  if (!inlay) return;
-  put(0, 0, 8, inlayWidth, "cobbleInlay");
-  put(0, 0, inlayWidth, 8, "cobbleInlay");
+  if (inlay === undefined) return;
+  put(0, 0, 8, inlay.z, "cobbleInlay");
+  put(0, 0, inlay.x, 8, "cobbleInlay");
 }
 
 function pool(brush: Brush, east: boolean, south: boolean): void {

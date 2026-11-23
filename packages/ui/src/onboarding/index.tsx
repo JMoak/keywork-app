@@ -1,130 +1,40 @@
-import "../panes/overview/overview.css";
-import "./onboarding.css";
 import type { CreatureSummary, SessionSummary } from "@keywork-app/protocol";
-import {
-  createEffect,
-  createSignal,
-  For,
-  Match,
-  on,
-  onCleanup,
-  onMount,
-  Show,
-  Switch,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import type { AppAction } from "../keys/actions.ts";
-import { OverviewRow, SubLine } from "../panes/overview/rows.tsx";
 import type { ShellSeams } from "../panes/registry.ts";
 import { creaturesListed } from "../shell/first-frame.ts";
-import { useKeyboardScope } from "../shell/keyboard-claim.ts";
 import { createOnboardingController, type OnboardingController } from "./controller.ts";
-import {
-  acceptRestKey,
-  backKey,
-  connectKey,
-  homeTitle,
-  madeKeys,
-  makingLine,
-  modelsAsk,
-  modelsKeys,
-  nameAsk,
-  nameField,
-  nameKeys,
-  nameRefused,
-  notMadeLine,
-  notNowKey,
-  onboardingName,
-  readingLine,
-  skinAsk,
-  skinKeys,
-  stepWords,
-  titleLine,
-  workshopAsk,
-  workshopKeys,
-} from "./copy.ts";
 import { introducingClient } from "./introduction.ts";
-import { MeetCreature } from "./meet.tsx";
-import {
-  type CloudStanding,
-  localFirst,
-  nothingReachable,
-  policyLines,
-  type Reach,
-  reachLines,
-} from "./models.ts";
-import { nameOf } from "./names.ts";
+import type { CloudStanding } from "./models.ts";
 import {
   firstRunWanted,
-  type Onboarding,
   type OnboardingSeams,
   type OnboardingStorage,
   onboardingStorageKey,
   type Phase,
   rememberedOnboarding,
   startOnboarding,
-  type Verb,
 } from "./onboarding.ts";
-import { Portrait } from "./portrait.tsx";
 import { onboardingClientFor } from "./requests.ts";
-import {
-  type Decision,
-  decisionOf,
-  type Proposals,
-  type Sequence,
-  type Step,
-  steps,
-} from "./sequence.ts";
-import { offeredSkins } from "./skins.ts";
-
-export {
-  type Choice,
-  choicesFor,
-  firstRunWanted,
-  type Onboarding,
-  type OnboardingSeams,
-  type OnboardingStorage,
-  onboardingStorageKey,
-  type Phase,
-  rememberedOnboarding,
-  startOnboarding,
-  type Verb,
-} from "./onboarding.ts";
+import { HatchStage } from "./stage.tsx";
 
 export const onboardingActionId = "onboarding.start";
 
 export const onboardingAction: AppAction = {
   chords: "leader 1",
-  help: "make a creature: name, skin, workshop, models",
+  help: "make a creature",
   command: {
     name: "creature.new",
     label: "new creature",
-    aliases: ["new-creature", "onboard"],
+    aliases: ["new-creature", "onboard", "hatch"],
     description:
-      "make a creature on the stead: name, skin, workshop, models, then its first thread",
+      "make a creature on the stead: it hatches, you name it, and its first conversation opens",
   },
   invoke: (target) => {
     target.requestOnboarding();
     target.summon("stead");
   },
 };
-
-const keyVerbs: Readonly<Record<string, Verb>> = {
-  j: "down",
-  ArrowDown: "down",
-  k: "up",
-  ArrowUp: "up",
-  Enter: "keep",
-  Escape: "dismiss",
-  a: "rest",
-  Backspace: "back",
-  x: "dismiss",
-  c: "connect",
-  i: "install",
-};
-
-export function cardOwnsFocus(phase: Phase["kind"]): boolean {
-  return phase === "made" || phase === "failed";
-}
 
 export function cloudStandingOf(rows: readonly SessionSummary[]): CloudStanding {
   const answered = [...rows]
@@ -148,7 +58,6 @@ export function onboardingSeamsOf(
       shell.client.inject(sessionId, { text, client: introducingClient, frame: { creature } }),
     openThread: (sessionId) => shell.sessions.openSession(sessionId),
     openConnect: () => shell.openPane({ kind: "terminal", mode: "bridge", verb: "connect" }),
-    openInstall: () => shell.openPane({ kind: "terminal", mode: "shell" }),
     storage,
   };
 }
@@ -156,7 +65,6 @@ export function onboardingSeamsOf(
 export interface OnboardingOnTheSteadProps {
   readonly shell: ShellSeams;
   readonly automatic?: boolean;
-  readonly simple?: boolean;
   readonly controller?: OnboardingController;
   readonly storage?: OnboardingStorage | undefined;
   readonly seams?: Partial<OnboardingSeams> | undefined;
@@ -165,36 +73,27 @@ export interface OnboardingOnTheSteadProps {
 export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
   const controller = props.controller ?? props.shell.onboarding ?? createOnboardingController();
   const storage = props.storage ?? localStorageOrNone();
-  const [preferredSkin, setPreferredSkin] = createSignal<string>();
   const onboarding = startOnboarding({
     ...onboardingSeamsOf(props.shell, storage),
     ...props.seams,
-    get skins() {
-      const offered = props.seams?.skins ?? offeredSkins();
-      const preferred = preferredSkin();
-      return preferred !== undefined && offered.includes(preferred)
-        ? [preferred, ...offered.filter((id) => id !== preferred)]
-        : offered;
-    },
   });
   const listed = props.automatic ? createCreatureListing(props.shell) : () => undefined;
-  const trusted = (): boolean => props.shell.trust.state().kind === "trusted";
   const wanted = (): boolean =>
     props.automatic === true &&
     firstRunWanted({
-      trusted: trusted(),
+      trusted: props.shell.trust.state().kind === "trusted",
       creatures: listed(),
       remembered: rememberedOnboarding(storage, onboardingStorageKey(props.shell.workspace)),
     });
-  const homeIsEmpty = (): boolean =>
-    props.automatic === true && trusted() && listed()?.length === 0;
-  const underway = (): boolean => {
-    const kind = onboarding.phase().kind;
-    return kind === "making" || kind === "made" || kind === "failed";
+  const stagedElsewhere = (): boolean => {
+    const staged = controller.active();
+    return staged !== undefined && staged !== onboarding;
   };
-  const showing = (): boolean =>
-    controller.requested() ||
-    (onboarding.phase().kind !== "closed" && (underway() || (props.simple !== true && wanted())));
+  const showing = createMemo((): boolean => {
+    const kind = onboarding.phase().kind;
+    if (stagedElsewhere()) return false;
+    return controller.requested() || (kind !== "closed" && (hatched(kind) || wanted()));
+  });
   createEffect(
     on(
       () => onboarding.phase().kind,
@@ -207,346 +106,14 @@ export function OnboardingOnTheStead(props: OnboardingOnTheSteadProps) {
     if (showing()) onCleanup(controller.bind(onboarding));
   });
   return (
-    <>
-      <Show when={props.simple && !showing()}>
-        <MeetCreature
-          shell={props.shell}
-          creatures={listed()}
-          first={homeIsEmpty()}
-          initialSkin={preferredSkin()}
-          onCustomize={(skin) => {
-            setPreferredSkin(skin);
-            controller.request();
-          }}
-        />
-      </Show>
-      <Show when={showing()}>
-        <OnboardingCard
-          onboarding={onboarding}
-          workspace={props.shell.workspace}
-          controller={controller}
-          home={props.shell.steadHome !== undefined}
-        />
-      </Show>
-    </>
+    <Show when={showing()}>
+      <HatchStage onboarding={onboarding} controller={controller} random={props.seams?.random} />
+    </Show>
   );
 }
 
-export interface OnboardingCardProps {
-  readonly onboarding: Onboarding;
-  readonly workspace: string;
-  readonly controller?: OnboardingController;
-  readonly home?: boolean;
-}
-
-export function OnboardingCard(props: OnboardingCardProps) {
-  const keyboard = useKeyboardScope();
-  let root: HTMLElement | undefined;
-  const phase = () => props.onboarding.phase();
-  const step = () => props.onboarding.step();
-  const proposals = () => props.onboarding.proposals();
-  const [notice, setNotice] = createSignal<string>();
-  const installOffered = (): boolean => proposals()?.workshop.installStep !== undefined;
-
-  const keepName = (text: string): void => {
-    const name = nameOf(text);
-    if (name === undefined) setNotice(nameRefused);
-    else props.onboarding.name(name);
-  };
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.target instanceof HTMLInputElement) return;
-    const verb = keyVerbs[event.key];
-    if (verb !== undefined && props.onboarding.act(verb)) event.preventDefault();
-  };
-
-  createEffect(
-    on(step, (current) => {
-      setNotice(undefined);
-      if (current !== undefined && current !== "name" && focusIsHere(root)) {
-        root?.focus({ preventScroll: true });
-      }
-    }),
-  );
-  createEffect(
-    on(
-      () => phase().kind,
-      (kind) => {
-        if (cardOwnsFocus(kind)) root?.focus({ preventScroll: true });
-      },
-    ),
-  );
-  onMount(() => {
-    if (root === undefined) return;
-    if (props.controller !== undefined) onCleanup(props.controller.bindCard(root));
-    if (keyboard !== undefined) onCleanup(keyboard.claim(root));
-  });
-  createEffect(
-    on(
-      () => props.onboarding,
-      (onboarding) => void onboarding.begin(),
-    ),
-  );
-
-  return (
-    <aside
-      class="kw-onboard"
-      aria-label={onboardingName}
-      tabIndex={-1}
-      ref={root}
-      data-phase={phase().kind}
-      onKeyDown={onKeyDown}
-    >
-      <div class="kw-onboard-head">
-        <span class="kw-onboard-title">{props.home ? homeTitle : titleLine(props.workspace)}</span>
-        <ol class="kw-onboard-steps" aria-label="steps">
-          <For each={steps}>
-            {(each) => (
-              <StepMark step={each} current={step()} sequence={props.onboarding.sequence()} />
-            )}
-          </For>
-        </ol>
-      </div>
-      <div class="kw-onboard-portrait-slot">
-        <Portrait skin={props.onboarding.shownSkin()} hueStop={props.onboarding.coat()} />
-      </div>
-      <div class="kw-onboard-body">
-        <Switch>
-          <Match when={phase().kind === "reading"}>
-            <p class="kw-onboard-line">{readingLine}</p>
-          </Match>
-          <Match when={step() === "name"}>
-            <NameStep
-              proposals={proposals()?.names ?? []}
-              notice={notice()}
-              onKeep={keepName}
-              onNotNow={() => props.onboarding.act("dismiss")}
-            />
-          </Match>
-          <Match when={step() !== undefined && step() !== "name"}>
-            <ChoiceStep
-              step={step() ?? "skin"}
-              onboarding={props.onboarding}
-              facts={factsFor(step(), proposals(), props.onboarding.reach())}
-              keys={keysFor(step(), installOffered())}
-            />
-          </Match>
-          <Match when={makingName(phase())}>
-            {(name) => <p class="kw-onboard-line">{makingLine(name())}</p>}
-          </Match>
-          <Match when={madeLines(phase())}>
-            {(lines) => (
-              <>
-                <For each={lines()}>
-                  {(line, index) => (
-                    <p class="kw-onboard-line" data-tone={index() === 0 ? "made" : undefined}>
-                      {line}
-                    </p>
-                  )}
-                </For>
-                <p class="kw-onboard-line">{madeKeys}</p>
-              </>
-            )}
-          </Match>
-          <Match when={failureOf(phase())}>
-            {(reason) => (
-              <p class="kw-onboard-line" data-tone="error">
-                {notMadeLine(reason())}
-              </p>
-            )}
-          </Match>
-        </Switch>
-      </div>
-    </aside>
-  );
-}
-
-const decisionMarks: Readonly<Record<Decision, string>> = { kept: "█", skipped: "·" };
-
-function StepMark(props: { step: Step; current: Step | undefined; sequence: Sequence }) {
-  const decision = () => decisionOf(props.sequence, props.step);
-  return (
-    <li
-      class="kw-onboard-step"
-      data-current={props.current === props.step ? "" : undefined}
-      data-decided={decision() === undefined ? undefined : ""}
-    >
-      {stepWords[props.step]}
-      <Show when={decision()}>{(made) => <> {decisionMarks[made()]}</>}</Show>
-    </li>
-  );
-}
-
-interface NameStepProps {
-  proposals: readonly string[];
-  notice: string | undefined;
-  onKeep(text: string): void;
-  onNotNow(): void;
-}
-
-function NameStep(props: NameStepProps) {
-  let input: HTMLInputElement | undefined;
-  const [text, setText] = createSignal("");
-  const first = (): string => props.proposals[0] ?? "";
-  onMount(() => input?.focus());
-  const proposalAt = (key: string): string | undefined => {
-    const index = Number.parseInt(key, 10) - 1;
-    return Number.isInteger(index) ? props.proposals[index] : undefined;
-  };
-  return (
-    <>
-      <p class="kw-onboard-ask">{nameAsk}</p>
-      <form
-        class="kw-ov-draft"
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onKeep(text() === "" ? first() : text());
-        }}
-      >
-        <span>{nameField}</span>
-        <input
-          aria-label={nameField}
-          value={text()}
-          placeholder={first()}
-          ref={input}
-          onInput={(event) => setText(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              props.onNotNow();
-              return;
-            }
-            const proposal = text() === "" ? proposalAt(event.key) : undefined;
-            if (proposal === undefined) return;
-            event.preventDefault();
-            props.onKeep(proposal);
-          }}
-        />
-      </form>
-      <ol class="kw-onboard-choices" aria-label="proposed names">
-        <For each={props.proposals}>
-          {(name, index) => (
-            <OverviewRow
-              cursor={false}
-              mark={String(index() + 1)}
-              onClick={() => props.onKeep(name)}
-            >
-              {name}
-            </OverviewRow>
-          )}
-        </For>
-      </ol>
-      <p class="kw-onboard-line">{nameKeys(first())}</p>
-      <Show when={props.notice}>
-        {(line) => (
-          <p class="kw-onboard-line" data-tone="error">
-            {line()}
-          </p>
-        )}
-      </Show>
-    </>
-  );
-}
-
-interface ChoiceStepProps {
-  step: Step;
-  onboarding: Onboarding;
-  facts: readonly string[];
-  keys: string;
-}
-
-function ChoiceStep(props: ChoiceStepProps) {
-  const cursor = () => props.onboarding.cursor();
-  return (
-    <>
-      <p class="kw-onboard-ask">{askFor(props.step)}</p>
-      <Show when={props.facts.length > 0}>
-        <ul class="kw-onboard-facts" aria-label="what this machine has">
-          <For each={props.facts}>{(fact) => <li>{fact}</li>}</For>
-        </ul>
-      </Show>
-      <ol class="kw-onboard-choices" aria-label={`${props.step} choices`}>
-        <For each={props.onboarding.choices()}>
-          {(choice, index) => (
-            <>
-              <OverviewRow
-                cursor={index() === cursor()}
-                density={index() === cursor() ? "full" : "light"}
-                mark={index() === cursor() ? "█" : undefined}
-                onClick={() => {
-                  props.onboarding.point(index());
-                  props.onboarding.act("keep");
-                }}
-              >
-                <span onPointerEnter={() => props.onboarding.point(index())}>{choice.label}</span>
-              </OverviewRow>
-              <Show when={choice.detail}>{(detail) => <SubLine text={detail()} />}</Show>
-            </>
-          )}
-        </For>
-      </ol>
-      <p class="kw-onboard-line">
-        {props.keys} · {acceptRestKey} · {backKey} · {notNowKey}
-      </p>
-    </>
-  );
-}
-
-function askFor(step: Step): string {
-  switch (step) {
-    case "name":
-      return nameAsk;
-    case "skin":
-      return skinAsk;
-    case "workshop":
-      return workshopAsk;
-    case "models":
-      return modelsAsk;
-  }
-}
-
-function keysFor(step: Step | undefined, installOffered: boolean): string {
-  switch (step) {
-    case "workshop":
-      return workshopKeys(installOffered);
-    case "models":
-      return modelsKeys;
-    default:
-      return skinKeys;
-  }
-}
-
-export function factsFor(
-  step: Step | undefined,
-  proposals: Proposals | undefined,
-  reach: Reach | undefined,
-): string[] {
-  if (proposals === undefined) return [];
-  switch (step) {
-    case "workshop":
-      return proposals.workshop.installStep === undefined ? [] : [proposals.workshop.installStep];
-    case "models": {
-      if (reach === undefined) return [];
-      const connect = nothingReachable(reach) ? [connectKey] : [];
-      const policy = localFirst(proposals.policy)
-        ? policyLines(proposals.policy).map(([modelClass, word]) => `${modelClass}: ${word}`)
-        : [];
-      return [...reachLines(reach), ...policy, ...connect];
-    }
-    default:
-      return [];
-  }
-}
-
-function makingName(phase: ReturnType<Onboarding["phase"]>): string | undefined {
-  return phase.kind === "making" ? phase.name : undefined;
-}
-
-function madeLines(phase: ReturnType<Onboarding["phase"]>): readonly string[] | undefined {
-  return phase.kind === "made" ? phase.made.lines : undefined;
-}
-
-function failureOf(phase: ReturnType<Onboarding["phase"]>): string | undefined {
-  return phase.kind === "failed" ? phase.reason : undefined;
+function hatched(kind: Phase["kind"]): boolean {
+  return kind !== "egg" && kind !== "closed";
 }
 
 function createCreatureListing(
@@ -572,11 +139,6 @@ function createCreatureListing(
     }),
   );
   return listed;
-}
-
-function focusIsHere(root: HTMLElement | undefined): boolean {
-  const focused = document.activeElement;
-  return focused === null || focused === document.body || root?.contains(focused) === true;
 }
 
 function localStorageOrNone(): OnboardingStorage | undefined {

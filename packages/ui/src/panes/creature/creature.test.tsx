@@ -1,6 +1,7 @@
 import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { mountPane, settle } from "../overview/testing.tsx";
+import { skinIds } from "../stead/habitat-render.ts";
 import {
   badModelReference,
   deleteTitle,
@@ -92,11 +93,13 @@ describe("the creature profile", () => {
     }));
     act("creature.skin");
     expect(container.querySelector("[data-tone='ask']")?.textContent).toBe(
-      "body for Wren · 1 kid · 2 carter · 3 joiner · 4 tessera · 5 cairn · 6 placeholder · any other key cancels",
+      `body for Wren · ${skinIds()
+        .map((id, index) => `${index + 1} ${id}`)
+        .join(" · ")} · any other key cancels`,
     );
     choose(container, "2");
     await settle();
-    expect(lastCall(harness.served, "PATCH")?.body).toEqual({ body: { skin: "carter" } });
+    expect(lastCall(harness.served, "PATCH")?.body).toEqual({ body: { skin: skinIds()[1] } });
     act("creature.policy");
     expect(container.querySelector("[data-tone='ask']")?.textContent).toBe(
       "which class of Wren's models · s strong · l loop · d decide · v vision · any other key cancels",
@@ -257,6 +260,7 @@ async function open(staging: CreatureStaging = {}): Promise<{
   await settle();
   await settle();
   await settle();
+  mounted.act("creature.profile");
   return { ...mounted, harness };
 }
 

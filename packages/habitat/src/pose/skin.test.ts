@@ -69,7 +69,7 @@ describe("a skin", () => {
 
   it("is rejected when the atlas, the palette or the ground line disagree with the manifest", () => {
     const indices = new Uint8Array(10);
-    indices[3] = 16;
+    indices[3] = 23;
     expect(
       validateSkin({
         ...skin,
@@ -80,7 +80,7 @@ describe("a skin", () => {
     ).toEqual([
       "atlas width 10 is not 8 cells of 48",
       "atlas height 1 is not 21 rows of 52",
-      "atlas uses a palette index at or above 16",
+      "atlas uses a palette index at or above 23",
       "ground line 0 is outside the cell",
       "skin id Ridge_Tinker is not kebab-case",
     ]);

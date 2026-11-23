@@ -3,6 +3,7 @@ import type {
   BotSummary,
   BusEnvelope,
   CreatureDetail,
+  CreatureLedgerEntry,
   CreatureRemoval,
   CreatureSummary,
   MemoryNotes,
@@ -10,6 +11,7 @@ import type {
   RoutineView,
   ServedRefusal,
   SessionRow,
+  SteadPlace,
 } from "@keywork-app/protocol";
 import { createRoot, createSignal } from "solid-js";
 import type { HostPort, ServerRequestInit, ServerResponseHead } from "../../host/port.ts";
@@ -312,7 +314,65 @@ export function fakeRanch(staging: RanchStaging = {}): FakeRanch {
   return { routes, calls };
 }
 
+export interface LedgerCall {
+  readonly method: "read" | "seen" | "conversation";
+  readonly slug: string;
+  readonly id?: string | undefined;
+}
+
+export function ledgerEntry(
+  id: string,
+  facts: Partial<CreatureLedgerEntry> & Pick<CreatureLedgerEntry, "kind" | "state" | "openedAt">,
+): CreatureLedgerEntry {
+  return {
+    id,
+    title: id,
+    directory: "C:/work",
+    session: `session-of-${id}`,
+    closedAt: null,
+    answer: null,
+    about:
+      facts.kind === "question"
+        ? { kind: "ask", callId: `call-${id}`, tool: "bash" }
+        : { kind: "thread" },
+    conversation: null,
+    ...facts,
+  };
+}
+
+function fakeLedger(entries: readonly CreatureLedgerEntry[], calls: LedgerCall[]) {
+  const entryOf = (id: string): CreatureLedgerEntry | undefined =>
+    entries.find((entry) => entry.id === id);
+  return {
+    creatureLedger: async (slug: string) => {
+      calls.push({ method: "read", slug });
+      return { creature: slug, entries: [...entries], folded: 0 };
+    },
+    markLedgerEntrySeen: async (slug: string, id: string) => {
+      calls.push({ method: "seen", slug, id });
+      const entry = entryOf(id);
+      return entry === undefined ? missingEntry : { ...entry, state: "done" as const };
+    },
+    openLedgerConversation: async (slug: string, id: string) => {
+      calls.push({ method: "conversation", slug, id });
+      const entry = entryOf(id);
+      if (entry === undefined) return missingEntry;
+      const conversation = {
+        session: `about-${id}`,
+        state: "open" as const,
+        openedAt: new Date().toISOString(),
+        endedAt: null,
+        endedBy: null,
+      };
+      return { ...entry, conversation };
+    },
+  };
+}
+
+const missingEntry: ServedRefusal = { refused: "missing", detail: "no entry with that id" };
+
 export interface CreatureStaging extends RanchStaging {
+  ledger?: CreatureLedgerEntry[] | undefined;
   report?: KeeperReport | undefined;
   rows?: SessionRow[] | undefined;
   bots?: BotSummary[] | undefined;
@@ -330,6 +390,8 @@ export interface CreatureHarness {
   readonly edited: string[];
   readonly layers: string[];
   readonly refetched: string[];
+  readonly ledgerCalls: LedgerCall[];
+  readonly setOut: { readonly spec: unknown; readonly place: SteadPlace }[];
   refreshes(): number;
   emit(batch: readonly BusEnvelope[]): void;
   setCurrentSession(id: string | undefined): void;
@@ -340,6 +402,7 @@ export const shortChords: Readonly<Record<string, string>> = {
   "creature.down": "j",
   "creature.up": "k",
   "creature.open": "enter",
+  "creature.profile": "i",
   "creature.conversation": "c",
   "creature.rename": "r",
   "creature.skin": "b",
@@ -388,6 +451,8 @@ export function creatureHarness(staging: CreatureStaging = {}): CreatureHarness 
     const edited: string[] = [];
     const layers: string[] = [];
     const refetched: string[] = [];
+    const ledgerCalls: LedgerCall[] = [];
+    const setOut: CreatureHarness["setOut"][number][] = [];
     let refreshes = 0;
     const [currentSession, setCurrentSession] = createSignal(staging.currentSession);
     const base = overviewShell({ summaries: rows }).shell;
@@ -418,11 +483,13 @@ export function creatureHarness(staging: CreatureStaging = {}): CreatureHarness 
       keys: { chord: (action) => shortChords[action] ?? action, leader: () => "ctrl+k" },
       sessions: { ...base.sessions, openSession: (id) => void opened.push(id) },
       openPane: (spec) => void panes.push(spec),
+      setOut: (spec, place) => void setOut.push({ spec, place }),
       openInEditor: async (path) => void edited.push(path),
       currentSession,
       client: {
         ...base.client,
         ...ranch.routes,
+        ...fakeLedger(staging.ledger ?? [], ledgerCalls),
         creatures: async () => creatures,
         memoryNotes: async (layer?: string) => {
           layers.push(layer ?? "");
@@ -446,6 +513,8 @@ export function creatureHarness(staging: CreatureStaging = {}): CreatureHarness 
       edited,
       layers,
       refetched,
+      ledgerCalls,
+      setOut,
       refreshes: () => refreshes,
       emit: (batch) => {
         for (const listener of listeners) listener(batch);

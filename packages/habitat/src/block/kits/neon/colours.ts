@@ -4,6 +4,7 @@ import { derived } from "../sketch/derive.ts";
 export const neonColours: Readonly<Record<Appearance, KitColours>> = {
   night: derived(
     {
+      bg: "#1a1b26",
       ink: "#0b0c16",
       paper: "#eef0ff",
       star: "#6f76b0",
@@ -45,6 +46,7 @@ export const neonColours: Readonly<Record<Appearance, KitColours>> = {
   ),
   day: derived(
     {
+      bg: "#e9ebf3",
       ink: "#2a2550",
       paper: "#ffffff",
       star: undefined,

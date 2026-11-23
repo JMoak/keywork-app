@@ -4,10 +4,13 @@ import {
   type Box,
   type FaceKey,
   type FacePaint,
+  frontOnGrid,
+  type Grid,
   type Part,
   type RampKey,
   type Side,
   type Sprite,
+  sideOnGrid,
   sides,
   topTexel,
 } from "../../model.ts";
@@ -34,11 +37,7 @@ export interface BoxPaints {
 export const memo = textureMemo(4096);
 
 export function painted(key: string, width: number, height: number, paint: Paint): FacePaint {
-  return {
-    texture: memo(`${key}|${width}x${height}`, () =>
-      paintTexture(width, height, (brush) => paint(brush, width, height)),
-    ),
-  };
+  return { texture: textureOf(key, width, height, paint) };
 }
 
 export function filled(role: Role): FacePaint {
@@ -83,10 +82,14 @@ export function box(
   return { box: shaped };
 }
 
-export function topPainted(key: string, across: number, deep: number, paint: Paint): FacePaint {
-  return painted(`top|${key}`, across / topTexel, deep / topTexel, (brush, width, height) =>
-    paint(halved(brush), width * topTexel, height * topTexel),
-  );
+export type TopPaint = (brush: Brush, across: number, deep: number, grid: Grid) => void;
+
+export function topPainted(key: string, across: number, deep: number, paint: TopPaint): FacePaint {
+  const seen = (grid: Grid): IndexedTexture =>
+    textureOf(`top|${key}`, across / grid.x, deep / grid.z, (brush) =>
+      paint(onGrid(brush, grid), across, deep, grid),
+    );
+  return { texture: seen(frontOnGrid), sideOn: seen(sideOnGrid) };
 }
 
 export type Put = (x: number, y: number, width: number, height: number, role: Role) => void;
@@ -148,15 +151,22 @@ export function truncated(value: number): number {
   return value | 0;
 }
 
-function halved(brush: Brush): Brush {
-  const scale = (value: number): number => value / topTexel;
+function textureOf(key: string, width: number, height: number, paint: Paint): IndexedTexture {
+  return memo(`${key}|${width}x${height}`, () =>
+    paintTexture(width, height, (brush) => paint(brush, width, height)),
+  );
+}
+
+function onGrid(brush: Brush, grid: Grid): Brush {
+  const across = (value: number): number => value / grid.x;
+  const deep = (value: number): number => value / grid.z;
   return {
-    width: brush.width * topTexel,
-    height: brush.height * topTexel,
-    rect: (x, y, w, h, role) => brush.rect(scale(x), scale(y), scale(w), scale(h), role),
-    dot: (x, y, role) => brush.rect(scale(x), scale(y), scale(2), scale(2), role),
-    erase: (x, y, w, h) => brush.erase(scale(x), scale(y), scale(w), scale(h)),
+    width: brush.width * grid.x,
+    height: brush.height * grid.z,
+    rect: (x, y, w, h, role) => brush.rect(across(x), deep(y), across(w), deep(h), role),
+    dot: (x, y, role) => brush.rect(across(x), deep(y), across(topTexel), deep(topTexel), role),
+    erase: (x, y, w, h) => brush.erase(across(x), deep(y), across(w), deep(h)),
     wash: (x, y, w, h, role, alpha) =>
-      brush.wash(scale(x), scale(y), scale(w), scale(h), role, alpha),
+      brush.wash(across(x), deep(y), across(w), deep(h), role, alpha),
   };
 }

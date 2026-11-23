@@ -188,6 +188,11 @@ export const nothingConnected: ServerReading = withMarket(noModels, [
   onTheMarketRoad(openai, keyless("OPENAI_API_KEY")),
 ]);
 
+export const inheritsOffTheMarketRoad: ServerReading = withInherits(nothingConnected, {
+  provider: "mill",
+  model: "puppet",
+});
+
 export const localAndCloud: ServerReading = withMarket(localModels, [
   onTheMarketRoad(openrouter, listedByTheRegistry),
 ]);
@@ -231,59 +236,6 @@ export function creaturesListed(
         conversation: null,
         threads: 0,
       })),
-    },
-  };
-}
-
-export function workshopsHeldBy(
-  slugs: readonly string[],
-  byIdOnly: readonly string[] = [],
-): ServerReading {
-  const row = (slug: string, named: boolean) => ({
-    id: `${slug}-dc1057`,
-    ...(named && { creature: slug }),
-    substrate: "host",
-    state: "stopped",
-    workdir: "C:/elsewhere",
-    brokers: [],
-    limitations: ["bare host"],
-    display: false,
-    createdAt: at,
-  });
-  return {
-    status: 200,
-    body: {
-      workshops: [
-        ...slugs.map((slug) => row(slug, true)),
-        ...byIdOnly.map((slug) => row(slug, false)),
-      ],
-    },
-  };
-}
-
-export function nameTakenOnNode(slug: string, workshop: string): ServerReading {
-  return {
-    status: 409,
-    body: {
-      refused: "conflict",
-      error: `the name ${slug} is taken on this node: workshop ${workshop} belongs to a creature made in another workspace, and two creatures never share one · choose another name, or remove that workshop first (DELETE /workshops/${workshop})`,
-    },
-  };
-}
-
-export function workshopRaised(substrate: "host" | "sbx", creature = "wren"): ServerReading {
-  return {
-    status: 201,
-    body: {
-      id: `w-${creature}`,
-      creature,
-      substrate,
-      state: "stopped",
-      workdir: "/state/workshops/w-wren/home",
-      brokers: [],
-      limitations: substrate === "host" ? ["commands run unconfined"] : [],
-      display: substrate === "sbx",
-      createdAt: at,
     },
   };
 }

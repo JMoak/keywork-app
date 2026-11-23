@@ -28,6 +28,8 @@ export {
 } from "./paint.ts";
 export {
   type Appearance,
+  coatShares,
+  forcedFixedColour,
   forcedPalette,
   forcedSky,
   type GlyphPalette,
@@ -46,6 +48,7 @@ export {
   tokensRead,
   transparentColor,
   unresolvedRoles,
+  withFixedColours,
 } from "./palette.ts";
 export {
   alphaMask,

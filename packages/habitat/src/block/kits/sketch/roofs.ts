@@ -36,7 +36,12 @@ export function roofParts(roof: Roof): Part[] {
             height,
             gablePaint(roof, step),
           )
-        : painted(`slope|${step % 2}`, width, height, slopePaint(step));
+        : painted(
+            `slope|${step % 2}|${dormerOf(roof, step, width)}`,
+            width,
+            height,
+            slopePaint(step, dormerOf(roof, step, width)),
+          );
     parts.push(
       box(x0, x1, y, y + stepHeight, z0, z1, { sides, top: filled("hue.l"), ramp: roof.ramp }),
     );
@@ -65,11 +70,16 @@ function loftOf(roof: Roof, step: number, width: number): string {
   return loft.lit ? "lit" : "dark";
 }
 
-function slopePaint(step: number): Paint {
+function dormerOf(roof: Roof, step: number, width: number): boolean {
+  return roof.kind === "hip" && loftOf(roof, step, width) === "lit";
+}
+
+function slopePaint(step: number, dormer: boolean): Paint {
   return (brush, width, height) => {
     brush.rect(0, 0, width, 1, "hue.b");
     brush.rect(0, 1, width, height - 1, "hue.m");
     for (let x = (step % 2) * 3 + 1; x < width; x += 6) brush.rect(x, 0, 1, 1, "hue.l");
+    if (dormer) brush.rect((width >> 1) - 2, 0, 4, height, "lamp");
   };
 }
 

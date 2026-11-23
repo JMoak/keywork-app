@@ -1,5 +1,5 @@
 import type { ConsoleClient, ServerFeed } from "@keywork-app/client";
-import type { SettingSignal, SettingSubject } from "@keywork-app/protocol";
+import type { SettingSignal, SettingSubject, SteadPlace } from "@keywork-app/protocol";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
 import type { TitleBot } from "../chrome/identity.ts";
@@ -24,6 +24,7 @@ import type { TrustFlow } from "../shell/trust.ts";
 import type { Attire, Outfit } from "../theme/attire.ts";
 import type { Wardrobe } from "../theme/wardrobe.ts";
 import type { CreatureNames } from "./creature/names.ts";
+import type { SteadPlaceBoard } from "./stead/block/board.ts";
 import type { SteadHomeScope } from "./stead/home-scope.ts";
 
 export type PaneHome = "main" | DockSide;
@@ -177,6 +178,8 @@ export interface ShellSeams {
   readonly needsYou?: NeedsYouSeams;
   readonly commands?: CommandRegistry;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
+  setOut?<Spec extends PaneSpecBase>(spec: Spec, place: SteadPlace): void;
+  readonly steadPlaces?: SteadPlaceBoard | undefined;
   openFromSetting?(settingId: string, what: SettingSubject): void;
   closePane?(paneId: PaneId): void;
   openInEditor?(path: string, line?: number): Promise<void>;

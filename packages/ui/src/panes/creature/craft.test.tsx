@@ -104,6 +104,7 @@ async function open(notes: MemoryNote[] = lessons): Promise<Opened> {
   await settle();
   await settle();
   await settle();
+  mounted.act("creature.profile");
   return { ...mounted, harness, listings: () => listings };
 }
 

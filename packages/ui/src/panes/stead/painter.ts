@@ -14,33 +14,12 @@ import {
   type PaintSurface,
   type Palette,
   type PaletteSource,
-  paintedHeight,
-  paintStead,
   resolveGlyphPalette,
   resolvePalette,
   resolveSky,
   type SteadPainting,
-  type SteadScene,
-  samePainting,
-  scaleFor,
   tokensRead,
 } from "./habitat-render.ts";
-
-export interface CanvasFit {
-  readonly scale: number;
-  readonly dpr: number;
-  readonly artWidth: number;
-  readonly artHeight: number;
-  readonly cssWidth: number;
-  readonly cssHeight: number;
-  readonly cssPerArt: number;
-}
-
-export type CanvasPainter = (
-  canvas: HTMLCanvasElement,
-  painting: SteadPainting,
-  fit: CanvasFit,
-) => boolean;
 
 export interface Palettes {
   readonly key: string;
@@ -50,7 +29,6 @@ export interface Palettes {
   coat(hueStop: number): Palette;
 }
 
-export const fallbackStageWidth = 640;
 export const forcedColorsQuery = "(forced-colors: active)";
 export const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 
@@ -111,62 +89,6 @@ export function devicePixelRatioOf(anchor?: Node): number {
   return typeof document === "undefined" ? 1 : pixelRatioOf(anchor ?? document);
 }
 
-export function fitCanvas(cssWidth: number, scene: SteadScene, dpr: number): CanvasFit {
-  const width = cssWidth > 0 ? cssWidth : fallbackStageWidth;
-  const preferredScale = scaleFor(dpr);
-  const artWidth = Math.max(scene.width, Math.floor((width * dpr) / preferredScale));
-  const scale =
-    scene.infrastructure === undefined
-      ? preferredScale
-      : Math.max(1, Math.min(preferredScale, Math.floor(8192 / artWidth)));
-  const artHeight = paintedHeight(scene);
-  const cssPerArt = preferredScale / dpr;
-  return {
-    scale,
-    dpr,
-    artWidth,
-    artHeight,
-    cssWidth: artWidth * cssPerArt,
-    cssHeight: artHeight * cssPerArt,
-    cssPerArt,
-  };
-}
-
-export function paintCanvas(
-  canvas: HTMLCanvasElement,
-  painting: SteadPainting,
-  fit: CanvasFit,
-): boolean {
-  const deviceWidth = fit.artWidth * fit.scale;
-  const deviceHeight = fit.artHeight * fit.scale;
-  if (canvas.width !== deviceWidth) canvas.width = deviceWidth;
-  if (canvas.height !== deviceHeight) canvas.height = deviceHeight;
-  canvas.style.width = `${fit.cssWidth}px`;
-  canvas.style.height = `${fit.cssHeight}px`;
-  const context = canvas.getContext("2d");
-  if (context === null) return false;
-  context.imageSmoothingEnabled = false;
-  paintStead(surfaceOf(context), painting);
-  return true;
-}
-
-export function paintWhenChanged(paint: CanvasPainter = paintCanvas): CanvasPainter {
-  let shown: { canvas: HTMLCanvasElement; painting: SteadPainting; fit: CanvasFit } | undefined;
-  return (canvas, painting, fit) => {
-    if (
-      shown !== undefined &&
-      shown.canvas === canvas &&
-      sameFit(shown.fit, fit) &&
-      samePainting(shown.painting, painting)
-    ) {
-      return false;
-    }
-    const painted = paint(canvas, painting, fit);
-    shown = painted ? { canvas, painting, fit } : undefined;
-    return painted;
-  };
-}
-
 export function surfaceOf(context: CanvasRenderingContext2D): PaintSurface {
   return {
     get fillStyle() {
@@ -200,15 +122,4 @@ export function watchTheme(react: () => void, anchor?: Node): () => void {
 
 export function watchSize(element: Element, react: () => void): () => void {
   return observeSize(element, () => react());
-}
-
-function sameFit(a: CanvasFit, b: CanvasFit): boolean {
-  return (
-    a.scale === b.scale &&
-    a.dpr === b.dpr &&
-    a.artWidth === b.artWidth &&
-    a.artHeight === b.artHeight &&
-    a.cssWidth === b.cssWidth &&
-    a.cssHeight === b.cssHeight
-  );
 }

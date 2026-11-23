@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cloudNeverRequired, nothingReachableLine } from "./copy.ts";
+import { nothingReachableLine } from "./copy.ts";
 import {
   cloudConnected,
   cloudUnverified,
   inheritsKeyworksDefault,
+  inheritsOffTheMarketRoad,
   inheritsRefused,
   inheritsResolved,
   inheritsUnconfigured,
@@ -79,7 +80,6 @@ describe("what is reachable now", () => {
       nothingLocal,
       "cloud: anthropic/claude-sonnet-4-5 answered this workspace before",
     ]);
-    expect(cloudNeverRequired).toContain("no cloud account needed");
   });
 
   it("counts a cloud provider connected with keywork connect as reachable on a workspace no turn has answered in", () => {
@@ -126,6 +126,10 @@ describe("what is reachable now", () => {
     expect(introductionOf(reachOf(inheritsResolved, unknown), "inherit")).toEqual({
       kind: "promised",
       through: "openrouter/openai/gpt-5-mini",
+    });
+    expect(introductionOf(reachOf(inheritsOffTheMarketRoad, unknown), "inherit")).toEqual({
+      kind: "promised",
+      through: "mill/puppet",
     });
     expect(introductionOf(reachOf(inheritsRefused, unknown), "inherit")).toEqual({
       kind: "waits",

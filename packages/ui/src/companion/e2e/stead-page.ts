@@ -1,9 +1,23 @@
-import { coldStart, type PowerTier, type StepContext } from "@keywork-app/habitat";
-import { type SceneContext, steadDrawer } from "../../panes/stead/draw.ts";
+import { coldStart, type PowerTier } from "@keywork-app/habitat";
+import {
+  backdropOf,
+  blockScene,
+  drawList,
+  figureFor,
+  firefliesOf,
+  firstKit,
+  moves,
+  type Picture,
+  resolveBlockPalette,
+  restCamera,
+  tickMs,
+  viewOf,
+} from "@keywork-app/habitat/block";
+import { eyeFor } from "../../panes/stead/block/motion.ts";
+import { paintPicture, textureCache } from "../../panes/stead/block/paint.ts";
 import { browserFieldHost, type FieldPicture, steadField } from "../../panes/stead/field.ts";
 import { defaultSkinId } from "../../panes/stead/habitat-render.ts";
-import { emptyHerd, type Herd } from "../../panes/stead/herd.ts";
-import { reducedMotionActive } from "../../panes/stead/painter.ts";
+import { paletteSourceOf, reducedMotionActive } from "../../panes/stead/painter.ts";
 
 export interface SteadPage {
   skins(): string[];
@@ -24,43 +38,51 @@ const world = coldStart({
 });
 
 const stage = document.createElement("div");
+stage.style.width = "100%";
+stage.style.height = "100%";
 const canvas = document.createElement("canvas");
 canvas.style.imageRendering = "pixelated";
 stage.append(canvas);
 document.body.append(stage);
 
-let herd: Herd = emptyHerd;
 let paints = 0;
-const drawer = steadDrawer();
+let shownKey = "";
+
+const kit = firstKit;
+const source = paletteSourceOf(document.documentElement);
+const appearance = source.appearance === "light" ? "day" : "night";
+const palette = resolveBlockPalette(kit, appearance, source.read("--kw-background"));
+const cache = textureCache(() => palette);
+const scene = blockScene(world, { kit, appearance, now: mountedAt });
 
 const hidden = (): boolean => document.visibilityState === "hidden";
 
-const contextAt = (tier: PowerTier): SceneContext => ({
-  visible: !hidden(),
-  focused: false,
-  fullscreen: false,
-  doNotDisturb: false,
-  tier,
-  reducedMotion: reducedMotionActive(),
-  quietHours: false,
-});
-
-const draw = (now: number, tier: PowerTier): FieldPicture => {
-  const context = contextAt(tier);
-  const stepContext: StepContext = { ...context, pointer: undefined, gestures: [] };
-  const drawing = drawer.draw({
-    world,
-    herd,
-    mountedAt,
-    now,
-    context,
-    memberContext: () => stepContext,
-    stageWidth: stage.clientWidth,
-    canvas,
-  });
-  herd = drawing.herd;
-  if (drawing.painted) paints += 1;
-  return drawing.picture;
+const draw = (now: number, _tier: PowerTier): FieldPicture => {
+  const reduced = reducedMotionActive();
+  const tick = reduced ? 0 : Math.floor(now / tickMs);
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(stage.clientWidth * dpr));
+  const height = Math.max(1, Math.round(stage.clientHeight * dpr));
+  const eye = eyeFor(scene.residents.length);
+  const view = viewOf(scene.world, width, height, eye);
+  const colours = kit.colours[appearance];
+  const list = drawList(scene.world, restCamera(0, eye), view, tick, colours.haze);
+  const picture: Picture = {
+    list,
+    backdrop: backdropOf(colours, view),
+    lights: firefliesOf(colours, view, list.pivot.y, tick),
+  };
+  const key = `${width}x${height}|${tick}`;
+  const context = canvas.getContext("2d");
+  if (key !== shownKey && context !== null) {
+    canvas.width = width;
+    canvas.height = height;
+    paintPicture(context, picture, palette, cache);
+    shownKey = key;
+    paints += 1;
+  }
+  const alive = !reduced && (moves(scene.world) || picture.lights.length > 0);
+  return { nextWakeAt: alive ? (tick + 1) * tickMs : undefined, still: !alive };
 };
 
 const field = steadField(
@@ -72,8 +94,11 @@ document.addEventListener("visibilitychange", field.request);
 field.redraw();
 
 const steadPage: SteadPage = {
-  skins: () => herd.members.map((member) => world.creatures[member.slug]?.skin ?? defaultSkinId),
-  refused: () => herd.refused.length,
+  skins: () => Object.values(world.creatures).map((creature) => creature.skin ?? defaultSkinId),
+  refused: () =>
+    Object.values(world.creatures).filter(
+      (creature) => figureFor(creature.skin).name !== creature.skin,
+    ).length,
   tier: () => field.tier(),
   wakes: () => field.wakes(),
   paints: () => paints,

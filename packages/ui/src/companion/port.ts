@@ -58,6 +58,41 @@ export interface CompanionCreature {
   skin?: string | undefined;
 }
 
+export type TeamDoing = "work" | "porch" | "walk" | "nap" | "idle" | "blocked" | "sit";
+
+export interface TeamMember {
+  slug: string;
+  name: string;
+  skin: string | undefined;
+  identity: number;
+  order: number;
+  doing: TeamDoing;
+  telling: string;
+  threadId: string | undefined;
+  first: boolean;
+}
+
+export interface TeamSnapshot {
+  kit: string;
+  pitch: number;
+  members: readonly TeamMember[];
+}
+
+export interface ScreenBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SteadAsk {
+  creature: string | undefined;
+}
+
+export interface SteadRequest extends SteadAsk {
+  beside: ScreenBox;
+}
+
 export interface CompanionSnapshot {
   creature: CompanionCreature;
   state: SemanticState;
@@ -72,6 +107,8 @@ export interface CompanionSnapshot {
   crate?: boolean | undefined;
   residents?: readonly CompanionCreature[] | undefined;
   waiting?: number | undefined;
+  team?: TeamSnapshot | undefined;
+  steadOut?: boolean | undefined;
 }
 
 export interface CompanionConditions {
@@ -142,6 +179,11 @@ export interface CompanionPort {
   open(threadId: string | undefined): void;
   answer(request: AnswerRequest): void;
   reportWakeups(report: WakeupReport): void;
+  choose(creature: string): void;
+  hatch(): void;
+  askForStead(ask: SteadAsk): void;
+  release(): void;
+  onSteadKey(listener: () => void): () => void;
 }
 
 export interface CompanionPreferences {
@@ -155,6 +197,7 @@ export interface CompanionPreferences {
   onlyWhileBusy: boolean;
   size: number;
   shortcut: string | null;
+  creature: string | null;
   motion: MotionChoice;
   positions: Record<string, unknown>;
   selfTest?: { result: "clear" | "opaque" | "unknown"; gpu: string; at: string } | undefined;
@@ -174,6 +217,12 @@ export interface CompanionHost {
   onOpenRequested(listener: (threadId: string | undefined) => void): () => void;
   onSettingsRequested(listener: () => void): () => void;
   onSwitchRequested(listener: (creature: string) => void): () => void;
+  askForStead(ask: SteadAsk): void;
+  takeKeyboardBack(): Promise<void>;
+  steadPutAway(tookTheKeyboard: boolean): void;
+  onChooseRequested(listener: (creature: string) => void): () => void;
+  onHatchRequested(listener: () => void): () => void;
+  onSteadRequested(listener: (request: SteadRequest) => void): () => void;
 }
 
 export const companionGlobal = "companionPort";

@@ -15,6 +15,7 @@ const lanternHues = [
 export const lanternColours: Readonly<Record<Appearance, KitColours>> = {
   night: derived(
     {
+      bg: "#1a1b26",
       ink: "#10101c",
       paper: "#dfe3ff",
       star: "#7d86b8",
@@ -46,6 +47,7 @@ export const lanternColours: Readonly<Record<Appearance, KitColours>> = {
   ),
   day: derived(
     {
+      bg: "#e9ebf3",
       ink: "#2b2d55",
       paper: "#ffffff",
       star: undefined,

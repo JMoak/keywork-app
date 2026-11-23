@@ -2,9 +2,6 @@ import {
   type Creature,
   createCreature,
   type HabitatState,
-  type MotionPrefs,
-  type Pose,
-  poseOf,
   type Skin,
   type StepContext,
   step,
@@ -12,11 +9,10 @@ import {
 import { hueStop } from "../../chrome/pane-frame.tsx";
 import {
   createRenderer,
-  defaultSkinId,
-  type FigurePose,
   type LoadedSkin,
   loadSkin,
   type Renderer,
+  resolveSkinId,
 } from "./habitat-render.ts";
 
 export interface Member {
@@ -70,7 +66,7 @@ export function gatherHerd(
   for (const slug of slugs) {
     const resident = world.creatures[slug];
     if (resident === undefined) continue;
-    const id = resident.skin ?? defaultSkinId;
+    const id = resolveSkinId(resident.skin, resident.seed ?? 0);
     const previous = seated.get(slug);
     const hue = coatOf(resident, ranks.get(slug) ?? 0);
     if (previous?.skin.id === id) {
@@ -130,30 +126,4 @@ export function stepHerd(
       creature: step(member.creature, world, now, contextFor(member)),
     })),
   };
-}
-
-export function posesOf(herd: Herd, prefs: MotionPrefs): Map<string, Pose> {
-  return new Map(herd.members.map((member) => [member.slug, poseOf(member.creature, prefs)]));
-}
-
-export function figurePoseOf(pose: Pose): FigurePose {
-  return {
-    clip: pose.clip,
-    frame: pose.frame,
-    facing: pose.facing,
-    x: pose.x,
-    lift: pose.lift,
-    blink: pose.blink,
-    gaze: pose.gaze === undefined ? undefined : { direction: pose.gaze.direction },
-    glyph: pose.glyph,
-  };
-}
-
-export function earliestWake(wakes: Iterable<number | undefined>): number | undefined {
-  let earliest: number | undefined;
-  for (const wake of wakes) {
-    if (wake === undefined) continue;
-    if (earliest === undefined || wake < earliest) earliest = wake;
-  }
-  return earliest;
 }

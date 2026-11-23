@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { poseNames } from "../pose/skin.ts";
-import { bitmapFromRows, rowsFromBitmap, worldGlyphs } from "../skins/legend.ts";
+import { loadSkin } from "../skins/index.ts";
+import {
+  bitmapFromRows,
+  coatBase,
+  coatDeep,
+  coatHighlight,
+  coatLight,
+  coatShade,
+  creatureInk,
+  paper,
+  rowsFromBitmap,
+  transparent,
+  worldGlyphs,
+} from "../skins/legend.ts";
 import { placeholderSkin } from "../skins/placeholder.ts";
 import { emptyHabitat, emptyThread, type HabitatState } from "../world/types.ts";
 import { glyphGap, glyphSize } from "./glyph.ts";
@@ -85,10 +98,10 @@ function tracingSource(appearance: "dark" | "light" = "dark"): PaletteSource & {
 }
 
 describe("the palette roles", () => {
-  it("resolves all sixteen indices from tokens through the art direction's derivations", () => {
+  it("resolves every shared index from tokens through the art direction's derivations", () => {
     const source = tracingSource();
     const palette = resolvePalette(source, { hueStop: 2 });
-    expect(palette).toHaveLength(16);
+    expect(palette).toHaveLength(23);
     expect(unresolvedRoles(palette)).toEqual([]);
     expect(palette[0]).toBe("transparent");
     expect(palette[2]).toBe(tokens["--kw-ramp-2"]);
@@ -103,7 +116,7 @@ describe("the palette roles", () => {
     expect(palette[13]).toBe(tokens["--kw-panel"]);
     expect(palette[14]).toBe(tokens["--kw-text-faint"]);
     expect(palette[15]).toBe(tokens["--kw-text-dim"]);
-    expect(paletteRoles.map((role) => role.index)).toEqual(Array.from({ length: 16 }, (_, i) => i));
+    expect(paletteRoles.map((role) => role.index)).toEqual(Array.from({ length: 23 }, (_, i) => i));
   });
 
   it("paints system colors verbatim under forced colors and never reads a token", () => {
@@ -606,6 +619,54 @@ describe("the painter", () => {
     expect(samePainting(shown, { ...shown, scene: { ...shown.scene, bitmap: repainted } })).toBe(
       false,
     );
+  });
+});
+
+describe("a creature's coat", () => {
+  it("repaints only the own-tone pixels when the creature colour changes", () => {
+    const loaded = loadSkin("newfie");
+    if (!loaded.ok) throw new Error(loaded.faults.join("; "));
+    const source: PaletteSource = {
+      appearance: "dark",
+      read: (name) => tokens[name] as string,
+      mix: mixHex,
+    };
+    const render = createRenderer(loaded.skin);
+    const [first, second] = [1, 2].map((hueStop) => {
+      const frame = render(
+        { clip: "ring", frame: 0, facing: "right" },
+        resolvePalette(source, { hueStop }),
+        {
+          scale: 1,
+        },
+      );
+      const surface = createRasterSurface(frame.width, frame.height);
+      frame.paint(surface);
+      return { indices: frame.indexed.indices, rgba: surface.raster().rgba };
+    });
+    if (first === undefined || second === undefined) throw new Error("two coats were painted");
+    const ownTones = new Set([coatDeep, coatShade, coatBase, coatLight, coatHighlight]);
+    const roleOf = (index: number): string =>
+      ownTones.has(index)
+        ? "own"
+        : index === creatureInk
+          ? "ink"
+          : index === paper
+            ? "paper"
+            : "fixed";
+    const seen = new Set<string>();
+    const wrong: string[] = [];
+    first.indices.forEach((index, at) => {
+      if (index === transparent) return;
+      const role = roleOf(index);
+      seen.add(role);
+      const same = [0, 1, 2, 3].every(
+        (channel) => first.rgba[at * 4 + channel] === second.rgba[at * 4 + channel],
+      );
+      if (same === (role === "own")) wrong.push(`${role} pixel ${at}`);
+    });
+    expect([...seen].sort()).toEqual(["fixed", "ink", "own", "paper"]);
+    expect(wrong).toEqual([]);
   });
 });
 

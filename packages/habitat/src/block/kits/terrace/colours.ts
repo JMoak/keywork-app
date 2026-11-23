@@ -15,6 +15,7 @@ const terraceHues = [
 export const terraceColours: Readonly<Record<Appearance, KitColours>> = {
   night: derived(
     {
+      bg: "#1a1b26",
       ink: "#0f1322",
       paper: "#e8eeff",
       star: "#8a95c0",
@@ -46,6 +47,7 @@ export const terraceColours: Readonly<Record<Appearance, KitColours>> = {
   ),
   day: derived(
     {
+      bg: "#e9ebf3",
       ink: "#3a3350",
       paper: "#ffffff",
       star: undefined,

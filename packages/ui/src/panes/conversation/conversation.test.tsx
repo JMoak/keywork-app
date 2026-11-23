@@ -11,6 +11,7 @@ import {
 import type {
   ContextReport,
   CostReport,
+  CreatureLedgerEntry,
   EffortLevel,
   PresetName,
   PresetReading,
@@ -27,6 +28,7 @@ import { parseJsonl } from "../../dev/replay.ts";
 import { browserHost } from "../../host/browser.ts";
 import type { SaveOutcome } from "../../host/port.ts";
 import type { SessionReadings } from "../../shell/controls-store.ts";
+import { inertFeed } from "../../shell/trust-testing.ts";
 import type { ShellSeams } from "../registry.ts";
 import { childAtWorkNotice, presetStep, unsteppableNotice } from "./controls.ts";
 import {
@@ -68,6 +70,7 @@ interface Fakes {
   live?: LiveSession;
   child?: ChildLineage;
   loading?: boolean;
+  ledger?: CreatureLedgerEntry[];
 }
 
 interface LiveSession {
@@ -171,6 +174,14 @@ function shellOver(sent: Sent, fakes: Fakes = {}): ShellSeams {
     trust: { untrusted: () => false } as ShellSeams["trust"],
     openPane: () => {},
     unseen: () => false,
+    client: {
+      creatureLedger: async (creature: string) => ({
+        creature,
+        entries: fakes.ledger ?? [],
+        folded: 0,
+      }),
+    } as unknown as ShellSeams["client"],
+    feed: inertFeed(),
   };
   return shell as ShellSeams;
 }
@@ -296,6 +307,61 @@ describe("the conversation pane's controls", () => {
     const quiet = mount();
     await quiet.act("conversation.retry");
     expect(lines()).toEqual([nothingToRetryNotice]);
+  });
+
+  it("keeps an ended ledger conversation read-only: no composer, one line on how it ended, and no prompt sent", async () => {
+    const at = "2026-11-22T12:00:00.000Z";
+    const failed = projectAll(emptyProjection, [
+      { id: 1, ts: at, sessionId: "s1", type: "turn.started", payload: { userText: "and then?" } },
+      {
+        id: 2,
+        ts: at,
+        sessionId: "s1",
+        type: "engine.error",
+        payload: { error: { name: "Error", message: "upstream 529 overloaded" } },
+      },
+    ]);
+    const about: SessionSummary = {
+      id: "s1",
+      title: "About: Wire the new route",
+      createdAt: at,
+      lastActivityAt: at,
+      messageCount: 3,
+      bot: "wren",
+    };
+    const { sent, act } = mount({
+      live: { summary: () => about, projection: () => failed, trashed: () => false },
+      ledger: [
+        {
+          id: "e1",
+          kind: "task",
+          state: "finished",
+          title: "Wire the new route",
+          directory: "C:/work",
+          session: "t1",
+          openedAt: at,
+          closedAt: at,
+          answer: null,
+          about: { kind: "thread" },
+          conversation: {
+            session: "s1",
+            state: "ended",
+            openedAt: at,
+            endedAt: at,
+            endedBy: "keeper",
+          },
+        },
+      ],
+    });
+    await settle();
+    await settle();
+    expect(document.querySelector(".kw-composer-input")).toBeNull();
+    expect(document.querySelector(".kw-talk-ended")?.textContent).toBe(
+      "This conversation has ended: you closed it.",
+    );
+    fireEvent.keyDown(document.querySelector(".kw-ending") as HTMLElement, { key: "Enter" });
+    await act("conversation.retry");
+    expect(sent.prompts).toEqual([]);
   });
 
   it("seeds the composer with an undone prompt", () => {

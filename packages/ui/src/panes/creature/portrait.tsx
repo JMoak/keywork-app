@@ -27,6 +27,7 @@ export interface PortraitProps {
   skin: string;
   hueStop: number;
   name: string;
+  size?: number | undefined;
 }
 
 export interface Portrait {
@@ -73,7 +74,7 @@ export function PortraitView(props: PortraitProps) {
     const held = portrait();
     if (held === undefined || canvas === undefined) return;
     const dpr = devicePixelRatioOf();
-    const scale = scaleFor(dpr, portraitSize);
+    const scale = scaleFor(dpr, props.size ?? portraitSize);
     const width = held.skin.cell.width * scale;
     const height = held.skin.cell.height * scale;
     if (canvas.width !== width) canvas.width = width;
@@ -95,7 +96,9 @@ export function PortraitView(props: PortraitProps) {
       .paint(surface, 0, 0);
   };
 
-  createEffect(on([portrait, frame, () => props.hueStop], paint, { defer: true }));
+  createEffect(
+    on([portrait, frame, () => props.hueStop, () => props.size], paint, { defer: true }),
+  );
   createEffect(
     on(
       [portrait, still],

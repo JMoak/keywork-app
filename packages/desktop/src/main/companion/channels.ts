@@ -23,6 +23,16 @@ export const companionChannels = {
   open: "companion:open",
   answer: "companion:answer",
   wakeups: "companion:wakeups",
+  choose: "companion:choose",
+  chooseRequested: "companion:choose-requested",
+  hatch: "companion:hatch",
+  hatchRequested: "companion:hatch-requested",
+  stead: "companion:stead-ask",
+  steadRequested: "companion:stead-requested",
+  steadAway: "companion:stead-away",
+  steadGone: "companion:stead-gone",
+  steadKey: "companion:stead-key",
+  release: "companion:release",
 } as const;
 
 export type PresenceMode = "floating" | "tray" | "pane" | "notification";
@@ -87,9 +97,39 @@ export interface CompanionCreature {
   skin?: string | undefined;
 }
 
+export type TeamDoing = "work" | "porch" | "walk" | "nap" | "idle" | "blocked" | "sit";
+
+export interface TeamMember {
+  slug: string;
+  name: string;
+  skin: string | undefined;
+  identity: number;
+  order: number;
+  doing: TeamDoing;
+  telling: string;
+  threadId: string | undefined;
+  first: boolean;
+}
+
+export interface TeamSnapshot {
+  kit: string;
+  pitch: number;
+  members: readonly TeamMember[];
+}
+
+export interface SteadAsk {
+  creature: string | undefined;
+}
+
+export interface SteadRequest extends SteadAsk {
+  beside: { x: number; y: number; width: number; height: number };
+}
+
 export interface CompanionSnapshot {
   creature: CompanionCreature;
   residents?: readonly CompanionCreature[] | undefined;
+  team?: TeamSnapshot | undefined;
+  steadOut?: boolean | undefined;
   state: SemanticState;
   stateLabel: string;
   activeThreads: number;

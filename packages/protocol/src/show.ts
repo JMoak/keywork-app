@@ -17,7 +17,9 @@ export const settingKinds = [
 
 export type SettingKind = (typeof settingKinds)[number];
 
-// The console's own panes a session may set out (contract 1.34): the `ref` of a "pane" setting.
+// The console's own panes a session may set out (contract 1.34, more since 1.38): the `ref` of a
+// "pane" setting. The engine also names "screen", which this console opens only for a named
+// machine, so it is not among them.
 export const settingPanes = [
   "sessions",
   "arcs",
@@ -28,9 +30,29 @@ export const settingPanes = [
   "permissions",
   "mcp",
   "workspaces",
+  "workshop",
+  "mills",
+  "parcels",
+  "bots",
+  "campaigns",
+  "themes",
+  "posture",
+  "stead",
+  "terminal",
 ] as const;
 
 export type SettingPane = (typeof settingPanes)[number];
+
+export const steadPlaceKinds = ["workshop", "porch", "store", "mill", "project"] as const;
+
+export type SteadPlaceKind = (typeof steadPlaceKinds)[number];
+
+export type SteadPlace =
+  | { readonly kind: "workshop"; readonly creature: string }
+  | { readonly kind: "porch" }
+  | { readonly kind: "store" }
+  | { readonly kind: "mill" }
+  | { readonly kind: "project"; readonly creature: string; readonly directory: string };
 
 export interface SettingSubject {
   kind: SettingKind;
@@ -114,7 +136,18 @@ export interface Setting {
   // Since contract 1.35: how much the setting wants the keeper, drawn as an outline. A change
   // arrives as `show.changed`; the keeper clears it with `DELETE /show/{id}/signal`.
   signal?: SettingSignal | undefined;
+  // Since contract 1.38: the place in the stead the setting rises from and returns to. An older
+  // engine sends none; the engine's own default is the creature's workshop, or the porch for a
+  // conversation that belongs to no creature.
+  place?: SteadPlace | undefined;
+  // Since contract 1.38: the tone the mark is drawn in, only ever present with a mark; absent
+  // means neutral.
+  markTone?: MarkTone | undefined;
 }
+
+export const markTones = ["good", "caution", "bad"] as const;
+
+export type MarkTone = (typeof markTones)[number];
 
 export const settingSignals = ["needs-you", "critical"] as const;
 

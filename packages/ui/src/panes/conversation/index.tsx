@@ -87,6 +87,7 @@ import {
   replacementOf,
   turnRunningNotice,
 } from "./forget.ts";
+import { followLedgerTalk, LedgerBand } from "./ledger-talk.tsx";
 import { revealWhatWaits } from "./reveal.ts";
 import { createTurnLedger, turnRibbon } from "./turn-ledger.ts";
 import { walkTranscript } from "./walk.ts";
@@ -346,10 +347,12 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
     setPending(restoreOffer(props.shell, id, knownName(), say));
   });
 
+  const talk = followLedgerTalk(props.shell, () => props.spec.sessionId);
   const [returned, setReturned] = createSignal<DraftSeed>();
   const delivering =
     (deliver: (text: string) => Promise<void>) =>
     async (text: string): Promise<void> => {
+      if (talk.ended()) return say(talk.endedLine());
       setLines([]);
       setReturned(undefined);
       try {
@@ -484,29 +487,35 @@ function ConversationSlot(props: PaneProps<ConversationSpec>) {
         onConfirm={answerPending}
         onDismiss={() => setPending(undefined)}
       />
-      <Composer
-        queue={projection().queue}
-        busy={projection().turn !== undefined}
-        seed={returned() ?? props.shell.store.controls.seed(props.spec.sessionId)}
-        hold={
-          composerHold(props.shell.server?.()) ??
-          (props.shell.store.childOf(props.spec.sessionId)?.state === "running"
-            ? childAtWorkNotice
-            : undefined)
-        }
-        onSteer={(text) => void send("steer")(text)}
-        onQueue={(text) => void send("queue")(text)}
-        onNow={(text) => void sendNow(text)}
-        onInterrupt={interrupt}
-        queueKeys={queueKeys}
-        commands={props.shell.commands}
-        commandScope="conversation"
-        inputRef={(input) => {
-          composerInput = input;
-        }}
-        onDraft={setDrafting}
-        memory={props.shell.drafts?.memory(props.id, props.spec.sessionId)}
-      />
+      <LedgerBand talk={talk} />
+      <Show when={!talk.ended()}>
+        <Composer
+          queue={projection().queue}
+          busy={projection().turn !== undefined}
+          seed={returned() ?? props.shell.store.controls.seed(props.spec.sessionId)}
+          hold={
+            composerHold(props.shell.server?.()) ??
+            (props.shell.store.childOf(props.spec.sessionId)?.state === "running"
+              ? childAtWorkNotice
+              : undefined)
+          }
+          onSteer={(text) => void send("steer")(text)}
+          onQueue={(text) => void send("queue")(text)}
+          onNow={(text) => void sendNow(text)}
+          onInterrupt={interrupt}
+          queueKeys={queueKeys}
+          commands={props.shell.commands}
+          commandScope="conversation"
+          inputRef={(input) => {
+            composerInput = input;
+            onCleanup(() => {
+              if (composerInput === input) composerInput = undefined;
+            });
+          }}
+          onDraft={setDrafting}
+          memory={props.shell.drafts?.memory(props.id, props.spec.sessionId)}
+        />
+      </Show>
     </div>
   );
 }

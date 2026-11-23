@@ -454,6 +454,99 @@
         "to": "string"
       }
     },
+    "creature.ledger": [
+      {
+        "change": "string",
+        "creature": "string",
+        "entry": {
+          "about": {
+            "callId": "string",
+            "kind": "string",
+            "tool": "string"
+          },
+          "answer": "null",
+          "closedAt": "null",
+          "conversation": "null",
+          "directory": "string",
+          "id": "string",
+          "kind": "string",
+          "openedAt": "string",
+          "session": "string",
+          "state": "string",
+          "title": "string"
+        },
+        "folded": "number"
+      },
+      {
+        "change": "string",
+        "creature": "string",
+        "entry": {
+          "about": {
+            "kind": "string",
+            "routineId": "string"
+          },
+          "answer": "string",
+          "closedAt": "string",
+          "conversation": {
+            "endedAt": "string",
+            "endedBy": "string",
+            "openedAt": "string",
+            "session": "string",
+            "state": "string"
+          },
+          "directory": "string",
+          "id": "string",
+          "kind": "string",
+          "openedAt": "string",
+          "session": "null",
+          "state": "string",
+          "title": "string"
+        },
+        "folded": "number"
+      },
+      {
+        "change": "string",
+        "creature": "string",
+        "entry": {
+          "about": {
+            "kind": "string",
+            "routineId": "string",
+            "runId": "string"
+          },
+          "answer": "null",
+          "closedAt": "string",
+          "conversation": "null",
+          "directory": "string",
+          "id": "string",
+          "kind": "string",
+          "openedAt": "string",
+          "session": "string",
+          "state": "string",
+          "title": "string"
+        },
+        "folded": "number"
+      },
+      {
+        "change": "string",
+        "creature": "string",
+        "entry": {
+          "about": {
+            "kind": "string"
+          },
+          "answer": "null",
+          "closedAt": "string",
+          "conversation": "null",
+          "directory": "string",
+          "id": "string",
+          "kind": "string",
+          "openedAt": "string",
+          "session": "null",
+          "state": "string",
+          "title": "string"
+        },
+        "folded": "number"
+      }
+    ],
     "routine.fired": {
       "attempt": "number",
       "catchUp": "boolean",
@@ -704,6 +797,10 @@
           "from": "null",
           "id": "string",
           "origin": "string",
+          "place": {
+            "creature": "string",
+            "kind": "string"
+          },
           "replaces": "null",
           "rung": "string",
           "sessionId": "string",
@@ -724,6 +821,9 @@
           "from": "string",
           "id": "string",
           "origin": "string",
+          "place": {
+            "kind": "string"
+          },
           "replaces": "string",
           "rung": "string",
           "sessionId": "string",
@@ -744,6 +844,10 @@
           "from": "string",
           "id": "string",
           "origin": "string",
+          "place": {
+            "creature": "string",
+            "kind": "string"
+          },
           "replaces": "null",
           "rung": "string",
           "sessionId": "string",
@@ -764,6 +868,11 @@
           "id": "string",
           "mood": "string",
           "origin": "string",
+          "place": {
+            "creature": "string",
+            "directory": "string",
+            "kind": "string"
+          },
           "replaces": "null",
           "rung": "string",
           "seat": {
@@ -798,7 +907,11 @@
         "from": "null",
         "id": "string",
         "mark": "string",
+        "markTone": "string",
         "origin": "string",
+        "place": {
+          "kind": "string"
+        },
         "replaces": "null",
         "rung": "string",
         "sessionId": "string",

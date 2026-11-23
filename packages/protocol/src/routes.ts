@@ -8,6 +8,7 @@ import {
   recordIdBody,
   ruleClassBody,
 } from "./creatures.ts";
+import { ledgerRoutes } from "./ledger.ts";
 import { lifecycleRoutes } from "./lifecycle.ts";
 import { forgetApplyBody, forgetSourceBody } from "./memory.ts";
 import { creatureMessageBody, meshRoutes } from "./mesh.ts";
@@ -19,9 +20,9 @@ import { placementsReportBody, showAnswerBody, showOpeningBody, showRoutes } fro
 import { workRoutes } from "./work.ts";
 import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
-export const protocolVersion = "0.10.0";
+export const protocolVersion = "0.12.0";
 
-export const contractVersion = "1.36";
+export const contractVersion = "1.38";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -152,6 +153,7 @@ export const routes = [
   ...workRoutes,
   ...permissionRoutes,
   ...creatureRoutes,
+  ...ledgerRoutes,
   ...routineRoutes,
   ...modelRoutes,
   ...workshopRoutes,

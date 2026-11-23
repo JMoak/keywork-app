@@ -16,40 +16,18 @@ import {
   viewOf,
 } from "@keywork-app/habitat/block";
 import { noon, pageGround, sketchTown } from "@keywork-app/habitat/block/testing";
-import { cleanup, fireEvent, render } from "@solidjs/testing-library";
+import { cleanup, render } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { rampStops } from "../../../chrome/pane-frame.tsx";
 import { coatOf } from "../herd.ts";
 import { artPointOf, BlockWorld, type BlockWorldControls, deviceSizeOf } from "./block-world.tsx";
 import { paintPicture, textureCache } from "./paint.ts";
-import { blockWorldShown, blockWorldSwitch, blockWorldVariable } from "./switch.ts";
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
-});
-
-describe("the block world switch", () => {
-  it("is off unless the one variable says on, and off in this build", () => {
-    expect(blockWorldShown).toBe(false);
-    expect(blockWorldSwitch({})).toBe(false);
-    expect(blockWorldSwitch({ [blockWorldVariable]: "0" })).toBe(false);
-    expect(blockWorldSwitch({ [blockWorldVariable]: "1" })).toBe(true);
-    expect(blockWorldSwitch({ [blockWorldVariable]: " On " })).toBe(true);
-  });
-
-  it("loads with the variable set, which is the only way the app ever turns it on", async () => {
-    vi.stubEnv(blockWorldVariable, "1");
-    vi.resetModules();
-    try {
-      const loaded = await import("./switch.ts");
-      expect(loaded.blockWorldShown).toBe(true);
-    } finally {
-      vi.unstubAllEnvs();
-      vi.resetModules();
-    }
-  });
 });
 
 describe("a creature's colour in the world", () => {
@@ -85,7 +63,7 @@ describe("forced colours", () => {
       removeEventListener: () => undefined,
     }));
     const painted = styledCanvas();
-    render(() => <BlockWorld world={sketchTown(5)} focused={false} hidden={false} />);
+    render(() => <BlockWorld world={sketchTown(5)} focused={false} hidden={false} kit={neonKit} />);
     await vi.advanceTimersByTimeAsync(50);
     expect(painted.styles().size).toBeGreaterThan(0);
     expect([...painted.styles()].every((style) => systemNames.has(style))).toBe(true);
@@ -144,11 +122,15 @@ describe("the block world on the stead", () => {
   it("turns a quarter at a time on the pane's keys, rests on corners, and changes kit", () => {
     stubCanvas();
     let controls: BlockWorldControls | undefined;
-    const { container, getByText } = render(() => (
+    const [corners, setCorners] = createSignal(false);
+    const [kit, setKit] = createSignal(neonKit);
+    const { container } = render(() => (
       <BlockWorld
         world={sketchTown(2)}
         focused={true}
         hidden={false}
+        kit={kit()}
+        corners={corners()}
         onControls={(given) => {
           controls = given;
         }}
@@ -160,9 +142,9 @@ describe("the block world on the stead", () => {
     expect(stage.dataset.kit).toBe("neon");
     controls.turn(1);
     expect(stage.dataset.side).toBe("right");
-    fireEvent.click(getByText("Rest on corners"));
+    setCorners(true);
     expect(stage.dataset.side).toBe("corner");
-    fireEvent.click(getByText("Lantern"));
+    setKit(lanternKit);
     expect(stage.dataset.kit).toBe("lantern");
   });
 
@@ -175,7 +157,7 @@ describe("the block world on the stead", () => {
       removeEventListener: () => undefined,
     }));
     const context = stubCanvas();
-    render(() => <BlockWorld world={sketchTown(9)} focused={false} hidden={false} />);
+    render(() => <BlockWorld world={sketchTown(9)} focused={false} hidden={false} kit={neonKit} />);
     await vi.advanceTimersByTimeAsync(50);
     const painted = context.clears();
     await vi.advanceTimersByTimeAsync(20_000);

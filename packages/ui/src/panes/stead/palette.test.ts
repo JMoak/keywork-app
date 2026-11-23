@@ -6,7 +6,6 @@ import {
   resolveSky,
   unresolvedRoles,
 } from "./habitat-render.ts";
-import { fitCanvas } from "./painter.ts";
 import { sourceOfTheme } from "./theme-source.ts";
 
 const hex = /^#[0-9a-f]{6}$/;
@@ -38,23 +37,6 @@ describe("the palette across the gallery", () => {
         expect(sky.horizon, `${theme.name} ${phase}`).toMatch(hex);
       }
     }
-  });
-
-  it("keeps the integer scale of the device pixel ratio and lets a wide stead scroll", () => {
-    const fit = fitCanvas(0, { width: 200, height: 72, groundY: 64 } as never, 1);
-    expect(fit.scale).toBe(2);
-    expect(fit.artWidth).toBe(320);
-    expect(fit.cssWidth).toBe(640);
-    expect(fit.cssHeight).toBe(136);
-    expect(fit.cssPerArt).toBe(2);
-    const wide = fitCanvas(300, { width: 400, height: 72, groundY: 64 } as never, 1);
-    expect(wide.scale).toBe(2);
-    expect(wide.artWidth).toBe(400);
-    expect(wide.cssWidth).toBe(800);
-    const retina = fitCanvas(300, { width: 100, height: 72, groundY: 64 } as never, 2);
-    expect(retina.scale).toBe(4);
-    expect(retina.cssPerArt).toBe(2);
-    expect(retina.artWidth).toBe(150);
   });
 });
 

@@ -4,6 +4,7 @@ import { CompanionPage, type PageHost } from "./companion-page.tsx";
 import type { CompanionConditions, CompanionPort, CompanionSnapshot } from "./port.ts";
 import { restingConditions } from "./port.ts";
 import { placeholderRenderer, type Renderer } from "./renderer.ts";
+import { frontDoorPortUnused } from "./testing.ts";
 
 interface FakePort extends CompanionPort {
   calls: Array<[string, unknown]>;
@@ -21,6 +22,7 @@ function fakePort(): FakePort {
       calls.push([name, payload]);
     };
   return {
+    ...frontDoorPortUnused,
     calls,
     emitSnapshot: (snapshot) => onSnapshot?.(snapshot),
     emitConditions: (conditions) => onConditions?.(conditions),
@@ -43,6 +45,7 @@ function fakePort(): FakePort {
     open: record("open"),
     answer: record("answer"),
     reportWakeups: record("reportWakeups"),
+    release: record("release"),
   };
 }
 
@@ -206,12 +209,13 @@ describe("the companion page", () => {
     expect(view.getByRole("button", { name: "pip, at the porch, 2 active threads" })).toBeTruthy();
   });
 
-  it("nudges with arrows, goes home on Escape, opens on Enter, and asks main for the menu on right click", () => {
+  it("nudges with shift and arrows, goes home on Home, gives the keyboard back on Escape, opens on Enter, and asks main for the menu on right click", () => {
     const { view, calls } = mount();
     const stage = view.container.querySelector(".kw-companion");
     if (!(stage instanceof HTMLElement)) throw new Error("no stage");
-    fireEvent.keyDown(stage, { key: "ArrowLeft" });
-    fireEvent.keyDown(stage, { key: "ArrowDown" });
+    fireEvent.keyDown(stage, { key: "ArrowLeft", shiftKey: true });
+    fireEvent.keyDown(stage, { key: "ArrowDown", shiftKey: true });
+    fireEvent.keyDown(stage, { key: "Home" });
     fireEvent.keyDown(stage, { key: "Escape" });
     fireEvent.click(view.getByRole("button", { name: "companion" }), { detail: 0 });
     fireEvent.contextMenu(stage, { clientX: 12, clientY: 34 });
@@ -220,6 +224,7 @@ describe("the companion page", () => {
       ["nudge", { dx: 0, dy: 1 }],
     ]);
     expect(calls("home")).toHaveLength(1);
+    expect(calls("release")).toHaveLength(1);
     expect(calls("open")).toEqual([["open", undefined]]);
     expect(calls("openMenu")).toEqual([["openMenu", { x: 12, y: 34 }]]);
   });

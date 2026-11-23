@@ -1,5 +1,5 @@
 import type { PaletteSource } from "@keywork-app/habitat/render";
-import { loadSkin } from "@keywork-app/habitat/skins";
+import { defaultSkinId, loadSkin } from "@keywork-app/habitat/skins";
 import { describe, expect, it } from "vitest";
 import { keyworkNight, themeVariables } from "../theme/index.ts";
 import { mixOklab } from "../theme/oklab.ts";
@@ -39,11 +39,11 @@ function fakeContext() {
 }
 
 describe("the skinned companion renderer", () => {
-  const loaded = loadSkin("kid");
+  const loaded = loadSkin(defaultSkinId);
   if (!loaded.ok) throw new Error(loaded.faults.join("; "));
   const render = skinnedRenderer(loaded.skin, nightSource);
 
-  it("draws the kid skin at the companion's device scale with a matching alpha mask", () => {
+  it("draws the default skin at the companion's device scale with a matching alpha mask", () => {
     const frame = render({ clip: "idle", frame: 0, facing: "right" }, tokens, { deviceScale: 2 });
     expect(frame.width).toBe(loaded.skin.cell.width * 2);
     expect(frame.height).toBe(loaded.skin.cell.height * 2);

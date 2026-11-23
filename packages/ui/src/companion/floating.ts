@@ -1,3 +1,4 @@
+import type { SteadPlace } from "@keywork-app/protocol";
 import { createSignal } from "solid-js";
 import type { AppAction } from "../keys/actions.ts";
 import type { CompanionCreature } from "./port.ts";
@@ -26,8 +27,24 @@ export const companionSwitchAction: AppAction = {
   invoke: (target, argument) => target.switchCompanion(argument),
 };
 
+export const companionSteadActionId = "companion.stead";
+
+export const companionSteadAction: AppAction = {
+  chords: "leader shift+home",
+  help: "show the stead beside the companion, or put it away",
+  command: {
+    name: "companion-stead",
+    label: "the stead beside the companion",
+    aliases: ["reveal-stead"],
+    description:
+      "set the stead out beside the floating companion with its creature's plot under the cursor; again, or space or escape in the stead, puts it away",
+  },
+  invoke: (target) => target.toggleCompanionStead(),
+};
+
 export function createCompanionController() {
   const [wanted, setWanted] = createSignal<string>();
+  let askForStead: (() => void) | undefined;
   const [floating, noteFloating] = createSignal<string>();
   const [residents, noteResidents] = createSignal<readonly CompanionCreature[]>([]);
   const [toggle, setToggle] = createSignal<CompanionSwitch>();
@@ -35,6 +52,16 @@ export function createCompanionController() {
     wanted,
     switchTo: (slug: string | undefined): void => {
       setWanted(slug?.trim() || undefined);
+    },
+    choosePlace: (place: SteadPlace): void => {
+      if (place.kind === "workshop" || place.kind === "project") setWanted(place.creature);
+    },
+    toggleStead: (): void => askForStead?.(),
+    bindStead: (ask: () => void): (() => void) => {
+      askForStead = ask;
+      return () => {
+        if (askForStead === ask) askForStead = undefined;
+      };
     },
     floating,
     noteFloating,

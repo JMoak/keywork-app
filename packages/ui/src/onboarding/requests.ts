@@ -41,6 +41,7 @@ export interface CreatureOnTheStead {
   readonly slug: string;
   readonly name: string;
   readonly seed: number | undefined;
+  readonly skin: string | undefined;
 }
 
 export const onboardingPaths = {
@@ -81,11 +82,16 @@ export function creaturesOnTheStead(reading: ServerReading): CreatureOnTheStead[
   const parsed = creatureListing.safeParse(reading.body);
   if (!parsed.success) return [];
   const rows = Array.isArray(parsed.data) ? parsed.data : parsed.data.creatures;
-  return rows.map((row) => ({ slug: row.slug, name: row.name, seed: row.seed }));
+  return rows.map((row) => ({ slug: row.slug, name: row.name, seed: row.seed, skin: row.skin }));
 }
 
 const creatureRow = z
-  .object({ slug: z.string(), name: z.string(), seed: z.number().optional() })
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    seed: z.number().optional(),
+    skin: z.string().optional(),
+  })
   .loose();
 
 const creatureListing = z.union([

@@ -1,7 +1,7 @@
 import type { Facing } from "../pose/pose.ts";
 import type { PoseName, Skin } from "../pose/skin.ts";
 import { type IndexedFrame, mirrorFrame, type SlicedSkin, sliceSkin } from "../skins/atlas.ts";
-import type { Palette } from "./palette.ts";
+import { type Palette, withFixedColours } from "./palette.ts";
 import { alphaMask, type HitMask, mirrors, type PaintSurface, paintIndexed } from "./raster.ts";
 
 export interface RenderPose {
@@ -34,18 +34,27 @@ export function createRenderer(skin: Skin): Renderer {
   const sliced = sliceSkin(skin);
   const mirrored = new Map<string, IndexedFrame>();
   const masks = new Map<string, HitMask>();
+  const painted = new WeakMap<Palette, Palette>();
+  const paletteFor = (coat: Palette): Palette => {
+    const known = painted.get(coat);
+    if (known !== undefined) return known;
+    const full = withFixedColours(coat, skin.fixed);
+    painted.set(coat, full);
+    return full;
+  };
   return (pose, tokens, prefs) => {
     const scale = Math.max(1, Math.round(prefs.scale));
     const indexed = frameFor(sliced, mirrored, pose);
     const key = `${pose.clip}:${pose.frame}:${pose.facing}:${scale}`;
     const mask = masks.get(key) ?? alphaMask(indexed, scale);
     masks.set(key, mask);
+    const palette = paletteFor(tokens);
     return {
       width: indexed.width * scale,
       height: indexed.height * scale,
       indexed,
       alpha: mask.bits,
-      paint: (surface, x = 0, y = 0) => paintIndexed(surface, indexed, tokens, scale, x, y),
+      paint: (surface, x = 0, y = 0) => paintIndexed(surface, indexed, palette, scale, x, y),
     };
   };
 }

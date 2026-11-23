@@ -215,6 +215,7 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
       );
     case "models.changed":
     case "creature.handoff":
+    case "creature.ledger":
     case "workspace.changed":
     case "mesh.listener":
     case "mesh.pairing":

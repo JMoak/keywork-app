@@ -5,6 +5,7 @@ import {
   type SettingKind,
   type SettingOrigin,
   type SettingSize,
+  type SteadPlace,
 } from "@keywork-app/protocol";
 import { parseTs } from "../clock/clock.ts";
 import type { Budget, GateContext, Verdict } from "../creature/gate.ts";
@@ -168,6 +169,13 @@ export function sizeOf(setting: Pick<YardSetting, "size">): SettingSize {
 
 export function originOf(setting: Pick<Setting, "origin">): SettingOrigin {
   return setting.origin ?? "creature";
+}
+
+export function placeOf(setting: Pick<Setting, "place" | "creature">): SteadPlace {
+  if (setting.place !== undefined) return setting.place;
+  return setting.creature === null
+    ? { kind: "porch" }
+    : { kind: "workshop", creature: setting.creature };
 }
 
 export function fromOf(setting: Pick<Setting, "from">): string | null {

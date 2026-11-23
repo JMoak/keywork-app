@@ -1,27 +1,46 @@
-import type { Skin } from "../pose/skin.ts";
-import { cairnSkin } from "./cairn/index.ts";
-import { carterSkin } from "./carter/index.ts";
-import { joinerSkin } from "./joiner/index.ts";
-import { kidSkin } from "./kid/index.ts";
+import { artSkin, type CreatureArt, type CreatureId, creatureIds } from "./art.ts";
+import { beaverArt } from "./beaver/art.ts";
+import { cairnArt } from "./cairn/art.ts";
+import { folioArt } from "./folio/art.ts";
+import { hippoArt } from "./hippo/art.ts";
+import { hushArt } from "./hush/art.ts";
+import { knotArt } from "./knot/art.ts";
 import {
   type LoadedSkin,
   type LoadedSkinOk,
   loadSkin as loadFrom,
   type SkinSource,
 } from "./loader.ts";
+import { newfieArt } from "./newfie/art.ts";
 import { placeholderSkin } from "./placeholder.ts";
-import { tesseraSkin } from "./tessera/index.ts";
+import { purlArt } from "./purl/art.ts";
+import { tesseraArt } from "./tessera/art.ts";
+
+export const creatureArts: Readonly<Record<CreatureId, CreatureArt>> = {
+  cairn: cairnArt,
+  tessera: tesseraArt,
+  folio: folioArt,
+  purl: purlArt,
+  hush: hushArt,
+  knot: knotArt,
+  beaver: beaverArt,
+  newfie: newfieArt,
+  hippo: hippoArt,
+};
 
 export const skins: Readonly<Record<string, SkinSource>> = {
-  kid: () => kidSkin() as Skin,
-  carter: () => carterSkin() as Skin,
-  joiner: () => joinerSkin() as Skin,
-  tessera: tesseraSkin,
-  cairn: cairnSkin,
+  ...Object.fromEntries(
+    creatureIds.map((id): [string, SkinSource] => [id, () => artSkin(creatureArts[id])]),
+  ),
   placeholder: placeholderSkin,
 };
 
-export const defaultSkinId = "kid";
+export const defaultSkinId = "cairn";
+
+export function resolveSkinId(id: string | undefined, seed: number): string {
+  if (isCreatureId(id)) return id;
+  return creatureIds[(seed >>> 0) % creatureIds.length] ?? defaultSkinId;
+}
 
 export function loadSkin(
   id: string = defaultSkinId,
@@ -44,6 +63,18 @@ export function skinIds(): string[] {
   return Object.keys(skins);
 }
 
+function isCreatureId(id: string | undefined): id is CreatureId {
+  return (creatureIds as readonly (string | undefined)[]).includes(id);
+}
+
+export {
+  type ArtFrame,
+  artSkin,
+  type CreatureArt,
+  type CreatureId,
+  creatureIds,
+  decodeFrame,
+} from "./art.ts";
 export {
   assembleAtlas,
   clearSliceCache,
@@ -57,6 +88,7 @@ export {
   sliceCacheSize,
   sliceSkin,
 } from "./atlas.ts";
+export { type Clip, gazeTurns, sheetBeatMs, sheetClips, turnBeatMs } from "./clips.ts";
 export {
   type BorrowedPose,
   borrowedRows,
@@ -69,8 +101,15 @@ export {
 } from "./codex.ts";
 export {
   bitmapFromRows,
+  coatBase,
+  coatDeep,
+  coatHighlight,
+  coatLight,
+  coatShade,
   creatureGlyphs,
+  creatureInk,
   dim,
+  firstFixed,
   fog,
   glass,
   groundBase,
@@ -86,6 +125,7 @@ export {
   lamplight,
   needsYou,
   outline,
+  paper,
   rowsFromBitmap,
   transparent,
   trouble,

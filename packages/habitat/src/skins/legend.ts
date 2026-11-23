@@ -16,6 +16,14 @@ export const trouble = 12;
 export const glass = 13;
 export const fog = 14;
 export const dim = 15;
+export const creatureInk = 16;
+export const coatDeep = 17;
+export const coatShade = 18;
+export const coatBase = 19;
+export const coatLight = 20;
+export const coatHighlight = 21;
+export const paper = 22;
+export const firstFixed = 23;
 
 export const creatureGlyphs = ".sclhdgwpo*@!DEF";
 export const worldGlyphs = ".:#=-sgwpo*@!DEF";

@@ -218,8 +218,8 @@ test.describe("the Wayland presence fallback", () => {
 test.describe
   .serial("power tiers with the kid drawn @perf", () => {
     test("the kid is drawn through the skin loader on the stead field and in the companion", async () => {
-      expect(await pageValue<string>("window.harnessPage.skin")).toBe("kid");
-      expect(await steadValue<string[]>("window.steadPage.skins()")).toEqual(["kid"]);
+      expect(await pageValue<string>("window.harnessPage.skin")).toBe("cairn");
+      expect(await steadValue<string[]>("window.steadPage.skins()")).toEqual(["cairn"]);
       expect(await steadValue<number>("window.steadPage.refused()")).toBe(0);
       const painted = await steadValue<Painted>("window.steadPage.painted()");
       expect(painted.width * painted.height).toBeGreaterThan(0);

@@ -1,12 +1,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type PoseName, type Skin, validateSkin } from "../pose/skin.ts";
+import { type PoseName, poseNames, type Skin, validateSkin } from "../pose/skin.ts";
 import {
   clearSliceCache,
   contentHash,
   lowestOpaqueRow,
   mirrorFrame,
+  opaqueCount,
   sliceCacheSize,
   sliceSkin,
 } from "./atlas.ts";
@@ -17,24 +18,44 @@ import {
   codexRows,
   importCodexAtlas,
 } from "./codex.ts";
-import { defaultSkinId, loadSkin, skinIds } from "./index.ts";
+import { defaultSkinId, loadSkin, resolveSkinId, skinIds } from "./index.ts";
 import { bitmapFromRows, outline, rowsFromBitmap, worldGlyphs } from "./legend.ts";
 import { groundContact, validateAtlas } from "./loader.ts";
 import { placeholderAirborne, placeholderSkin } from "./placeholder.ts";
 import * as tiles from "./world/tiles.ts";
 
+const nine = ["cairn", "tessera", "folio", "purl", "hush", "knot", "beaver", "newfie", "hippo"];
+
 describe("the skin registry", () => {
-  it("loads every registered skin, the kid by default", () => {
-    expect(skinIds()).toEqual(["kid", "carter", "joiner", "tessera", "cairn", "placeholder"]);
-    expect(defaultSkinId).toBe("kid");
-    for (const id of skinIds()) {
+  it("loads the nine creatures, cairn by default, each drawn in every frame of all 21 poses", () => {
+    expect(skinIds()).toEqual([...nine, "placeholder"]);
+    expect(defaultSkinId).toBe("cairn");
+    expect(poseNames).toHaveLength(21);
+    for (const id of nine) {
       const loaded = loadSkin(id);
-      expect(loaded.ok, id).toBe(true);
-      if (loaded.ok) {
-        expect(loaded.skin.id).toBe(id);
-        expect(loaded.sliced.frame("idle", 0).width).toBe(loaded.skin.cell.width);
+      if (!loaded.ok) throw new Error(`${id}: ${loaded.faults.join("; ")}`);
+      expect(validateAtlas(loaded.skin), id).toEqual([]);
+      for (const pose of poseNames) {
+        for (let frame = 0; frame < loaded.skin.rows[pose].frames; frame += 1) {
+          expect(
+            opaqueCount(loaded.sliced.frame(pose, frame)),
+            `${id} ${pose} ${frame}`,
+          ).toBeGreaterThan(0);
+        }
       }
+      expect(loaded.skin.rows.look.frames, id).toBe(8);
     }
+  });
+
+  it("draws a retired or unknown look as one of the nine by seed, and leaves a current one alone", () => {
+    for (const seed of [0, 4, 8, 9, 2 ** 32 + 3, -1]) {
+      const drawn = resolveSkinId("kid", seed);
+      expect(drawn).toBe(nine[(seed >>> 0) % 9]);
+      expect(resolveSkinId("kid", seed)).toBe(drawn);
+      expect(resolveSkinId("never-made", seed)).toBe(drawn);
+      expect(resolveSkinId(undefined, seed)).toBe(drawn);
+    }
+    for (const id of nine) expect(resolveSkinId(id, 5)).toBe(id);
   });
 
   it("refuses an id nobody registered", () => {
@@ -69,11 +90,11 @@ describe("atlas validation", () => {
     expect(faults.some((fault) => fault.includes("holds 100 indices"))).toBe(true);
   });
 
-  it("rejects a palette index past the sixteenth", () => {
+  it("rejects a palette index past the skin's palette", () => {
     const indices = new Uint8Array(sound.atlas.indices);
-    indices[0] = 16;
+    indices[0] = 23;
     const faults = validateAtlas({ ...sound, atlas: { ...sound.atlas, indices } });
-    expect(faults.some((fault) => fault.includes("at or above 16"))).toBe(true);
+    expect(faults.some((fault) => fault.includes("at or above 23"))).toBe(true);
   });
 
   it("rejects a missing row, a bad timing table and an id that is not kebab-case", () => {

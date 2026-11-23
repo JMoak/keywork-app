@@ -10,7 +10,7 @@ export const reserved = {
   house: { cx: 0, cz: 0 },
   storehouse: { cx: 1, cz: 0 },
   green: { cx: 0, cz: 1 },
-  mill: { cx: 2, cz: -1 },
+  mill: { cx: 1, cz: -1 },
 } as const satisfies Readonly<Record<string, CellAddress>>;
 
 export const firstSlots: readonly CellAddress[] = [
@@ -19,18 +19,20 @@ export const firstSlots: readonly CellAddress[] = [
   [-1, 1],
   [1, 1],
   [2, 1],
-  [0, -1],
-  [-1, -1],
-  [1, -1],
   [-2, 0],
   [-2, 1],
-  [0, 2],
-  [-1, 2],
-  [1, 2],
-  [-2, -1],
-  [2, 2],
-  [-2, 2],
+  [3, 0],
+  [3, 1],
+  [-3, 0],
+  [-3, 1],
+  [4, 0],
+  [4, 1],
+  [-4, 0],
+  [-4, 1],
 ].map(([cx, cz]) => ({ cx: cx ?? 0, cz: cz ?? 0 }));
+
+export const streetReach = 4;
+export const bandRows = 4;
 
 export function workshopCell(rank: number): CellAddress {
   while (slotsKnown.length <= rank) growSlots();
@@ -38,7 +40,30 @@ export function workshopCell(rank: number): CellAddress {
 }
 
 export function doorSideOf(cell: CellAddress): Side {
-  return cell.cz >= 1 ? "nz" : "pz";
+  return ((cell.cz % bandRows) + bandRows) % bandRows === 1 ? "nz" : "pz";
+}
+
+export function lotOf(cell: CellAddress): CellAddress {
+  return { cx: cell.cx, cz: cell.cz + (doorSideOf(cell) === "pz" ? -1 : 1) };
+}
+
+export function landTowardsTheStreet(cell: CellAddress): CellAddress[] {
+  const rows: number[] = [];
+  for (let cz = cell.cz - 1; cz > 1; cz -= 1) rows.push(cz);
+  for (let cz = cell.cz + 1; cz < 0; cz += 1) rows.push(cz);
+  return rows.map((cz) => ({ cx: cell.cx, cz }));
+}
+
+export const lotSpots: readonly Point[] = [
+  { x: -14, z: -13 },
+  { x: 14, z: 13 },
+  { x: 14, z: -13 },
+  { x: -14, z: 13 },
+];
+
+export function lotSpot(index: number, door: Side): Point | undefined {
+  const spot = lotSpots[index];
+  return spot === undefined || door === "pz" ? spot : { x: -spot.x, z: -spot.z };
 }
 
 export const shedSpots: readonly (ShedSpot & { readonly on?: number })[] = [
@@ -65,7 +90,6 @@ export function shedSpot(
   };
 }
 
-export const porchSpot: Point = { x: 8, z: 25 };
 export const treeSpot: Point = { x: 18, z: -2 };
 export const wellSpot: Point = { x: -20, z: 2 };
 export const monumentSpot: Point = { x: 18, z: 22 };
@@ -77,41 +101,18 @@ export function monumentFor(creatures: number): MonumentTier {
   return creatures >= statueFrom ? 2 : creatures >= stoneFrom ? 1 : 0;
 }
 
-export const greenSpots: readonly Point[] = [
-  { x: -16, z: -16 },
-  { x: 15, z: -14 },
-  { x: 1, z: 6 },
-  { x: -17, z: 22 },
-];
-
-export const outOnTheGreenEvery = 4;
-
-export function restsOnTheGreen(seed: number): boolean {
-  return Math.max(0, Math.floor(seed)) % outOnTheGreenEvery === 0;
-}
-
 const slotsKnown: CellAddress[] = [...firstSlots];
-let ringsGrown = 0;
+let bandsGrown = 0;
 
 function growSlots(): void {
-  ringsGrown += 1;
-  const reach = ringsGrown;
-  const inner = (cell: CellAddress): boolean =>
-    cell.cx >= -2 - (reach - 1) &&
-    cell.cx <= 2 + (reach - 1) &&
-    cell.cz >= -1 - (reach - 1) &&
-    cell.cz <= 2 + (reach - 1);
-  const ring: CellAddress[] = [];
-  for (let cz = -1 - reach; cz <= 2 + reach; cz += 1) {
-    for (let cx = -2 - reach; cx <= 2 + reach; cx += 1) {
-      if (!inner({ cx, cz })) ring.push({ cx, cz });
-    }
+  bandsGrown += 1;
+  const columns = [0];
+  for (let reach = 1; reach <= streetReach; reach += 1) columns.push(-reach, reach);
+  const above = bandsGrown * bandRows;
+  for (const rows of [
+    [above, above + 1],
+    [1 - above, -above],
+  ]) {
+    for (const cx of columns) for (const cz of rows) slotsKnown.push({ cx, cz });
   }
-  ring.sort(
-    (a, b) =>
-      Math.abs(a.cx) + Math.abs(a.cz - 0.5) - (Math.abs(b.cx) + Math.abs(b.cz - 0.5)) ||
-      b.cz - a.cz ||
-      a.cx - b.cx,
-  );
-  slotsKnown.push(...ring);
 }
