@@ -36,6 +36,7 @@ import {
   overturnDecided,
   overturnHint,
 } from "./desk.ts";
+import { DeskActs } from "./desk-acts.tsx";
 import { DeskRowView } from "./desk-row.tsx";
 import "../overview/overview.css";
 import "./desk.css";
@@ -305,6 +306,15 @@ function Desk(props: PaneProps<NeedsYouSpec>) {
             )}
           </Index>
         </div>
+      </Show>
+      <Show when={rows().length > 0}>
+        <DeskActs
+          keys={keys()}
+          decided={decidedOfRow(current()) !== undefined}
+          onDismiss={() => dismiss(current())}
+          onNext={toNextWaiting}
+          onOverturn={() => overturn(current())}
+        />
       </Show>
       <Show when={footLine()}>{(line) => <p class="kw-ov-line">{line()}</p>}</Show>
     </section>

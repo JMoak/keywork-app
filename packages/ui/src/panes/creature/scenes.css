@@ -1,0 +1,50 @@
+.kw-creature-scenes {
+  border-bottom: 1px solid var(--kw-border);
+  padding-bottom: 0.35rem;
+}
+
+.kw-scenes {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.2rem 0.75rem;
+  list-style: none;
+}
+
+.kw-scene {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 1.5ch;
+  min-width: 0;
+}
+
+.kw-scene-name {
+  color: var(--kw-text);
+}
+
+.kw-scene-place {
+  color: var(--kw-accent);
+}
+
+.kw-scene-holds {
+  flex: 1 1 12ch;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--kw-text-mid);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-scene-acts {
+  display: flex;
+  gap: 1.5ch;
+  margin-left: auto;
+}
+
+.kw-scenes-none,
+.kw-scenes-line {
+  margin: 0;
+  padding: 0.2rem 0.75rem;
+  color: var(--kw-text-dim);
+}

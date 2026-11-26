@@ -1,3 +1,4 @@
+import { type Temperament, temperaments, temperamentWords } from "@keywork-app/client";
 import type { LandmarkKind } from "@keywork-app/habitat";
 import type { QuestionAnswer } from "@keywork-app/protocol";
 import { formatCost } from "../../instruments/format.ts";
@@ -6,6 +7,7 @@ import type { ModelChoice, ModelClass, ThreadState, WorkshopHealthWord } from ".
 export const creatureWord = "creature";
 
 export const sectionWords = {
+  temperament: "temperament",
   body: "body",
   workshop: "workshop",
   models: "models",
@@ -101,24 +103,44 @@ export function handleLine(slug: string): string {
   return `@${slug}`;
 }
 
-export function keyHints(keys: {
-  face: string;
-  rename: string;
-  skin: string;
-  policy: string;
-  conversation: string;
-  pause: string;
-  remove: string;
-}): string {
-  return [
-    `${keys.face} ledger`,
-    `${keys.rename} rename`,
-    `${keys.skin} body`,
-    `${keys.policy} models`,
-    `${keys.conversation} conversation`,
-    `${keys.pause} pause`,
-    `${keys.remove} delete`,
-  ].join(" · ");
+export const headActWords = {
+  face: "ledger",
+  rename: "rename",
+  skin: "body",
+  policy: "models",
+  conversation: "conversation",
+  pause: "pause",
+  file: "file",
+  remove: "delete",
+} as const;
+
+export type HeadAct = keyof typeof headActWords;
+
+export const headActs = Object.keys(headActWords) as HeadAct[];
+
+export const changesItWord = "changes it";
+export const opensItWord = "opens it";
+export const opensChoresWord = "opens the chore board";
+export const opensMemoryWord = "opens the memory pane";
+
+export const temperamentChoices: Readonly<Record<string, string>> = Object.fromEntries(
+  temperaments.map((temperament, index) => [String(index + 1), temperamentWords[temperament]]),
+);
+
+export function temperamentOfChoice(key: string): Temperament | undefined {
+  return temperaments[Number(key) - 1];
+}
+
+export function choiceOfTemperament(temperament: Temperament | undefined): string | undefined {
+  return temperament === undefined ? undefined : String(temperaments.indexOf(temperament) + 1);
+}
+
+export function temperamentQuestion(name: string): string {
+  return `temperament for ${name}`;
+}
+
+export function temperamentChangedLine(temperament: Temperament): string {
+  return `temperament: ${temperamentWords[temperament]}`;
 }
 
 export function bodyLine(skin: string, seed: number): string {
@@ -183,10 +205,6 @@ export function memoryLine(notes: number | undefined, inbox: number): string {
         : `${notes} notes in its layer`;
   const waiting = inbox === 0 ? "inbox empty" : `${inbox} in the inbox`;
   return `${noteCount} · ${waiting}`;
-}
-
-export function opensLine(chord: string, what: string): string {
-  return `${chord} opens ${what}`;
 }
 
 export function shadowClassLine(facts: {
@@ -429,14 +447,19 @@ export function conversationRefusedLine(detail: string): string {
   return `Blocked: the conversation did not open, ${detail}.`;
 }
 
+export function projectNotOpenLine(project: string): string {
+  return `${project} is not open here`;
+}
+
 export function ledgerHint(
   keys: { open: string; down: string; up: string; face: string },
   rows: number,
+  talks = true,
 ): string {
   const profile = `${keys.face} its profile`;
-  return rows === 0
-    ? profile
-    : `${keys.open} talk it over · ${keys.down} ${keys.up} move · ${profile}`;
+  const moving = `${keys.down} ${keys.up} move · ${profile}`;
+  if (rows === 0) return profile;
+  return talks ? `${keys.open} talk it over · ${moving}` : moving;
 }
 
 export function spokenRow(facts: {

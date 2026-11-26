@@ -1,3 +1,5 @@
+import { type Temperament, temperamentFor } from "@keywork-app/client";
+import { hashSeed } from "@keywork-app/habitat";
 import type { CreatureSummary } from "@keywork-app/protocol";
 import { batch, createSignal } from "solid-js";
 import { z } from "zod";
@@ -93,6 +95,7 @@ export interface Hatchling {
   readonly name: string;
   readonly skin: string;
   readonly coat: number;
+  readonly temperament: Temperament;
 }
 
 export type Verb = "accept" | "leave" | "previous" | "next" | "up" | "down" | "another";
@@ -172,10 +175,19 @@ export function namesLeft(
   return left.length === 0 ? [...plainNames] : left;
 }
 
+export function proposedTemperament(
+  workspace: string,
+  neighbours: number,
+  skin: string,
+): Temperament {
+  return temperamentFor(hashSeed(workspace, neighbours, skin, "temperament"));
+}
+
 export function creatureRequestOf(chosen: Hatchling, known: Proposals): CreatureRequest {
   return {
     name: chosen.name,
     skin: chosen.skin,
+    temperament: chosen.temperament,
     ...(known.raising && { substrate: known.workshop }),
     ...(localFirst(known.policy) && { models: classesChosenIn(known.policy) }),
   };
@@ -219,7 +231,12 @@ export function startOnboarding(seams: OnboardingSeams): Onboarding {
     const look = skin();
     const worn = coat();
     if (known === undefined || look === undefined || worn === undefined) return undefined;
-    return { name: typed() ?? known.names[nameAt()] ?? "", skin: look, coat: worn };
+    return {
+      name: typed() ?? known.names[nameAt()] ?? "",
+      skin: look,
+      coat: worn,
+      temperament: proposedTemperament(seed, neighbours.length, look),
+    };
   };
 
   const begin = (): Promise<void> => {

@@ -11,7 +11,8 @@ import {
   type Slug,
   threadsOf,
 } from "../world/types.ts";
-import { critterParts, type Doing, figureFor } from "./figures.ts";
+import { bearingOf, critterParts, type Doing, figureFor } from "./figures.ts";
+import { easeOf, type Leisure, type Shared, sharedSpaces, type Waiting } from "./green.ts";
 import {
   type Appearance,
   type BannerTier,
@@ -20,6 +21,7 @@ import {
   identityCount,
   type Kit,
   type MonumentTier,
+  type RibbonTier,
   type RoadGrade,
   type WallMeaning,
 } from "./kit.ts";
@@ -61,6 +63,7 @@ import {
 } from "./model.ts";
 import { layRoads, type RoadMap, type RoadRequest, type Route } from "./roads.ts";
 import { stageFor } from "./sites.ts";
+import { mannerOf, type Temperament } from "./temperament.ts";
 
 export interface ProjectSite {
   readonly id: string;
@@ -74,6 +77,12 @@ export interface ProjectSite {
   readonly family?: number | undefined;
   readonly heardAt?: number | undefined;
   readonly spot?: number | undefined;
+  readonly bound?: BoundProject | undefined;
+}
+
+export interface BoundProject {
+  readonly project: string;
+  readonly root: string;
 }
 
 export interface Partnership {
@@ -83,9 +92,12 @@ export interface Partnership {
 
 export interface Decoration {
   readonly garland: boolean;
+  readonly ribbon?: RibbonTier | undefined;
   readonly banner: BannerTier;
   readonly star: boolean;
 }
+
+export type ToolTier = 0 | 1 | 2 | 3;
 
 export const undecorated: Decoration = { garland: false, banner: 0, star: false };
 
@@ -96,12 +108,17 @@ export interface BlockSceneInput {
   readonly appearance: Appearance;
   readonly now: number;
   readonly decorations?: Readonly<Record<Slug, Decoration>> | undefined;
+  readonly tools?: Readonly<Record<Slug, ToolTier>> | undefined;
+  readonly medals?: Readonly<Record<Slug, boolean>> | undefined;
+  readonly temperaments?: Readonly<Record<Slug, Temperament>> | undefined;
   readonly monument?: MonumentTier | undefined;
   readonly readings?: Readonly<Record<Slug, CreatureReading>> | undefined;
   readonly projects?: Readonly<Record<Slug, readonly ProjectSite[]>> | undefined;
   readonly partnerships?: readonly Partnership[] | undefined;
   readonly order?: readonly Slug[] | undefined;
   readonly stances?: Readonly<Record<Slug, Stance>> | undefined;
+  readonly waiting?: readonly Waiting[] | undefined;
+  readonly leisure?: Leisure | undefined;
 }
 
 export interface Resident {
@@ -248,6 +265,7 @@ class SceneBuilder {
   private readonly cast: CastMember[] = [];
   private readonly raised: Raised[] = [];
   private porch: Plot | undefined;
+  private shared: Shared | undefined;
   private reach = lowestReach;
 
   constructor(state: HabitatState, input: BlockSceneInput) {
@@ -280,13 +298,38 @@ class SceneBuilder {
     if (monument > 0) {
       this.place(reserved.green, "monument", this.kit.prop({ kind: "monument", tier: monument }), {
         at: monumentSpot,
+        target: { kind: "monument" },
       });
     }
     this.millBuilding();
     for (const resident of this.residents) this.workshop(resident);
+    this.gather();
     const roads = layRoads(this.roadRequests());
     this.figures(roads);
     return { world: this.finish(roads), residents: this.residents, roads };
+  }
+
+  private gather(): void {
+    this.shared = sharedSpaces({
+      kit: this.kit,
+      residents: this.residents,
+      projects: this.input.projects,
+      waiting: this.input.waiting,
+      kept: (slug) => this.keptFromGathering(this.state.creatures[slug]),
+      land: (cell) => this.cells.has(addressKey(cell)),
+      mill: houseMill(this.state) !== undefined,
+      ease: easeOf(this.state, this.readings, this.input.now, this.input.leisure),
+    });
+    const council = this.shared.council;
+    if (council !== undefined) {
+      this.place(reserved.green, "council", council.built, council.placing);
+    }
+  }
+
+  private keptFromGathering(creature: Creature | undefined): boolean {
+    if (creature === undefined || creature.workshop.boardedAt !== undefined) return true;
+    const doing = this.doingOf(creature);
+    return doing === "porch" || doing === "blocked";
   }
 
   private house(): void {
@@ -461,17 +504,23 @@ class SceneBuilder {
       if (creature === undefined || ground === undefined) return;
       if (creature.workshop.boardedAt !== undefined) return;
       const doing = this.doingOf(creature);
+      const call = this.shared?.call(resident.slug);
       const figure = figureFor(creature.skin, creature.seed);
-      const parts = critterParts(figure, doing, resident.order);
+      const parts = critterParts(
+        figure,
+        doing,
+        resident.order,
+        bearingOf(this.input, resident.slug),
+      );
       const ramp = identityRamp(resident.identity);
       const toThePorch = routes[1 + index];
       const route = firstRoad.get(resident.slug) ?? toThePorch;
-      if (doing === "walk" && route !== undefined) {
+      if (call === undefined && doing === "walk" && route !== undefined) {
         this.walkers.push({
           what: "creature",
           path: route.points,
           phase: resident.order * walkerSpacing,
-          pace: walkerPace,
+          pace: walkerPace * mannerOf(this.input.temperaments?.[resident.slug]).road,
           parts,
           ramp,
           target: { kind: "creature", creature: resident.slug },
@@ -488,11 +537,14 @@ class SceneBuilder {
         slug: resident.slug,
         order: resident.order,
         home,
-        stands: doing === "porch" && toThePorch !== undefined ? (this.porch ?? home) : home,
+        stands:
+          call?.stands ??
+          (doing === "porch" && toThePorch !== undefined ? (this.porch ?? home) : home),
         road: toThePorch?.points ?? [],
         still: doing === "nap" || doing === "sit",
         parts,
         ramp,
+        ...(call === undefined ? {} : { seat: call.seat }),
       });
     });
   }

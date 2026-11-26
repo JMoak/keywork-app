@@ -125,6 +125,16 @@ p.kw-hatch-name {
   animation: kw-hatch-shakes-again 320ms steps(1, jump-end);
 }
 
+.kw-hatch-temperament {
+  grid-column: 1;
+  justify-self: end;
+  margin-right: 0.6rem;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--kw-text-mid);
+  animation: kw-hatch-arrives var(--kw-tempo-settle);
+}
+
 .kw-hatch-name-field {
   grid-column: 2;
   max-width: 100%;

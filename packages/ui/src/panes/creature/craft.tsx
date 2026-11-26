@@ -1,6 +1,7 @@
 import type { MemoryNote, MemoryNotes, Provenance } from "@keywork-app/protocol";
 import { For, Show } from "solid-js";
 import { isCraftNote } from "../memory/forget.ts";
+import { ActsLine, type ProfileAct } from "./profile-acts.tsx";
 
 export interface CraftRow {
   readonly name: string;
@@ -24,14 +25,16 @@ export function craftSource(slug: string, note: string): string {
   return `craft:${slug}/${note}`;
 }
 
-export function craftHint(keys: { next: string; edit: string; forget: string }): string {
-  return `${keys.next} next lesson · ${keys.edit} edits it · ${keys.forget} forgets it after a dry run`;
-}
+export const craftActWords = {
+  craft: "next lesson",
+  "craft-edit": "edits it",
+  "craft-forget": "forgets it after a dry run",
+} as const;
 
 export interface CraftSectionProps {
   rows: readonly CraftRow[];
   focused: number;
-  hint: string;
+  acts: readonly ProfileAct[];
 }
 
 export function CraftSection(props: CraftSectionProps) {
@@ -56,7 +59,7 @@ export function CraftSection(props: CraftSectionProps) {
             )}
           </For>
         </ul>
-        <p class="kw-creature-opens">{props.hint}</p>
+        <ActsLine class="kw-creature-opens" acts={props.acts} />
       </Show>
     </>
   );

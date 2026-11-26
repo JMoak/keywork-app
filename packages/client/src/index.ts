@@ -38,6 +38,20 @@ export {
   type ServerFeed,
   serverFeed,
 } from "./feed.ts";
+export {
+  type HonoursClient,
+  honourChangeOf,
+  honourKey,
+  honourOperations,
+  honourRoutes,
+  honoursAfter,
+} from "./honours.ts";
+export {
+  type ModelWaitsClient,
+  modelWaitChangeOf,
+  modelWaitOperations,
+  modelWaitRoutes,
+} from "./model-waits.ts";
 export { type ClientMethod, operationOfMethod } from "./operations.ts";
 export {
   type ChangesAvailability,
@@ -174,6 +188,14 @@ export {
   type UserEntry,
 } from "./projection/types.ts";
 export { type RanchClient, ranchOperations, ranchRoutes, servedRefusalOf } from "./ranch.ts";
+export {
+  type ScenesClient,
+  sameName,
+  sceneChangeOf,
+  sceneOperations,
+  sceneRoutes,
+  scenesAfter,
+} from "./scenes.ts";
 export { parseServeLine, type ServeLine, serveTicket } from "./serve-output.ts";
 export { type ShowClient, showOperations } from "./show.ts";
 export {
@@ -186,3 +208,10 @@ export {
   type StreamNotice,
   sseFrames,
 } from "./sse.ts";
+export {
+  isTemperament,
+  type Temperament,
+  temperamentFor,
+  temperaments,
+  temperamentWords,
+} from "./temperament.ts";

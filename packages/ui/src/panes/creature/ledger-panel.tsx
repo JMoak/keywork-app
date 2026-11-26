@@ -120,7 +120,7 @@ function LedgerList(props: LedgerPanelProps) {
         {(entry, index) => (
           <LedgerRow
             entry={entry}
-            project={named() ? projectOf(entry.directory) : undefined}
+            project={named() || entry.project !== null ? projectOf(entry.directory) : undefined}
             cursor={props.cursor === index()}
             keyed={props.held === index()}
             now={props.now}
@@ -208,6 +208,9 @@ function LedgerRow(props: LedgerRowProps) {
             </span>
           </Show>
         )}
+      </Show>
+      <Show when={props.asks.notHere(props.entry)}>
+        {(line) => <span class="kw-ledger-words-line">{line()}</span>}
       </Show>
     </li>
   );

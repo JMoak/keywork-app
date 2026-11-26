@@ -1,9 +1,13 @@
 import type { CreatureLedgerEntry } from "@keywork-app/protocol";
-import { cleanup } from "@solidjs/testing-library";
+import { cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
+import { answersNeverWait } from "../../page/ask-card-guard-testing.ts";
 import { mountPane, settle } from "../overview/testing.tsx";
+import { askingToRun, projectOpenHere } from "../stead/project-open-testing.ts";
 import { creaturePane } from "./index.tsx";
 import { creatureHarness, ledgerEntry, minutesAgo } from "./testing.ts";
+
+answersNeverWait();
 
 afterEach(cleanup);
 
@@ -70,6 +74,54 @@ describe("the creature's ledger", () => {
     ]);
     const talking = container.querySelector(".kw-ledger-row[data-conversation='open']");
     expect(talking?.querySelector(".kw-ledger-words")?.textContent).toBe("t1");
+    harness.dispose();
+  });
+
+  it("shows a bound project's entry under its project's name, answers it in that project, and offers it no conversation", async () => {
+    const harness = creatureHarness({
+      ledger: [
+        ledgerEntry("q-orchard", {
+          kind: "question",
+          state: "waiting",
+          openedAt: minutesAgo(2),
+          directory: "C:/work/orchard",
+          session: "p1",
+          about: { kind: "ask", callId: "c7", tool: "bash" },
+          project: "4e1c0d9a7b23",
+        }),
+      ],
+    });
+    const orchard = projectOpenHere(harness.shell, {
+      workspace: "4e1c0d9a7b23",
+      label: "orchard",
+      sessions: {
+        p1: { title: "run the orchard tests", projection: askingToRun("c7", "bun test") },
+      },
+    });
+    const { container, act } = mountPane(
+      creaturePane.component,
+      { kind: "creature", slug: "wren" },
+      { ...harness.shell, steadHome: orchard.scope },
+    );
+    await settle();
+    await settle();
+    await settle();
+    const row = container.querySelector(".kw-ledger-row") as Element;
+    expect(row.querySelector(".kw-ledger-meta")?.textContent).toMatch(/^orchard · /);
+    expect(orchard.loaded).toContain("p1");
+    const once = [...row.querySelectorAll(".kw-ledger-answer")].find((answer) =>
+      answer.textContent?.startsWith("once"),
+    );
+    fireEvent.pointerDown(once as Element);
+    fireEvent.click(once as Element, { detail: 1 });
+    await settle();
+    expect(orchard.answered).toEqual([["c7", "granted", undefined]]);
+
+    expect(container.querySelector(".kw-ledger-hint")?.textContent).not.toMatch(/talk it over/);
+    act("creature.open");
+    await settle();
+    expect(harness.ledgerCalls.filter((call) => call.method === "conversation")).toEqual([]);
+    expect(orchard.went).toEqual([{ workspace: "4e1c0d9a7b23", session: "p1" }]);
     harness.dispose();
   });
 });

@@ -102,6 +102,7 @@ function plainWall(style: SketchStyle): Omit<Wall, "face"> {
     boarded: false,
     garland: false,
     banner: 0,
+    runRibbon: 0,
   };
 }
 
@@ -145,6 +146,7 @@ function workshop(style: SketchStyle, spec: WorkshopSpec): WorkshopConstruction 
     boarded: spec.boarded,
     garland: spec.garland,
     banner: spec.banner,
+    runRibbon: spec.ribbon ?? 0,
   });
   const parts: Part[] = [
     box(x0, x1, 0, height, z0, z1, {

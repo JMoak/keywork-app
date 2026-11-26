@@ -1,6 +1,7 @@
 import type { Construction, PropSpec, SpriteArt } from "../../kit.ts";
 import type { Part } from "../../model.ts";
 import type { Role } from "../../texture.ts";
+import { councilTable } from "./council.ts";
 import { anchored, box, filled, type Paint, placed, sameSides, spriteOf } from "./shapes.ts";
 import type { SketchStyle } from "./style.ts";
 
@@ -12,6 +13,8 @@ export function propsOf(style: SketchStyle): (spec: PropSpec) => Construction {
     switch (spec.kind) {
       case "crate":
         return { parts: [crate(0, 0)], reach: 0 };
+      case "council":
+        return councilTable(style, spec.lit);
       case "monument":
         return spec.tier === 0
           ? { parts: [], reach: 0 }

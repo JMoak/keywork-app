@@ -1,4 +1,4 @@
-import type { Fetch, RanchClient } from "@keywork-app/client";
+import { type Fetch, type RanchClient, type Temperament, temperaments } from "@keywork-app/client";
 import {
   type CreatureDetail,
   type CreaturePause,
@@ -64,6 +64,7 @@ export const creatureSummarySchema = z.object({
   conversation: z.string().nullable(),
   threads: z.number(),
   paused: z.string().nullable().optional(),
+  temperament: z.enum(temperaments).optional(),
 }) satisfies z.ZodType<CreatureSummary>;
 
 export const creatureThreadSchema = z.object({
@@ -191,6 +192,7 @@ export interface CreatureChange {
   readonly name?: string;
   readonly body?: { readonly skin: string };
   readonly models?: Partial<ModelPolicy>;
+  readonly temperament?: Temperament;
 }
 
 export type Reading<T> =

@@ -24,6 +24,7 @@ import {
   type HabitatState,
   type HeldChore,
   hasLandmark,
+  type ProjectQuestion,
   type Slug,
   threadsOf,
 } from "../world/types.ts";
@@ -334,6 +335,7 @@ function ringKey(reading: CreatureReading): string {
   if (reading.chore !== undefined) {
     return `chore:${reading.chore.creature}/${reading.chore.routineId}`;
   }
+  if (reading.question !== undefined) return `question:${reading.question.id}`;
   if (reading.decided !== undefined) return `decided:${reading.decided.recordId}`;
   return `${carrier?.thread}:${carrier?.since}`;
 }
@@ -345,6 +347,8 @@ export function heldAtThePorch(
 ): CreatureReading {
   const chore = heldChoreOf(world, slug);
   if (chore !== undefined) return { ...reading, state: "porch", chore };
+  const question = askedInAProject(world, slug);
+  if (question !== undefined) return { ...reading, state: "porch", question };
   const decided = decidedFor(world, slug);
   return decided === undefined ? reading : { ...reading, state: "porch", decided };
 }
@@ -353,6 +357,12 @@ function heldChoreOf(world: HabitatState, slug: Slug): HeldChore | undefined {
   return Object.values(world.porch.chores)
     .filter((held) => held.creature === slug)
     .sort((a, b) => (a.since ?? "").localeCompare(b.since ?? ""))[0];
+}
+
+function askedInAProject(world: HabitatState, slug: Slug): ProjectQuestion | undefined {
+  return Object.values(world.porch.questions)
+    .filter((asked) => asked.creature === slug)
+    .sort((a, b) => a.since.localeCompare(b.since))[0];
 }
 
 function celebrateOnce(creature: Creature): Creature {

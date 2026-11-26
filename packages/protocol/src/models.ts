@@ -150,8 +150,30 @@ export type ModelAcknowledgement = Readonly<Record<string, unknown>>;
 
 export type ModelBenchReport = Readonly<Record<string, unknown>>;
 
+export type ModelWaitReason = "busy" | "limited";
+
+export interface ModelWait {
+  readonly session: string;
+  readonly creature: string | null;
+  readonly server: string | null;
+  readonly reason: ModelWaitReason;
+  readonly since: string;
+}
+
+export type ModelWaitChangeKind = "waiting" | "over";
+
+export interface ModelWaitChange {
+  readonly change: ModelWaitChangeKind;
+  readonly wait: ModelWait;
+}
+
+export interface ModelWaits {
+  readonly waits: readonly ModelWait[];
+}
+
 export const modelRoutes = [
   { method: "GET", path: "/models", operationId: "listModels" },
+  { method: "GET", path: "/model-waits", operationId: "listModelWaits" },
   { method: "POST", path: "/models/probe", operationId: "probeModels" },
   { method: "POST", path: "/models/refresh", operationId: "refreshModels" },
   { method: "POST", path: "/models/acknowledgements", operationId: "acknowledgeModelLicense" },

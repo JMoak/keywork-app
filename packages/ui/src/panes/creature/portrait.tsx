@@ -1,4 +1,6 @@
-import type { Skin } from "@keywork-app/habitat";
+import type { PoseName, Skin } from "@keywork-app/habitat";
+import { aspects, front } from "@keywork-app/habitat/block";
+import { gazeTurns } from "@keywork-app/habitat/skins";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import {
   createRenderer,
@@ -19,15 +21,19 @@ import {
   watchTheme,
 } from "../stead/painter.ts";
 import { skinRefusedWord } from "./copy.ts";
+import { pinMedal } from "./medal.ts";
+import { aspectAtRise } from "./risen.ts";
 
 export const portraitSize = 2;
 export const portraitClip = "idle";
+export const turnedClip = "look";
 
 export interface PortraitProps {
   skin: string;
   hueStop: number;
   name: string;
   size?: number | undefined;
+  medal?: boolean | undefined;
 }
 
 export interface Portrait {
@@ -40,6 +46,22 @@ export function portraitOf(id: string): Portrait | undefined {
   return loaded.ok ? { skin: loaded.skin, render: createRenderer(loaded.skin) } : undefined;
 }
 
+export interface PortraitPose {
+  readonly clip: PoseName;
+  readonly frame: number;
+  readonly word: string;
+}
+
+export function turnedPose(aspect: number | undefined): PortraitPose | undefined {
+  const side = aspect === undefined || aspect === front ? undefined : aspects[aspect];
+  if (aspect === undefined || side === undefined) return undefined;
+  return {
+    clip: turnedClip,
+    frame: gazeTurns.indexOf(aspect),
+    word: `from the ${side.replace("-", " ")}`,
+  };
+}
+
 export function idleFrameAfter(skin: Skin, frame: number): { frame: number; ms: number } {
   const row = skin.rows[portraitClip];
   const next = (frame + 1) % row.frames;
@@ -49,8 +71,12 @@ export function idleFrameAfter(skin: Skin, frame: number): { frame: number; ms: 
 export function PortraitView(props: PortraitProps) {
   let canvas: HTMLCanvasElement | undefined;
   const portrait = createMemo(() => portraitOf(props.skin));
+  const seen = aspectAtRise(props.skin, props.name);
+  const turned = turnedPose(seen);
   const [frame, setFrame] = createSignal(0);
-  const [still, setStill] = createSignal(reducedMotionActive());
+  const [still, setStill] = createSignal(turned !== undefined || reducedMotionActive());
+  const pose = (): PortraitPose =>
+    turned ?? { clip: portraitClip, frame: frame(), word: portraitClip };
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const stopBreathing = (): void => {
@@ -91,13 +117,16 @@ export function PortraitView(props: PortraitProps) {
     });
     const surface = surfaceOf(context);
     surface.clearRect(0, 0, width, height);
-    held
-      .render({ clip: portraitClip, frame: frame(), facing: "right" }, palette, { scale })
-      .paint(surface, 0, 0);
+    const { clip, frame: shown } = pose();
+    const drawn = held.render({ clip, frame: shown, facing: "right" }, palette, { scale });
+    drawn.paint(surface, 0, 0);
+    if (props.medal === true) pinMedal(surface, drawn.indexed, palette, scale, seen);
   };
 
   createEffect(
-    on([portrait, frame, () => props.hueStop, () => props.size], paint, { defer: true }),
+    on([portrait, frame, () => props.hueStop, () => props.size, () => props.medal], paint, {
+      defer: true,
+    }),
   );
   createEffect(
     on(
@@ -115,7 +144,7 @@ export function PortraitView(props: PortraitProps) {
     const stops = [
       watchTheme(paint),
       watchMedia(forcedColorsQuery, paint),
-      watchMedia(reducedMotionQuery, () => setStill(reducedMotionActive())),
+      watchMedia(reducedMotionQuery, () => setStill(turned !== undefined || reducedMotionActive())),
       listen(document, "visibilitychange", breathe),
     ];
     onCleanup(() => {
@@ -138,10 +167,10 @@ export function PortraitView(props: PortraitProps) {
           ref={canvas}
           class="kw-creature-portrait"
           role="img"
-          aria-label={`${props.name}, ${portraitClip}`}
+          aria-label={`${props.name}, ${pose().word}`}
           data-skin={held().skin.id}
-          data-clip={portraitClip}
-          data-frame={frame()}
+          data-clip={pose().clip}
+          data-frame={pose().frame}
           data-still={still() ? "" : undefined}
         />
       )}

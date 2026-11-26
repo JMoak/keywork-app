@@ -1,6 +1,6 @@
 import type { SteadPlace } from "@keywork-app/protocol";
 import type { DrawList, Quad } from "./draw-list.ts";
-import type { Target } from "./model.ts";
+import { type Target, theCouncil } from "./model.ts";
 
 export interface ArtRect {
   readonly x: number;
@@ -40,6 +40,10 @@ export function placeOfTarget(target: Target): SteadPlace | undefined {
       return { kind: "store" };
     case "mill":
       return { kind: "mill" };
+    case "monument":
+      return { kind: "green" };
+    case "council":
+      return { kind: "project", creature: theCouncil, directory: target.directory };
     case "creature":
       return undefined;
   }

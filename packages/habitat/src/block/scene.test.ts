@@ -5,7 +5,7 @@ import { projectAll } from "../world/project.ts";
 import { emptyHabitat, type HabitatState } from "../world/types.ts";
 import type { HouseSpec, Kit, MillSpec, ProjectSpec, PropSpec, WorkshopSpec } from "./kit.ts";
 import { kits, neonKit } from "./kits/index.ts";
-import { lotOf, monumentFor, reserved, workshopCell } from "./layout.ts";
+import { lotOf, reserved, workshopCell } from "./layout.ts";
 import type { BlockWorld, Item } from "./model.ts";
 import { blockScene, type ProjectSite, wallsAround } from "./scene.ts";
 import { noon, plotProjects, sketchCreature, sketchTown, slugOf } from "./testing.ts";
@@ -154,10 +154,6 @@ describe("the block world as a reading of the habitat", () => {
     expect(itemsIn(built.world, workshopCell(0)).some((item) => item.target?.kind === "shed")).toBe(
       false,
     );
-  });
-
-  it("raises the green's monument by creature count: a stone from three, a gold statue from eight", () => {
-    expect([0, 1, 2, 3, 7, 8, 16].map(monumentFor)).toEqual([0, 0, 0, 1, 1, 2, 2]);
   });
 });
 

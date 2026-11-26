@@ -8,8 +8,8 @@ import {
   type TownChange,
 } from "@keywork-app/habitat/block";
 
-export interface Arrival {
-  readonly change: TownChange;
+export interface Arrival<Change = TownChange> {
+  readonly change: Change;
   readonly ring: Ring;
   readonly startedAt: number;
   readonly before: HTMLCanvasElement;
@@ -28,12 +28,12 @@ export function snapshotOf(canvas: HTMLCanvasElement): HTMLCanvasElement | undef
   return copy;
 }
 
-export function arrivalOf(
-  change: TownChange,
+export function arrivalOf<Change>(
+  change: Change,
   ring: Ring,
   startedAt: number,
   before: HTMLCanvasElement,
-): Arrival {
+): Arrival<Change> {
   const make = (): HTMLCanvasElement => before.ownerDocument.createElement("canvas");
   return {
     change,
@@ -44,13 +44,13 @@ export function arrivalOf(
   };
 }
 
-export function arrived(arrival: Arrival, now: number): boolean {
+export function arrived(arrival: Arrival<unknown>, now: number): boolean {
   return ringOver(arrival.ring, now - arrival.startedAt);
 }
 
 export function paintArrival(
   context: CanvasRenderingContext2D,
-  arrival: Arrival,
+  arrival: Arrival<unknown>,
   now: number,
   scale: number,
   glow: string,

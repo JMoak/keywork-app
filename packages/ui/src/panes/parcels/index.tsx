@@ -1,7 +1,18 @@
 import { parcelsPaletteHeading } from "./copy.ts";
 import "../overview/overview.css";
 import "./parcels.css";
-import { createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+} from "solid-js";
 import { z } from "zod";
 import { createTileFillStep, tileFill } from "../../chrome/stamp.ts";
 import { hostFetch } from "../../host/transport.ts";
@@ -61,7 +72,15 @@ import {
 } from "./routes.ts";
 import type { Census, Grant, GrantList, PairRecord, PairsReading } from "./wire.ts";
 
-const parcelsSpec = z.object({ kind: z.literal("parcels") });
+const parcelsSpec = z.object({
+  kind: z.literal("parcels"),
+  machine: z
+    .string()
+    .min(1)
+    .max(128)
+    .optional()
+    .describe("The machine to put the cursor on, as the stead's map opens it."),
+});
 
 export type ParcelsSpec = z.output<typeof parcelsSpec>;
 
@@ -183,6 +202,13 @@ export function ParcelsBoard(props: ParcelsBoardProps) {
     }),
   );
   const cursor = createCursor(() => rows().length);
+  createEffect(
+    on([rows, () => props.pane.spec.machine], ([all, machine], before) => {
+      const at = all.findIndex((row) => row.id === machine);
+      const seen = before?.[1] === machine && before?.[0].some((row) => row.id === machine);
+      if (at >= 0 && !seen) cursor.set(at);
+    }),
+  );
   const atCursor = (): ParcelRow | undefined => rows()[cursor.index()];
   const context = createMemo(
     (): GateContext => ({

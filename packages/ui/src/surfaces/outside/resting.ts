@@ -13,6 +13,7 @@ import {
   type Start,
   tidyWays,
   type Way,
+  waysAtTheirSize,
   waysBeside,
 } from "../feel/patterns.ts";
 import type { Desk, ScreenRect, SurfaceId } from "../port.ts";
@@ -197,6 +198,8 @@ function seatedBeside(
   return clearOf([desk.console, ...standing]) ?? clearOf(standing);
 }
 
+const roomyRungs = arrivalSizes.length - 1;
+
 const workingPanes: ReadonlySet<OutsideKind> = new Set<OutsideKind>([
   "conversation",
   "file",
@@ -218,7 +221,20 @@ function wayFor(
   taste: Taste,
 ): Way | undefined {
   const ladder = ladderFor(desk.workArea, seeking, taste);
-  return chosenWay(tidyWays({ desk, ladder, standing: taken }), taste, taste.random);
+  const roomy = aLonePaneToWorkIn(seeking, desk.workArea) ? ladder.slice(0, roomyRungs) : [];
+  const atItsSize =
+    firstFound(roomy, (rung) => {
+      const ways = waysAtTheirSize({ desk, ladder: [rung], standing: taken });
+      return ways.length > 0 ? ways : undefined;
+    }) ?? [];
+  const ways = atItsSize.length > 0 ? atItsSize : tidyWays({ desk, ladder, standing: taken });
+  return chosenWay(ways, taste, taste.random);
+}
+
+function aLonePaneToWorkIn(seeking: readonly Seeking[], area: ScreenRect): boolean {
+  const [pane] = seeking;
+  if (pane === undefined || seeking.length > 1 || !workingPanes.has(pane.kind)) return false;
+  return (pane.wanted ?? sizeWanted(pane.kind, pane.measured, area)) === "working";
 }
 
 function troupeWay(

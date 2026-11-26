@@ -1,0 +1,15 @@
+.kw-stead {
+  --kw-stead-foot: calc(0.7rem + 1lh + 1px);
+}
+
+.kw-stead > .kw-ov-line {
+  box-sizing: border-box;
+  min-height: var(--kw-stead-foot);
+}
+
+.kw-stead:not(:has(> .kw-ov-line))::after {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  height: var(--kw-stead-foot);
+}

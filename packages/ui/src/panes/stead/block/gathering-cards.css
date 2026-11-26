@@ -1,0 +1,5 @@
+.kw-stead-gathering {
+  width: max-content;
+  max-width: min(26rem, calc(100% - 12px));
+  white-space: normal;
+}

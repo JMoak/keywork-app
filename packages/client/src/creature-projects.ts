@@ -9,6 +9,7 @@ import type { RanchRequest } from "./ranch.ts";
 
 export interface CreatureProjectsClient {
   receiveCreatureProjectWork(input: ProjectWorkRequest): Promise<{ session: WorkspaceSessionRef }>;
+  creatureProjectChanged(project: string): Promise<void>;
   listCreatureProjects(slug: string): Promise<{ projects: CreatureProjectBinding[] }>;
   bindCreatureProject(slug: string, project: string): Promise<CreatureProjectBinding>;
   unbindCreatureProject(slug: string, project: string): Promise<{ unbound: true }>;
@@ -26,6 +27,7 @@ export interface CreatureProjectsClient {
 
 export const creatureProjectOperations = {
   receiveCreatureProjectWork: "receiveCreatureProjectWork",
+  creatureProjectChanged: "creatureProjectChanged",
   listCreatureProjects: "listCreatureProjects",
   bindCreatureProject: "bindCreatureProject",
   unbindCreatureProject: "unbindCreatureProject",
@@ -65,6 +67,13 @@ export function creatureProjectClient(request: RanchRequest): CreatureProjectsCl
   return {
     receiveCreatureProjectWork: async (input) =>
       answer(await request("POST", "/creature-project-work", input)),
+    creatureProjectChanged: async (project) => {
+      const response = await request(
+        "POST",
+        `/creature-projects/${encodeURIComponent(project)}/changed`,
+      );
+      if (!response.ok) await answer(response);
+    },
     listCreatureProjects: async (slug) => answer(await request("GET", route(slug))),
     bindCreatureProject: async (slug, project) =>
       answer(await request("PUT", route(slug, project))),

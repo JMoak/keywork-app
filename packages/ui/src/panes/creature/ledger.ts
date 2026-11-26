@@ -84,7 +84,8 @@ export function summaryOf(
 ): LedgerSummary {
   const ordered = ledgerOrder(entries);
   return {
-    projects: bound.length > 0 ? [...bound] : workedIn(ordered, home),
+    projects:
+      bound.length > 0 ? bound.map((id) => nameOfBound(id, ordered)) : workedIn(ordered, home),
     waiting: entries.filter(waitsOnKeeper).length,
     running: ordered.filter((entry) => entry.state === "running").map((entry) => entry.title),
   };
@@ -96,6 +97,11 @@ export function summaryLines(summary: LedgerSummary): readonly string[] {
 
 export function headCount(summary: LedgerSummary): string {
   return waitingCount(summary.waiting);
+}
+
+function nameOfBound(project: string, entries: readonly CreatureLedgerEntry[]): string {
+  const there = entries.find((entry) => entry.project === project);
+  return there === undefined ? project : projectOf(there.directory);
 }
 
 function workedIn(ordered: readonly CreatureLedgerEntry[], home: string): string[] {

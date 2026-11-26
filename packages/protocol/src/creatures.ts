@@ -86,6 +86,10 @@ export type ModelPolicySlot = "inherit" | ModelCandidate;
 
 export type ModelPolicy = Record<ModelClass, ModelPolicySlot>;
 
+export const temperaments = ["calm", "brisk", "eager", "playful", "decisive", "tentative"] as const;
+
+export type Temperament = (typeof temperaments)[number];
+
 export interface CreatureSummary {
   slug: string;
   name: string;
@@ -99,6 +103,7 @@ export interface CreatureSummary {
   threads: number;
   paused?: string | null | undefined;
   inbound?: InboundPolicy | undefined;
+  temperament?: Temperament | undefined;
 }
 
 export type CreatureThreadState = "working" | "waiting" | "back" | "blocked" | "paused";
@@ -138,6 +143,7 @@ export interface CreatureDraft {
   workshop?: string | undefined;
   substrate?: WorkshopSubstrate | undefined;
   models?: Partial<ModelPolicy> | undefined;
+  temperament?: Temperament | undefined;
 }
 
 export interface CreaturePatch {
@@ -146,6 +152,7 @@ export interface CreaturePatch {
   models?: Partial<ModelPolicy> | undefined;
   cloudFallback?: boolean | undefined;
   inbound?: InboundPolicy | undefined;
+  temperament?: Temperament | undefined;
 }
 
 export interface CreaturePause {
@@ -293,7 +300,14 @@ export type CreatureRemovalOutcome =
   | { removed: true; removal: CreatureRemoval }
   | { removed: false; removal: CreatureRemoval };
 
-export const creatureDraftBody = ["name", "skin", "workshop", "substrate", "models"] as const;
+export const creatureDraftBody = [
+  "name",
+  "skin",
+  "workshop",
+  "substrate",
+  "models",
+  "temperament",
+] as const;
 
 export const creaturePatchBody = [
   "name",
@@ -303,6 +317,7 @@ export const creaturePatchBody = [
   "models",
   "cloudFallback",
   "inbound",
+  "temperament",
 ] as const;
 
 export const ruleClassBody = ["ruleClass"] as const;

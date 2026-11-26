@@ -1,3 +1,4 @@
+import type { SteadHonourKind } from "@keywork-app/protocol";
 import type { MonumentTier, ShedSpot } from "./kit.ts";
 import type { Point, Side } from "./model.ts";
 
@@ -105,9 +106,10 @@ export const treeSpot: Point = { x: 18, z: -2 };
 export const wellSpot: Point = { x: -20, z: 2 };
 export const monumentSpot: Point = { x: 18, z: 22 };
 
-export const stoneFrom = 3;
-export const statueFrom = 8;
+export const stoneWith: SteadHonourKind = "hamlet";
+export const statueFrom = 4;
 
-export function monumentFor(creatures: number): MonumentTier {
-  return creatures >= statueFrom ? 2 : creatures >= stoneFrom ? 1 : 0;
+export function monumentFor(held: readonly SteadHonourKind[]): MonumentTier {
+  if (new Set(held).size >= statueFrom) return 2;
+  return held.includes(stoneWith) ? 1 : 0;
 }

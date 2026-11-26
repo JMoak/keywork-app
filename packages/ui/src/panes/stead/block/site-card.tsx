@@ -94,7 +94,7 @@ function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-function besideTheBuilding(
+export function besideTheBuilding(
   building: Rect,
   stage: { readonly width: number; readonly height: number },
 ): Record<string, string> {

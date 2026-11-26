@@ -51,6 +51,9 @@ export function projectSitesOf(
       family: family === undefined ? undefined : flags.get(family),
       heardAt: heardAt.get(worksiteKey(worksite)),
       spot: spotOn(order, worksite),
+      ...(typeof worksite.project === "string" && {
+        bound: { project: worksite.project, root: worksite.root },
+      }),
     });
   }
   for (const lot of Object.values(sites)) lot.sort((a, b) => (a.spot ?? 0) - (b.spot ?? 0));

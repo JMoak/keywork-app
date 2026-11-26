@@ -1,3 +1,4 @@
+import type { MapKit } from "./map/kit.ts";
 import type { FaceKey, Footprint, Part, Side, Sprite } from "./model.ts";
 import type { Role } from "./texture.ts";
 
@@ -14,6 +15,7 @@ export interface Kit {
   shed(spec: ShedSpec): Construction;
   project(spec: ProjectSpec): Construction;
   prop(spec: PropSpec): Construction;
+  readonly map: MapKit;
 }
 
 export type Appearance = "night" | "day";
@@ -116,9 +118,12 @@ export interface WorkshopSpec {
   readonly garland: boolean;
   readonly banner: BannerTier;
   readonly star: boolean;
+  readonly ribbon?: RibbonTier | undefined;
 }
 
 export type BannerTier = 0 | 1 | 2;
+
+export type RibbonTier = 0 | 1 | 2 | 3;
 
 export type MonumentTier = 0 | 1 | 2;
 
@@ -181,6 +186,7 @@ export interface ShedSpot extends Footprint {
 
 export type PropSpec =
   | { readonly kind: "crate" }
+  | { readonly kind: "council"; readonly lit: boolean }
   | { readonly kind: "monument"; readonly tier: MonumentTier }
   | { readonly kind: "tree" }
   | { readonly kind: "well" }

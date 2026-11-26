@@ -2,8 +2,11 @@ import type {
   CreatureProjectBinding,
   ProjectDiscussionInput,
   ProjectThreadInput,
+  SteadPlace,
   WorkspaceSessionRef,
 } from "@keywork-app/protocol";
+import type { AskStore } from "../../shell/answer-ask.ts";
+import type { SessionStore } from "../../shell/session-store.ts";
 import type { PaneSpecBase, ShellSeams } from "../registry.ts";
 
 export type {
@@ -18,9 +21,16 @@ export interface SteadHomeScope {
   activeProject(): SteadProjectContext | undefined;
   openSession(reference: SteadSessionReference): void;
   openProject?(): void;
+  openBoundProject?(root: string, then: SteadPlace): void;
+  pressWhenOpen?(): PressWhenOpen | undefined;
   openMemory?(): void;
   presentedPane?(): PaneSpecBase | undefined;
   dismissPane?(): void;
+}
+
+export interface PressWhenOpen {
+  readonly place: SteadPlace;
+  done(): void;
 }
 
 export type SteadSessionReference = WorkspaceSessionRef;
@@ -29,8 +39,12 @@ export interface SteadProjectContext {
   readonly workspace: string;
   readonly label: string;
   readonly ideSession?: SteadSessionReference;
+  readonly store?: ProjectStore;
+  readonly shell?: ShellSeams;
   session?(reference: SteadSessionReference): SteadProjectSessionView | undefined;
 }
+
+export type ProjectStore = AskStore & Pick<SessionStore, "open">;
 
 export interface SteadProjectSessionView {
   readonly label: string;
@@ -68,4 +82,12 @@ export function shellForStead(host: ShellSeams, scope: SteadHomeScope): ShellSea
       openSession: (session) => scope.openSession({ workspace: scope.workspace, session }),
     },
   };
+}
+
+export function projectStoreOf(
+  scope: Pick<SteadHomeScope, "activeProject"> | undefined,
+  project: string,
+): ProjectStore | undefined {
+  const open = scope?.activeProject();
+  return open?.workspace === project ? open.store : undefined;
 }

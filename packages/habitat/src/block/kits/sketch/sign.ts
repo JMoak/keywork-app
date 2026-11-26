@@ -60,7 +60,7 @@ export function nameSign(name: string | undefined, place: SignPlace): Annex | un
   };
 }
 
-const font: Readonly<Record<string, string>> = {
+export const font: Readonly<Record<string, string>> = {
   A: "25755",
   B: "65656",
   C: "34443",

@@ -126,6 +126,9 @@ function absorb(state: SessionProjection, envelope: BusEnvelope): SessionProject
     case "creature.handoff":
     case "creature.ledger":
     case "creature.worksites":
+    case "creature.honours":
+    case "creature.scenes":
+    case "model.wait":
     case "routine.fired":
     case "routine.finished":
     case "routine.needs":

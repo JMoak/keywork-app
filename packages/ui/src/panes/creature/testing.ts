@@ -336,6 +336,7 @@ export function ledgerEntry(
         ? { kind: "ask", callId: `call-${id}`, tool: "bash" }
         : { kind: "thread" },
     conversation: null,
+    project: null,
     ...facts,
   };
 }
@@ -412,6 +413,8 @@ export const shortChords: Readonly<Record<string, string>> = {
   "creature.chores": "t",
   "creature.memory": "n",
   "creature.file": "e",
+  "creature.temperament": "a",
+  "creature.earned": "h",
   "creature.delete": "d",
   "onboarding.start": "ctrl+k 1",
 };

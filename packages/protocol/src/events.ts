@@ -7,6 +7,7 @@ import type {
   PromptOrigin,
 } from "./creatures.ts";
 import type { MemoryDecision } from "./decisions.ts";
+import type { HonourChange } from "./honours.ts";
 import type { CreatureLedgerChange } from "./ledger.ts";
 import type {
   MeshGrantChange,
@@ -17,9 +18,10 @@ import type {
   MeshRevocationChange,
   MeshWalk,
 } from "./mesh.ts";
-import type { ModelFallback, ModelsChanged } from "./models.ts";
+import type { ModelFallback, ModelsChanged, ModelWaitChange } from "./models.ts";
 import type { AskScope, DenyReason, PermissionRule } from "./permissions.ts";
 import type { RoutineFinished, RoutineFired, RoutineNeeds } from "./routines.ts";
+import type { SceneChange } from "./scenes.ts";
 import type { CompactionEntry } from "./sessions.ts";
 import type { ShowArranged, ShowChanged, ShowProposed, ShowSettled } from "./show.ts";
 import type { WorkshopChange } from "./workshops.ts";
@@ -67,6 +69,9 @@ export const serverEventTypes = [
   "creature.handoff",
   "creature.ledger",
   "creature.worksites",
+  "creature.honours",
+  "creature.scenes",
+  "model.wait",
   "routine.fired",
   "routine.finished",
   "routine.needs",
@@ -124,6 +129,9 @@ export interface ServerPayloads {
   "creature.handoff": CreatureHandoffChange;
   "creature.ledger": CreatureLedgerChange;
   "creature.worksites": CreatureWorksiteChange;
+  "creature.honours": HonourChange;
+  "creature.scenes": SceneChange;
+  "model.wait": ModelWaitChange;
   "routine.fired": RoutineFired;
   "routine.finished": RoutineFinished;
   "routine.needs": RoutineNeeds;

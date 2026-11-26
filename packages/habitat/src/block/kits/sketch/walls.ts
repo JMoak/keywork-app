@@ -1,5 +1,6 @@
 import type { Brush, Role } from "../../texture.ts";
 import { mixedRole } from "../../texture.ts";
+import { runRibbon, runRibbonPlace } from "./run-ribbon.ts";
 import { type Paint, sketchRandom, truncated } from "./shapes.ts";
 
 export interface Wall {
@@ -28,6 +29,7 @@ export interface Wall {
   readonly boarded: boolean;
   readonly garland: boolean;
   readonly banner: number;
+  readonly runRibbon: number;
 }
 
 export interface DoorRoles {
@@ -39,6 +41,7 @@ export interface DoorRoles {
 }
 
 export const pierColumn = 5;
+export const doorHeight = 13;
 
 export const faces = {
   door: 0,
@@ -106,14 +109,17 @@ function paintWall(brush: Brush, wall: Wall, w: number, h: number): void {
   if (wall.garland) garland(brush, w);
   if (wall.banner > 0 && wall.face === faces.door && wall.storeys >= 2) banner(brush, wall, w, h);
   if (wall.ivy > 0) ivy(brush, wall, w, h);
+  if (wall.face === faces.door) {
+    runRibbon(brush, wall.runRibbon, runRibbonPlace(wall, h, floor - doorHeight));
+  }
 }
 
 function face(brush: Brush, wall: Wall, w: number, h: number, floor: number): void {
   const r = brush.rect;
   switch (wall.face) {
     case faces.door:
-      door(brush, wall, 5, floor - 13);
-      sign(brush, wall, 16, floor - 13);
+      door(brush, wall, 5, floor - doorHeight);
+      sign(brush, wall, 16, floor - doorHeight);
       window(brush, wall, w - 10, floor - 12);
       for (let lantern = 0; lantern < wall.lanterns; lantern += 1) {
         r(17 + lantern * 4, 2, 2, 1, "ink");

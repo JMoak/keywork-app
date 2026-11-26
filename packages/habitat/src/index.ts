@@ -223,6 +223,7 @@ export {
   type ParcelRole,
   type PathClass,
   type Porch,
+  type ProjectQuestion,
   type Shelf,
   type Spyglass,
   type Storehouse,

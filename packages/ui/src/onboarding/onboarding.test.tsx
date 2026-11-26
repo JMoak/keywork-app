@@ -9,7 +9,7 @@ import { nextCoat, nextLook } from "./copy.ts";
 import { at, creatureMade, creatureOpened, localModels, noWorkshops } from "./fixtures.ts";
 import { OnboardingOnTheStead } from "./index.tsx";
 import { proposeNames } from "./names.ts";
-import { freeCoat, type OnboardingSeams, seedForCoat } from "./onboarding.ts";
+import { freeCoat, type OnboardingSeams, proposedTemperament, seedForCoat } from "./onboarding.ts";
 import type { CreatureRequest, OnboardingClient } from "./requests.ts";
 import { offeredSkins } from "./skins.ts";
 import type { ServerReading } from "./workshop.ts";
@@ -35,7 +35,14 @@ describe("the hatching stage", () => {
     expect([name.selectionStart, name.selectionEnd]).toEqual([0, proposedName.length]);
     press(name, "Enter");
     await settle();
-    expect(stage.created).toEqual([{ name: proposedName, skin: lastOffered, substrate: "host" }]);
+    expect(stage.created).toEqual([
+      {
+        name: proposedName,
+        skin: lastOffered,
+        temperament: proposedTemperament(workspace, 0, lastOffered),
+        substrate: "host",
+      },
+    ]);
     expect(stage.patched).toEqual([[proposedName.toLowerCase(), seedForCoat(freeCoat([]))]]);
   });
 

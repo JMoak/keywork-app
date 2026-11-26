@@ -1,6 +1,6 @@
 import { mixHex } from "../../colour.ts";
 import type { KitColours } from "../../kit.ts";
-import { gold } from "./colours.ts";
+import { gold, metals } from "./colours.ts";
 
 export interface SketchColours {
   readonly bg: string;
@@ -91,7 +91,7 @@ export function derived(base: SketchColours, night: boolean): KitColours {
     ground: base.bg,
     roles,
     hues: base.hues,
-    ramps: { slate: base.slate, accent: base.accent },
+    ramps: { slate: base.slate, accent: base.accent, ...metals, golden: reward },
     sky: base.sky,
     orb: base.orb,
     orbSlit: base.orbSlit === true,

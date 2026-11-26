@@ -36,6 +36,19 @@ export interface Porch {
   readonly inbox: InboxTally | undefined;
   readonly chores: Readonly<Record<string, HeldChore>>;
   readonly decided: Readonly<Record<string, DecidedForKeeper>>;
+  readonly questions: Readonly<Record<string, ProjectQuestion>>;
+}
+
+export interface ProjectQuestion {
+  readonly id: string;
+  readonly creature: Slug;
+  readonly project: string;
+  readonly session: SessionId | undefined;
+  readonly callId: string;
+  readonly tool: string;
+  readonly title: string;
+  readonly directory: string;
+  readonly since: string;
 }
 
 export interface DecidedForKeeper {
@@ -255,7 +268,7 @@ export function emptyHabitat(offsetMinutes = 0): HabitatState {
     mills: {},
     spyglasses: {},
     storehouse: { shelves: [], folded: 0, wings: 1 },
-    porch: { inbox: undefined, chores: {}, decided: {} },
+    porch: { inbox: undefined, chores: {}, decided: {}, questions: {} },
     landmarks: [],
     history: [],
   };

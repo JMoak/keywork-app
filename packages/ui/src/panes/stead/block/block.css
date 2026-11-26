@@ -1,4 +1,5 @@
 .kw-stead-block {
+  --kw-stead-place-room: calc(1.3rem + 3px + 1lh);
   position: relative;
   flex: 1 1 auto;
   width: 100%;
@@ -6,6 +7,15 @@
   overflow: hidden;
   background: var(--kw-background);
   user-select: none;
+}
+
+.kw-stead-block-room {
+  position: absolute;
+  inset: auto auto 0 0;
+  width: 0;
+  height: var(--kw-stead-place-room);
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .kw-stead-block[hidden] {
@@ -133,18 +143,13 @@
   position: absolute;
   inset: auto 0 0 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.75rem;
+  gap: 0.75rem;
   padding: 0.4rem 0.75rem;
   border-top: 1px solid var(--kw-border);
   background: var(--kw-panel);
   color: var(--kw-text-mid);
-}
-
-.kw-stead-place-portrait {
-  flex: none;
-  display: flex;
+  white-space: nowrap;
 }
 
 .kw-courtyard-portrait {
@@ -159,13 +164,24 @@
   font-size: 0.875em;
 }
 
+.kw-stead-place-words {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .kw-stead-place-name {
   color: var(--kw-text);
 }
 
+.kw-stead-place-telling:not(:empty) {
+  margin-left: 0.75rem;
+}
+
 .kw-stead-place-faces {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
   gap: 0.3rem;
 }
 

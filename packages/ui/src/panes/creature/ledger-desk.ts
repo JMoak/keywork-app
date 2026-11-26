@@ -6,11 +6,13 @@ import {
 import { createEffect, createMemo, createResource, createSignal, untrack } from "solid-js";
 import type { ConversationSpec } from "../conversation/index.tsx";
 import type { ShellSeams } from "../registry.ts";
-import { answeredAlreadyLine, conversationRefusedLine } from "./copy.ts";
+import { projectStoreOf } from "../stead/home-scope.ts";
+import { answeredAlreadyLine, conversationRefusedLine, projectNotOpenLine } from "./copy.ts";
 import {
   answeredWithoutConversation,
   type LedgerSummary,
   ledgerOrder,
+  projectOf,
   summaryOf,
   unseen,
 } from "./ledger.ts";
@@ -57,6 +59,12 @@ export function createLedgerDesk(
     if (shell.setOut !== undefined) shell.setOut(spec, { kind: "workshop", creature });
     else shell.sessions.openSession(sessionId);
   };
+  const goWhereItRuns = (project: string, entry: CreatureLedgerEntry): void => {
+    const scope = shell.steadHome;
+    if (entry.session === null || projectStoreOf(scope, project) === undefined)
+      say(projectNotOpenLine(projectOf(entry.directory)));
+    else scope?.openSession({ workspace: project, session: entry.session });
+  };
   const open = async (creature: string, entry: CreatureLedgerEntry): Promise<void> => {
     opening.add(entry.id);
     try {
@@ -91,6 +99,8 @@ export function createLedgerDesk(
       const entry = cursor.place(index);
       if (held === undefined || entry === undefined) return;
       see(entry);
+      const project = entry.project ?? undefined;
+      if (project !== undefined) return goWhereItRuns(project, entry);
       const known = entry.conversation?.session;
       if (known !== undefined) rise(known, held);
       else if (answeredWithoutConversation(entry)) say(answeredAlreadyLine);

@@ -6,7 +6,7 @@ import {
   serverFeed,
 } from "@keywork-app/client";
 import { keyworkProfile, type ProductProfile } from "@keywork-app/product";
-import type { WorkspaceView as WorkspaceReading } from "@keywork-app/protocol";
+import type { SteadPlace, WorkspaceView as WorkspaceReading } from "@keywork-app/protocol";
 import { type Accessor, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { ProductProvider, useProductProfile } from "./chrome/product.ts";
 import { sessionName } from "./chrome/session-name.ts";
@@ -84,6 +84,7 @@ function ConnectedApp(props: AppProps) {
   const [project, setProject] = createSignal<Connection>();
   const [home, setHome] = createSignal<Connection>();
   const [homePane, setHomePane] = createSignal<PaneSpec>();
+  const [pressWhenOpen, setPressWhenOpen] = createSignal<SteadPlace>();
   const [opening, setOpening] = createSignal<string>();
   const [failure, setFailure] = createSignal<OpenFailureView>();
   const [homeFailure, setHomeFailure] = createSignal<string>();
@@ -220,6 +221,14 @@ function ConnectedApp(props: AppProps) {
       activeProject: () => activeProject(project(), surface),
       openSession,
       openProject: () => void chooseProject(),
+      openBoundProject: (root, then) => {
+        setPressWhenOpen(then);
+        void open(root);
+      },
+      pressWhenOpen: () => {
+        const place = pressWhenOpen();
+        return place === undefined ? undefined : { place, done: () => setPressWhenOpen(undefined) };
+      },
       openMemory: () => openPane({ kind: "memory" }),
       presentedPane: homePane,
       dismissPane: () => setHomePane(undefined),
@@ -406,6 +415,8 @@ function activeProject(
     ...(selected !== undefined && {
       ideSession: { workspace: project.identity, session: selected.id },
     }),
+    store: connection.store,
+    shell: surface,
     session: (reference) => {
       if (reference.workspace !== project.identity) return undefined;
       const row = connection.store.summary(reference.session);

@@ -1,6 +1,8 @@
 import type { HabitatState, PowerTier, StepContext } from "@keywork-app/habitat";
 import {
   type Appearance,
+  aspectShown,
+  axesOf,
   type BlockPalette,
   type BlockScene,
   backdropOf,
@@ -14,7 +16,7 @@ import {
   type Hit,
   hitAt,
   type Kit,
-  monumentFor,
+  leisureMemory,
   moves,
   type Partnership,
   type Picture,
@@ -35,11 +37,15 @@ import {
   samePlace,
   shownShare,
   sideNameOf,
+  type Temperament,
   type BlockWorld as Town,
   type TownChange,
   tickMs,
+  townMargin,
   type View,
   viewOf,
+  type Waiting,
+  withLineRects,
 } from "@keywork-app/habitat/block";
 import type { SteadPlace } from "@keywork-app/protocol";
 import "./block.css";
@@ -68,6 +74,9 @@ import {
   watchTheme,
 } from "../painter.ts";
 import type { SteadPlaceBoard } from "./board.ts";
+import { GatheringCards } from "./gathering-cards.tsx";
+import { GreenCard } from "./green-card.tsx";
+import type { SteadStanding } from "./honours.ts";
 import {
   type CameraMotion,
   cameraAt,
@@ -105,6 +114,9 @@ export interface BlockWorldProps {
   readonly order?: readonly string[] | undefined;
   readonly projects?: Readonly<Record<string, readonly ProjectSite[]>> | undefined;
   readonly partnerships?: readonly Partnership[] | undefined;
+  readonly standing?: SteadStanding | undefined;
+  readonly temperaments?: Readonly<Record<string, Temperament>> | undefined;
+  readonly waiting?: readonly Waiting[] | undefined;
   readonly board?: SteadPlaceBoard | undefined;
   readonly held?: SteadPlace | undefined;
   readonly label?: string | undefined;
@@ -119,6 +131,15 @@ export interface BlockWorldControls {
   face(place: SteadPlace): void;
   onStage(place: SteadPlace): Rect | undefined;
   side(): string;
+  look(): TownLook;
+  shownFrom(place: SteadPlace, steps: number): number;
+  turning(): boolean;
+  seen(creature: string): number | undefined;
+}
+
+export interface TownLook {
+  readonly world: Town;
+  readonly motion: CameraMotion;
 }
 
 export interface DeviceSize {
@@ -213,7 +234,10 @@ interface Carded {
 export function BlockWorld(props: BlockWorldProps) {
   let stage: HTMLDivElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
+  let room: HTMLSpanElement | undefined;
+  let footHeld = 0;
   const herd = herdOnTheStead();
+  const leisure = leisureMemory();
   const troupe = createTroupe();
   const [refreshedAt, setRefreshedAt] = createSignal(Date.now());
   const [themed, setThemed] = createSignal<Appearance>("night");
@@ -231,6 +255,7 @@ export function BlockWorld(props: BlockWorldProps) {
     { equals: sameLayout },
   );
   const [pointedAt, setPointedAt] = createSignal<SteadPlace>();
+  const [pointedCreature, setPointedCreature] = createSignal<string>();
   const scene = createMemo<BlockScene>(() =>
     blockScene(without(props.world, withheld()), {
       kit: props.kit,
@@ -238,7 +263,10 @@ export function BlockWorld(props: BlockWorldProps) {
       now: refreshedAt(),
       projects: props.projects,
       partnerships: props.partnerships,
-      monument: monumentFor(Object.keys(props.world.creatures).length),
+      temperaments: props.temperaments,
+      waiting: props.waiting,
+      leisure,
+      ...props.standing?.world(),
       order: props.order,
       stances: stances(),
     }),
@@ -281,6 +309,18 @@ export function BlockWorld(props: BlockWorldProps) {
     gestures: [],
   });
 
+  const footRoom = (): number => {
+    const standing = [
+      ...(stage?.querySelectorAll<HTMLElement>(":scope > [data-stage-foot]") ?? []),
+    ];
+    footHeld = Math.max(
+      footHeld,
+      room?.offsetHeight ?? 0,
+      ...standing.map((each) => each.offsetHeight),
+    );
+    return footHeld;
+  };
+
   const draw = (now: number, tier: PowerTier): FieldPicture => {
     const reduced = reducedMotionActive();
     setStances(herd.step(props.world, now, herdContext(tier, reduced)));
@@ -291,7 +331,11 @@ export function BlockWorld(props: BlockWorldProps) {
     if (stage !== undefined) {
       size = deviceSizeOf(stage.clientWidth, stage.clientHeight, devicePixelRatioOf(stage));
     }
-    const view = viewOf(world, size.width, size.height, motion.eye, { corners: motion.corner });
+    const kept = Math.min(size.height - 1, Math.round(footRoom() * size.dpr));
+    const view = viewOf(world, size.width, size.height - kept, motion.eye, {
+      corners: motion.corner,
+      margin: kept > 0 ? townMargin / 2 : townMargin,
+    });
     const camera = cameraAt(motion, now);
     if (arrival !== undefined && arrived(arrival, now)) {
       arrival = undefined;
@@ -299,8 +343,9 @@ export function BlockWorld(props: BlockWorldProps) {
     }
     arrival = reduced ? undefined : (arriving(world, camera, view, now) ?? arrival);
     const rest = restCamera(motion.quarter, motion.eye, motion.corner);
-    const list = drawList(world, camera, view, tick, colours.haze, {
-      standing: troupe.standing(world, rest, now, reduced),
+    const town = troupe.town(world, now, reduced);
+    const list = drawList(town, camera, view, tick, colours.haze, {
+      standing: troupe.standing(town, rest, now, reduced),
       lifts:
         arrival === undefined ? undefined : risingCells(arrival.change, now - arrival.startedAt),
     });
@@ -321,9 +366,12 @@ export function BlockWorld(props: BlockWorldProps) {
   };
 
   const arriving = (world: Town, camera: Camera, view: View, now: number): Arrival | undefined => {
-    if (painted === undefined || painted === world || canvas === undefined) return undefined;
+    if (painted === undefined || canvas === undefined) return undefined;
     if (paintedIn !== paletteNow().key) return undefined;
-    const change = changesBetween(painted, world).find((each) => fresh(each, now));
+    const built = painted === world ? [] : changesBetween(painted, world);
+    const change =
+      built.find((each) => fresh(each, now)) ??
+      props.standing?.arriving(world, now, arrival !== undefined);
     if (change === undefined) return undefined;
     const before = snapshotOf(canvas);
     if (before === undefined) return undefined;
@@ -341,6 +389,8 @@ export function BlockWorld(props: BlockWorldProps) {
   };
 
   const fresh = (change: TownChange, now: number): boolean => {
+    if (change.kind === "honour") return true;
+    if (change.kind === "council") return true;
     const heard =
       change.kind === "creature"
         ? Date.parse(props.world.creatures[change.creature]?.workshop.raisedAt ?? "")
@@ -365,7 +415,7 @@ export function BlockWorld(props: BlockWorldProps) {
     canvas.style.height = `${size.height / size.dpr}px`;
     shown = { picture, theme: colours.key };
     setLayout({
-      rects: placeRectsOf(picture.list),
+      rects: withLineRects(placeRectsOf(picture.list), picture.list, scene().world),
       cssPerArt: picture.list.view.scale / size.dpr,
       width: size.width / size.dpr,
       height: size.height / size.dpr,
@@ -373,6 +423,7 @@ export function BlockWorld(props: BlockWorldProps) {
     const context = canvas.getContext("2d");
     if (context === null) return;
     paintPicture(context, picture, colours, cache);
+    paintTheFoot(context, picture.list.view, size, colours.background);
     if (arrival === undefined) return;
     const glow = colours.colourOf("lampHi", undefined) ?? colours.background;
     paintArrival(context, arrival, now, picture.list.view.scale, glow);
@@ -425,7 +476,33 @@ export function BlockWorld(props: BlockWorldProps) {
       .sort((a, b) => b.share - a.share);
     if (best !== undefined && best.share > here) turn(best.steps);
   };
-  props.onControls?.({ turn, face, onStage, side });
+  const shownFrom = (place: SteadPlace, steps: number): number =>
+    shownShare(
+      scene().world,
+      restCamera(motion.quarter + steps, motion.eye, motion.corner),
+      (item) =>
+        samePlace(item.target === undefined ? undefined : placeOfTarget(item.target), place),
+    );
+  const turning = (): boolean => moving(motion, Date.now());
+  const seen = (creature: string): number | undefined => {
+    const now = Date.now();
+    const reduced = reducedMotionActive();
+    const rest = restCamera(motion.quarter, motion.eye, motion.corner);
+    const town = troupe.town(scene().world, now, reduced);
+    const standing = troupe.standing(town, rest, now, reduced);
+    const eye = axesOf(cameraAt(motion, now));
+    return aspectShown(town, standing, eye, tickAt(now, reduced), creature);
+  };
+  props.onControls?.({
+    turn,
+    face,
+    onStage,
+    side,
+    shownFrom,
+    turning,
+    seen,
+    look: () => ({ world: scene().world, motion }),
+  });
 
   const carded = createMemo((): Carded | undefined => {
     const pointed = pointedAt();
@@ -439,6 +516,7 @@ export function BlockWorld(props: BlockWorldProps) {
   const point = (hit: Hit | undefined): void => {
     hovered = hit;
     setPointedAt(hit === undefined ? undefined : placeOfTarget(hit.target));
+    setPointedCreature(hit?.target.kind === "creature" ? hit.target.creature : undefined);
     props.onHover?.(hit);
   };
 
@@ -479,7 +557,9 @@ export function BlockWorld(props: BlockWorldProps) {
     });
   });
   createEffect(
-    on([scene, () => props.hidden, () => props.focused], () => loop.request(), { defer: true }),
+    on([scene, () => props.hidden, () => props.focused, () => props.held], () => loop.request(), {
+      defer: true,
+    }),
   );
   createEffect(on([() => props.kit, () => props.light], rethemed, { defer: true }));
   createEffect(
@@ -521,6 +601,7 @@ export function BlockWorld(props: BlockWorldProps) {
       }}
     >
       <canvas class="kw-stead-block-canvas" ref={canvas} />
+      <span class="kw-stead-block-room" ref={room} aria-hidden="true" />
       {props.children}
       <Show when={carded()}>
         {(card) => (
@@ -533,6 +614,24 @@ export function BlockWorld(props: BlockWorldProps) {
           />
         )}
       </Show>
+      <GreenCard
+        standing={props.standing}
+        pointed={pointedAt()}
+        held={props.held}
+        onStage={onStage}
+        stage={layout()}
+        now={refreshedAt()}
+      />
+      <GatheringCards
+        town={scene().world}
+        creatures={props.world.creatures}
+        projects={props.projects}
+        waiting={props.waiting}
+        pointed={pointedAt()}
+        pointedCreature={pointedCreature()}
+        held={props.held}
+        stage={layout()}
+      />
     </div>
   );
 }
@@ -566,6 +665,17 @@ function welcome(town: Town): void {
 
 function sameSlugs(one: readonly string[], other: readonly string[]): boolean {
   return one.length === other.length && one.every((slug, index) => slug === other[index]);
+}
+
+function paintTheFoot(
+  context: CanvasRenderingContext2D,
+  view: View,
+  size: DeviceSize,
+  background: string,
+): void {
+  if (size.height <= view.height) return;
+  context.fillStyle = background;
+  context.fillRect(0, view.height, size.width, size.height - view.height);
 }
 
 function earliest(...wakes: readonly (number | undefined)[]): number | undefined {

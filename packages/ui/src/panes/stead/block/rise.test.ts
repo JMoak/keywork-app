@@ -1,3 +1,6 @@
+// The pane registry loads before the setting panes that name its panes, as it does in the app.
+import "../../index.ts";
+import type { YardSetting } from "@keywork-app/habitat";
 import {
   blockScene,
   drawList,
@@ -9,10 +12,16 @@ import {
 } from "@keywork-app/habitat/block";
 import { noon, plotProjects, sketchTown, slugOf } from "@keywork-app/habitat/block/testing";
 import type { SteadPlace } from "@keywork-app/protocol";
+import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
+import type { OutsidePanes } from "../../../shell/outside-panes.ts";
+import { createSettingPanes } from "../../../shell/setting-panes.ts";
+import type { Tiler } from "../../../shell/tiler.ts";
 import { emergeStart } from "../../../surfaces/feel/arrange.ts";
 import { arrivalPlan, riseTiming, windowFloor } from "../../../surfaces/feel/choreography.ts";
+import type { Sending } from "../../../surfaces/outside/panes-outside.tsx";
 import type { Desk, ScreenRect, SurfaceShow } from "../../../surfaces/port.ts";
+import { aYardSetting } from "../../../yard/testing.ts";
 import { placeOnStage } from "./block-world.tsx";
 
 describe("a pane set out from a place in the stead", () => {
@@ -95,7 +104,82 @@ describe("a pane set out from a place in the stead", () => {
     );
     expect(still.cues).toEqual([{ atMs: 0, kind: "show", show }]);
   });
+
+  it("rises from its creature's building when a thread in a bound project sets it out", async () => {
+    const builder = slugOf(0);
+    const project = plotProjects(1)[0]?.id ?? "";
+    const town = blockScene(sketchTown(5), {
+      kit: neonKit,
+      appearance: "night",
+      now: noon,
+      projects: { [builder]: plotProjects(1) },
+    }).world;
+    const list = drawList(town, restCamera(0, raisedEye), viewOf(town, 1008, 580, raisedEye));
+    const onStage = (place: SteadPlace) => placeOnStage(placeRectsOf(list), place, 2);
+    const itsBuilding: SteadPlace = { kind: "project", creature: builder, directory: project };
+    const fromTheProject = aYardSetting({
+      id: "set-out-in-the-project",
+      creature: builder,
+      sessionId: "a-thread-of-the-project",
+      origin: "creature",
+      where: "outside",
+      mood: "brisk",
+      place: itsBuilding,
+    });
+
+    const { sent, faced } = await setOutBySettingPanes(fromTheProject);
+    expect(faced).toEqual([[itsBuilding, builder]]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.place).toEqual(itsBuilding);
+    expect(sent[0]?.mood).toBe("brisk");
+    const risesFrom = onStage(sent[0]?.place as SteadPlace);
+    expect(risesFrom?.width).toBeGreaterThan(0);
+    expect(risesFrom).not.toEqual(onStage({ kind: "workshop", creature: builder }));
+    expect(risesFrom).not.toEqual(onStage({ kind: "porch" }));
+  });
 });
+
+async function setOutBySettingPanes(setting: YardSetting) {
+  const sent: Sending[] = [];
+  const faced: [SteadPlace, string | null][] = [];
+  const tiler = {
+    version: () => 0,
+    findPane: () => undefined,
+    isOutside: () => false,
+    spec: () => undefined,
+    panes: () => [],
+  } as unknown as Tiler;
+  const outside = {
+    reachesOutside: true,
+    standOutside: async (_spec: unknown, sending: Sending) => {
+      sent.push(sending);
+      return undefined;
+    },
+    standings: () => new Map(),
+    desk: async () => undefined,
+  } as unknown as OutsidePanes;
+  const dispose = createRoot((done) => {
+    createSettingPanes({
+      tiler,
+      outside,
+      settings: () => [setting],
+      feeds: () => [],
+      listed: async () => undefined,
+      clientOf: () => ({ reportPlacements: async () => undefined }),
+      answer: () => undefined,
+      unfoldsBeside: () => false,
+      crowds: () => false,
+      facing: (place, creature) => {
+        faced.push([place, creature]);
+        return undefined;
+      },
+    });
+    return done;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  dispose();
+  return { sent, faced };
+}
 
 const workArea: ScreenRect = { x: 0, y: 0, width: 1920, height: 1040 };
 

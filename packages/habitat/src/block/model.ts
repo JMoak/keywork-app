@@ -1,4 +1,5 @@
 import type { Slug } from "../world/types.ts";
+import type { Seat } from "./green.ts";
 import type { IndexedTexture, Role } from "./texture.ts";
 
 export const cellPitch = 56;
@@ -64,7 +65,11 @@ export type Target =
   | { readonly kind: "shed"; readonly creature: Slug; readonly project: string }
   | { readonly kind: "house" }
   | { readonly kind: "storehouse" }
-  | { readonly kind: "mill"; readonly mill: string };
+  | { readonly kind: "mill"; readonly mill: string }
+  | { readonly kind: "monument" }
+  | { readonly kind: "council"; readonly directory: string };
+
+export const theCouncil = "the council";
 
 export interface CrownPart {
   readonly x: number;
@@ -97,6 +102,7 @@ export interface Plot {
   readonly ground: Footprint;
   readonly door: Side;
   readonly beside: number;
+  readonly road?: readonly Point[];
 }
 
 export interface CastMember {
@@ -108,6 +114,7 @@ export interface CastMember {
   readonly still: boolean;
   readonly parts: readonly Part[];
   readonly ramp: RampKey;
+  readonly seat?: Seat;
 }
 
 export interface Stand extends Point {

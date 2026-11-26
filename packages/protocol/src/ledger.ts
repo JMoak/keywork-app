@@ -41,6 +41,8 @@ export interface CreatureLedgerEntry {
   answer: QuestionAnswer | null;
   about: CreatureLedgerAbout;
   conversation: LedgerConversation | null;
+  // Since contract 1.40: the bound project whose runtime runs the work, null for this server's.
+  project: string | null;
 }
 
 export interface CreatureLedgerView {

@@ -1,0 +1,7 @@
+.kw-stead-map[data-hit] {
+  cursor: pointer;
+}
+
+.kw-stead-land-press {
+  color: var(--kw-text-dim);
+}

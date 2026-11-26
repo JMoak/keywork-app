@@ -1,4 +1,4 @@
-import type { Fetch } from "@keywork-app/client";
+import type { Fetch, Temperament } from "@keywork-app/client";
 import { z } from "zod";
 import type { HostPort } from "../host/port.ts";
 import { hostFetch } from "../host/transport.ts";
@@ -8,6 +8,7 @@ import { errorOf, type ServerReading, type Substrate } from "./workshop.ts";
 export interface CreatureRequest {
   readonly name: string;
   readonly skin: string;
+  readonly temperament?: Temperament;
   readonly substrate?: Substrate;
   readonly models?: Partial<Readonly<Record<ModelClass, ModelChoice>>>;
 }

@@ -14,15 +14,23 @@ export {
   sideNames,
 } from "./camera.ts";
 export {
+  aspectShown,
   castItems,
+  type Eye,
+  type FacedStand,
+  headingAtRest,
+  headingOnPath,
   journey,
   nearSides,
   pathLength,
   pointAlong,
   restNearest,
   shownShare,
+  squareOn,
   standingFor,
   standingSpots,
+  walkerHeading,
+  walkerParts,
   walkRound,
 } from "./cast.ts";
 export {
@@ -60,11 +68,28 @@ export {
   pivotOf,
   projectorOf,
   type Quad,
+  townMargin,
   type View,
   viewOf,
   walkerAt,
 } from "./draw-list.ts";
 export {
+  aspectSeen,
+  eighthTurn,
+  facesAway,
+  facesLeft,
+  facesRight,
+  type Heading,
+  headingAlong,
+  headingOf,
+} from "./facing.ts";
+export { type Aspect, aspects, front } from "./figure-art.ts";
+export {
+  type Bearing,
+  type Bearings,
+  bearingOf,
+  type Critter,
+  critterOf,
   critterParts,
   type Doing,
   type FigureArt,
@@ -72,6 +97,7 @@ export {
   figureArts,
   figureFor,
   figureNames,
+  seenFrom,
 } from "./figures.ts";
 export {
   forcedBlockPalette,
@@ -83,6 +109,25 @@ export {
   type SystemColours,
   systemColourNames,
 } from "./forced.ts";
+export {
+  buildingOfTheCouncil,
+  type Council,
+  councilAt,
+  councilPlace,
+  councilStops,
+  councilsOf,
+  type Leisure,
+  type Line,
+  leisureMemory,
+  lineKey,
+  lineOf,
+  pauseBeforeStrolling,
+  type Seat,
+  seatedAt,
+  type Waiting,
+  type WaitReason,
+  withLineRects,
+} from "./green.ts";
 export {
   droppedPairTakesItsRoadUp,
   type HandoffTally,
@@ -111,6 +156,7 @@ export {
   type ProjectStage,
   type PropSpec,
   projectStages,
+  type RibbonTier,
   type RoadEdges,
   type RoadGrade,
   type ShedSpec,
@@ -140,9 +186,10 @@ export {
   shedSpot,
   shedSpots,
   statueFrom,
-  stoneFrom,
+  stoneWith,
   workshopCell,
 } from "./layout.ts";
+export * from "./map/index.ts";
 export {
   type BlockWorld,
   type Box,
@@ -198,6 +245,7 @@ export {
 export {
   type BlockScene,
   type BlockSceneInput,
+  type BoundProject,
   blockScene,
   type Decoration,
   deliveredBy,
@@ -210,6 +258,7 @@ export {
   residentsOf,
   type Stance,
   storeysFor,
+  type ToolTier,
   undecorated,
   wallsAround,
 } from "./scene.ts";
@@ -230,9 +279,19 @@ export {
 } from "./sites.ts";
 export { type Backdrop, backdropOf, firefliesOf, type Light } from "./sky.ts";
 export {
+  type Manner,
+  mannerOf,
+  plainTemperament,
+  type Temperament,
+  temperamentOf,
+  temperaments,
+  turnsToDawdle,
+} from "./temperament.ts";
+export {
   type IndexedTexture,
   opaqueAt,
   paintTexture,
   type Role,
   textureFromRows,
 } from "./texture.ts";
+export { type ToolArt, toolArts, toolMetals } from "./tools.ts";

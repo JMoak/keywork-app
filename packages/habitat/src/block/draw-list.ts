@@ -1,5 +1,5 @@
 import { type Axes, axesOf, type Camera } from "./camera.ts";
-import { castItems, standingFor } from "./cast.ts";
+import { castItems, standingFor, walkerParts } from "./cast.ts";
 import {
   type BlockWorld,
   type Box,
@@ -59,7 +59,10 @@ export interface Framing {
   readonly tight?: number | undefined;
   readonly slab?: number | undefined;
   readonly corners?: boolean | undefined;
+  readonly margin?: number | undefined;
 }
+
+export const townMargin = 10;
 
 export interface Pivot {
   readonly x: number;
@@ -101,9 +104,10 @@ export function viewOf(
   const floor = framing.slab ?? slab;
   const corners = framing.corners === true;
   const tall = riseOf(world.bounds, depth, eye, corners) + floor + (depth / 2) * eye;
+  const margin = framing.margin ?? townMargin;
   const scale = Math.max(
     1,
-    Math.floor(Math.min(deviceWidth / (wide + 12), deviceHeight / (tall + 10))),
+    Math.floor(Math.min(deviceWidth / (wide + 12), deviceHeight / (tall + margin))),
   );
   return { scale, width: deviceWidth, height: deviceHeight, depth, slab: floor, corners };
 }
@@ -154,7 +158,10 @@ export function drawUnits(
   const standing = staging.standing ?? standingFor(world, camera);
   const moving = byCell(world, [
     ...walkersNow(world, axes, tick),
-    ...castItems(world, standing).map((item) => ({ item, tries: [item, ...beside(item, axes)] })),
+    ...castItems(world, standing, axes).map((item) => ({
+      item,
+      tries: [item, ...beside(item, axes)],
+    })),
   ]);
   const farthest = Math.max(...cells.map((cell) => cellDepth(cell, axes)));
   const units = cells.flatMap((cell): DrawUnit[] => {
@@ -279,7 +286,7 @@ function walkersNow(world: BlockWorld, axes: Axes, tick: number): Placed[] {
       what: walker.what,
       x: at.x,
       z: at.z,
-      parts: walker.parts.map((part) =>
+      parts: walkerParts(walker, axes, tick).map((part) =>
         "sprite" in part
           ? { sprite: { ...part.sprite, x: part.sprite.x + at.x, z: part.sprite.z + at.z } }
           : part,

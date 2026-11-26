@@ -13,6 +13,7 @@ import type {
   NodeId,
   ParcelRole,
   PathClass,
+  ProjectQuestion,
   SessionId,
   Slug,
   ThreadKind,
@@ -88,6 +89,11 @@ export type KeeperNotice =
       readonly standing: readonly DecidedForKeeper[];
     }
   | {
+      readonly type: "keeper.questions";
+      readonly ts: string;
+      readonly questions: readonly ProjectQuestion[];
+    }
+  | {
       readonly type: "keeper.routines";
       readonly ts: string;
       readonly creature: Slug;
@@ -158,6 +164,7 @@ export const keeperNoticeTypes: readonly KeeperNoticeType[] = Object.keys({
   "keeper.asks": true,
   "keeper.chores": true,
   "keeper.decided": true,
+  "keeper.questions": true,
   "keeper.routines": true,
   "keeper.sessions": true,
   "keeper.show": true,

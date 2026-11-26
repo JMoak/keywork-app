@@ -34,6 +34,8 @@ export interface OverviewOptions {
   empty?: boolean | undefined;
 }
 
+const testServer = { url: "http://127.0.0.1:4770", token: "t" };
+
 export function overviewShell(options: OverviewOptions = {}): OverviewHarness {
   const feed = fakeFeed();
   const client = options.empty
@@ -64,7 +66,7 @@ export function overviewShell(options: OverviewOptions = {}): OverviewHarness {
       newSession: async () => {},
       startSession: async () => {},
     },
-    host: browserHost({ server: { url: "http://127.0.0.1:4770", token: "t" } }),
+    host: browserHost({ server: testServer, fetch: withNoHonoursYet }),
     workspace: "C:/work",
     currentSession: () => options.currentSession,
     focusedPane: () => undefined,
@@ -73,6 +75,14 @@ export function overviewShell(options: OverviewOptions = {}): OverviewHarness {
     ...inertShellExtras(),
   };
   return { shell, surfaces, client, emit: feed.emit, opened, refreshed: () => refreshes, dispose };
+}
+
+async function withNoHonoursYet(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (String(input) !== `${testServer.url}/creature-honours`) return fetch(input, init);
+  return new Response(JSON.stringify({ honours: [] }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 export function mountPane<Spec extends PaneSpecBase>(

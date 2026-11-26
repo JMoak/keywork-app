@@ -10,6 +10,8 @@ import type { MillsSpec } from "../../mills/index.tsx";
 import type { NeedsYouSpec } from "../../needs-you/index.tsx";
 import type { ParcelsSpec } from "../../parcels/index.tsx";
 import { noThreadYet } from "../copy.ts";
+import { greenLine } from "./honour-words.ts";
+import "./stage-hold.css";
 
 export type PaneOpening =
   | ChoresSpec
@@ -59,6 +61,8 @@ export function openingAt(
       return { kind: "pane", spec: { kind: "parcels" } };
     case "mill":
       return { kind: "pane", spec: { kind: "mills" } };
+    case "green":
+      return { kind: "notice", line: greenLine };
   }
 }
 
@@ -74,6 +78,15 @@ export function directoryInWorkspace(directory: string, workspaceRoot: string): 
 
 export const outsideTheWorkspace = (directory: string): string =>
   `${directory} lies outside this workspace · no pane here opens it`;
+
+export const openToSeeIt = (project: string): string => `open ${project} to see it`;
+
+export const untitledSession = "(untitled session)";
+
+export function askedBy(title: string, creature: string): string {
+  const told = title.trim();
+  return told === "" || told === untitledSession ? creature : told;
+}
 
 export function threadItIsOn(world: HabitatState, slug: string, now: number): string | undefined {
   const carried = creatureReading(world, slug, now).carrier?.thread;

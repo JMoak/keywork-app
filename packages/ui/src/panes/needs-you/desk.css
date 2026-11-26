@@ -238,3 +238,13 @@
     display: none;
   }
 }
+
+.kw-desk-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 2ch;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-top: 1px solid var(--kw-border);
+  color: var(--kw-text-mid);
+}

@@ -45,10 +45,9 @@
 }
 
 .kw-creature-hints {
+  margin: 0;
   color: var(--kw-text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .kw-creature-facts {
@@ -242,11 +241,58 @@
   margin: 0;
 }
 
-@container frame (max-width: 559.98px) {
-  .kw-creature-hints,
-  .kw-creature-opens {
-    display: none;
-  }
+.kw-creature-earned-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5ch;
+}
+
+.kw-creature-earned {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.75rem 0.5rem;
+  color: var(--kw-text-mid);
+  border-bottom: 1px solid var(--kw-border);
+}
+
+.kw-creature-earned li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 1.5ch;
+  align-items: baseline;
+  line-height: 1.35rem;
+}
+
+.kw-creature-earned time,
+.kw-creature-earned-proof,
+.kw-creature-earned-fold {
+  color: var(--kw-text-dim);
+}
+
+.kw-creature-earned-what {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kw-creature-earned-title {
+  margin-right: 1.5ch;
+  color: var(--kw-text);
+}
+
+.kw-creature-earned li[data-earlier] .kw-creature-earned-title {
+  color: var(--kw-text-mid);
+}
+
+.kw-creature-earned li[data-earlier] .kw-creature-earned-what {
+  padding-left: 2ch;
+}
+
+.kw-creature-choices {
+  overflow-wrap: anywhere;
+}
+
+.kw-creature-choices .kw-key-act[aria-pressed="true"] {
+  text-decoration: underline;
 }
 
 .kw-ledger-panel {

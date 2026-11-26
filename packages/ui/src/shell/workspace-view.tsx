@@ -148,6 +148,7 @@ import type { NeedsYouQueue } from "./needs-you-queue.ts";
 import { connectingPane, OpenFailureCard, type OpenFailureNotice } from "./open-failure.tsx";
 import { createOutsidePanes, kindsKeptInside, outsideNotices } from "./outside-panes.ts";
 import { decidedAmong, overturnStanding } from "./overturn.ts";
+import { createPlacePanes, settingPlaceOf } from "./place-panes.ts";
 import { bindPointerGestures, type PointerGestures } from "./pointer-gestures.ts";
 import { toggleSessionQuiet } from "./quiet.ts";
 import {
@@ -547,17 +548,16 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     setOut: (spec, place) => {
       companion.choosePlace(place);
       const parsed = parsePaneSpec(spec);
-      if (parsed === undefined) return;
-      const standing = tiler.findPane((held) => sameSpec(held, parsed));
-      if (standing !== undefined) act(tiler.focus(standing));
-      else if (!outsidePanes.reachesOutside || kindsKeptInside.has(parsed.kind)) openInside(parsed);
-      else
-        void outsidePanes
-          .standOutside(parsed, { origin: "keeper", focus: true, follows: true, place })
-          .then((pane) => {
-            if (pane === undefined) openInside(parsed);
-          });
+      if (parsed !== undefined) placePanes.setOut(parsed, place);
     },
+    setOutTogether: (specs, place) => {
+      companion.choosePlace(place);
+      placePanes.setOutTogether(
+        specs.flatMap((spec) => parsePaneSpec(spec) ?? []),
+        place,
+      );
+    },
+    bringForward: (place) => placePanes.bringForward(place),
     closePane: (paneId) => act(closePane(paneId)),
     openFromSetting: (settingId, what) => {
       const from = yard.settings().find((setting) => setting.id === settingId);
@@ -806,12 +806,34 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
     unfoldsBeside: yard.control.on,
     crowds: unfoldingWouldCrowd,
     opensOutside: () => standsAsHub(),
+    facing: (place, creature) => steadPlaces.face(place, creature),
     storage,
     storageKey: `${profile.id}.put-away:${props.workspace}`,
   });
+  const placePanes = createPlacePanes({
+    tiler,
+    outside: outsidePanes,
+    onPage: steadPlaces.onPage,
+    settingPlaceOf: (pane) => settingPlaceOf(yard.settings(), tiler.spec(pane)),
+    slotOf: (pane) =>
+      workspaceRoot?.querySelector<HTMLElement>(`.kw-slot[data-pane-id="${pane}"]`) ?? undefined,
+    openInside,
+    keptInside: (spec) => kindsKeptInside.has(spec.kind),
+    motion: () => ({ reducedMotion: yard.reducedMotion(), tier: "interact" }),
+    act,
+  });
   const closePane = (pane: PaneId): Verdict => {
-    settingPanes.closing(pane);
-    return tiler.close(pane);
+    const home = placePanes.returning(pane);
+    if (home === undefined) {
+      settingPanes.closing(pane);
+      return tiler.close(pane);
+    }
+    void home.then(() => {
+      if (tiler.spec(pane) === undefined) return;
+      settingPanes.closing(pane);
+      act(tiler.close(pane));
+    });
+    return { ok: true };
   };
   const enterFromTheYard = (setting: YardSetting, way: PanelWay): void => {
     if (way === "unfold" && standsAsHub() && settingPanes.setOutByHand(setting)) return;
@@ -1645,10 +1667,6 @@ function WorkspaceSurface(props: WorkspaceViewProps & { keyboard: KeyboardScope 
 }
 
 export const layerChangeMs = 160;
-
-function sameSpec(one: PaneSpec, other: PaneSpec): boolean {
-  return JSON.stringify(one) === JSON.stringify(other);
-}
 
 function markedNotice(count: number): string {
   const carry = count === 1 ? "carries" : "carry";

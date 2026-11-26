@@ -1,0 +1,18 @@
+.kw-stead-green-earned {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: 2ch;
+  row-gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kw-stead-green-earned li {
+  display: contents;
+}
+
+.kw-stead-green-earned time {
+  color: var(--kw-text-dim);
+  text-align: right;
+}

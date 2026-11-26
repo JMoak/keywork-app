@@ -15,7 +15,9 @@ export type TownChange =
       readonly creature: string;
       readonly project: string;
       readonly at: Point;
-    };
+    }
+  | { readonly kind: "council"; readonly at: Point }
+  | { readonly kind: "honour"; readonly holder: string | undefined; readonly at: Point };
 
 export interface Ring {
   readonly x: number;
@@ -65,7 +67,11 @@ export function changesBetween(before: BlockWorld, after: BlockWorld): TownChang
       });
     }
   }
-  const rank = { creature: 0, project: 1, stage: 2 } as const;
+  const lamp = councilSitting(after);
+  if (lamp !== undefined && councilSitting(before) === undefined) {
+    changes.push({ kind: "council", at: lamp });
+  }
+  const rank = { creature: 0, project: 1, stage: 2, council: 3, honour: 4 } as const;
   return changes.sort((a, b) => rank[a.kind] - rank[b.kind]);
 }
 
@@ -203,6 +209,10 @@ function standingOf(world: BlockWorld): Map<string, Standing> {
     }
   }
   return standing;
+}
+
+function councilSitting(world: BlockWorld): Item | undefined {
+  return world.cells.flatMap((cell) => cell.items).find((item) => item.target?.kind === "council");
 }
 
 function heightOf(item: Item): number {

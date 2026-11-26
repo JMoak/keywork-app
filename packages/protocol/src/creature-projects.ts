@@ -66,4 +66,9 @@ export const creatureProjectRoutes = [
     operationId: "discussCreatureProjectSession",
   },
   { method: "POST", path: "/creature-project-work", operationId: "receiveCreatureProjectWork" },
+  {
+    method: "POST",
+    path: "/creature-projects/{project}/changed",
+    operationId: "creatureProjectChanged",
+  },
 ] as const;

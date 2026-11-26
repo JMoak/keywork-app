@@ -1,0 +1,18 @@
+.kw-slot[data-rise="waiting"] {
+  visibility: hidden;
+}
+
+/* The tiling writes a slot's rectangle inline; a pane rising from its place steps over it for the
+   length of the rise only. */
+.kw-slot[data-rise="stepping"] {
+  z-index: 40;
+  /* biome-ignore lint/complexity/noImportantStyles: steps over the tiling's inline rectangle */
+  left: var(--kw-rise-x) !important;
+  /* biome-ignore lint/complexity/noImportantStyles: steps over the tiling's inline rectangle */
+  top: var(--kw-rise-y) !important;
+  /* biome-ignore lint/complexity/noImportantStyles: steps over the tiling's inline rectangle */
+  width: var(--kw-rise-width) !important;
+  /* biome-ignore lint/complexity/noImportantStyles: steps over the tiling's inline rectangle */
+  height: var(--kw-rise-height) !important;
+  overflow: hidden;
+}

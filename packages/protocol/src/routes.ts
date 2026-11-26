@@ -8,6 +8,7 @@ import {
   recordIdBody,
   ruleClassBody,
 } from "./creatures.ts";
+import { honourRoutes } from "./honours.ts";
 import { ledgerRoutes } from "./ledger.ts";
 import { lifecycleRoutes } from "./lifecycle.ts";
 import { forgetApplyBody, forgetSourceBody } from "./memory.ts";
@@ -15,6 +16,7 @@ import { creatureMessageBody, meshRoutes } from "./mesh.ts";
 import { modelRoutes } from "./models.ts";
 import { permissionRoutes } from "./permissions.ts";
 import { routineFileBody, routineRoutes } from "./routines.ts";
+import { sceneRoutes } from "./scenes.ts";
 import { hunkVerdictBody, promptInjectionBody } from "./sessions.ts";
 import { placementsReportBody, showAnswerBody, showOpeningBody, showRoutes } from "./show.ts";
 import { workRoutes } from "./work.ts";
@@ -22,7 +24,7 @@ import { workshopRoutes, workshopTerminalBody } from "./workshops.ts";
 
 export const protocolVersion = "0.13.0";
 
-export const contractVersion = "1.39";
+export const contractVersion = "1.40";
 
 export function contractMajorOf(contract: string): number {
   return Number.parseInt(contract.split(".")[0] ?? "", 10);
@@ -153,12 +155,14 @@ export const routes = [
   ...workRoutes,
   ...permissionRoutes,
   ...creatureRoutes,
+  ...honourRoutes,
   ...ledgerRoutes,
   ...routineRoutes,
   ...modelRoutes,
   ...workshopRoutes,
   ...meshRoutes,
   ...showRoutes,
+  ...sceneRoutes,
   ...campaignRoutes,
 ] as const satisfies readonly RouteShape[];
 

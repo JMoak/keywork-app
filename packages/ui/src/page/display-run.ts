@@ -38,7 +38,8 @@ export const settingOutLine = "setting things out";
 const fewestInARun = 2;
 
 const words: Readonly<Record<DisplayTool, (done: readonly ToolRun[]) => string>> = {
-  show: (done) => `set out ${counted(done.length)}${done.every(saysOutside) ? " outside" : ""}`,
+  show: (done) =>
+    `set out ${counted(sum(done.map(thingsSetOut)))}${done.every(saysOutside) ? " outside" : ""}`,
   arrange: () => "arranged them",
   withdraw: (done) => `took ${done.length} back`,
   shown: () => "looked over what is out",
@@ -66,6 +67,17 @@ function saysOutside(run: ToolRun): boolean {
     /"where":\s*"outside"/.test(run.args) ||
     (run.detail ?? []).some((line) => /\boutside\b/i.test(line))
   );
+}
+
+function thingsSetOut(run: ToolRun): number {
+  const said = run.detail?.[0] ?? "";
+  if (said.startsWith("Not set out")) return 0;
+  const several = /^Set out (\d+):/.exec(said);
+  return several === null ? 1 : Number(several[1]);
+}
+
+function sum(counts: readonly number[]): number {
+  return counts.reduce((total, count) => total + count, 0);
 }
 
 function firstOf(done: readonly ToolRun[], tool: DisplayTool): number {

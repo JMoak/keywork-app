@@ -7,6 +7,7 @@ import {
   type DecidedForKeeper,
   type HabitatState,
   type HeldChore,
+  type ProjectQuestion,
   type SessionId,
   type Slug,
   type Thread,
@@ -68,6 +69,7 @@ export interface CreatureReading {
   readonly state: Semantic;
   readonly carrier: ThreadReading | undefined;
   readonly chore?: HeldChore | undefined;
+  readonly question?: ProjectQuestion | undefined;
   readonly decided?: DecidedForKeeper | undefined;
   readonly lamps: number;
   readonly lanterns: number;

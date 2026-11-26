@@ -9,6 +9,7 @@ import type {
   Setting,
   SettingSize,
   SettingWeight,
+  SteadPlace,
 } from "@keywork-app/protocol";
 import {
   type Accessor,
@@ -64,6 +65,7 @@ export interface SettingPanesSeams {
   unfoldsBeside(): boolean;
   crowds(): boolean;
   opensOutside?(): boolean;
+  facing?(place: SteadPlace, creature: string | null): Promise<void> | undefined;
   readonly storage?: Pick<Storage, "getItem" | "setItem"> | undefined;
   readonly storageKey?: string | undefined;
 }
@@ -190,12 +192,25 @@ export function createSettingPanes(seams: SettingPanesSeams): SettingPanes {
     last?: ScreenRect,
   ): Promise<PaneId | undefined> => {
     if (setting.mood !== undefined) moods.set(setting.id, setting.mood);
+    const turning = turnedToFace(setting, why);
+    if (turning !== undefined) await turning;
+    if (settingOf(setting.id) === undefined) {
+      opening.delete(setting.id);
+      return undefined;
+    }
     const sending = sendingOf(setting, why, last);
     const pane = await outside.standOutside(settingSpecOf(setting), sending);
     opening.delete(setting.id);
     if (pane !== undefined) standsOutsideAgain(setting.id);
     else setKeptBeside((held) => new Set([...held, setting.id]));
     return pane;
+  };
+
+  const turnedToFace = (setting: YardSetting, why: Leaving): Promise<void> | undefined => {
+    const { place, creature } = setting;
+    const shown = why === "asked" || why === "crowds";
+    if (!shown || originOf(setting) !== "creature" || place === undefined) return undefined;
+    return seams.facing?.(place, creature);
   };
 
   const standsOutsideAgain = (id: string): void => {

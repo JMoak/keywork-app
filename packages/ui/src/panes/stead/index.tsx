@@ -6,15 +6,20 @@ import "./stead.css";
 import type { ToolRun } from "@keywork-app/client";
 import {
   CourtyardCapacityError,
+  type CreatureReading,
   creatureReading,
   type HabitatState,
   heldAtThePorch,
+  type ProjectQuestion,
   reconcileCourtyardOrder,
   skyAt,
   type Thread,
 } from "@keywork-app/habitat";
 import {
   type Appearance,
+  buildingOfTheCouncil,
+  councilAt,
+  councilStops,
   firstKit,
   type Hit,
   type Kit,
@@ -35,6 +40,7 @@ import {
   onCleanup,
   onMount,
   Show,
+  untrack,
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { z } from "zod";
@@ -63,6 +69,9 @@ import {
 import { needsYouCount } from "../../shell/needs-you-ledger.ts";
 import { decidedAmong, overturnStanding } from "../../shell/overturn.ts";
 import { choresOverFetch } from "../chores/port.ts";
+import { projectNotOpenLine } from "../creature/copy.ts";
+import { projectOf } from "../creature/ledger.ts";
+import { ledgerSourceOf } from "../creature/ledger-book.ts";
 import { EmptyState } from "../empty-state.tsx";
 import { definitionOf, parsePaneSpec } from "../index.ts";
 import { keepKeyboardHome } from "../keyboard-home.ts";
@@ -73,13 +82,30 @@ import {
   type PaneProps,
   type ShellSeams,
 } from "../registry.ts";
-import { BlockWorld, type BlockWorldControls } from "./block/block-world.tsx";
+import { BlockWorld, type BlockWorldControls, siteAt } from "./block/block-world.tsx";
+import { createFacing } from "./block/facing.ts";
 import { createPartnerships, handoffSeamsOf } from "./block/handoffs.ts";
+import { greenName, steadEarnedHeading } from "./block/honour-words.ts";
+import { createSteadStanding, honourSeamsOf } from "./block/honours.ts";
+import type { MapControls } from "./block/map-world.tsx";
 import { createProjectSites, placeSeamsOf } from "./block/places.ts";
-import { type Face, type Opening, openingAt, type Pressed, pressedOn } from "./block/press.ts";
+import {
+  askedBy,
+  type Face,
+  type Opening,
+  openingAt,
+  type Pressed,
+  pressedOn,
+} from "./block/press.ts";
+import { createProjectOpener } from "./block/project-press.ts";
+import { noteHowItFaced } from "./block/rise-facing.ts";
+import { mapSpoken, onTheMap, parcelsOn, SteadMap } from "./block/stead-map.tsx";
+import { createTemperaments, temperamentSeamsOf } from "./block/temperaments.ts";
+import { createModelWaits, waitSeamsOf } from "./block/waits.ts";
 import {
   acceptHint,
   acceptsOnly,
+  askLine,
   bubbleLine,
   emptyStateLine,
   headLine,
@@ -94,12 +120,16 @@ import {
   whatAreYouDoing,
 } from "./copy.ts";
 import { HomeOpening } from "./creature-home.tsx";
-import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "./habitat.ts";
-import { resolveSkinId } from "./habitat-render.ts";
+import { clockOffsetMinutes, createHabitatWorld, houseOffsetMinutes } from "./habitat.ts";
 import { coatOf } from "./herd.ts";
-import { type SteadHomeScope, shellForStead } from "./home-scope.ts";
-import { CourtyardPortrait } from "./portrait.tsx";
+import {
+  type ProjectStore,
+  projectStoreOf,
+  type SteadHomeScope,
+  shellForStead,
+} from "./home-scope.ts";
 import { CreatureProjectControls } from "./project-controls.tsx";
+import { followProjectQuestions } from "./project-questions.ts";
 
 const steadSpec = z.object({
   kind: z.literal(steadName),
@@ -134,6 +164,15 @@ const steadSpec = z.object({
     .boolean()
     .optional()
     .describe("Rest the turned town on its corners, two sides at once, instead of square on."),
+  lands: z
+    .object({
+      order: z.array(z.string().min(1).max(128)).max(256),
+      halls: z.array(z.string().min(1).max(128)).max(256),
+    })
+    .optional()
+    .describe(
+      "Keep each machine's land on the map where it first appeared, and where a hall stood.",
+    ),
 });
 
 export type SteadSpec = z.output<typeof steadSpec>;
@@ -184,6 +223,12 @@ export const steadPane = definePane<SteadSpec>({
       "turn the stead a quarter to the right",
       "stead-turn-right",
       "turn the stead a quarter turn to the right to see its next side",
+    ),
+    "stead.map": steadAction(
+      "m",
+      "step back to the map of your machines, or into the town again",
+      "stead-map",
+      "step back to the map, where each of your machines is a piece of land, or step into the town again",
     ),
     "stead.style": steadAction(
       "t",
@@ -270,7 +315,7 @@ export function steadKeys(keys: KeyHints): AskChords {
   };
 }
 
-export type Porch = ThreadAtThePorch | ChoreAtThePorch | DecidedAtThePorch;
+export type Porch = ThreadAtThePorch | QuestionAtThePorch | ChoreAtThePorch | DecidedAtThePorch;
 
 export interface Waiter {
   readonly slug: string;
@@ -282,6 +327,12 @@ export interface ThreadAtThePorch {
   readonly waiter: Waiter;
   readonly thread: Thread;
   readonly callId: string | undefined;
+}
+
+export interface QuestionAtThePorch {
+  readonly kind: "question";
+  readonly waiter: Waiter;
+  readonly question: ProjectQuestion;
 }
 
 export interface ChoreAtThePorch {
@@ -303,7 +354,7 @@ export function porchOf(world: HabitatState, now: number): Porch | undefined {
     const reading = heldAtThePorch(creatureReading(world, slug, now), world, slug);
     if (reading.state !== "porch") continue;
     const waiter = { slug, name: world.creatures[slug]?.name ?? slug };
-    const standing = standingAtThePorch(world, waiter, reading.carrier?.thread, now);
+    const standing = standingAtThePorch(world, waiter, reading, now);
     if (standing !== undefined) return standing;
   }
   return undefined;
@@ -388,7 +439,7 @@ function Stead(props: PaneProps<SteadSpec>) {
   );
   const houseOffset = houseOffsetMinutes();
   const offsetMinutes = clockOffsetMinutes();
-  const world = createHabitatState({
+  const habitat = createHabitatWorld({
     rows: () => props.shell.store.state.summaries,
     bots: () => props.shell.store.surfaces.state.bots,
     currentSession: () => props.shell.currentSession(),
@@ -401,6 +452,8 @@ function Stead(props: PaneProps<SteadSpec>) {
     now: Date.now,
     offsetMinutes: houseOffset,
   });
+  followProjectQuestions(habitat, ledgerSourceOf(props.shell));
+  const world = habitat.state;
   const [preference, setPreference] = createSignal(props.spec);
   createEffect(
     on(
@@ -429,14 +482,35 @@ function Stead(props: PaneProps<SteadSpec>) {
     keep: (lotOrder) => remember({ lotOrder }),
   });
   const partnerships = createPartnerships(handoffSeamsOf(props.shell));
+  const standing = createSteadStanding(
+    honourSeamsOf(props.shell),
+    (slug) => world().creatures[slug]?.name ?? slug,
+  );
+  const temperaments = createTemperaments(temperamentSeamsOf(props.shell));
+  const waiting = createModelWaits(waitSeamsOf(props.shell));
   const kit = createMemo((): Kit => kitNamed(preference().kit ?? "") ?? firstKit);
   const [controls, setControls] = createSignal<BlockWorldControls>();
+  const [mapShown, setMapShown] = createSignal(false);
+  const [mapControls, setMapControls] = createSignal<MapControls>();
+  const toggleMap = (): void => (mapShown() ? mapControls()?.stepIn() : void setMapShown(true));
   const [cursor, setCursor] = createSignal<SteadPlace>();
   const [hovered, setHovered] = createSignal(false);
   const [notice, setNotice] = createSignal<string>();
   const [wording, setWording] = createSignal<string>();
+  const opensProject = createProjectOpener(props.shell, setNotice, sites);
+  const facing = createFacing({
+    board: props.shell.steadPlaces,
+    controls,
+    world,
+    root: () => root,
+    say: setNotice,
+  });
 
-  const places = createMemo(() => placesInOrder(world(), order(), sites()));
+  const places = createMemo(() => [
+    ...placesInOrder(world(), order(), sites()),
+    ...standing.places(),
+    ...councilStops(sites()),
+  ]);
   const pointed = (): SteadPlace | undefined => cursor() ?? places()[0];
   const meetsItsCreature = (): boolean =>
     profile.id === "stead" && props.shell.steadHome !== undefined;
@@ -444,8 +518,18 @@ function Stead(props: PaneProps<SteadSpec>) {
   const keys = createMemo(() => steadKeys(props.shell.keys));
   const now = minuteClock();
   const porch = createMemo(() => porchOf(world(), now()));
+  const answeredIn = (): ProjectStore | undefined => {
+    const standing = porch();
+    return standing?.kind === "question"
+      ? projectStoreOf(props.shell.steadHome, standing.question.project)
+      : props.shell.store;
+  };
   const heldAsk = (): HeldAsk | undefined => {
     const standing = porch();
+    if (standing?.kind === "question") {
+      const { session, callId } = standing.question;
+      return answeredIn() === undefined ? undefined : { sessionId: session, callId };
+    }
     return standing?.kind !== "thread" || standing.callId === undefined
       ? undefined
       : { sessionId: standing.thread.id, callId: standing.callId };
@@ -453,16 +537,19 @@ function Stead(props: PaneProps<SteadSpec>) {
   const wordingHere = (): boolean => wording() !== undefined && wording() === heldAsk()?.callId;
   const overturnKey = (): string => props.shell.keys.chord("stead.overturn");
   const footLine = (): string | undefined => {
+    if (standing.said() !== undefined) return standing.said();
     if (notice() !== undefined) return notice();
     if (porch()?.kind === "chore") return acceptHint(keys().approve);
     return porch()?.kind === "decided"
       ? overturnHint(overturnKey(), props.shell.keys.chord("stead.open"))
       : undefined;
   };
-  const askedOnTheLine = (): ThreadAtThePorch | undefined => {
+  const askedOnTheLine = (): ThreadAtThePorch | QuestionAtThePorch | undefined => {
     const standing = porch();
     const asking = notice() === undefined && heldAsk() !== undefined && !wordingHere();
-    return asking && standing?.kind === "thread" ? standing : undefined;
+    return asking && (standing?.kind === "thread" || standing?.kind === "question")
+      ? standing
+      : undefined;
   };
 
   const setOut = (opening: Opening, place: SteadPlace): void => {
@@ -479,8 +566,23 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
   const press = (pressed: Pressed): void => {
     setCursor(pressed.place);
-    setOut(openingAt(pressed, world(), props.shell.workspace), pressed.place);
+    noteHowItFaced(pressed.place, world(), controls()?.seen);
+    const place = buildingOfTheCouncil(pressed.place, sites());
+    if (councilAt(place) !== undefined) return;
+    const onItsBuilding = { ...pressed, place };
+    const openHere = (): void =>
+      setOut(openingAt(onItsBuilding, world(), props.shell.workspace), place);
+    if (!opensProject(onItsBuilding, openHere)) openHere();
   };
+  createEffect(() => {
+    const scope = props.shell.steadHome;
+    const waiting = scope?.pressWhenOpen?.();
+    if (waiting === undefined || waiting.place.kind !== "project") return;
+    const bound = siteAt(sites(), waiting.place)?.bound;
+    if (bound === undefined || scope?.activeProject()?.workspace !== bound.project) return;
+    waiting.done();
+    untrack(() => press({ place: waiting.place, face: undefined }));
+  });
   const pick = (hit: Hit): void => {
     const pressed = pressedOn(hit);
     if (pressed !== undefined) press(pressed);
@@ -499,7 +601,15 @@ function Stead(props: PaneProps<SteadSpec>) {
     const place: SteadPlace = { kind: "porch" };
     if (standing.kind === "chore") setOut({ kind: "pane", spec: { kind: "chores" } }, place);
     else if (standing.kind === "decided") setOut(conversation(standing.threadId), place);
+    else if (standing.kind === "question") openWhereAsked(standing.question);
     else setOut(conversation(standing.thread.id), place);
+  };
+  const openWhereAsked = (question: ProjectQuestion): void => {
+    const scope = props.shell.steadHome;
+    const { project, session } = question;
+    if (session === undefined || projectStoreOf(scope, project) === undefined)
+      setNotice(notOpenFor(question));
+    else scope?.openSession({ workspace: project, session });
   };
   const overturn = (): void => {
     const standing = porch();
@@ -528,11 +638,12 @@ function Stead(props: PaneProps<SteadSpec>) {
       return;
     }
     const held = heldAsk();
-    if (held === undefined) {
-      setNotice(noAskHere);
+    const store = answeredIn();
+    if (held === undefined || store === undefined) {
+      setNotice(standing?.kind === "question" ? notOpenFor(standing.question) : noAskHere);
       return;
     }
-    const answering = { store: props.shell.store, approveKey: keys().approve };
+    const answering = { store, approveKey: keys().approve };
     void answerHeldAsk(answering, held, pick, by, reason, note).then((line) => setNotice(line));
   };
   const giveReason = (reason: DenyReason, by: AnswerBy): void => {
@@ -564,8 +675,11 @@ function Stead(props: PaneProps<SteadSpec>) {
   };
 
   props.onAction((action, argument) => {
+    facing.touched();
     if (onboarding.take(action)) return;
     if (action === steadAt) return at(argument);
+    if (action === "stead.map") return toggleMap();
+    if (mapShown() && onTheMap(action, mapControls())) return;
     const asked = answerPicks[action];
     if (asked !== undefined) return answer(asked, "key");
     switch (action) {
@@ -593,14 +707,13 @@ function Stead(props: PaneProps<SteadSpec>) {
   const porchCall = createMemo(() => heldAsk()?.callId);
   createEffect(
     on(porchCall, (callId) => {
-      const standing = porch();
-      if (callId !== undefined && standing?.kind === "thread") {
-        void props.shell.store.open(standing.thread.id);
-      }
+      const session = heldAsk()?.sessionId;
+      if (callId !== undefined && session !== undefined) void answeredIn()?.open(session);
     }),
   );
 
-  const needYou = (): number => waitingCount(props.shell);
+  const needYou = (): number =>
+    waitingCount(props.shell) + Object.keys(world().porch.questions).length;
   const working = createMemo(
     () =>
       residents().filter(
@@ -624,9 +737,22 @@ function Stead(props: PaneProps<SteadSpec>) {
     });
   const bubbleRun = (): ToolRun | undefined => {
     const held = heldAsk();
-    return held === undefined
+    const store = answeredIn();
+    return held === undefined || store === undefined
       ? undefined
-      : askingRun(props.shell.store.projection(held.sessionId), held.callId);
+      : askingRun(store.projection(held.sessionId), held.callId);
+  };
+  const bubbleAt = (standing: Porch): NeedsYouBubble => {
+    if (standing.kind !== "question") return porchBubble(standing);
+    const { project, session } = standing.question;
+    const open = props.shell.steadHome?.activeProject();
+    const thread =
+      session === undefined ? undefined : open?.session?.({ workspace: project, session })?.label;
+    return questionBubble(standing, {
+      open: answeredIn() !== undefined,
+      run: bubbleRun(),
+      ...(thread !== undefined && { thread }),
+    });
   };
   const workshopCreature = (): string | undefined => {
     const place = pointed();
@@ -650,6 +776,12 @@ function Stead(props: PaneProps<SteadSpec>) {
         <span class="kw-ov-head-lead">{head()}</span>
         <span class="kw-stead-looks" data-native-activation>
           <KeyAct
+            label={mapShown() ? "the town" : "the map"}
+            chord={props.shell.keys.chord("stead.map")}
+            spoken={mapSpoken(mapShown())}
+            onPress={toggleMap}
+          />
+          <KeyAct
             label={kit().name}
             chord={props.shell.keys.chord("stead.style")}
             spoken={styleSpoken(kit().name)}
@@ -671,7 +803,7 @@ function Stead(props: PaneProps<SteadSpec>) {
       <BlockWorld
         world={world()}
         focused={props.focused}
-        hidden={false}
+        hidden={mapShown()}
         kit={kit()}
         holding={onboarding.active() !== undefined}
         light={lightAt(preference().light, now(), houseOffset)}
@@ -680,6 +812,9 @@ function Stead(props: PaneProps<SteadSpec>) {
         order={order()}
         projects={sites()}
         partnerships={partnerships()}
+        standing={standing}
+        temperaments={temperaments()}
+        waiting={waiting()}
         board={props.shell.steadPlaces}
         held={cursor()}
         onPick={pick}
@@ -710,7 +845,7 @@ function Stead(props: PaneProps<SteadSpec>) {
             >
               <Bubble
                 placement="porch"
-                bubble={porchBubble(standing())}
+                bubble={bubbleAt(standing())}
                 run={bubbleRun()}
                 keys={keys()}
                 overturnChord={overturnKey()}
@@ -737,6 +872,20 @@ function Stead(props: PaneProps<SteadSpec>) {
           )}
         </Show>
       </BlockWorld>
+      <SteadMap
+        shell={props.shell}
+        shown={mapShown()}
+        town={controls()}
+        kit={kit()}
+        light={lightAt(preference().light, now(), houseOffset)}
+        focused={props.focused}
+        creatures={residents().length}
+        stored={preference().lands}
+        keep={(lands) => remember({ lands })}
+        onControls={setMapControls}
+        onOpen={(land) => setOut(parcelsOn(land), { kind: "store" })}
+        onLeft={() => setMapShown(false)}
+      />
       <TownControls
         eye={preference().eye}
         corners={preference().corners === true}
@@ -811,28 +960,19 @@ interface PlaceBarProps {
 }
 
 function PlaceBar(props: PlaceBarProps) {
-  const creature = () =>
-    props.place.kind === "workshop" ? props.world.creatures[props.place.creature] : undefined;
-  const ranks = createMemo(() => Object.keys(props.world.creatures).sort());
+  const telling = (): string =>
+    placeTelling(props.place, props.world, props.offsetMinutes, props.waiting);
   return (
     <section
       class="kw-stead-place"
       aria-label={placeName(props.place, props.world)}
       data-native-activation
+      data-stage-foot
     >
-      <Show when={creature()}>
-        {(resident) => (
-          <span class="kw-stead-place-portrait" aria-hidden="true">
-            <CourtyardPortrait
-              skin={resolveSkinId(resident().skin, resident().seed ?? 0)}
-              hueStop={coatOf(resident(), ranks().indexOf(resident().slug))}
-              appearance={0}
-            />
-          </span>
-        )}
-      </Show>
-      <span class="kw-stead-place-name">{placeName(props.place, props.world)}</span>
-      <span>{placeTelling(props.place, props.world, props.offsetMinutes, props.waiting)}</span>
+      <span class="kw-stead-place-words" title={telling() || undefined}>
+        <span class="kw-stead-place-name">{placeName(props.place, props.world)}</span>
+        <span class="kw-stead-place-telling">{telling()}</span>
+      </span>
       <span class="kw-stead-place-faces">
         <For each={facesOf(props.place)}>
           {(face) => (
@@ -924,6 +1064,7 @@ const wholeWords: Readonly<Record<SteadPlace["kind"], string>> = {
   store: "Parcels",
   mill: "Mills",
   project: "Files",
+  green: steadEarnedHeading,
 };
 
 function facesOf(place: SteadPlace): readonly (Face | undefined)[] {
@@ -942,6 +1083,8 @@ function placeName(place: SteadPlace, world: HabitatState): string {
       return "the storehouse";
     case "mill":
       return "the mill";
+    case "green":
+      return greenName;
   }
 }
 
@@ -997,7 +1140,7 @@ function storedOrder(world: HabitatState, prior: readonly string[]): readonly st
 function standingAtThePorch(
   world: HabitatState,
   waiter: Waiter,
-  carried: string | undefined,
+  reading: CreatureReading,
   now: number,
 ): Porch | undefined {
   const snapshot = creatureSnapshot(world, { ...waiter, hueStop: undefined }, now);
@@ -1013,6 +1156,9 @@ function standingAtThePorch(
   }
   if (shown !== undefined && shown.callId === undefined)
     return { kind: "chore", waiter, bubble: shown };
+  if (shown?.callId === undefined && reading.question !== undefined)
+    return { kind: "question", waiter, question: reading.question };
+  const carried = reading.carrier?.thread;
   const id = shown?.callId === undefined ? carried : threadOfAsk(world, shown.callId);
   const thread = id === undefined ? undefined : world.threads[id];
   return thread === undefined
@@ -1020,14 +1166,34 @@ function standingAtThePorch(
     : { kind: "thread", waiter, thread, callId: shown?.callId };
 }
 
-function porchBubble(porch: Porch): NeedsYouBubble {
+function porchBubble(porch: Exclude<Porch, QuestionAtThePorch>): NeedsYouBubble {
   if (porch.kind !== "thread") return porch.bubble;
   return {
-    title: porch.thread.title === "" ? porch.thread.id : porch.thread.title,
+    title: askedBy(porch.thread.title, porch.waiter.name),
     line: bubbleLine(porch.thread),
     callId: porch.callId,
     answers: [],
   };
+}
+
+function questionBubble(
+  porch: QuestionAtThePorch,
+  asked: { readonly open: boolean; readonly run: ToolRun | undefined; readonly thread?: string },
+): NeedsYouBubble {
+  const { question, waiter } = porch;
+  const line = asked.open
+    ? askLine(asked.run?.name ?? question.tool, asked.run?.subject ?? "")
+    : notOpenFor(question);
+  return {
+    title: askedBy(asked.thread ?? "", waiter.name),
+    line,
+    callId: asked.open ? question.callId : undefined,
+    answers: [],
+  };
+}
+
+function notOpenFor(question: ProjectQuestion): string {
+  return projectNotOpenLine(projectOf(question.directory));
 }
 
 function seatAbove(porch: Rect | undefined): Record<string, string> {

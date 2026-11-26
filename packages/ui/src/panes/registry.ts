@@ -179,6 +179,8 @@ export interface ShellSeams {
   readonly commands?: CommandRegistry;
   openPane<Spec extends PaneSpecBase>(spec: Spec): void;
   setOut?<Spec extends PaneSpecBase>(spec: Spec, place: SteadPlace): void;
+  setOutTogether?(specs: readonly PaneSpecBase[], place: SteadPlace): void;
+  bringForward?(place: SteadPlace): boolean;
   readonly steadPlaces?: SteadPlaceBoard | undefined;
   openFromSetting?(settingId: string, what: SettingSubject): void;
   closePane?(paneId: PaneId): void;

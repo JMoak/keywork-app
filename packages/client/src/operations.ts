@@ -2,7 +2,10 @@ import type { OperationId } from "@keywork-app/protocol";
 import type { CampaignsClient } from "./campaigns.ts";
 import type { ConsoleClient } from "./client.ts";
 import { creatureProjectOperations } from "./creature-projects.ts";
+import { honourOperations } from "./honours.ts";
+import { modelWaitOperations } from "./model-waits.ts";
 import { ranchOperations } from "./ranch.ts";
+import { sceneOperations } from "./scenes.ts";
 import { showOperations } from "./show.ts";
 
 export type ClientMethod = Exclude<keyof ConsoleClient, "url">;
@@ -22,6 +25,9 @@ export const operationOfMethod = {
   ...creatureProjectOperations,
   ...ranchOperations,
   ...showOperations,
+  ...sceneOperations,
+  ...honourOperations,
+  ...modelWaitOperations,
   document: "getDocument",
   events: "streamEvents",
   sessions: "listSessions",

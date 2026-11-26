@@ -225,7 +225,13 @@ export function sketchDecorations(count: number): Record<string, Decoration> {
 }
 
 export function sketchMonument(count: number): MonumentTier {
-  return monumentFor(count);
+  const paved = sketchPartnerships(count).some((pair) => pair.grade === 3);
+  return monumentFor([
+    ...(count >= 1 ? (["first-creature"] as const) : []),
+    ...(count >= 3 ? (["hamlet"] as const) : []),
+    ...(count >= 8 ? (["town"] as const) : []),
+    ...(paved ? (["paved-road"] as const) : []),
+  ]);
 }
 
 export function plotProjects(

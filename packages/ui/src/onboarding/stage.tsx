@@ -1,4 +1,5 @@
 import "./onboarding.css";
+import { temperamentWords } from "@keywork-app/client";
 import {
   createEffect,
   createSignal,
@@ -154,6 +155,11 @@ export function HatchStage(props: HatchStageProps) {
       <div class="kw-hatch-words">
         <Show when={named()}>
           <div class="kw-hatch-name" data-shaken={shakenAs(props.onboarding.shakes())}>
+            <Show when={hatchling()}>
+              {(hatched) => (
+                <span class="kw-hatch-temperament">{temperamentWords[hatched().temperament]}</span>
+              )}
+            </Show>
             <input
               class="kw-hatch-name-field"
               aria-label={nameField}
@@ -284,6 +290,8 @@ function actsIn(phase: Phase, trouble: string | undefined): readonly StageAct[] 
       return meetActs;
     case "made":
       return madeActs[phase.made.next.kind];
+    case "hatching":
+      return [notNowAct];
     default:
       return [];
   }

@@ -1,5 +1,6 @@
 import "../overview/overview.css";
 import "./creature.css";
+import { type Temperament, temperamentWords } from "@keywork-app/client";
 import type { BusEnvelope, ForgetSourcePlan } from "@keywork-app/protocol";
 import {
   createEffect,
@@ -29,19 +30,23 @@ import {
   forgotLine,
 } from "../memory/forget.ts";
 import { ForgetCard } from "../memory/forget-card.tsx";
-import { ChoiceLine, createCursor, DraftLine, NoticeLine, OverviewRow } from "../overview/rows.tsx";
+import { createCursor, DraftLine, NoticeLine, OverviewRow } from "../overview/rows.tsx";
 import { definePane, type PaneLocalAction, type PaneProps, type ShellSeams } from "../registry.ts";
+import { createHonours, honourSeamsOf, standingOf } from "../stead/block/honours.ts";
 import { timeWord } from "../stead/copy.ts";
 import { creatureHomeShell, InCreatureHome } from "../stead/creature-home.tsx";
 import { clockOffsetMinutes, createHabitatState, houseOffsetMinutes } from "../stead/habitat.ts";
 import { resolveSkinId, skinIds } from "../stead/habitat-render.ts";
 import { coatOf } from "../stead/herd.ts";
+import { ChoiceActs } from "./choice-acts.tsx";
 import {
   badModelReference,
   badName,
   bodyLine,
   calibrationLine,
+  changesItWord,
   childrenWord,
+  choiceOfTemperament,
   choresLine,
   classChoices,
   classOfChoice,
@@ -52,9 +57,11 @@ import {
   emptyStateLine,
   goneLine,
   groupWords,
+  type HeadAct,
   handleLine,
+  headActs,
+  headActWords,
   hostWorkshopLine,
-  keyHints,
   ledgerHint,
   memoryLine,
   modelLabel,
@@ -67,7 +74,9 @@ import {
   nothingRemembered,
   noVerbYetLine,
   noWorkshopToOpen,
-  opensLine,
+  opensChoresWord,
+  opensItWord,
+  opensMemoryWord,
   pausedLine,
   policyChangedLine,
   refusedLine,
@@ -79,6 +88,10 @@ import {
   shadowClassLine,
   skinChangedLine,
   skinQuestion,
+  temperamentChangedLine,
+  temperamentChoices,
+  temperamentOfChoice,
+  temperamentQuestion,
   threadStateWords,
   unpricedWord,
   usageHeadings,
@@ -88,13 +101,15 @@ import {
 import {
   type CraftRow,
   CraftSection,
-  craftHint,
+  craftActWords,
   craftRows,
   craftSource,
   noCraftToEdit,
   noCraftToForget,
 } from "./craft.tsx";
 import { DeleteCard } from "./delete-card.tsx";
+import { earnedBy, earnedRows, foldsAnything } from "./earned.ts";
+import { createFolds, EarnedSection } from "./earned-section.tsx";
 import { createLedgerAsks } from "./ledger-asks.ts";
 import { createLedgerDesk } from "./ledger-desk.ts";
 import { LedgerPanel } from "./ledger-panel.tsx";
@@ -115,6 +130,8 @@ import {
   threadRows,
   usageRows,
 } from "./profile.ts";
+import { ActsLine, OpensAct, type ProfileAct } from "./profile-acts.tsx";
+import { CreatureScenes } from "./scenes.tsx";
 import { type Face, TwoFaces } from "./two-faces.tsx";
 import {
   type CreatureChange,
@@ -214,6 +231,18 @@ export const creaturePane = definePane<CreatureSpec>({
       "creature-models",
       "set which model answers one class of the creature's work",
     ),
+    "creature.temperament": action(
+      "a",
+      "change its temperament",
+      "creature-temperament",
+      "choose how the creature carries itself: calm, brisk, eager, playful, decisive or careful",
+    ),
+    "creature.earned": action(
+      "h",
+      "show or fold the earlier ones it earned",
+      "creature-earned",
+      "show every tier of what the creature earned, or fold each kind back to its highest",
+    ),
     "creature.pause": action(
       "p",
       "pause or resume its chores",
@@ -299,9 +328,23 @@ export function concernsCreature(envelope: BusEnvelope, slug: string): boolean {
   );
 }
 
+const headActions: Readonly<Record<HeadAct, string>> = {
+  face: "creature.profile",
+  rename: "creature.rename",
+  skin: "creature.skin",
+  policy: "creature.policy",
+  conversation: "creature.conversation",
+  pause: "creature.pause",
+  file: "creature.file",
+  remove: "creature.delete",
+};
+
+const craftActs = ["craft", "craft-edit", "craft-forget"] as const;
+
 type Prompt =
   | { kind: "rename" }
   | { kind: "skin" }
+  | { kind: "temperament" }
   | { kind: "class" }
   | { kind: "model"; modelClass: ModelClass };
 
@@ -381,6 +424,12 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
   const turnFaces = (): void => {
     setFace(face() === "ledger" ? "profile" : "ledger");
   };
+  const honours = createHonours(honourSeamsOf(shell));
+  const earned = createMemo(() => earnedBy(honours.rows(), slug() ?? ""));
+  const decorated = (): boolean => standingOf(earned().length) === "decorated";
+  const folds = createFolds();
+  const nameOfCreature = (other: string): string =>
+    world().creatures[other]?.name ?? shell.creatureNames?.nameOf(other) ?? other;
   const ledger = createLedgerDesk(shell, slug, setNotice);
   const asks = createLedgerAsks({
     shell,
@@ -400,17 +449,9 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
             face: shell.keys.chord("creature.profile"),
           },
           ledger.rows().length,
+          (ledger.rows()[ledger.cursor()]?.project ?? null) === null,
         )
       : undefined;
-  const keys = () => ({
-    face: shell.keys.chord("creature.profile"),
-    rename: shell.keys.chord("creature.rename"),
-    skin: shell.keys.chord("creature.skin"),
-    policy: shell.keys.chord("creature.policy"),
-    conversation: shell.keys.chord("creature.conversation"),
-    pause: shell.keys.chord("creature.pause"),
-    remove: shell.keys.chord("creature.delete"),
-  });
 
   const refetchAll = (): void => {
     void refetchDetail();
@@ -476,6 +517,11 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
   const dress = (skin: string): void => {
     setPrompt(undefined);
     void write("body", { body: { skin } }, skinChangedLine(skin));
+  };
+  const temper = (temperament: Temperament | undefined): void => {
+    setPrompt(undefined);
+    if (temperament === undefined) return;
+    void write("temperament", { temperament }, temperamentChangedLine(temperament));
   };
   const setModel = (modelClass: ModelClass, text: string): void => {
     setPrompt(undefined);
@@ -586,7 +632,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
     keyboard?.returnHome();
   };
 
-  props.onAction((action, argument) => {
+  const act = (action: string, argument?: string) => {
     if (prompt() !== undefined || card() !== undefined || forgetting() !== undefined) {
       setPrompt(undefined);
       setCard(undefined);
@@ -608,12 +654,19 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
         return openThread(held?.conversation);
       case "creature.rename":
         if (held === undefined) return;
-        return argument === undefined ? setPrompt({ kind: "rename" }) : rename(argument);
+        if (argument === undefined) setPrompt({ kind: "rename" });
+        else rename(argument);
+        return;
       case "creature.skin":
         if (held === undefined) return;
-        return argument === undefined || !skinIds().includes(argument)
-          ? setPrompt({ kind: "skin" })
-          : dress(argument);
+        if (argument === undefined || !skinIds().includes(argument)) setPrompt({ kind: "skin" });
+        else dress(argument);
+        return;
+      case "creature.temperament":
+        if (held?.temperament !== undefined) setPrompt({ kind: "temperament" });
+        return;
+      case "creature.earned":
+        return folds.turnAll();
       case "creature.policy":
         if (held !== undefined) setPrompt({ kind: "class" });
         return;
@@ -638,6 +691,12 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
         if (held !== undefined) void askDelete(false);
         return;
     }
+  };
+  props.onAction(act);
+  const pressable = (action: string, words: string): ProfileAct => ({
+    chord: shell.keys.chord(action),
+    words,
+    onPress: () => act(action),
   });
 
   const skinChoices = (): Readonly<Record<string, string>> =>
@@ -687,16 +746,41 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
                       skin={resolveSkinId(held().skin, held().seed)}
                       hueStop={hue()}
                       name={held().name}
+                      medal={decorated()}
                     />
                     <div class="kw-creature-identity">
                       <p class="kw-creature-title">
                         <span class="kw-creature-name">{held().name}</span>
                         <span class="kw-creature-handle">{handleLine(held().slug)}</span>
                       </p>
-                      <p class="kw-creature-hints">{keyHints(keys())}</p>
+                      <ActsLine
+                        class="kw-creature-hints"
+                        acts={headActs.map((name) =>
+                          pressable(headActions[name], headActWords[name]),
+                        )}
+                      />
                     </div>
                   </header>
+                  <EarnedSection
+                    rows={earnedRows(earned(), nameOfCreature, folds.open)}
+                    folds={foldsAnything(earned())}
+                    everyOpen={folds.everyOpen()}
+                    chord={shell.keys.chord("creature.earned")}
+                    onTurn={folds.turn}
+                    onTurnAll={folds.turnAll}
+                  />
                   <dl class="kw-creature-facts" aria-label="identity">
+                    <Show when={held().temperament}>
+                      {(temperament) => (
+                        <>
+                          <dt>{sectionWords.temperament}</dt>
+                          <dd data-fact="temperament">
+                            <span>{temperamentWords[temperament()]}</span>
+                            <OpensAct {...pressable("creature.temperament", changesItWord)} />
+                          </dd>
+                        </>
+                      )}
+                    </Show>
                     <dt>{sectionWords.body}</dt>
                     <dd data-fact="body">
                       <span>{bodyLine(held().skin, held().seed)}</span>
@@ -705,9 +789,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
                     <dd data-fact="workshop" data-health={readValue(health())?.health}>
                       <span>{workshopText(held(), health())}</span>
                       <Show when={workshopId()}>
-                        <span class="kw-creature-opens">
-                          {opensLine(shell.keys.chord("creature.workshop"), "it")}
-                        </span>
+                        <OpensAct {...pressable("creature.workshop", opensItWord)} />
                       </Show>
                     </dd>
                     <For each={policyRows(held().models)}>
@@ -724,6 +806,7 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
                       )}
                     </For>
                   </dl>
+                  <CreatureScenes shell={shell} creature={held().slug} />
                   <h3 class="kw-creature-heading">{sectionWords.threads}</h3>
                   <ol class="kw-creature-rows kw-ov-list" aria-label={sectionWords.threads}>
                     <For each={groupedRows(rows())}>
@@ -778,16 +861,12 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
                       <span>
                         {choresText(chores(), readValue(routines()), now(), offsetMinutes)}
                       </span>
-                      <span class="kw-creature-opens">
-                        {opensLine(shell.keys.chord("creature.chores"), "the chore board")}
-                      </span>
+                      <OpensAct {...pressable("creature.chores", opensChoresWord)} />
                     </dd>
                     <dt>{sectionWords.memory}</dt>
                     <dd data-fact="memory">
                       <span>{memoryLine(noteCount(), inbox())}</span>
-                      <span class="kw-creature-opens">
-                        {opensLine(shell.keys.chord("creature.memory"), "the memory pane")}
-                      </span>
+                      <OpensAct {...pressable("creature.memory", opensMemoryWord)} />
                     </dd>
                   </dl>
                   <h3 class="kw-creature-heading">{sectionWords.remembered}</h3>
@@ -810,11 +889,9 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
                   <CraftSection
                     rows={craft()}
                     focused={craftAt()}
-                    hint={craftHint({
-                      next: shell.keys.chord("creature.craft"),
-                      edit: shell.keys.chord("creature.craft-edit"),
-                      forget: shell.keys.chord("creature.craft-forget"),
-                    })}
+                    acts={craftActs.map((name) =>
+                      pressable(`creature.${name}`, craftActWords[name]),
+                    )}
                   />
                   <h3 class="kw-creature-heading">{sectionWords.shadow}</h3>
                   <p class="kw-creature-shadow-opening">{nothingEnforced}</p>
@@ -835,15 +912,24 @@ function CreatureProfile(props: PaneProps<CreatureSpec>) {
         />
       </Show>
       <Show when={asking("skin")}>
-        <ChoiceLine
+        <ChoiceActs
           question={skinQuestion(creature()?.name ?? "")}
           choices={skinChoices()}
           onChoose={(key) => dress(skinChoices()[key] ?? "")}
           onCancel={() => setPrompt(undefined)}
         />
       </Show>
+      <Show when={asking("temperament")}>
+        <ChoiceActs
+          question={temperamentQuestion(creature()?.name ?? "")}
+          choices={temperamentChoices}
+          chosen={choiceOfTemperament(creature()?.temperament)}
+          onChoose={(key) => temper(temperamentOfChoice(key))}
+          onCancel={() => setPrompt(undefined)}
+        />
+      </Show>
       <Show when={asking("class")}>
-        <ChoiceLine
+        <ChoiceActs
           question={classQuestion(creature()?.name ?? "")}
           choices={classChoices}
           onChoose={(key) =>

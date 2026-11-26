@@ -72,5 +72,11 @@ describe("a run of a creature's display-tool rows", () => {
       "set out 1 thing outside",
     );
     expect(displayRunLine([ran("show", "running"), ran("show", "proposed")])).toBe(settingOutLine);
+    const listed = {
+      detail: ['Set out 2: "A" (a) as a pane beside the conversation; "B" (b) too.'],
+    };
+    expect(displayRunLine([ran("show", "failed"), ran("show", "done", listed)])).toBe(
+      "set out 2 things · 1 did not go through",
+    );
   });
 });

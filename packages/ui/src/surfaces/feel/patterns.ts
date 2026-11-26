@@ -118,6 +118,16 @@ export function tidyWays(burst: Burst): readonly Way[] {
   return apart ?? [overlapping({ desk, arriving: smallest, standing })];
 }
 
+export function waysAtTheirSize(burst: Burst): readonly Way[] {
+  const { desk, ladder, standing } = burst;
+  const [arriving = []] = ladder;
+  if (arriving.length === 0) return [];
+  const incoming = { desk, arriving, standing };
+  const besideOrOverTheFarSide = cardWays({ desk, ladder: [arriving], standing });
+  if (besideOrOverTheFarSide.length > 0) return besideOrOverTheFarSide;
+  return firstFound(allButTheNearEdge(desk), (ground) => anyOf(waysOn(ground, incoming))) ?? [];
+}
+
 export function cardWays(burst: Burst): readonly Way[] {
   const { desk, ladder, standing } = burst;
   const atEachSize = ladder.map((arriving): Incoming => ({ desk, arriving, standing }));

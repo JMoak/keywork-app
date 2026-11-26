@@ -7,23 +7,37 @@ import {
   projectorOf,
   type View,
 } from "./draw-list.ts";
+import { aspectSeen, type Heading, headingAlong, headingOf } from "./facing.ts";
+import { critterOf, seenFrom } from "./figures.ts";
+import { middleOf, roadBetween, seatPoint } from "./green.ts";
 import {
   along,
   type BlockWorld,
   type CastMember,
+  cellAt,
   cellCenter,
   type Footprint,
   halfCell,
   type Item,
+  type Part,
   type Plot,
   type Point,
   type Side,
   type Sprite,
   type Stand,
   type Standing,
+  sideAfter,
+  type Walker,
 } from "./model.ts";
 import { type IndexedTexture, opaqueAt } from "./texture.ts";
 
+export interface FacedStand extends Stand {
+  readonly heading?: Heading | undefined;
+}
+
+export type Eye = Pick<Axes, "c" | "s">;
+
+export const squareOn: Eye = { c: 1, s: 0 };
 export const standOut = 5;
 export const plotMargin = 2;
 export const spotStep = 2;
@@ -66,8 +80,16 @@ export function standingSpots(world: BlockWorld, rest: Camera): Standing {
     for (const quad of unit.quads) if (quad.light !== undefined) stamp(stage, quad, index);
   });
   const spots = new Map<string, Stand>();
+  const land = landOf(world);
   for (const member of nearestFirst(world.cast, axes)) {
-    const spot = bestSpot(stage, world, member);
+    const spot = ontoTheLand(
+      land,
+      member,
+      axes,
+      member.seat === undefined
+        ? bestSpot(stage, world, member, land)
+        : seatPoint(member.seat, axes),
+    );
     spots.set(member.slug, spot);
     eachTexel(stage, member, spot, (at) => {
       stage.taken[at] = 1;
@@ -112,16 +134,21 @@ export function shownShare(
   return all === 0 ? 0 : shown / all;
 }
 
-export function castItems(world: BlockWorld, standing: Standing): Item[] {
+export function castItems(
+  world: BlockWorld,
+  standing: ReadonlyMap<string, FacedStand>,
+  eye: Eye = squareOn,
+): Item[] {
   return world.cast.flatMap((member) => {
     const stand = standing.get(member.slug);
     if (stand === undefined) return [];
+    const heading = stand.heading ?? headingAtRest(member, stand);
     return [
       {
         what: "creature",
         x: stand.x,
         z: stand.z,
-        parts: member.parts.map((part, index) => {
+        parts: seenFrom(member.parts, aspectSeen(heading, eye)).map((part, index) => {
           if (!("sprite" in part)) return part;
           const sprite = index === 0 ? stepping(part.sprite, stand.stride) : part.sprite;
           return { sprite: { ...sprite, x: sprite.x + stand.x, z: sprite.z + stand.z } };
@@ -133,9 +160,68 @@ export function castItems(world: BlockWorld, standing: Standing): Item[] {
   });
 }
 
+export function headingAtRest(member: CastMember, at?: Point): Heading {
+  const seat = member.seat;
+  const table =
+    seat?.at === "council" && at !== undefined ? headingAlong(at, middleOf(seat.round)) : undefined;
+  if (table !== undefined) return table;
+  const { door } = member.stands;
+  return headingOf(critterOf(member.parts)?.doing === "work" ? sideAfter(door, 1) : door);
+}
+
+export function aspectShown(
+  world: BlockWorld,
+  standing: ReadonlyMap<string, FacedStand>,
+  eye: Eye,
+  tick: number,
+  creature: string,
+): number | undefined {
+  const member = world.cast.find((each) => each.slug === creature);
+  if (member !== undefined) {
+    const stand = standing.get(creature);
+    return aspectSeen(stand?.heading ?? headingAtRest(member, stand), eye);
+  }
+  const walker = world.walkers.find(
+    ({ target }) => target?.kind === "creature" && target.creature === creature,
+  );
+  const heading = walker === undefined ? undefined : walkerHeading(walker, tick);
+  return heading === undefined ? undefined : aspectSeen(heading, eye);
+}
+
+export function walkerParts(walker: Walker, eye: Eye, tick: number): readonly Part[] {
+  const heading = walkerHeading(walker, tick);
+  return heading === undefined ? walker.parts : seenFrom(walker.parts, aspectSeen(heading, eye));
+}
+
+export function walkerHeading(walker: Walker, tick: number): Heading | undefined {
+  const total = pathLength(walker.path);
+  if (total === 0) return undefined;
+  const lap = (tick * walker.pace + walker.phase) % (2 * total);
+  const homeward = lap > total;
+  const heading = headingOnPath(walker.path, homeward ? 2 * total - lap : lap);
+  return heading === undefined || !homeward ? heading : heading + Math.PI;
+}
+
+export function headingOnPath(path: readonly Point[], travelled: number): Heading | undefined {
+  let left = Math.max(0, travelled);
+  let latest: Heading | undefined;
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1] ?? { x: 0, z: 0 };
+    const to = path[index] ?? from;
+    const leg = legLength(from, to);
+    if (leg === 0) continue;
+    latest = headingAlong(from, to);
+    if (left <= leg) return latest;
+    left -= leg;
+  }
+  return latest;
+}
+
 export function journey(member: CastMember, left: Plot, from: Point, to: Point): Point[] {
   if (samePlot(left, member.stands)) return walkRound(left.ground, from, to);
-  const road = samePlot(member.stands, member.home) ? [...member.road].reverse() : member.road;
+  const road =
+    roadBetween(member, left) ??
+    (samePlot(member.stands, member.home) ? [...member.road].reverse() : member.road);
   const first = road[0];
   const last = road[road.length - 1];
   if (first === undefined || last === undefined) return distinct([from, to]);
@@ -240,8 +326,13 @@ function nearestFirst(cast: readonly CastMember[], axes: Axes): CastMember[] {
   return [...cast].sort((a, b) => depth(b) - depth(a) || a.order - b.order);
 }
 
-function bestSpot(stage: Stage, world: BlockWorld, member: CastMember): Point {
-  const spots = candidates(world, member, stage.axes);
+function bestSpot(
+  stage: Stage,
+  world: BlockWorld,
+  member: CastMember,
+  land: ReadonlySet<string>,
+): Point {
+  const spots = candidates(world, member, stage.axes, land);
   let best = spots[0] ?? preferred(member, nearSides(stage.axes));
   let most = -1;
   for (const spot of spots) {
@@ -255,11 +346,16 @@ function bestSpot(stage: Stage, world: BlockWorld, member: CastMember): Point {
   return best;
 }
 
-function candidates(world: BlockWorld, member: CastMember, axes: Axes): Point[] {
+function candidates(
+  world: BlockWorld,
+  member: CastMember,
+  axes: Axes,
+  land: ReadonlySet<string>,
+): Point[] {
   const sides = nearSides(axes);
   const { cell, ground } = member.stands;
   const centre = cellCenter(cell.cx, cell.cz);
-  const reach = halfCell - plotMargin;
+  const reach = halfCell;
   const first = preferred(member, sides);
   const spots: Point[] = [first];
   for (const side of sides) {
@@ -275,7 +371,77 @@ function candidates(world: BlockWorld, member: CastMember, axes: Axes): Point[] 
   const far = (spot: Point): number => Math.abs(spot.x - first.x) + Math.abs(spot.z - first.z);
   return spots
     .filter((spot) => !blocked.some((built) => within(built, spot)))
+    .filter((spot) => drawnOnTheLand(land, member, spot, axes))
     .sort((a, b) => far(a) - far(b));
+}
+
+function landOf(world: BlockWorld): ReadonlySet<string> {
+  return new Set(world.cells.filter((cell) => cell.land).map((cell) => `${cell.cx},${cell.cz}`));
+}
+
+function ontoTheLand(
+  land: ReadonlySet<string>,
+  member: CastMember,
+  axes: Axes,
+  spot: Point,
+): Point {
+  for (let shift = 0; shift <= halfCell; shift += 1) {
+    for (const way of shift === 0 ? [0] : [shift, -shift]) {
+      const moved = { x: Math.round(spot.x + way * axes.c), z: Math.round(spot.z - way * axes.s) };
+      if (drawnOnTheLand(land, member, moved, axes)) return moved;
+    }
+  }
+  return spot;
+}
+
+function drawnOnTheLand(
+  land: ReadonlySet<string>,
+  member: CastMember,
+  spot: Point,
+  axes: Axes,
+): boolean {
+  const { left, right } = breadthOf(member, spot, axes);
+  for (let column = left; column < right; column += 1) {
+    const across = column + 0.5;
+    const under = cellAt(spot.x + across * axes.c, spot.z - across * axes.s);
+    if (!land.has(`${under.cx},${under.cz}`)) return false;
+  }
+  return true;
+}
+
+interface Breadth {
+  readonly left: number;
+  readonly right: number;
+}
+
+const breadths = new WeakMap<readonly Part[], Breadth>();
+
+function breadthOf(member: CastMember, spot: Point, axes: Axes): Breadth {
+  const parts = seenFrom(member.parts, aspectSeen(headingAtRest(member, spot), axes));
+  const known = breadths.get(parts);
+  if (known !== undefined) return known;
+  let left = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  for (const part of parts) {
+    if (!("sprite" in part)) continue;
+    for (const frame of part.sprite.frames) {
+      for (let column = 0; column < frame.width; column += 1) {
+        if (!columnDrawn(frame, column)) continue;
+        left = Math.min(left, part.sprite.left + column);
+        right = Math.max(right, part.sprite.left + column + 1);
+      }
+    }
+  }
+  const breadth = left < right ? { left, right } : { left: 0, right: 0 };
+  breadths.set(parts, breadth);
+  return breadth;
+}
+
+function columnDrawn(texture: IndexedTexture, column: number): boolean {
+  for (let row = 0; row < texture.height; row += 1) {
+    if (opaqueAt(texture, column, row)) return true;
+  }
+  return false;
 }
 
 function preferred(member: CastMember, sides: readonly Side[]): Point {
@@ -310,7 +476,7 @@ function within(built: Footprint, spot: Point): boolean {
 }
 
 function shownAt(stage: Stage, member: CastMember, spot: Point): number {
-  const rank = rankOf(stage, member, spot);
+  const rank = rankOf(stage, spot);
   let all = 0;
   let shown = 0;
   eachTexel(stage, member, spot, (at) => {
@@ -320,13 +486,14 @@ function shownAt(stage: Stage, member: CastMember, spot: Point): number {
   return all === 0 ? 0 : shown / all;
 }
 
-function rankOf(stage: Stage, member: CastMember, spot: Point): number {
+function rankOf(stage: Stage, spot: Point): number {
   const depth = depthOf(spot, stage.axes);
+  const drawnIn = cellAt(spot.x, spot.z);
   let after = stage.units.length;
   for (let index = 0; index < stage.units.length; index += 1) {
     const unit = stage.units[index];
     if (unit === undefined) continue;
-    if (unit.cell.cx !== member.stands.cell.cx || unit.cell.cz !== member.stands.cell.cz) continue;
+    if (unit.cell.cx !== drawnIn.cx || unit.cell.cz !== drawnIn.cz) continue;
     after = index + 1;
     if (unit.item !== undefined && depthOf(unit.item, stage.axes) > depth) return index;
   }
@@ -339,7 +506,7 @@ function eachTexel(
   spot: Point,
   visit: (at: number) => void,
 ): void {
-  const body = bodyOf(member);
+  const body = bodyOf(member, stage.axes);
   if (body === undefined) return;
   const [x, y] = stage.point(spot.x, 0, spot.z);
   const left = Math.round(x) + body.sprite.left;
@@ -357,8 +524,9 @@ function eachTexel(
 
 function bodyOf(
   member: CastMember,
+  eye: Eye,
 ): { readonly sprite: Sprite; readonly texture: IndexedTexture } | undefined {
-  const [first] = member.parts;
+  const [first] = seenFrom(member.parts, aspectSeen(headingAtRest(member), eye));
   if (first === undefined || !("sprite" in first)) return undefined;
   const texture = first.sprite.frames[0];
   return texture === undefined ? undefined : { sprite: first.sprite, texture };

@@ -5,6 +5,7 @@ import type {
   AskVerdict,
   BotSummary,
   BusEnvelope,
+  CreatureLedgerEntry,
   CreatureSummary,
   DenyReason,
   PermissionRule,
@@ -26,6 +27,7 @@ import { mountPane, overviewShell, settle } from "../overview/testing.tsx";
 import type { ShellSeams } from "../registry.ts";
 import { acceptHint, acceptsOnly, overturnHint, overturnsOnly } from "./copy.ts";
 import { steadPane } from "./index.tsx";
+import { projectOpenHere } from "./project-open-testing.ts";
 
 answersNeverWait();
 
@@ -46,7 +48,9 @@ describe("the stead pane", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        posted.push(`${init?.method} ${String(input)} ${String(init?.body)}`);
+        if (init?.method === "POST") {
+          posted.push(`${init.method} ${String(input)} ${String(init.body)}`);
+        }
         return new Response(JSON.stringify({ routine: morningTriage }), {
           status: 200,
           headers: { "content-type": "application/json" },
@@ -165,6 +169,68 @@ describe("the stead pane", () => {
     expect(stead.answered.at(-1)).toEqual(["c1", "denied", undefined, "unsafe"]);
     fireEvent.click(bubble?.querySelector(".kw-stead-bubble-open") as Element);
     expect(stead.opened).toEqual(["t1"]);
+  });
+
+  it("stands a creature at the porch for its question waiting in a bound project, and answers it on that project's server", async () => {
+    const stead = steadHarness({});
+    const asked: CreatureLedgerEntry = {
+      id: "6d8f0b2c4e6a8193",
+      kind: "question",
+      state: "waiting",
+      title: "Allow bash bun test?",
+      directory: "C:/work/orchard",
+      session: "p1",
+      openedAt: minutesAgo(1),
+      closedAt: null,
+      answer: null,
+      about: { kind: "ask", callId: "c7", tool: "bash" },
+      conversation: null,
+      project: "4e1c0d9a7b23",
+    };
+    const home: ShellSeams = {
+      ...stead.shell,
+      client: {
+        ...stead.shell.client,
+        creatureLedger: async (slug: string) => ({
+          creature: slug,
+          entries: slug === "reviewer" ? [asked] : [],
+          folded: 0,
+        }),
+      } as ShellSeams["client"],
+    };
+    const orchard = projectOpenHere(home, {
+      workspace: "4e1c0d9a7b23",
+      label: "orchard",
+      sessions: {
+        p1: { title: "run the orchard tests", projection: asking("c7", [bashRule("bun test *")]) },
+      },
+    });
+    const { container, act } = mountPane(
+      steadPane.component,
+      { kind: "stead" },
+      { ...home, steadHome: orchard.scope },
+    );
+    const bubble = await waitFor(() => {
+      const shown = container.querySelector(".kw-stead-bubble");
+      expect(shown).not.toBeNull();
+      return shown as Element;
+    });
+    expect(bubble.querySelector(".kw-stead-bubble-title")?.textContent).toBe(
+      "run the orchard tests",
+    );
+    expect(bubble.querySelector(".kw-stead-bubble-line")?.textContent).toMatch(
+      /^asks to run .*trash\.test\.ts$/,
+    );
+    expect(answers(container)).toEqual(["once y", "this session s", "this workspace w", "deny n"]);
+    expect(container.querySelector(".kw-ov-head-lead")?.textContent).toMatch(/1 needs you/);
+    expect(orchard.loaded).toContain("p1");
+
+    act("stead.session");
+    await settle();
+    expect(orchard.answered).toEqual([["c7", "granted", "session"]]);
+    expect(stead.answered).toEqual([]);
+    fireEvent.click(bubble.querySelector(".kw-stead-bubble-open") as Element);
+    expect(orchard.went).toEqual([{ workspace: "4e1c0d9a7b23", session: "p1" }]);
   });
 
   it("sends from a press on the porch line exactly what the key sends: each answer, and a denial with its reason", async () => {

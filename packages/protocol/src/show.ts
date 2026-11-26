@@ -43,7 +43,7 @@ export const settingPanes = [
 
 export type SettingPane = (typeof settingPanes)[number];
 
-export const steadPlaceKinds = ["workshop", "porch", "store", "mill", "project"] as const;
+export const steadPlaceKinds = ["workshop", "porch", "store", "mill", "project", "green"] as const;
 
 export type SteadPlaceKind = (typeof steadPlaceKinds)[number];
 
@@ -52,7 +52,8 @@ export type SteadPlace =
   | { readonly kind: "porch" }
   | { readonly kind: "store" }
   | { readonly kind: "mill" }
-  | { readonly kind: "project"; readonly creature: string; readonly directory: string };
+  | { readonly kind: "project"; readonly creature: string; readonly directory: string }
+  | { readonly kind: "green" };
 
 export interface SettingSubject {
   kind: SettingKind;

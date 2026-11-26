@@ -46,6 +46,7 @@ import {
   type LandmarkKind,
   type LiveTurn,
   type NodeId,
+  type ProjectQuestion,
   previewLimit,
   type SessionId,
   type Slug,
@@ -217,6 +218,9 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
     case "creature.handoff":
     case "creature.ledger":
     case "creature.worksites":
+    case "creature.honours":
+    case "creature.scenes":
+    case "model.wait":
     case "workspace.changed":
     case "mesh.listener":
     case "mesh.pairing":
@@ -243,6 +247,8 @@ function absorbBus(state: HabitatState, envelope: BusEnvelope): HabitatState {
     case "session.tree":
     case "surface.changed":
       return id === "" ? state : progress(state, id, at);
+    default:
+      return state;
   }
 }
 
@@ -339,6 +345,8 @@ function absorbKeeper(state: HabitatState, notice: KeeperNotice): HabitatState {
       return { ...state, porch: { ...state.porch, chores: heldChoresOf(notice.needs) } };
     case "keeper.decided":
       return { ...state, porch: { ...state.porch, decided: standingOf(notice.standing) } };
+    case "keeper.questions":
+      return { ...state, porch: { ...state.porch, questions: askedOf(notice.questions) } };
     case "keeper.routines":
       return postBoard(state, notice.creature, notice.routines, notice.ts);
     case "keeper.show":
@@ -652,6 +660,10 @@ function decidedForKeeperOf(
 
 function standingOf(standing: readonly DecidedForKeeper[]): Record<string, DecidedForKeeper> {
   return Object.fromEntries(standing.map((decided) => [decided.recordId, decided]));
+}
+
+function askedOf(questions: readonly ProjectQuestion[]): Record<string, ProjectQuestion> {
+  return Object.fromEntries(questions.map((question) => [question.id, question]));
 }
 
 function forgetDecided(state: HabitatState, sessionId: SessionId): HabitatState {

@@ -129,6 +129,8 @@ export {
   type PromptOrigin,
   type RoutineRunAhead,
   ruleClassBody,
+  type Temperament,
+  temperaments,
 } from "./creatures.ts";
 export {
   candidateClausesOf,
@@ -197,6 +199,19 @@ export {
   type WaitReason,
   type WorkspaceChanged,
 } from "./events.ts";
+export {
+  type CreatureHonourKind,
+  type CreatureHonours,
+  creatureHonourKinds,
+  type Honour,
+  type HonourChange,
+  type HonourChangeKind,
+  type HonourKind,
+  honourChangeKinds,
+  honourRoutes,
+  type SteadHonourKind,
+  steadHonourKinds,
+} from "./honours.ts";
 export {
   type CreatureLedgerAbout,
   type CreatureLedgerChange,
@@ -380,6 +395,11 @@ export {
   type ModelsChangedReason,
   type ModelsReport,
   type ModelTarget,
+  type ModelWait,
+  type ModelWaitChange,
+  type ModelWaitChangeKind,
+  type ModelWaitReason,
+  type ModelWaits,
   modelClasses,
   modelRoutes,
   type NodeModels,
@@ -451,6 +471,20 @@ export {
   routineRoutes,
   type ToolPosture,
 } from "./routines.ts";
+export {
+  type CreatureScene,
+  type CreatureScenes,
+  type SceneChange,
+  type SceneChangeKind,
+  type SceneItem,
+  type SceneKeeping,
+  type SceneKept,
+  type SceneSetOut,
+  type SceneThing,
+  sceneChangeKinds,
+  sceneLimit,
+  sceneRoutes,
+} from "./scenes.ts";
 export {
   isServedRefusal,
   type ServedRefusal,

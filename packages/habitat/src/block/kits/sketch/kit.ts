@@ -1,6 +1,7 @@
 import type { Appearance, Kit, KitColours } from "../../kit.ts";
 import { buildersOf } from "./buildings.ts";
 import { groundsOf } from "./ground.ts";
+import { mapPartsOf } from "./map.ts";
 import { propsOf } from "./props.ts";
 import type { SketchStyle } from "./style.ts";
 
@@ -19,6 +20,7 @@ export function sketchKit(
     shading: sketchShading,
     ground: groundsOf(style),
     prop: propsOf(style),
+    map: mapPartsOf(style),
     ...buildersOf(style),
   };
 }

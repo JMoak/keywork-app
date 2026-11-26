@@ -350,6 +350,7 @@ describe("the conversation pane's controls", () => {
             endedAt: at,
             endedBy: "keeper",
           },
+          project: null,
         },
       ],
     });
